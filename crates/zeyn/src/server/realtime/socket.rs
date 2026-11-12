@@ -13,6 +13,7 @@ use axum::response::{IntoResponse, Response};
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::Value as Json;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -40,32 +41,100 @@ pub trait Event: serde::Serialize {
     const NAME: &'static str;
 }
 
-/// One open page socket: who it belongs to, its outgoing queue, its event counter and its
-/// groups.
+/// One page socket: who it belongs to, its outgoing queue, the numbered messages it may still
+/// replay, its topics and its groups. It outlives a dropped connection for
+/// [`Limits::detached`], so the browser can resume where it was.
 pub(super) struct Peer {
     pub(super) id: u64,
     pub(super) tenant: String,
     pub(super) user: Arc<str>,
     identity: Identity,
-    tx: Outbox,
-    seq: AtomicU64,
+    /// The queue of the connection the peer is attached to; replaced when a dropped one resumes.
+    tx: Mutex<Outbox>,
+    replay: Mutex<Replay>,
     /// Set when a message did not fit the queue; the connection then tells the browser to resync.
     lost: AtomicBool,
+    attached: AtomicBool,
+    /// Bumped on every attach, so the sweep of an earlier drop leaves a resumed peer alone.
+    epoch: AtomicU64,
+    /// The secret half of the resume token.
+    secret: String,
     groups: Mutex<Vec<String>>,
+    topics: Mutex<Vec<&'static str>>,
+}
+
+/// Numbered messages since the last acknowledgement, oldest first, capped by count and bytes.
+struct Replay {
+    seq: u64,
+    held: VecDeque<(u64, Arc<str>)>,
+    bytes: usize,
+    max: usize,
+    max_bytes: usize,
+}
+
+impl Replay {
+    fn push(&mut self, seq: u64, text: Arc<str>) {
+        self.bytes += text.len();
+        self.held.push_back((seq, text));
+        while self.held.len() > self.max || self.bytes > self.max_bytes {
+            match self.held.pop_front() {
+                Some((_, t)) => self.bytes -= t.len(),
+                None => break,
+            }
+        }
+    }
+
+    /// Drops what the browser confirmed it received.
+    fn ack(&mut self, seq: u64) {
+        while self
+            .held
+            .front()
+            .is_some_and(|(s, _)| *s <= seq)
+        {
+            if let Some((_, t)) = self.held.pop_front() {
+                self.bytes -= t.len();
+            }
+        }
+    }
+
+    /// The messages after `seq`, or `None` when some of them are no longer held.
+    fn since(&self, seq: u64) -> Option<Vec<Arc<str>>> {
+        if seq >= self.seq {
+            return Some(Vec::new());
+        }
+        let first = self.held.front()?.0;
+        (first <= seq + 1).then(|| {
+            self.held
+                .iter()
+                .filter(|(s, _)| *s > seq)
+                .map(|(_, t)| t.clone())
+                .collect()
+        })
+    }
 }
 
 impl Peer {
-    /// Queues a message numbered with the next sequence. `false` when the connection is gone.
+    /// Numbers a message, keeps it for a resume and queues it while a connection is attached.
+    /// `false` only when the peer is poisoned.
     fn send_numbered(&self, body: impl FnOnce(u64) -> String) -> bool {
-        let s = self.seq.fetch_add(1, Ordering::Relaxed) + 1;
-        self.send(body(s))
+        let Ok(mut r) = self.replay.lock() else {
+            return false;
+        };
+        r.seq += 1;
+        let seq = r.seq;
+        let text: Arc<str> = body(seq).into();
+        r.push(seq, text.clone());
+        if self.attached.load(Ordering::Acquire) {
+            self.send(text.to_string());
+        }
+        true
     }
 
     fn send(&self, text: String) -> bool {
-        match self
-            .tx
-            .try_send(Message::Text(text.into()))
-        {
+        let Ok(tx) = self.tx.lock() else {
+            return false;
+        };
+        match tx.try_send(Message::Text(text.into())) {
             Ok(()) => true,
             Err(mpsc::error::TrySendError::Full(_)) => {
                 self.lost.store(true, Ordering::Relaxed);
@@ -73,6 +142,11 @@ impl Peer {
             }
             Err(mpsc::error::TrySendError::Closed(_)) => false,
         }
+    }
+
+    /// The token the browser sends back to resume this peer: its id and its secret.
+    fn token(&self) -> String {
+        format!("{}.{}", self.id, self.secret)
     }
 
     pub(super) fn notify(&self, topic: &str) -> bool {
@@ -304,9 +378,14 @@ impl Socket {
     }
 
     /// Forgets a closed connection: its topics, groups and entry.
-    fn forget(&self, peer: &Peer, topics: &[&'static str]) {
+    fn forget(&self, peer: &Peer) {
+        let topics = peer
+            .topics
+            .lock()
+            .map(|t| t.clone())
+            .unwrap_or_default();
         if let Ok(mut map) = self.0.topics.lock() {
-            for t in topics {
+            for t in &topics {
                 let key = (peer.tenant.clone(), t.to_string());
                 if let Some(subs) = map.get_mut(&key) {
                     subs.retain(|p| p.id != peer.id);
@@ -346,6 +425,19 @@ struct Incoming {
     d: Option<Json>,
     #[serde(default)]
     t: Option<String>,
+    #[serde(default)]
+    hello: Option<Hello>,
+    #[serde(default)]
+    ack: Option<u64>,
+}
+
+/// The first frame of a browser: the token and the last sequence it got, when it reconnects.
+#[derive(Deserialize)]
+struct Hello {
+    #[serde(default)]
+    resume: Option<String>,
+    #[serde(default)]
+    seq: u64,
 }
 
 /// Most topics one connection listens to.
@@ -382,6 +474,14 @@ pub(super) async fn page_socket(
         .expect("checked in admit")
         .limits;
     let (tx, rx) = mpsc::channel::<Message>(limits.queue);
+    let mut secret = [0u8; 16];
+    if getrandom::getrandom(&mut secret).is_err() {
+        socket.release_user(&user);
+        return st.error_response(
+            &ctx,
+            Failure::App(Error::Internal("no random source".into())),
+        );
+    }
     let peer = Arc::new(Peer {
         id: socket
             .0
@@ -398,10 +498,23 @@ pub(super) async fn page_socket(
             .unwrap_or_default()
             .into(),
         identity: ctx.identity().clone(),
-        tx,
-        seq: AtomicU64::new(0),
+        tx: Mutex::new(tx),
+        replay: Mutex::new(Replay {
+            seq: 0,
+            held: VecDeque::new(),
+            bytes: 0,
+            max: limits.replay,
+            max_bytes: limits.replay_bytes,
+        }),
         lost: AtomicBool::new(false),
+        attached: AtomicBool::new(true),
+        epoch: AtomicU64::new(0),
+        secret: secret
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
         groups: Mutex::new(Vec::new()),
+        topics: Mutex::new(Vec::new()),
     });
     if let Ok(mut conns) = socket.0.conns.lock() {
         conns.insert(peer.id, peer.clone());
@@ -414,104 +527,214 @@ pub(super) async fn page_socket(
         })
 }
 
+/// How a connection ended: closed on purpose (forget the peer now), or dropped (keep it for a
+/// resume).
+enum Ending {
+    Clean(Option<(u16, &'static str)>),
+    Dropped,
+}
+
 async fn run(
     st: Arc<AppState>,
     ctx: Ctx,
     socket: Socket,
-    peer: Arc<Peer>,
+    mut peer: Arc<Peer>,
     mut rx: mpsc::Receiver<Message>,
     ws: axum::extract::ws::WebSocket,
     limits: Limits,
 ) {
     let (mut sink, mut stream) = ws.split();
-    let mut topics: Vec<&'static str> = Vec::new();
     let mut beat = tokio::time::interval(limits.heartbeat);
     beat.tick().await;
     let mut heard = Instant::now();
     let mut window = (Instant::now(), 0u32);
-    let conn = Conn {
-        socket: socket.clone(),
-        peer: peer.clone(),
-    };
-    let close = loop {
+    let mut first = true;
+    let ending = loop {
         tokio::select! {
             out = rx.recv() => match out {
                 Some(m) => {
                     if sink.send(m).await.is_err() {
-                        break None;
+                        break Ending::Dropped;
                     }
                     if peer.lost.swap(false, Ordering::Relaxed)
                         && sink.send(Message::Text(r#"{"resync":true}"#.into())).await.is_err()
                     {
-                        break None;
+                        break Ending::Dropped;
                     }
                 }
-                None => break None,
+                None => break Ending::Dropped,
             },
             incoming = stream.next() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     heard = Instant::now();
                     let Ok(frame) = serde_json::from_str::<Incoming>(&text) else {
-                        break Some((CLOSE_POLICY, "bad frame"));
+                        break Ending::Clean(Some((CLOSE_POLICY, "bad frame")));
                     };
-                    if let Some(names) = frame.sub {
-                        subscribe(&socket, &peer, &ctx, &mut topics, &names);
+                    if let Some(hello) = frame.hello {
+                        if !first {
+                            break Ending::Clean(Some((CLOSE_POLICY, "hello comes first")));
+                        }
+                        let (now, frames) = greet(&socket, peer, hello);
+                        peer = now;
+                        for f in frames {
+                            if sink.send(Message::Text(f.into())).await.is_err() {
+                                break;
+                            }
+                        }
+                    } else if let Some(names) = frame.sub {
+                        subscribe(&socket, &peer, &ctx, &names);
                     } else if let Some(names) = frame.unsub {
-                        unsubscribe(&socket, &peer, &mut topics, &names);
+                        unsubscribe(&socket, &peer, &names);
+                    } else if let Some(seq) = frame.ack {
+                        if let Ok(mut r) = peer.replay.lock() {
+                            r.ack(seq);
+                        }
                     } else if let (Some(id), Some(action)) = (frame.c, frame.a) {
                         if window.0.elapsed().as_secs() >= 1 {
                             window = (Instant::now(), 0);
                         }
                         window.1 += 1;
                         let over = window.1 > limits.calls;
+                        let conn = Conn {
+                            socket: socket.clone(),
+                            peer: peer.clone(),
+                        };
                         tokio::spawn(answer(
                             st.clone(),
                             ctx.clone(),
-                            conn.clone(),
+                            conn,
                             id,
                             action,
                             frame.d.unwrap_or(Json::Null),
                             over,
                         ));
                     } else if frame.t.is_some() {
+                        let topics = peer
+                            .topics
+                            .lock()
+                            .map(|t| t.clone())
+                            .unwrap_or_default();
                         if let Some((topic, room)) = typing_signal(&text, &topics) {
                             socket.typing(&peer.tenant, topic, &peer.user, &room);
                         }
                     } else {
-                        break Some((CLOSE_POLICY, "bad frame"));
+                        break Ending::Clean(Some((CLOSE_POLICY, "bad frame")));
                     }
+                    first = false;
                 }
-                Some(Ok(Message::Binary(_))) => break Some((CLOSE_POLICY, "text only")),
-                Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break None,
+                Some(Ok(Message::Binary(_))) => break Ending::Clean(Some((CLOSE_POLICY, "text only"))),
+                Some(Ok(Message::Close(Some(f)))) if matches!(f.code, 1000 | 1001) => break Ending::Clean(None),
+                Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break Ending::Dropped,
                 Some(Ok(_)) => heard = Instant::now(),
             },
             _ = beat.tick() => {
-                if heard.elapsed() > limits.heartbeat * 3 || sink.send(Message::Ping(Default::default())).await.is_err() {
-                    break None;
+                if heard.elapsed() > limits.heartbeat * 3
+                    || sink.send(Message::Ping(Default::default())).await.is_err()
+                    || sink.send(Message::Text(r#"{"p":1}"#.into())).await.is_err()
+                {
+                    break Ending::Dropped;
                 }
             }
         }
     };
-    if let Some((code, reason)) = close {
-        let _ = sink
-            .send(Message::Close(Some(CloseFrame {
-                code,
-                reason: reason.into(),
-            })))
-            .await;
+    match ending {
+        Ending::Clean(close) => {
+            if let Some((code, reason)) = close {
+                let _ = sink
+                    .send(Message::Close(Some(CloseFrame {
+                        code,
+                        reason: reason.into(),
+                    })))
+                    .await;
+            }
+            socket.forget(&peer);
+        }
+        Ending::Dropped => detach(socket, peer, limits.detached),
     }
-    socket.forget(&peer, &topics);
+}
+
+/// Keeps a dropped peer, numbering and holding its messages, until it resumes or
+/// [`Limits::detached`] passes.
+fn detach(socket: Socket, peer: Arc<Peer>, after: std::time::Duration) {
+    peer.attached
+        .store(false, Ordering::Release);
+    let epoch = peer.epoch.load(Ordering::Acquire);
+    tokio::spawn(async move {
+        tokio::time::sleep(after).await;
+        if !peer.attached.load(Ordering::Acquire) && peer.epoch.load(Ordering::Acquire) == epoch {
+            socket.forget(&peer);
+        }
+    });
+}
+
+/// Answers a `hello`: resumes the dropped peer the token names when it belongs to the same user
+/// and tenant, moving this connection's queue to it, and returns the peer to use from now on and
+/// the frames to send first: `welcome`, then the replayed messages or `resync`.
+fn greet(socket: &Socket, fresh: Arc<Peer>, hello: Hello) -> (Arc<Peer>, Vec<String>) {
+    let tried = hello.resume.is_some();
+    let old = hello
+        .resume
+        .as_deref()
+        .and_then(|t| t.split_once('.'))
+        .and_then(|(id, secret)| {
+            let id: u64 = id.parse().ok()?;
+            let old = socket
+                .0
+                .conns
+                .lock()
+                .ok()?
+                .get(&id)
+                .cloned()?;
+            let same = old.tenant == fresh.tenant
+                && old.user == fresh.user
+                && !old.attached.load(Ordering::Acquire)
+                && super::super::same_bytes(old.secret.as_bytes(), secret.as_bytes());
+            same.then_some(old)
+        });
+    let Some(old) = old else {
+        let seq = fresh.replay.lock().map_or(0, |r| r.seq);
+        let welcome = serde_json::json!({ "welcome": { "resume": fresh.token(), "seq": seq, "resumed": false } });
+        let mut frames = vec![welcome.to_string()];
+        if tried {
+            frames.push(r#"{"resync":true}"#.into());
+        }
+        return (fresh, frames);
+    };
+    let Ok(r) = old.replay.lock() else {
+        return (fresh, Vec::new());
+    };
+    if let (Ok(mut to), Ok(from)) = (old.tx.lock(), fresh.tx.lock()) {
+        *to = from.clone();
+    }
+    old.epoch.fetch_add(1, Ordering::AcqRel);
+    old.attached
+        .store(true, Ordering::Release);
+    let replay = r.since(hello.seq);
+    let welcome = |replayed: usize| {
+        serde_json::json!({ "welcome": { "resume": old.token(), "seq": r.seq, "resumed": true, "replayed": replayed } })
+            .to_string()
+    };
+    let frames = match replay {
+        Some(items) => {
+            let mut frames = vec![welcome(items.len())];
+            frames.extend(items.iter().map(|t| t.to_string()));
+            frames
+        }
+        None => vec![welcome(0), r#"{"resync":true}"#.into()],
+    };
+    drop(r);
+    if let Ok(mut conns) = socket.0.conns.lock() {
+        conns.remove(&fresh.id);
+    }
+    (old, frames)
 }
 
 /// Adds the topics the user may read and answers `{"denied":[..]}` with the others.
-fn subscribe(
-    socket: &Socket,
-    peer: &Arc<Peer>,
-    ctx: &Ctx,
-    topics: &mut Vec<&'static str>,
-    names: &[String],
-) {
+fn subscribe(socket: &Socket, peer: &Arc<Peer>, ctx: &Ctx, names: &[String]) {
     let Some(config) = socket.config() else {
+        return;
+    };
+    let Ok(mut topics) = peer.topics.lock() else {
         return;
     };
     let mut denied = Vec::new();
@@ -541,7 +764,10 @@ fn subscribe(
     }
 }
 
-fn unsubscribe(socket: &Socket, peer: &Peer, topics: &mut Vec<&'static str>, names: &[String]) {
+fn unsubscribe(socket: &Socket, peer: &Peer, names: &[String]) {
+    let Ok(mut topics) = peer.topics.lock() else {
+        return;
+    };
     let gone: Vec<&'static str> = topics
         .iter()
         .copied()

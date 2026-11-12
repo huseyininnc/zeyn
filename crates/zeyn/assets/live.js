@@ -16,17 +16,31 @@
  * function that stops listening; `zeyn.socket.call(action, input)` calls a published action and
  * resolves with its answer or rejects with its problem; `zeyn.socket.state` is `connected`,
  * `reconnecting` or `offline`, announced as `zeyn:socket-state`. `{"resync":true}` (events were
- * lost) refreshes every live element. The socket reconnects with growing pauses (1 s up to 30 s)
- * and closes when nothing in the page needs it.
+ * lost) refreshes every live element.
+ *
+ * The connection does not drop for good: the first frame is `{"hello":{"resume":token,"seq":n}}`
+ * with the token of the last `welcome` and the last sequence received, so after a drop the server
+ * replays what the page missed (or answers `resync`). Received sequences are acknowledged at most
+ * once a second (`{"ack":n}`). The server sends `{"p":1}` every 20 s; 45 s without any frame
+ * counts as a dead connection. Reconnects wait a random time up to 0.5 s, doubling to 30 s, and
+ * happen at once when the browser comes online or the page becomes visible. The socket closes
+ * when nothing in the page needs it.
  * @module live
  */
 
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 /** Close codes after which the socket does not come back (policy, too big). */
 const STOP = new Set([1008, 1009]);
+/** Without any frame for this long the connection counts as dead. */
+const SILENT_MS = 45000;
 let socket = null;
 let subscribed = new Set();
-let wait = 1000;
+let wait = 500;
+let resume = null;
+let lastSeq = 0;
+let acked = 0;
+let ackTimer = 0;
+let heardAt = 0;
 let timer = 0;
 let state = 'offline';
 let nextCall = 1;
@@ -92,14 +106,32 @@ function sync() {
   if (drop.length) socket.send(JSON.stringify({ unsub: drop }));
 }
 
+/** Acknowledges the last sequence received, at most once a second. */
+function ack() {
+  ackTimer = 0;
+  if (lastSeq > acked && socket?.readyState === WebSocket.OPEN) {
+    acked = lastSeq;
+    socket.send(JSON.stringify({ ack: lastSeq }));
+  }
+}
+
 function receive(e) {
+  heardAt = Date.now();
   let msg;
   try {
     msg = JSON.parse(e.data);
   } catch {
     return;
   }
-  if (msg?.typing) {
+  if (typeof msg?.s === 'number') {
+    lastSeq = Math.max(lastSeq, msg.s);
+    ackTimer ||= setTimeout(ack, 1000);
+  }
+  if (msg?.welcome) {
+    resume = msg.welcome.resume;
+    if (!msg.welcome.resumed) lastSeq = msg.welcome.seq ?? 0;
+    acked = Math.min(acked, lastSeq);
+  } else if (msg?.typing) {
     document.dispatchEvent(new CustomEvent('zeyn:signal', { detail: { topic: msg.t, typing: msg.typing } }));
   } else if (typeof msg?.r === 'number') {
     const call = calls.get(msg.r);
@@ -139,7 +171,9 @@ function connect() {
   socket = ws;
   subscribed = new Set();
   ws.onopen = () => {
-    wait = 1000;
+    wait = 500;
+    heardAt = Date.now();
+    ws.send(JSON.stringify({ hello: resume ? { resume, seq: lastSeq } : {} }));
     setState('connected');
     sync();
     while (outbox.length) ws.send(outbox.shift());
@@ -155,10 +189,26 @@ function connect() {
       return;
     }
     setState('reconnecting');
-    timer = setTimeout(connect, wait);
+    timer = setTimeout(connect, Math.random() * wait);
     wait = Math.min(wait * 2, 30000);
   };
 }
+
+/** Reconnects at once while waiting to reconnect. */
+function retryNow() {
+  if (state === 'reconnecting' && !socket) {
+    wait = 500;
+    connect();
+  }
+}
+
+setInterval(() => {
+  if (socket?.readyState === WebSocket.OPEN && Date.now() - heardAt > SILENT_MS) socket.close(4000, 'silent');
+}, 5000);
+addEventListener('online', retryNow);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') retryNow();
+});
 
 /** Closes the socket when nothing in the page needs it any more, else syncs topics. */
 function update() {

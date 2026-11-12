@@ -623,8 +623,14 @@ async fn actions_run_over_the_socket_and_events_reach_groups_with_permission() {
             .is_err(),
         "an event not declared with ZeynSocket::event is refused"
     );
-    drop(reader);
-    drop(writer);
+    for mut s in [reader, writer] {
+        s.close(Some(tokio_tungstenite::tungstenite::protocol::CloseFrame {
+            code: CloseCode::Normal,
+            reason: "".into(),
+        }))
+        .await
+        .unwrap();
+    }
     let mut waited = 0;
     while hub.stats().groups > 0 && waited < 100 {
         tokio::time::sleep(Duration::from_millis(20)).await;
@@ -724,6 +730,163 @@ async fn a_bad_frame_closes_the_socket_with_policy() {
         }
     };
     assert_eq!(code, Some(CloseCode::Policy));
+}
+
+/// Opens a page socket, says hello (resuming `token` at `seq` when given) and subscribes to
+/// `orders`; returns the socket and the `welcome` frame.
+async fn hello(
+    addr: SocketAddr,
+    user: &str,
+    resume: Option<(&str, u64)>,
+) -> (Socket, serde_json::Value) {
+    let here = format!("http://{addr}");
+    let mut s = open(addr, PAGE, user, false, &here)
+        .await
+        .unwrap();
+    let hello = match resume {
+        Some((token, seq)) => serde_json::json!({ "hello": { "resume": token, "seq": seq } }),
+        None => serde_json::json!({ "hello": {} }),
+    };
+    send_json(&mut s, hello).await;
+    let welcome = next_json(&mut s).await;
+    send_json(&mut s, serde_json::json!({ "sub": ["orders"] })).await;
+    (s, welcome)
+}
+
+/// Waits until the socket holds exactly `n` page connections.
+async fn until_connections(hub: &LiveSocket, n: usize) {
+    let mut waited = 0;
+    while hub.stats().connections != n && waited < 150 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        waited += 1;
+    }
+}
+
+#[tokio::test]
+async fn a_dropped_socket_resumes_and_gets_what_it_missed() {
+    let (addr, hub, _) = start(Limits::default()).await;
+    let (mut s, welcome) = hello(addr, "ayse", None).await;
+    assert_eq!(welcome["welcome"]["resumed"], false);
+    let token = welcome["welcome"]["resume"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    until_subscribers(&hub, 1).await;
+    hub.notify_tenant(None, "orders");
+    assert_eq!(
+        next_json(&mut s).await,
+        serde_json::json!({ "s": 1, "t": "orders" })
+    );
+    drop(s);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(
+        hub.stats().connections,
+        1,
+        "a dropped socket is kept for a resume"
+    );
+    hub.notify_tenant(None, "orders");
+    hub.notify_tenant(None, "orders");
+
+    let (mut again, welcome) = hello(addr, "ayse", Some((&token, 1))).await;
+    assert_eq!(welcome["welcome"]["resumed"], true, "{welcome}");
+    assert_eq!(welcome["welcome"]["replayed"], 2);
+    assert_eq!(
+        next_json(&mut again).await,
+        serde_json::json!({ "s": 2, "t": "orders" })
+    );
+    assert_eq!(
+        next_json(&mut again).await,
+        serde_json::json!({ "s": 3, "t": "orders" })
+    );
+    until_connections(&hub, 1).await;
+    assert_eq!(
+        hub.stats().connections,
+        1,
+        "the resumed peer replaces the new one"
+    );
+    assert_eq!(hub.stats().subscribers, 1, "and keeps its topics once");
+    hub.notify_tenant(None, "orders");
+    assert_eq!(
+        next_json(&mut again).await,
+        serde_json::json!({ "s": 4, "t": "orders" })
+    );
+}
+
+#[tokio::test]
+async fn a_resume_past_the_buffer_or_of_another_user_gets_resync() {
+    let limits = Limits {
+        replay: 1,
+        ..Limits::default()
+    };
+    let (addr, hub, _) = start(limits).await;
+    let (s, welcome) = hello(addr, "ayse", None).await;
+    let token = welcome["welcome"]["resume"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    until_subscribers(&hub, 1).await;
+    drop(s);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    for _ in 0..3 {
+        hub.notify_tenant(None, "orders");
+    }
+    let (mut other, welcome) = hello(addr, "bora", Some((&token, 0))).await;
+    assert_eq!(
+        welcome["welcome"]["resumed"], false,
+        "a token of another user resumes nothing"
+    );
+    assert_eq!(
+        next_json(&mut other).await,
+        serde_json::json!({ "resync": true })
+    );
+
+    let (mut late, welcome) = hello(addr, "ayse", Some((&token, 0))).await;
+    assert_eq!(welcome["welcome"]["resumed"], true);
+    assert_eq!(welcome["welcome"]["seq"], 3);
+    assert_eq!(
+        next_json(&mut late).await,
+        serde_json::json!({ "resync": true }),
+        "two of the three missed messages are gone"
+    );
+}
+
+#[tokio::test]
+async fn detached_sockets_expire_and_clean_closes_are_forgotten_at_once() {
+    let limits = Limits {
+        detached: Duration::from_millis(100),
+        ..Limits::default()
+    };
+    let (addr, hub, _) = start(limits).await;
+    let (s, welcome) = hello(addr, "ayse", None).await;
+    let token = welcome["welcome"]["resume"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    drop(s);
+    until_connections(&hub, 0).await;
+    assert_eq!(hub.stats().connections, 0, "the dropped socket expired");
+    let (mut s, welcome) = hello(addr, "ayse", Some((&token, 0))).await;
+    assert_eq!(welcome["welcome"]["resumed"], false);
+    assert_eq!(
+        next_json(&mut s).await,
+        serde_json::json!({ "resync": true })
+    );
+
+    let (addr, hub, _) = start(Limits::default()).await;
+    let (mut s, _) = hello(addr, "ayse", None).await;
+    until_connections(&hub, 1).await;
+    s.close(Some(tokio_tungstenite::tungstenite::protocol::CloseFrame {
+        code: CloseCode::Normal,
+        reason: "".into(),
+    }))
+    .await
+    .unwrap();
+    until_connections(&hub, 0).await;
+    assert_eq!(
+        hub.stats().connections,
+        0,
+        "a page that closes on purpose is not kept for a minute"
+    );
 }
 
 /// The next text frame within `ms`, or `None`.

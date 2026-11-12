@@ -1,7 +1,8 @@
 # ZeynSocket: design
 
-Status: ZEYN-272 is built (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events,
-groups, `Conn`, actions over the socket). ZEYN-273 to ZEYN-278 follow in the order of section 8.
+Status: ZEYN-272 (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events, groups,
+`Conn`, actions over the socket) and ZEYN-273 (resume, replay, heartbeat, backoff) are built.
+ZEYN-274 to ZEYN-278 follow in the order of section 8.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,
@@ -115,7 +116,7 @@ Client to server:
 
 | Frame | Meaning |
 |---|---|
-| `{"hello":{"resume":"..","seq":41}}` | When reconnecting (ZEYN-273). |
+| `{"hello":{"resume":"..","seq":41}}` | First frame; `resume` and `seq` only when reconnecting. Any other frame first starts a new session without one. |
 | `{"c":7,"a":"send_message","d":{..}}` | Call action `a` with input `d`; `c` is the caller's id. |
 | `{"sub":["orders"]}` / `{"unsub":[..]}` | Topics of the page; the server answers `{"denied":[..]}` with the ones the user may not read. |
 | `{"t":"typing","topic":"chat","room":".."}` | A typing signal on a subscribed topic. |
@@ -125,7 +126,8 @@ Server to client:
 
 | Frame | Meaning |
 |---|---|
-| `{"welcome":{"resume":"..","seq":0,"replayed":3}}` | After `hello`. `resume` is a signed token: connection id, user, tenant, expiry. |
+| `{"welcome":{"resume":"..","seq":0,"resumed":true,"replayed":3}}` | After `hello`. `resume` is the connection id and a random secret; it resumes only a dropped connection of the same user and tenant. |
+| `{"p":1}` | Heartbeat every 20 s, so the page can tell a dead connection. |
 | `{"s":42,"e":"chat.message","d":{..}}` | Event with sequence `s`. |
 | `{"s":43,"t":"orders"}` | Topic notification (no data). |
 | `{"r":7,"ok":..}` / `{"r":7,"err":{problem}}` | Answer to call `c:7`; `err` is the same problem JSON as HTTP. |
@@ -140,7 +142,6 @@ Close codes:
 | 1009 | Too big | Stop |
 | 1013 | Too slow, queue full | Reconnect and resume |
 | 4401 | Signed out or session expired | Stop, `zeyn:signed-out` |
-| 4409 | Resume refused | Reconnect without resume, resync |
 
 ## 4. A connection that does not drop
 
@@ -150,8 +151,9 @@ Close codes:
   visible retry at once. Codes that say stop never retry.
 - **Resume:** after a drop the server keeps the connection's groups and a replay buffer for 60 s.
   The client sends `resume` and its last `seq`; the server replays what is newer and keeps the same
-  groups. If the buffer no longer holds `seq + 1`, or the token is for another user, it answers
-  `resync`. Calls in flight during the drop are rejected on the client with `offline`; actions are
+  groups and topics. If the buffer no longer holds `seq + 1`, or the token is for another user or
+  expired, it answers `welcome` with `resumed: false` and `resync` on the open socket. A close with
+  1000 or 1001 (the page closed the socket on purpose) forgets the connection at once. Calls in flight during the drop are rejected on the client with `offline`; actions are
   not retried automatically, because they are not known to be idempotent.
 - **State in the page:** `zeyn:socket-state` events and an optional `SocketStatus` component
   (hidden while connected, a polite live region otherwise).
