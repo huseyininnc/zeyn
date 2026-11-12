@@ -54,6 +54,21 @@
       "timeline": "Sıralı olaylar, her biri bir tonla.",
       "markdown": "Sunucuda işlenen güvenli Markdown.",
       "spoiler": "Okuyucu açana kadar gizli içerik.",
+      "accordion": "Başlıklarının altında açılıp kapanan bölümler.",
+      "avatar_group": "Bir işin kişileri, kalanlar için bir sayıyla.",
+      "quote": "Kimin, nerede söylediğiyle birlikte alıntı.",
+      "kbd": "Basılacak tuşlar, tek ya da birlikte.",
+      "divider": "Bölümler arasında, isteğe bağlı etiketli çizgi.",
+      "stepper": "Bir sürecin adım adım nerede olduğu.",
+      "pagination": "Bir listenin sayfalarına bağlantılar.",
+      "copy_button": "Bir metni panoya kopyalar.",
+      "progress_ring": "İçinde yüzdesi yazan halka biçiminde ilerleme.",
+      "heatmap": "Her gün için bir sayı, tonlu karelerden bir takvim olarak.",
+      "table": "Ekranın zaten elinde olan metinlerden küçük bir tablo.",
+      "indicator": "Başka bir bileşenin köşesinde bir sayı ya da nokta.",
+      "meter": "Bir aralıktaki ölçüm, eşiklerine göre renklenir.",
+      "highlight": "Bir metinde aramanın kelimelerini işaretler.",
+      "toc": "Sayfadaki başlıklara bağlantılar.",
       "breadcrumb": "Geçerli sayfaya giden bağlantı izi.",
       "prev_next": "Önceki ve sonraki öğeye bağlantılar.",
       "alpha_index": "Kullanıcının alfabesinden harf çubuğu.",
@@ -128,6 +143,69 @@
       "property_inspector": "Bir adanın gönderdiği şemayla, adada seçili olanı düzenler."
     },
     "ex": {
+      "accordion": {
+        "overview": "Örnek",
+        "one_at_a_time": "Her seferinde tek bölüm"
+      },
+      "avatar_group": {
+        "overview": "Örnek",
+        "small_and_short": "Küçük ve daha az kişi",
+        "with_pictures": "Resimli"
+      },
+      "quote": {
+        "overview": "Örnek",
+        "text_only": "Yalnızca metin"
+      },
+      "kbd": {
+        "overview": "Örnek",
+        "single_keys": "Tek tuşlar",
+        "plus_key": "Artı tuşu"
+      },
+      "divider": {
+        "overview": "Örnek",
+        "plain": "Yalın",
+        "between_columns": "Sütunlar arasında"
+      },
+      "stepper": {
+        "overview": "Örnek",
+        "vertical": "Dikey",
+        "finished": "Tamamlanmış"
+      },
+      "pagination": {
+        "overview": "Örnek",
+        "more_numbers": "Daha çok sayfa numarası"
+      },
+      "copy_button": {
+        "overview": "Örnek",
+        "own_label": "Kendi etiketi, gizli metin"
+      },
+      "table": {
+        "overview": "Örnek",
+        "numbers_and_stripes": "Sayılar ve şeritler"
+      },
+      "indicator": {
+        "overview": "Örnek",
+        "tones_and_sizes": "Tonlar, boyutlar ve sıfır"
+      },
+      "meter": {
+        "overview": "Örnek",
+        "a_good_middle": "İyi olan orta aralık"
+      },
+      "highlight": {
+        "overview": "Örnek",
+        "several_words": "Birkaç kelime"
+      },
+      "toc": {
+        "overview": "Örnek"
+      },
+      "heatmap": {
+        "overview": "Örnek",
+        "a_few_weeks": "Birkaç hafta"
+      },
+      "progress_ring": {
+        "overview": "Örnek",
+        "sizes": "Boyutlar"
+      },
       "action_button": {
         "overview": "Örnek"
       },

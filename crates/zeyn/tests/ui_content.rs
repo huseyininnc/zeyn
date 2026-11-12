@@ -417,3 +417,662 @@ fn app_check_reports_link_shortcut_clashes_in_the_header_and_check_page_on_a_scr
             .is_ok()
     );
 }
+
+#[params]
+pub struct PageParams {
+    pub page: u32,
+}
+
+#[screen(route = "/blog", public)]
+pub fn blog(p: PageParams) -> Screen {
+    Screen::new("Blog").body(Paragraph::new(p.page.to_string()))
+}
+
+#[test]
+fn avatar_groups_show_the_first_avatars_and_count_the_rest() {
+    let group = [
+        "Ada Lovelace",
+        "Alan Turing",
+        "Grace Hopper",
+        "Edsger Dijkstra",
+    ]
+    .into_iter()
+    .fold(zeyn::ui::AvatarGroup::new("Team <one>"), |g, name| {
+        g.add(zeyn::ui::Avatar::new(name))
+    })
+    .max(2)
+    .size(zeyn::ui::AvatarSize::Small);
+    let out = html(&group, "en");
+    assert!(
+        out.starts_with(
+            r#"<div class="z-avatar-group" role="group" aria-label="Team &lt;one&gt;">"#
+        ),
+        "{out}"
+    );
+    assert_eq!(
+        out.matches("z-avatar-32").count(),
+        3,
+        "two people and the count: {out}"
+    );
+    assert!(out.contains(r#"aria-label="Ada Lovelace""#) && !out.contains("Grace Hopper"));
+    assert!(
+        out.contains(
+            r#"z-avatar-more" role="img" aria-label="2 more"><span aria-hidden="true">+2</span>"#
+        ),
+        "{out}"
+    );
+    assert!(html(&group, "tr").contains(r#"aria-label="2 kişi daha""#));
+    let all = html(
+        &zeyn::ui::AvatarGroup::new("Team").add(zeyn::ui::Avatar::new("Ada")),
+        "en",
+    );
+    assert!(
+        !all.contains("z-avatar-more"),
+        "nothing left to count: {all}"
+    );
+    assert_eq!(
+        group.schema()["avatars"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+}
+
+#[test]
+fn dividers_are_separators_with_an_optional_label() {
+    assert_eq!(
+        html(&zeyn::ui::Divider::new(), "en"),
+        r#"<hr class="z-divider">"#
+    );
+    let named = html(&zeyn::ui::Divider::new().label("or <b>"), "en");
+    assert!(
+        named.contains(r#"role="separator" aria-label="or &lt;b&gt;""#)
+            && named.contains(
+                r#"<span class="z-divider-label" aria-hidden="true">or &lt;b&gt;</span>"#
+            ),
+        "{named}"
+    );
+    let vertical = html(
+        &zeyn::ui::Divider::new()
+            .label("or")
+            .vertical(),
+        "en",
+    );
+    assert!(
+        vertical.contains(r#"aria-orientation="vertical""#) && !vertical.contains(">or<"),
+        "{vertical}"
+    );
+}
+
+#[test]
+fn kbd_writes_each_key_of_a_combination() {
+    let out = html(&zeyn::ui::Kbd::new("Ctrl + Shift+<P>"), "en");
+    assert_eq!(
+        out,
+        r#"<kbd class="z-keys"><kbd>Ctrl</kbd><span class="z-keys-plus">+</span><kbd>Shift</kbd><span class="z-keys-plus">+</span><kbd>&lt;P&gt;</kbd></kbd>"#
+    );
+    let plus = html(&zeyn::ui::Kbd::keys(["Ctrl", "+"]), "en");
+    assert!(plus.ends_with("<kbd>+</kbd></kbd>"), "{plus}");
+    let many = zeyn::ui::Kbd::keys(["1", "2", "3", "4", "5", "6", "7", "8"]);
+    assert_eq!(
+        many.schema()["keys"]
+            .as_array()
+            .unwrap()
+            .len(),
+        zeyn::ui::MAX_KBD_KEYS
+    );
+}
+
+#[test]
+fn quotes_are_blockquotes_with_their_author_and_source() {
+    let q = zeyn::ui::Quote::new("Less is <more>.")
+        .author("Ada")
+        .source("Notes");
+    let out = html(&q, "en");
+    assert!(
+        out.starts_with(
+            r#"<figure class="z-quote"><blockquote class="z-quote-text"><p>Less is &lt;more&gt;.</p></blockquote>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            r#"<span class="z-quote-author">Ada</span><cite class="z-quote-source">Notes</cite>"#
+        ),
+        "{out}"
+    );
+    let bare = html(&zeyn::ui::Quote::new("Alone"), "en");
+    assert!(!bare.contains("figcaption"), "{bare}");
+}
+
+#[test]
+fn accordions_are_native_disclosures_that_can_keep_one_section_open() {
+    let free = zeyn::ui::Accordion::new()
+        .section("First <1>", Paragraph::new("One"))
+        .open()
+        .section("Second", Paragraph::new("Two"))
+        .open();
+    let out = html(&free, "en");
+    assert_eq!(out.matches("<details").count(), 2);
+    assert_eq!(out.matches(" open>").count(), 2, "both start open: {out}");
+    assert!(!out.contains("name="), "sections are independent: {out}");
+    assert!(out.contains(r#"<summary class="z-accordion-title">First &lt;1&gt;</summary>"#));
+    assert!(out.contains(r#"data-zeyn-node="0""#) && out.contains(r#"data-zeyn-node="1""#));
+    assert_eq!(free.children().len(), 2);
+
+    let single = zeyn::ui::Accordion::new()
+        .section("First", Paragraph::new("One"))
+        .section("Second", Paragraph::new("Two"))
+        .open()
+        .section("Third", Paragraph::new("Three"))
+        .open()
+        .single();
+    let out = html(&single, "en");
+    assert_eq!(
+        out.matches(r#" name="s-accordion-""#)
+            .count(),
+        3,
+        "the sections share a name, so the browser closes the others: {out}"
+    );
+    assert_eq!(
+        out.matches(" open>").count(),
+        1,
+        "only one starts open: {out}"
+    );
+    assert_eq!(single.schema()["sections"][1]["open"], true);
+    assert_eq!(single.schema()["sections"][2]["open"], false);
+
+    let capped = (0..zeyn::ui::MAX_ACCORDION_SECTIONS + 5)
+        .fold(zeyn::ui::Accordion::new(), |a, i| {
+            a.section(i.to_string(), Paragraph::new("x"))
+        });
+    assert_eq!(capped.children().len(), zeyn::ui::MAX_ACCORDION_SECTIONS);
+}
+
+#[test]
+fn steppers_mark_done_current_and_coming_steps() {
+    let s = zeyn::ui::Stepper::new("Order <progress>")
+        .step("Placed")
+        .step("Packed")
+        .description("At the <warehouse>")
+        .step("Shipped")
+        .current(1);
+    let out = html(&s, "en");
+    assert!(
+        out.starts_with(r#"<ol class="z-stepper" aria-label="Order &lt;progress&gt;">"#),
+        "{out}"
+    );
+    assert_eq!(
+        out.matches(r#"aria-current="step""#)
+            .count(),
+        1
+    );
+    assert!(
+        out.contains(
+            r#"<li class="z-stage z-stage-done"><span class="z-stage-mark" aria-hidden="true">&#10003;</span>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"Placed<span class="z-sr-only"> (completed)</span>"#),
+        "the state is said, not only colored: {out}"
+    );
+    assert!(out.contains(
+        r#"<li class="z-stage z-stage-current" aria-current="step"><span class="z-stage-mark" aria-hidden="true">2</span>"#
+    ));
+    assert!(out.contains(r#"<span class="z-stage-desc">At the &lt;warehouse&gt;</span>"#));
+    assert!(out.contains(r#"<li class="z-stage z-stage-todo">"#));
+    assert!(html(&s, "tr").contains("(tamamlandı)"));
+
+    let done = zeyn::ui::Stepper::new("Order")
+        .step("Placed")
+        .step("Shipped")
+        .finished()
+        .vertical();
+    let out = html(&done, "en");
+    assert!(out.contains("z-stepper-vertical") && !out.contains("aria-current"));
+    assert_eq!(out.matches("z-stage-done").count(), 2);
+
+    let capped = (0..zeyn::ui::MAX_STEPS + 3)
+        .fold(zeyn::ui::Stepper::new("Many"), |s, i| s.step(i.to_string()));
+    assert_eq!(
+        capped.schema()["steps"]
+            .as_array()
+            .unwrap()
+            .len(),
+        zeyn::ui::MAX_STEPS
+    );
+}
+
+#[test]
+fn page_windows_keep_the_ends_and_never_hide_a_single_page() {
+    use zeyn::ui::page_window;
+    let numbers = |pages: Vec<Option<u32>>| {
+        pages
+            .iter()
+            .map(|p| p.map_or("..".to_string(), |n| n.to_string()))
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    assert_eq!(numbers(page_window(1, 1, 1)), "1");
+    assert_eq!(numbers(page_window(1, 10, 1)), "1 2 .. 10");
+    assert_eq!(numbers(page_window(4, 10, 1)), "1 2 3 4 5 .. 10");
+    assert_eq!(numbers(page_window(5, 10, 1)), "1 .. 4 5 6 .. 10");
+    assert_eq!(numbers(page_window(7, 10, 1)), "1 .. 6 7 8 9 10");
+    assert_eq!(numbers(page_window(10, 10, 2)), "1 .. 8 9 10");
+    assert_eq!(numbers(page_window(99, 10, 0)), "1 .. 10");
+    assert_eq!(numbers(page_window(0, 3, 0)), "1 2 3");
+    assert!(page_window(1, 0, 1).is_empty());
+}
+
+#[test]
+fn pagination_links_pages_of_a_screen_and_marks_the_current_one() {
+    let nav = |current: u32| {
+        zeyn::ui::Pagination::new(blog, |page| PageParams { page })
+            .pages(9)
+            .current(current)
+    };
+    let out = html(&nav(5), "en");
+    assert!(
+        out.starts_with(r#"<nav class="z-pagination" aria-label="Pagination">"#),
+        "{out}"
+    );
+    assert_eq!(
+        out.matches(r#"aria-current="page""#)
+            .count(),
+        1
+    );
+    assert!(
+        out.contains(r#"aria-label="Page 5" aria-current="page">5</a>"#),
+        "{out}"
+    );
+    assert!(out.contains(r#"rel="prev">Previous</a>"#) && out.contains(r#"rel="next">Next</a>"#));
+    assert_eq!(out.matches("z-pagination-gap").count(), 2);
+
+    let first = html(&nav(0), "en");
+    assert!(
+        first.contains(
+            r#"<span class="z-pagelink z-pagelink-step" aria-disabled="true">Previous</span>"#
+        ),
+        "no link before the first page, and page 0 is page 1: {first}"
+    );
+    assert!(first.contains(r#"aria-label="Page 1" aria-current="page""#));
+    let last = html(&nav(500), "tr");
+    assert!(
+        last.contains(r#"aria-disabled="true">Sonraki</span>"#)
+            && last.contains(r#"aria-label="Sayfa 9" aria-current="page""#),
+        "a page past the end is the last page: {last}"
+    );
+    assert!(last.contains(r#"aria-label="Sayfalama""#));
+
+    let one = zeyn::ui::Pagination::new(blog, |page| PageParams { page }).pages(1);
+    assert_eq!(html(&one, "en"), "", "one page needs no links");
+    assert_eq!(nav(500).schema()["current"], 9);
+}
+
+#[test]
+fn progress_rings_are_progressbars_named_by_their_label() {
+    let ring = zeyn::ui::ProgressRing::new("Storage <used>", 150, 100)
+        .tone(Tone::Warning)
+        .size(4);
+    let out = html(&ring, "en");
+    assert!(
+        out.starts_with(r#"<div class="z-ring z-tone-warning" style="--z-ring-size:32px">"#),
+        "the size is kept within its limits: {out}"
+    );
+    assert!(
+        out.contains(
+            r#"role="progressbar" aria-labelledby="s-ring-" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-valuetext="100%""#
+        ),
+        "the value never passes the maximum: {out}"
+    );
+    assert!(out.contains(r#"stroke-dasharray="100 100""#));
+    assert!(out.contains(r#"<span class="z-ring-label" id="s-ring-">Storage &lt;used&gt;</span>"#));
+    let empty = html(&zeyn::ui::ProgressRing::new("None", 0, 0), "en");
+    assert!(
+        empty.contains(r#"aria-valuemax="1" aria-valuenow="0""#),
+        "{empty}"
+    );
+}
+
+#[test]
+fn copy_buttons_carry_their_text_and_start_hidden() {
+    let out = html(&zeyn::ui::CopyButton::new("a<b>&c"), "en");
+    assert!(
+        out.contains(r#"<code class="z-copy-text" id="s-copy-" hidden>a&lt;b&gt;&amp;c</code>"#),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            r#"data-zeyn-copy="s-copy-" data-copied="Copied to the clipboard" data-failed="Could not copy" data-testid="s.copy" hidden>Copy</button>"#
+        ),
+        "{out}"
+    );
+    let shown = html(
+        &zeyn::ui::CopyButton::new("ZX-1")
+            .shown()
+            .label("Copy the code"),
+        "en",
+    );
+    assert!(
+        shown.contains(r#"id="s-copy-">ZX-1</code>"#) && shown.contains(">Copy the code</button>"),
+        "{shown}"
+    );
+    let long = zeyn::ui::CopyButton::new("ş".repeat(zeyn::ui::MAX_COPY_BYTES));
+    let kept = long.schema()["text"]
+        .as_str()
+        .unwrap()
+        .len();
+    assert_eq!(
+        kept,
+        zeyn::ui::MAX_COPY_BYTES,
+        "cut at a character boundary"
+    );
+}
+
+#[test]
+fn heatmaps_are_tables_of_days_in_the_locales_week_with_the_number_as_text() {
+    let end = Date::new(2026, 11, 12).unwrap();
+    let map = zeyn::ui::Heatmap::ending("Orders <a day>", end)
+        .weeks(2)
+        .value(end, 8)
+        .value(Date::new(2026, 11, 9).unwrap(), 2)
+        .value(Date::new(2026, 1, 1).unwrap(), 900)
+        .tone(Tone::Success);
+    let en = html(&map, "en");
+    assert!(
+        en.starts_with(r#"<div class="z-heat z-tone-success"><div class="z-heat-scroll" role="group" aria-labelledby="s-heat-" tabindex="0">"#),
+        "{en}"
+    );
+    assert!(
+        en.contains(r#"<caption class="z-heat-title" id="s-heat-">Orders &lt;a day&gt;</caption>"#)
+    );
+    assert_eq!(en.matches("<tr>").count(), 7);
+    let cells = en
+        .split("</tbody>")
+        .next()
+        .unwrap()
+        .matches("z-heat-cell")
+        .count();
+    let off = en.matches("z-heat-off").count();
+    assert_eq!(cells + off, 14, "two weeks of seven days: {en}");
+    assert!(off > 0, "days after the end stay empty");
+    assert!(
+        en.contains(r#"<td class="z-heat-cell z-heat-4" title="11/12/2026: 8"><span class="z-sr-only">11/12/2026: 8</span></td>"#),
+        "the largest shown number is the darkest, a number outside the weeks does not count: {en}"
+    );
+    assert!(en.contains(r#"z-heat-1" title="11/9/2026: 2""#), "{en}");
+    assert!(
+        en.contains(r#"aria-hidden="true"><span>Less</span>"#) && en.contains("<span>More</span>")
+    );
+
+    let tr = html(&map, "tr");
+    let first_row = tr.split("<tr>").nth(1).unwrap();
+    assert!(
+        first_row.starts_with(r#"<th class="z-heat-day" scope="row">Pazartesi</th>"#),
+        "the Turkish week starts on Monday: {first_row}"
+    );
+    assert!(tr.contains("12.11.2026: 8") && tr.contains("<span>Az</span>"));
+
+    let year = zeyn::ui::Heatmap::ending("Year", end).weeks(200);
+    assert_eq!(year.schema()["weeks"], zeyn::ui::MAX_HEATMAP_WEEKS);
+    assert_eq!(zeyn::ui::heat_level(u32::MAX, u32::MAX), 4);
+    assert_eq!(zeyn::ui::heat_level(1, u32::MAX), 1);
+}
+
+#[test]
+fn tables_name_their_columns_and_rows_and_pad_short_rows() {
+    let t = zeyn::ui::Table::new("Plans <2026>")
+        .head(["Plan", "Price"])
+        .row(["Free <b>", "0"])
+        .row(["Team"])
+        .row(["Extra", "9", "dropped"])
+        .row_headers()
+        .numeric(1)
+        .striped();
+    let out = html(&t, "en");
+    assert!(
+        out.starts_with(r#"<div class="z-table-scroll" role="group" aria-labelledby="s-table-" tabindex="0"><table class="z-table z-table-striped"><caption class="z-table-caption" id="s-table-">Plans &lt;2026&gt;</caption>"#),
+        "{out}"
+    );
+    assert!(out.contains(
+        r#"<thead><tr><th scope="col">Plan</th><th scope="col" class="z-table-num">Price</th></tr></thead>"#
+    ));
+    assert!(
+        out.contains(
+            r#"<tr><th scope="row">Free &lt;b&gt;</th><td class="z-table-num">0</td></tr>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"<tr><th scope="row">Team</th><td class="z-table-num"></td></tr>"#),
+        "a short row is filled: {out}"
+    );
+    assert!(!out.contains("dropped"), "a long row is cut at the head");
+
+    let bare = html(&zeyn::ui::Table::new("Bare").row(["a", "b", "c"]), "en");
+    assert!(
+        !bare.contains("<thead>") && bare.contains("<tr><td>a</td><td>b</td><td>c</td></tr>"),
+        "{bare}"
+    );
+    let capped = (0..zeyn::ui::MAX_TABLE_ROWS + 9)
+        .fold(zeyn::ui::Table::new("Many"), |t, i| t.row([i.to_string()]));
+    assert_eq!(
+        capped.schema()["rows"]
+            .as_array()
+            .unwrap()
+            .len(),
+        zeyn::ui::MAX_TABLE_ROWS
+    );
+    let wide = zeyn::ui::Table::new("Wide").head((0..40).map(|i| i.to_string()));
+    assert_eq!(
+        wide.schema()["head"]
+            .as_array()
+            .unwrap()
+            .len(),
+        zeyn::ui::MAX_TABLE_COLUMNS
+    );
+}
+
+#[test]
+fn indicators_hide_the_mark_and_say_the_label() {
+    let count = zeyn::ui::Indicator::on(zeyn::ui::Avatar::new("Ada"))
+        .count(3)
+        .label("3 unread <messages>");
+    let out = html(&count, "en");
+    assert!(out.starts_with(r#"<div class="z-indicator"><div class="z-node" data-zeyn-node="0">"#));
+    assert!(
+        out.contains(
+            r#"<span class="z-indicator-mark z-indicator-count z-tone-danger" aria-hidden="true">3</span><span class="z-sr-only">3 unread &lt;messages&gt;</span>"#
+        ),
+        "{out}"
+    );
+    assert_eq!(count.children().len(), 1);
+
+    let many = html(
+        &zeyn::ui::Indicator::on(Badge::new("Inbox")).count(250),
+        "en",
+    );
+    assert!(
+        many.contains(r#"aria-hidden="true">99+</span><span class="z-sr-only">99+</span>"#),
+        "{many}"
+    );
+    let none = html(
+        &zeyn::ui::Indicator::on(Badge::new("Inbox"))
+            .count(0)
+            .label("nothing"),
+        "en",
+    );
+    assert!(
+        !none.contains("z-indicator-mark") && !none.contains("nothing"),
+        "zero shows and says nothing: {none}"
+    );
+    let dot = html(
+        &zeyn::ui::Indicator::on(Badge::new("Ada"))
+            .dot()
+            .tone(Tone::Success),
+        "en",
+    );
+    assert!(
+        dot.contains(r#"z-indicator-dot z-tone-success" aria-hidden="true"></span></div>"#),
+        "a dot without a label is decoration: {dot}"
+    );
+}
+
+#[test]
+fn meters_say_their_state_in_words_and_color_it_by_direction() {
+    use zeyn::ui::{Better, Meter, MeterState};
+    let disk = Meter::new("Disk <used>", 4120, 0, 5000)
+        .high(4000)
+        .better(Better::Lower)
+        .unit("GB");
+    assert_eq!(disk.state(), MeterState::High);
+    let out = html(&disk, "en");
+    assert!(
+        out.starts_with(r#"<div class="z-meter z-tone-danger">"#),
+        "{out}"
+    );
+    assert!(out.contains(r#"<span id="s-meter-">Disk &lt;used&gt;</span>"#));
+    assert!(
+        out.contains(
+            r#"<span class="z-meter-value">4,120 GB<span class="z-meter-state">high</span></span>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            r#"role="meter" aria-labelledby="s-meter-" aria-valuemin="0" aria-valuemax="5000" aria-valuenow="4120" aria-valuetext="4,120 GB, high""#
+        ),
+        "{out}"
+    );
+    assert!(out.contains(r#"style="--z-meter:82%""#));
+    assert!(html(&disk, "tr").contains(r#"aria-valuetext="4.120 GB, yüksek""#));
+
+    let tone = |m: Meter| html(&m, "en")[..40].to_string();
+    assert!(
+        tone(
+            Meter::new("Stock", 50, 0, 100)
+                .low(20)
+                .high(80)
+        )
+        .contains("z-tone-success")
+    );
+    assert!(
+        tone(
+            Meter::new("Stock", 10, 0, 100)
+                .low(20)
+                .high(80)
+        )
+        .contains("z-tone-warning")
+    );
+    assert!(
+        tone(
+            Meter::new("Stock", 10, 0, 100)
+                .low(20)
+                .better(Better::Higher)
+        )
+        .contains("z-tone-danger")
+    );
+    assert!(
+        tone(
+            Meter::new("Stock", 50, 0, 100)
+                .low(20)
+                .high(80)
+                .better(Better::Higher)
+        )
+        .contains("z-tone-warning")
+    );
+    assert!(
+        tone(
+            Meter::new("Stock", 90, 0, 100)
+                .low(20)
+                .high(80)
+                .better(Better::Higher)
+        )
+        .contains("z-tone-success")
+    );
+
+    let wild = html(&Meter::new("Wild", i64::MAX, i64::MIN, i64::MAX), "en");
+    assert!(wild.contains(r#"--z-meter:100%"#), "{wild}");
+    let flat = html(&Meter::new("Flat", 9, 5, 5), "en");
+    assert!(
+        flat.contains(r#"aria-valuemin="5" aria-valuemax="6" aria-valuenow="6""#),
+        "an empty range gets one step and the value stays inside: {flat}"
+    );
+}
+
+#[test]
+fn highlights_mark_every_word_of_the_query_and_escape_both() {
+    use zeyn::ui::{Highlight, highlight_ranges};
+    let out = html(&Highlight::new("Green <tea> & TEA cups", "tea <"), "en");
+    assert_eq!(
+        out,
+        r#"<span class="z-highlight">Green <mark>&lt;</mark><mark>tea</mark>&gt; &amp; <mark>TEA</mark> cups</span>"#
+    );
+    assert_eq!(
+        html(&Highlight::new("a<b", ""), "en"),
+        r#"<span class="z-highlight">a&lt;b</span>"#
+    );
+    assert_eq!(highlight_ranges("teapot tea", "tea teapot"), [0..6, 7..10]);
+    assert_eq!(highlight_ranges("ŞEKER şeker", "şeker"), [0..6, 7..13]);
+    assert_eq!(
+        highlight_ranges("İstanbul", "i"),
+        [],
+        "a match never ends inside a character"
+    );
+    let words: Vec<String> = ('a'..='z')
+        .map(|c| format!("{c}q"))
+        .collect();
+    let text = words.join(" ");
+    assert_eq!(
+        highlight_ranges(&text, &text).len(),
+        zeyn::ui::MAX_HIGHLIGHT_TERMS,
+        "only the first words of a long query are looked for"
+    );
+    assert!(highlight_ranges("aaaa", &"a".repeat(65)).is_empty());
+}
+
+#[test]
+fn tocs_link_headings_by_their_cleaned_anchors_and_nest_sub_entries() {
+    let toc = zeyn::ui::Toc::new("On this <page>")
+        .sub("First", "first")
+        .item("Delivery", "deli very\"")
+        .sub("Abroad <far>", "abroad")
+        .sub("Islands", "islands")
+        .item("Bad", "!!!")
+        .item("Returns", "returns");
+    let out = html(&toc, "en");
+    assert_eq!(
+        out,
+        concat!(
+            r#"<nav class="z-toc" aria-label="On this &lt;page&gt;"><ol class="z-toc-list">"#,
+            r##"<li><a class="z-toc-link" href="#first">First</a></li>"##,
+            r##"<li><a class="z-toc-link" href="#delivery">Delivery</a>"##,
+            r#"<ol class="z-toc-list z-toc-sub">"#,
+            r##"<li><a class="z-toc-link" href="#abroad">Abroad &lt;far&gt;</a></li>"##,
+            r##"<li><a class="z-toc-link" href="#islands">Islands</a></li></ol></li>"##,
+            r##"<li><a class="z-toc-link" href="#returns">Returns</a></li>"##,
+            "</ol></nav>"
+        )
+    );
+    let heading = html(&Heading::h2("Delivery").id("deli very\""), "en");
+    assert!(
+        heading.contains(r#"id="delivery""#),
+        "the same string gives the same anchor on the heading: {heading}"
+    );
+    let ends_in_sub = html(
+        &zeyn::ui::Toc::new("Page")
+            .item("A", "a")
+            .sub("B", "b"),
+        "en",
+    );
+    assert!(
+        ends_in_sub.ends_with("</li></ol></li></ol></nav>"),
+        "{ends_in_sub}"
+    );
+    assert_eq!(
+        html(&zeyn::ui::Toc::new("Empty"), "en"),
+        r#"<nav class="z-toc" aria-label="Empty"><ol class="z-toc-list"></ol></nav>"#
+    );
+}

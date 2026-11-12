@@ -109,6 +109,108 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## AvatarGroup
+
+与同一事物相关的人，例如一项任务的负责人，以一排相互重叠的头像显示。标签为屏幕阅读器命名这个组。组内显示前几个头像：除非 `.max(n)` 另有指定，否则为 5 个，且最多 12 个，其余的数量显示为 "+3"，并按用户的语言读作"另外 3 人"。`.size(...)` 设置组内每个头像的尺寸。
+
+```rust
+AvatarGroup::new(t!("task.assignees"))
+    .add(Avatar::new(a.name.clone()).image(a.photo.clone()))
+    .add(Avatar::new(b.name.clone()))
+    .max(3)
+    .size(AvatarSize::Small)
+```
+
+## Quote
+
+引自某人或某部作品的话，以 `figure` 中的 `blockquote` 呈现。`.author(name)` 说明是谁说的，`.source(title)` 给出作品名称，作为标题书写（`cite`）。
+
+```rust
+Quote::new(review.text.clone()).author(review.name.clone()).source(t!("shop.verified_buyer"))
+```
+
+## Kbd
+
+需要按下的按键，以键盘输入的形式书写（`kbd`）。`Kbd::new("Ctrl+K")` 读取按键之间带 `+` 的组合；`Kbd::keys(["Ctrl", "+"])` 逐个接收按键，用于组合中包含加号键本身的情况。按键名称按给定内容原样书写，最多 6 个。它只显示按键；真正执行操作的快捷键在命令所在的位置设置，就像 `PrevNext::shortcut` 那样。
+
+```rust
+Kbd::new("Alt+Shift+P")
+```
+
+## Divider
+
+页面两个部分之间的一条线。`Divider::new()` 是一个主题分隔（`hr`）。`.label(text)` 在线的中间放置一段文字，例如两种登录方式之间的"或"；此时分隔线是一个以该文字命名的 `separator`。`.vertical()` 从上到下绘制这条线，用于紧凑 `Row` 的各列之间。
+
+```rust
+Divider::new().label(t!("signin.or"))
+```
+
+@live pieces
+
+## Highlight
+
+`Highlight::new(text, query)` 输出一段文字，并在其中标记出搜索词（`mark`），例如结果列表中的产品名称。查询按空白字符拆分，最多查找其中 8 个词，并且不区分大小写地标记出其中任何一个词出现的每一处；空查询不标记任何内容。文字和查询都是用户数据：文字会被转义，查询只用于比较，绝不会写入页面。字母按 Unicode 定义的小写形式进行比较，因此土耳其语的 `I ı` 和 `İ i` 这两对字母不会被视为相同。
+
+```rust
+Highlight::new(product.name.clone(), p.q.clone())
+```
+
+## Toc
+
+目录：指向当前页面各标题的链接，用于文章或政策之类的长页面。`Toc::new(label)` 是一个以标签命名的 `nav`；`.item(title, id)` 链接到通过 `Heading::id` 设置了相同锚点的标题，`.sub(title, id)` 在前一个条目之下一级添加一个条目。锚点的清理方式与 `Heading::id` 相同，因此同一个字符串在两处都可用，清理后锚点为空的条目会被省略；一个目录最多容纳 100 个条目。这些链接是指向 `#anchor` 的普通链接，因此没有脚本也能工作，浏览器会滚动到该标题，地址也可以分享。不会标记正在阅读的部分，因为那需要脚本。
+
+```rust
+Toc::new(t!("page.contents"))
+    .item(t!("policy.delivery"), "delivery")
+    .sub(t!("policy.abroad"), "delivery-abroad")
+    .item(t!("policy.returns"), "returns")
+Heading::h2(t!("policy.delivery")).id("delivery")
+```
+
+@live marks
+
+## Stepper
+
+一个流程所处的位置：按顺序排列的步骤，已完成的、当前的和尚未进行的，例如订单从下单到送达的过程。`.step(title)` 添加一个步骤，`.description(text)` 在最后添加的步骤下方放置一行说明。`.current(index)` 从 0 开始计数，并将其之前的步骤标记为已完成；`.finished()` 将所有步骤标记为已完成。`.vertical()` 将步骤上下排列，在窄屏上也是这样显示。一个 stepper 最多容纳 12 个步骤。
+
+```rust
+Stepper::new(t!("order.progress"))
+    .step(t!("order.placed"))
+    .step(t!("order.packed"))
+    .step(t!("order.shipped"))
+    .description(order.shipped_note.clone())
+    .step(t!("order.delivered"))
+    .current(order.stage as usize)
+```
+
+@live stepper
+
+这些步骤是一个由标签命名的有序列表。当前步骤带有 `aria-current="step"`，已完成的步骤会按用户的语言向屏幕阅读器读出"已完成"，因此状态不只靠颜色表达。stepper 只显示服务器给它的状态，其中没有任何可以按下的内容；分步填写的表单是带有自己步骤的 `Form`（参见[表单](forms.md)）。
+
+## Pagination
+
+指向列表各页的链接，这个列表由屏幕自己分页，例如博客的文章：上一页、页码和下一页。每个链接都指向同一个屏幕，页码在其参数中，因此服务器渲染被请求的那一页，地址可以分享，浏览器中不保存任何内容。链接通过 `nav.js` 打开而不重新加载页面，并且在没有脚本时也能工作。`DataGrid`、`List` 和 `CardGrid` 通过 `.paging(...)` 自行分页；只有在屏幕自己构建内容的地方才使用它。
+
+```rust
+#[screen(route = "/blog", public)]
+pub fn blog(p: BlogParams) -> Screen {
+    Screen::new(t!("blog.title")).body(
+        Pagination::new(blog, |page| BlogParams { page })
+            .pages(page_count)
+            .current(p.page),
+    )
+}
+```
+
+页码从 1 开始计数。第一页和最后一页始终显示，当前页两侧各显示一页；`.around(n)` 可显示更多，最多 4 页。被省略的页面成为一个间隔，而间隔绝不会只隐藏一页。页码来自地址，因此屏幕在加载数据之前先把它限制在范围内；组件对它所标记的页码也这样做。只有一页或没有页面时，它不渲染任何内容。
+
+这些链接是一个 `nav`，按用户的语言命名为"分页"。当前页带有 `aria-current="page"`，每个页码为屏幕阅读器命名为"第 3 页"，上一页和下一页带有 `rel="prev"` 和 `rel="next"`，在两端它们是标记了 `aria-disabled` 的纯文本，而不是无处可去的链接。
+
+| 按键 | 作用 |
+|---|---|
+| `Tab` | 在上一页、页码和下一页之间移动 |
+| `Enter` | 打开该页；焦点和滚动位置由 `nav.js` 处理 |
+
 ## Chips
 
 一排可换行的圆角小链接。`Chips::links(label)` 在以 label 命名的 `nav` 中放置指向屏幕的普通链接，例如文章的标签。`Chips::filter(label, screen, params)` 基于屏幕参数生成切换按钮：每个 chip 都是指向同一屏幕的链接，其值会被加入或移出参数，因此服务器根据收到的参数渲染 `aria-pressed`，浏览器中不保存任何状态。按下 chip 会通过 `nav.js` 在不刷新页面的情况下打开新地址，焦点和滚动位置保持在该 chip 上。除非调用 `.multiple()`，否则同一时间只能按下一个值；参数中不属于选项的值会被忽略。键盘：Tab 在 chip 之间移动，Enter 或 Space 按下其中一个，链接 chip 还可以有自己的快捷键（参见[链接快捷键](#link-shortcuts)）。被按下的 chip 还会显示对勾，因此状态不只依赖颜色。脚本（`chips.js`，小于 1 KB）只在带有筛选 chip 的页面上加载。
@@ -189,6 +291,15 @@ Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_artic
 
 @live engage
 
+
+## CopyButton
+
+把一段文字复制到剪贴板的按钮：运单号、API 地址、邀请链接。`.shown()` 用等宽字体把文字写在按钮旁边，这样也可以阅读和选择它；不使用它时，文字在页面中但被隐藏。除非 `.label` 另行设置，否则标签是用户语言中的"复制"，并由一个 toast 说明复制是否成功。它使用与 `Share` 相同的小脚本，这个脚本只在包含此类按钮的页面上加载；按钮以隐藏状态渲染并由该脚本显示，因此没有脚本的页面上不会有一个什么都不做的按钮。文字在 4096 字节处被截断，并且由于它是页面的一部分，它必须是用户可以看到的内容，绝不能是被掩码的值。
+
+```rust
+CopyButton::new(order.tracking.clone()).shown()
+CopyButton::new(invite_url).label(t!("team.copy_invitation"))
+```
 
 ## AlphaIndex
 

@@ -1,6 +1,7 @@
 //! Content components for reading pages: [`Heading`], [`Paragraph`], [`MetaLine`],
-//! [`PrevNext`], [`Avatar`], [`Spoiler`] and the [`AutoGrid`] layout. They are plain server
-//! rendered HTML with no browser script; their styles live in `content.css`.
+//! [`PrevNext`], [`Avatar`], [`AvatarGroup`], [`Spoiler`], [`Divider`], [`Kbd`], [`Quote`] and
+//! the [`AutoGrid`] layout. They are plain server rendered HTML with no browser script; their
+//! styles live in `content.css`.
 
 use super::layout::into_node;
 use super::render_child;
@@ -11,7 +12,17 @@ use crate::screen::{Component, Node, ScreenDef};
 use serde_json::{Value as Json, json};
 
 into_node!(
-    Heading, Paragraph, MetaLine, PrevNext, AutoGrid, Avatar, Spoiler
+    Heading,
+    Paragraph,
+    MetaLine,
+    PrevNext,
+    AutoGrid,
+    Avatar,
+    AvatarGroup,
+    Spoiler,
+    Divider,
+    Kbd,
+    Quote
 );
 
 /// A section heading with an explicit level, `h2` to `h6`. The screen title is the page's only
@@ -539,9 +550,10 @@ pub(crate) fn initials(name: &str, locale: &str) -> String {
         .collect()
 }
 
-impl Component for Avatar {
-    fn render(&self, out: &mut String, r: &Render) {
-        let px = self.size.px();
+impl Avatar {
+    /// Writes the avatar at `size`: its own size, or the one a group sets for all its avatars.
+    fn write(&self, out: &mut String, r: &Render, size: AvatarSize) {
+        let px = size.px();
         let name = r.i18n.text(r.locale, &self.name);
         let tone = name.bytes().fold(0u32, |h, b| {
             h.wrapping_mul(31)
@@ -572,9 +584,107 @@ impl Component for Avatar {
             }
         }
     }
+}
+
+impl Component for Avatar {
+    fn render(&self, out: &mut String, r: &Render) {
+        self.write(out, r, self.size);
+    }
 
     fn schema(&self) -> Json {
         json!({ "type": "avatar", "name": self.name, "image": self.image, "size": self.size, "decorative": self.decorative })
+    }
+}
+
+/// Most avatars an [`AvatarGroup`] shows before the rest become a count.
+pub const MAX_AVATAR_GROUP: usize = 12;
+
+/// Avatars of the people of one thing, such as the members of a team or the assignees of a task,
+/// overlapping in a row. The label names the group for screen readers ("Assignees"). The group
+/// shows the first `max` avatars (5 unless set, never more than [`MAX_AVATAR_GROUP`]) and then
+/// the number of the rest as "+3", read as "3 more". Every avatar takes the size of the group.
+///
+/// ```
+/// use zeyn::ui::{Avatar, AvatarGroup, AvatarSize};
+/// let team = AvatarGroup::new("Assignees")
+///     .add(Avatar::new("Ada Lovelace"))
+///     .add(Avatar::new("Alan Turing"))
+///     .add(Avatar::new("Grace Hopper"))
+///     .max(2)
+///     .size(AvatarSize::Small);
+/// ```
+pub struct AvatarGroup {
+    label: Text,
+    avatars: Vec<Avatar>,
+    max: usize,
+    size: AvatarSize,
+}
+
+impl AvatarGroup {
+    /// A group with an accessible name, such as "Assignees".
+    pub fn new(label: impl Into<Text>) -> Self {
+        AvatarGroup {
+            label: label.into(),
+            avatars: Vec::new(),
+            max: 5,
+            size: AvatarSize::Medium,
+        }
+    }
+
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "a builder method that appends an avatar; it is not arithmetic and `add` is the public name"
+    )]
+    pub fn add(mut self, avatar: Avatar) -> Self {
+        self.avatars.push(avatar);
+        self
+    }
+
+    /// How many avatars show before the rest become a count, 1 to [`MAX_AVATAR_GROUP`].
+    pub fn max(mut self, max: usize) -> Self {
+        self.max = max.clamp(1, MAX_AVATAR_GROUP);
+        self
+    }
+
+    /// The size of every avatar of the group.
+    pub fn size(mut self, size: AvatarSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl Component for AvatarGroup {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&format!(
+            r#"<div class="z-avatar-group" role="group" aria-label="{}">"#,
+            r.text(&self.label)
+        ));
+        for avatar in self.avatars.iter().take(self.max) {
+            avatar.write(out, r, self.size);
+        }
+        let rest = self
+            .avatars
+            .len()
+            .saturating_sub(self.max);
+        if rest > 0 {
+            let more = Text::key("zeyn.ui.avatar.more").arg("n", rest.to_string());
+            out.push_str(&format!(
+                r#"<span class="z-avatar z-avatar-{} z-avatar-more" role="img" aria-label="{}"><span aria-hidden="true">+{rest}</span></span>"#,
+                self.size.px(),
+                r.text(&more)
+            ));
+        }
+        out.push_str("</div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({
+            "type": "avatar_group",
+            "label": self.label,
+            "max": self.max,
+            "size": self.size,
+            "avatars": self.avatars.iter().map(Component::schema).collect::<Vec<_>>(),
+        })
     }
 }
 
@@ -629,5 +739,184 @@ impl Component for Spoiler {
 
     fn children(&self) -> &[Node] {
         &self.nodes
+    }
+}
+
+/// A line between two parts of a page. Without a label it is a thematic break (`<hr>`); with one
+/// the text sits in the middle of the line, such as "or" between two ways to sign in.
+/// `.vertical()` draws it between the columns of a compact [`super::Row`].
+///
+/// ```
+/// use zeyn::ui::Divider;
+/// let line = Divider::new();
+/// let named = Divider::new().label("or");
+/// let between = Divider::new().vertical();
+/// ```
+#[derive(Default)]
+pub struct Divider {
+    label: Option<Text>,
+    vertical: bool,
+}
+
+impl Divider {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// A text in the middle of the line. A vertical divider shows no label.
+    pub fn label(mut self, label: impl Into<Text>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    /// A line from top to bottom, for the space between columns.
+    pub fn vertical(mut self) -> Self {
+        self.vertical = true;
+        self
+    }
+}
+
+impl Component for Divider {
+    fn render(&self, out: &mut String, r: &Render) {
+        match (&self.label, self.vertical) {
+            (_, true) => out.push_str(
+                r#"<div class="z-divider z-divider-vertical" role="separator" aria-orientation="vertical"></div>"#,
+            ),
+            (Some(label), false) => {
+                let label = r.text(label);
+                out.push_str(&format!(
+                    r#"<div class="z-divider z-divider-labeled" role="separator" aria-label="{label}"><span class="z-divider-label" aria-hidden="true">{label}</span></div>"#
+                ));
+            }
+            (None, false) => out.push_str(r#"<hr class="z-divider">"#),
+        }
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "divider", "label": self.label, "vertical": self.vertical })
+    }
+}
+
+/// Most keys a [`Kbd`] shows.
+pub const MAX_KBD_KEYS: usize = 6;
+
+/// Keys to press, such as `Ctrl` + `K`, written as keyboard input (`<kbd>`). `Kbd::new` reads a
+/// combination with `+` between the keys; `Kbd::keys` takes the keys one by one, for a
+/// combination that holds the plus key itself. Key names are written as given, at most
+/// [`MAX_KBD_KEYS`] of them.
+///
+/// ```
+/// use zeyn::ui::Kbd;
+/// let search = Kbd::new("Ctrl+K");
+/// let zoom = Kbd::keys(["Ctrl", "+"]);
+/// ```
+pub struct Kbd {
+    keys: Vec<String>,
+}
+
+impl Kbd {
+    /// A key or a combination with `+` between its keys: `"Esc"`, `"Ctrl+Shift+P"`.
+    pub fn new(combination: &str) -> Self {
+        Self::keys(combination.split('+').map(str::trim))
+    }
+
+    /// The keys of a combination, one by one.
+    pub fn keys<I, S>(keys: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        Kbd {
+            keys: keys
+                .into_iter()
+                .map(|k| k.as_ref().to_string())
+                .filter(|k| !k.is_empty())
+                .take(MAX_KBD_KEYS)
+                .collect(),
+        }
+    }
+}
+
+impl Component for Kbd {
+    fn render(&self, out: &mut String, _r: &Render) {
+        out.push_str(r#"<kbd class="z-keys">"#);
+        for (i, key) in self.keys.iter().enumerate() {
+            if i > 0 {
+                out.push_str(r#"<span class="z-keys-plus">+</span>"#);
+            }
+            out.push_str(&format!("<kbd>{}</kbd>", escape(key)));
+        }
+        out.push_str("</kbd>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "kbd", "keys": self.keys })
+    }
+}
+
+/// Words quoted from a person or a work (`<blockquote>` in a `<figure>`), with who said them and
+/// where under the text.
+///
+/// ```
+/// use zeyn::ui::Quote;
+/// let q = Quote::new("The machine has no pretensions to originate anything.")
+///     .author("Ada Lovelace")
+///     .source("Notes on the Analytical Engine");
+/// ```
+pub struct Quote {
+    text: Text,
+    author: Option<Text>,
+    source: Option<Text>,
+}
+
+impl Quote {
+    pub fn new(text: impl Into<Text>) -> Self {
+        Quote {
+            text: text.into(),
+            author: None,
+            source: None,
+        }
+    }
+
+    /// Who said it.
+    pub fn author(mut self, author: impl Into<Text>) -> Self {
+        self.author = Some(author.into());
+        self
+    }
+
+    /// The work it comes from, written as a title (`<cite>`).
+    pub fn source(mut self, source: impl Into<Text>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+}
+
+impl Component for Quote {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&format!(
+            r#"<figure class="z-quote"><blockquote class="z-quote-text"><p>{}</p></blockquote>"#,
+            r.text(&self.text)
+        ));
+        if self.author.is_some() || self.source.is_some() {
+            out.push_str(r#"<figcaption class="z-quote-by">"#);
+            if let Some(author) = &self.author {
+                out.push_str(&format!(
+                    r#"<span class="z-quote-author">{}</span>"#,
+                    r.text(author)
+                ));
+            }
+            if let Some(source) = &self.source {
+                out.push_str(&format!(
+                    r#"<cite class="z-quote-source">{}</cite>"#,
+                    r.text(source)
+                ));
+            }
+            out.push_str("</figcaption>");
+        }
+        out.push_str("</figure>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "quote", "text": self.text, "author": self.author, "source": self.source })
     }
 }

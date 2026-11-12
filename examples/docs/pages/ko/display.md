@@ -28,6 +28,39 @@ Stack::new()
 
 `Progress::new(label, value, max)`이며 선택적으로 `.tone(...)`을 붙일 수 있습니다. 레이블과 값이 있는 실제 `progressbar`입니다.
 
+## ProgressRing
+
+`ProgressRing::new(label, value, max)`는 같은 진행률을 가운데에 백분율이 있고 아래에 레이블이 있는 고리로 보여 줍니다. 사용한 할당량이나 채워진 프로필처럼 전체에서 차지하는 몫을 좁은 자리에 보여 줄 때 씁니다. `.tone(...)`은 고리에 색을 입히고, `.size(px)`는 지름을 정합니다. 정하지 않으면 64이며 32에서 160 사이로 유지됩니다. 고리는 서버가 그리는 인라인 SVG이므로 스크립트가 필요 없고 어떤 화소 밀도에서도 선명합니다. 레이블을 이름으로 갖는 실제 `progressbar`입니다. 최댓값을 넘는 값은 최댓값으로 셉니다.
+
+```rust
+ProgressRing::new(t!("account.storage_used"), used, quota).tone(Tone::Warning).size(96)
+```
+
+@live rings
+
+## Meter
+
+`Meter::new(label, value, min, max)`는 사용 중인 디스크 공간이나 재고 수준처럼 정해진 범위 안의 측정값을 보여 줍니다. `Progress`와 달리 끝을 향해 나아가는 작업이 아닙니다. 값은 오르내릴 수 있으며, `.low(n)`과 `.high(n)`으로 어디부터 낮거나 높은지를 정합니다. 막대의 색은 그 상태에 따라 정해집니다. 방향을 정하지 않으면 두 임계값 사이가 좋은 범위이고 양쪽 끝은 모두 경고입니다. `.better(Better::Higher)`는 높은 값을 좋게, 낮은 값을 나쁘게 보며, `Better::Lower`는 그 반대입니다. 상태는 결코 색으로만 전달되지 않습니다. 값 옆에 사용자의 언어로 "낮음" 또는 "높음"이 적히고, 이는 스크린 리더가 ARIA `meter`에서 듣는 내용에도 들어갑니다. 값은 정수이며 사용자의 언어 방식대로 자릿수를 구분하고, `.unit(text)`로 단위를 붙입니다.
+
+```rust
+Meter::new(t!("server.disk_used"), used_gb, 0, total_gb)
+    .high(total_gb * 8 / 10)
+    .better(Better::Lower)
+    .unit("GB")
+```
+
+## Indicator
+
+`Indicator::on(node)`는 다른 컴포넌트의 모서리에 개수나 점을 놓습니다. 아바타 위의 읽지 않은 메시지 수, 링크 위의 새 소식 표시 등입니다. `.count(n)`은 숫자를 보여 주며 99를 넘으면 "99+", 0이면 아무것도 보여 주지 않습니다. `.dot()`은 점을 보여 줍니다. `.tone(...)`으로 색을 정하며 정하지 않으면 `Danger`입니다. 표시 자체는 스크린 리더에서 숨겨집니다. 이름 뒤에 "3"만 읽혀서는 뜻이 전달되지 않기 때문입니다. `.label(text)`로 대신 들려줄 말, 예를 들어 "읽지 않은 메시지 3개"를 줍니다. 표시가 그 아래 컴포넌트가 이미 말해 주지 않는 뜻을 담고 있다면 반드시 레이블을 주십시오. 레이블이 없으면 개수는 숫자로 읽히고 점은 읽히지 않습니다.
+
+```rust
+Indicator::on(Avatar::new(user.name.clone()))
+    .count(unread)
+    .label(t!("inbox.unread_count").arg("n", unread.to_string()))
+```
+
+@live meters
+
 ## DescriptionList
 
 레코드의 필드에서 만들거나 직접 작성하는 키와 값의 쌍입니다.

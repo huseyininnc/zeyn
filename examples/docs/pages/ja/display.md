@@ -28,6 +28,39 @@ Stack::new()
 
 `Progress::new(label, value, max)` に、任意で `.tone(...)` を付けます。ラベルと値を持つ本物の `progressbar` です。
 
+## ProgressRing
+
+`ProgressRing::new(label, value, max)` は同じ進捗を、中央にパーセント、下にラベルのあるリングとして表示します。使用済みの容量や、入力済みのプロフィールなど、全体に対する割合を小さなスペースで示すのに使います。`.tone(...)` はリングに色を付け、`.size(px)` は直径を設定します。指定しなければ 64 で、32 から 160 の範囲に収められます。リングはサーバーが描くインライン SVG なので、スクリプトを必要とせず、どの画素密度でも鮮明です。ラベルを名前に持つ本物の `progressbar` です。最大値を超える値は最大値として扱われます。
+
+```rust
+ProgressRing::new(t!("account.storage_used"), used, quota).tone(Tone::Warning).size(96)
+```
+
+@live rings
+
+## Meter
+
+`Meter::new(label, value, min, max)` は、ディスク使用量や在庫量など、決まった範囲の中の測定値を表示します。`Progress` と違い、終わりに向かって進む作業ではありません。値は上がることも下がることもあり、`.low(n)` と `.high(n)` で、どこから低い、高いとみなすかを指定します。バーの色はその状態から決まります。向きを指定しない場合、しきい値の間が良好で、両端はどちらも警告です。`.better(Better::Higher)` は高い値を良好、低い値を不良とし、`Better::Lower` はその逆です。状態が色だけで示されることはありません。値の横にユーザーの言語で「低」または「高」と表示され、スクリーンリーダーが ARIA の `meter` から読み上げる内容にも含まれます。値は整数で、ユーザーの言語の桁区切りで表示され、`.unit(text)` で単位を追加できます。
+
+```rust
+Meter::new(t!("server.disk_used"), used_gb, 0, total_gb)
+    .high(total_gb * 8 / 10)
+    .better(Better::Lower)
+    .unit("GB")
+```
+
+## Indicator
+
+`Indicator::on(node)` は、別のコンポーネントの角に件数またはドットを置きます。アバター上の未読メッセージ数や、リンク上の新着の印などです。`.count(n)` は数値を表示し、99 を超えると "99+"、0 のときは何も表示しません。`.dot()` はドットを表示します。`.tone(...)` で色を設定でき、指定しなければ `Danger` です。印そのものはスクリーンリーダーから隠されます。名前の後に "3" とだけ読まれても意味が伝わらないからです。`.label(text)` で、代わりに読み上げる言葉、たとえば「未読メッセージ 3 件」を指定します。印が、その下のコンポーネントでは伝わらない意味を持つ場合は必ずラベルを指定してください。ラベルがない場合、件数は数値として読み上げられ、ドットは読み上げられません。
+
+```rust
+Indicator::on(Avatar::new(user.name.clone()))
+    .count(unread)
+    .label(t!("inbox.unread_count").arg("n", unread.to_string()))
+```
+
+@live meters
+
 ## DescriptionList
 
 レコードのフィールドから、または手動で作るキーと値の組です。

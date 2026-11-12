@@ -42,6 +42,27 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `.remember(KEY)` は、ユーザーが開いたタブを choice キーの下に保持するため（[クライアント設定](security.md#client-preferences) を参照）、以降のページでも同じタブが開きます。URL のハッシュで指定されたタブが優先されます。
 
+## Accordion
+
+`Accordion::new()` と `.section(title, node)` は、セクションを縦に並べます。それぞれタイトルで開閉します。ヘルプページの回答や、長いレコードの各部分に使います。セクションは閉じた状態で始まります。セクションの後の `.open()` はそれを開きます。`.single()` は同時に開くセクションをひとつにします。その場合、開くよう指定された最初のセクションだけが開いた状態で始まります。accordion が持てるセクションは最大 50 個です（`MAX_ACCORDION_SECTIONS`）。
+
+```rust
+Accordion::new()
+    .section(t!("help.password"), Paragraph::new(t!("help.password_answer")))
+    .open()
+    .section(t!("help.invoices"), Paragraph::new(t!("help.invoices_answer")))
+    .single()
+```
+
+@live accordion
+
+各セクションはネイティブの開閉要素（`<details>` と `<summary>`）で、見出しとボタンによる ARIA の accordion パターンではありません。ネイティブ要素はスクリプトを必要とせず、閉じたコンテンツを読み上げ順序の外に保ち、ブラウザーのページ内検索が一致を含むセクションを開けるからです。単一モードではセクションが `name` を共有し、別のセクションが開くとブラウザーが開いていたものを閉じます。`Tabs` と違い、閉じたセクションのコンテンツは最初からページ内にあります。
+
+| キー | 動作 |
+|---|---|
+| `Tab` | 次のセクションのタイトルに移動します |
+| `Enter` または `Space` | セクションを開閉します。フォーカスはタイトルに残ります |
+
 ## Split
 
 `Split::new(start, end)` は、2 つのノードをハンドルを挟んで表示します。`.ratio(percent)` で開始側のサイズを設定します。ハンドルはポインターまたは矢印キーで動かせます。

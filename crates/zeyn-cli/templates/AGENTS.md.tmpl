@@ -173,12 +173,13 @@ matters. The `zeyn_docs` topic `language` and the docs pages have the details.
 
 - Layouts: `Row::new().col(node)`, `Stack::new().add(node)`, `Panel::new(t!(".."))`,
   `Card::new().title(..)`, `Tabs::new(..).tab(..)`, `Split::new(a, b).ratio(55)`, `AutoGrid`,
-  `Dock` for panels the user moves.
+  `Dock` for panels the user moves, `Accordion::new().section(title, node)` for sections that
+  open and close (`.single()` keeps one open).
 - Data: `DataGrid::of(action)` for tables, `DataGrid::dynamic(action)` with `DynamicPage` and
   `DynamicColumn` when columns come with the rows; `List::of(action).builder(|row| node)`,
   `CardGrid::of(action)` and `Rail::of(action)` for rows of another shape (a virtual list with a
   builder needs `.row_height(px)`); `Repeat::of(items, |item| node)` for data already in memory;
-  `Tree::of(action)`, `Chart::bar(..)`, `Kpi::new(..)`; `DocumentViewer::of(page_action, pages)`
+  `Tree::of(action)`, `Chart::bar(..)`, `Kpi::new(..)`, `Heatmap::ending(label, day).values(..)`; `DocumentViewer::of(page_action, pages)`
   for paged SVG or HTML documents such as report previews (`.document(id)`, `.page_size(PageSize::pt(w, h))`,
   `.outline(..)`, `.search(action)`; pages are cleaned unless `.trusted()`).
 - Forms and controls: `Form::of(model).field(..).row(..).submit(t!(".."), action)`;
@@ -215,7 +216,13 @@ matters. The `zeyn_docs` topic `language` and the docs pages have the details.
 - Display and content: `Alert::new(Tone::Warning, ..)`, `Badge::new(..)`, `Progress::new(..)`,
   `DescriptionList::of(&model)`, `Timeline`, `EmptyState`, `Breadcrumb`, `Markdown::new(..)`,
   `Heading`, `Paragraph`, `Avatar`, `Hero::new(..)`, `Reactions::of(action, target)`,
-  `Share::page()`, `RelativeTime::new(at)`.
+  `Share::page()`, `RelativeTime::new(at)`, `AvatarGroup::new(label).add(avatar)`, `Quote::new(..)`,
+  `Kbd::new(keys)`, `Divider::new()`, `ProgressRing::new(label, value, max)`,
+  `CopyButton::new(text)`, `Meter::new(label, value, min, max).high(n)`,
+  `Indicator::on(node).count(n)`, `Highlight::new(text, query)`, `Toc::new(label).item(title, id)`,
+  `Table::new(caption).head(..).row(..)` for small tables in memory.
+- A screen that pages its own content: `Pagination::new(screen, |page| Params { page }).pages(n)`;
+  `Stepper::new(label).step(..).current(1)` shows where a process stands (display only).
 - Shells: screens open in the app shell (menu, palette; `App::header(|h| h.search().account())`
   adds a top bar); public pages use `.shell(Shell::site())` on the feature, sign in pages
   `.shell(Shell::auth())` (`.split()` adds a brand panel); `MenuBar`, `StatusBar`.

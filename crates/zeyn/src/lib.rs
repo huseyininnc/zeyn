@@ -258,13 +258,15 @@ pub mod prelude {
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
-        ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card,
-        CardGrid, Chart, Chips, Control, DateOptions, DescriptionList, Dock, Embed,
-        EmbedPermission, EmptyState, ExternalLink, Fit, Heading, Hero, Image, Kpi, LinkButton,
-        List, Listens, LookupItem, LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph,
-        Placeholder, Popover, PrevNext, Progress, PropertyInspector, Rail, Reactions, RelativeTime,
-        Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar,
-        Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
+        Accordion, ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, AvatarGroup, Badge,
+        Breadcrumb, Busy, Card, CardGrid, Chart, Chips, Control, CopyButton, DateOptions,
+        DescriptionList, Divider, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Fit,
+        Heading, Heatmap, Hero, Image, Kbd, Kpi, LinkButton, List, Listens, LookupItem,
+        LookupQuery, MenuBar, MenuButton, MetaLine, Pagination, Panel, Paragraph, Placeholder,
+        Popover, PrevNext, Progress, ProgressRing, PropertyInspector, Quote, Rail, Reactions,
+        RelativeTime, Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack,
+        StatusBar, Stepper, Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
+        WeekSchedule,
     };
     pub use crate::ui::{
         Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeEditor, CodeError,
@@ -281,6 +283,7 @@ pub mod prelude {
     };
     pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
     pub use crate::ui::{FieldSpec, FormSchema, LengthUnit, SchemaForm};
+    pub use crate::ui::{Highlight, Indicator, Meter, Table, Toc};
     #[cfg(feature = "server")]
     pub use crate::ui::{Reply, ReplySender};
     pub use crate::{

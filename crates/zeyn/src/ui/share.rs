@@ -1,4 +1,5 @@
-//! [`Share`]: a button that shares a link through the system share sheet or copies it.
+//! [`Share`]: a button that shares a link through the system share sheet or copies it, and
+//! [`CopyButton`]: a button that copies a text.
 
 use super::layout::into_node;
 use super::widgets::screen_href;
@@ -115,5 +116,84 @@ impl Component for Share {
             "title": self.title,
             "label": self.label,
         })
+    }
+}
+
+/// Longest text a [`CopyButton`] carries, in bytes. A longer text is cut at a character boundary.
+pub const MAX_COPY_BYTES: usize = 4096;
+
+/// A button that copies a text to the clipboard: an API address, a tracking number, an
+/// invitation link. `.shown()` writes the text next to the button, in a fixed width font, so it
+/// can also be read and selected; otherwise the text is in the page but hidden.
+///
+/// The button uses the `share.js` module, loaded only on pages that hold one. It is rendered
+/// hidden and shown by the script, so a page without script has no button that does nothing; a
+/// shown text stays readable there. The result ("Copied to the clipboard") is said in a toast.
+/// The text is part of the page, so it must be one the user may see: never a masked value.
+///
+/// ```
+/// use zeyn::ui::CopyButton;
+/// let tracking = CopyButton::new("1Z999AA10123456784").shown();
+/// let invite = CopyButton::new("https://example.com/join/abc").label("Copy the invitation");
+/// ```
+pub struct CopyButton {
+    text: String,
+    label: Option<Text>,
+    shown: bool,
+}
+
+into_node!(CopyButton);
+
+impl CopyButton {
+    /// A button that copies `text`, at most [`MAX_COPY_BYTES`] of it.
+    pub fn new(text: impl Into<String>) -> Self {
+        let mut text = text.into();
+        if text.len() > MAX_COPY_BYTES {
+            let mut end = MAX_COPY_BYTES;
+            while !text.is_char_boundary(end) {
+                end -= 1;
+            }
+            text.truncate(end);
+        }
+        CopyButton {
+            text,
+            label: None,
+            shown: false,
+        }
+    }
+
+    /// The button's text, "Copy" unless set.
+    pub fn label(mut self, label: impl Into<Text>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    /// Writes the text next to the button.
+    pub fn shown(mut self) -> Self {
+        self.shown = true;
+        self
+    }
+}
+
+impl Component for CopyButton {
+    fn render(&self, out: &mut String, r: &Render) {
+        let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.code.{key}")));
+        let id = super::dom_id(r, "copy");
+        let label = match &self.label {
+            Some(l) => r.text(l),
+            None => t("copy"),
+        };
+        out.push_str(&format!(
+            r#"<span class="z-copy"><code class="z-copy-text" id="{id}"{}>{}</code><button type="button" class="z-button z-copy-button" data-zeyn-copy="{id}" data-copied="{}" data-failed="{}" data-testid="{}.copy" hidden>{label}</button></span>"#,
+            if self.shown { "" } else { " hidden" },
+            crate::render::escape(&self.text),
+            t("copied"),
+            t("failed"),
+            r.scope
+        ));
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "copy_button", "text": self.text, "label": self.label, "shown": self.shown })
     }
 }

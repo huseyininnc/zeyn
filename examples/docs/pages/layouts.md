@@ -42,6 +42,27 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `.remember(KEY)` keeps the tab the user opened under a choice key (see [Client preferences](security.md#client-preferences)), so the same tabs open on it on later pages. A tab named in the URL hash wins.
 
+## Accordion
+
+`Accordion::new()` with `.section(title, node)` puts sections one under the other, each opened and closed by its title: the answers of a help page, the parts of a long record. Sections start closed; `.open()` after a section opens it. `.single()` keeps one section open at a time, and then only the first section marked open starts open. An accordion holds at most 50 sections (`MAX_ACCORDION_SECTIONS`).
+
+```rust
+Accordion::new()
+    .section(t!("help.password"), Paragraph::new(t!("help.password_answer")))
+    .open()
+    .section(t!("help.invoices"), Paragraph::new(t!("help.invoices_answer")))
+    .single()
+```
+
+@live accordion
+
+Every section is a native disclosure (`<details>` and `<summary>`), not the ARIA accordion pattern of headings and buttons, because the native element needs no script, keeps closed content out of the reading order, and lets the browser's find in page open the section that holds a match. In single mode the sections share a `name`, and the browser closes the open one when another opens. Unlike `Tabs`, the content of a closed section is in the page from the start.
+
+| Key | What it does |
+|---|---|
+| `Tab` | Moves to the next section title |
+| `Enter` or `Space` | Opens or closes the section; focus stays on its title |
+
 ## Split
 
 `Split::new(start, end)` shows two nodes with a handle between them. `.ratio(percent)` sets the start size. The handle moves with the pointer or the arrow keys.

@@ -61,6 +61,35 @@ Her çubuk, nokta, dilim, aşama ve gauge değeri, etiketi ve değeri adı olan 
 
 Üzerine gelme, odaklanma ve dokunma aynı metni bir tooltip içinde gösterir; tooltip ekran okuyuculardan gizlenir, böylece hiçbir şey iki kez okunmaz. Betik olmadan da işaretler adlandırılmış kalır ve tablo durur. Küçük işaretler (8 px'lik noktalar) 24 px hedef boyutunun altındadır; *Show data* altındaki tablo eşdeğer yoldur (WCAG 2.5.8).
 
+## Table
+
+Ekranın zaten elinde olan metinlerden küçük bir tablo: bir fiyat listesinin planları, bir mağazanın açılış saatleri, bir raporun toplamları. `Table::new(caption)` tabloyu adlandıran bir başlık alır, `.head([...])` sütun başlıklarını, `.row([...])` ise her satırı verir; `.row_headers()` her satırın ilk hücresini o satırın başlığı yapar, böylece ekran okuyucular her hücrenin sütununu ve satırını söyler; `.numeric(index)` bir sayı sütununu sona hizalar, `.striped()` ise her ikinci satırı gölgelendirir. Başlıktan kısa bir satır boş hücrelerle doldurulur, uzun olan kesilir; bir tablo en fazla 200 satır ve 12 sütun tutar. Sayfalama, sıralama ya da filtre içermez ve istek göndermez: bir action'dan gelen ya da kullanıcının üzerinde çalıştığı satırların yeri `DataGrid`'dir. Dar ekranlarda kendi kutusunun içinde yana doğru kayar; kutu odak alır, böylece ok tuşları onu kaydırır.
+
+```rust
+Table::new(t!("shop.opening_hours"))
+    .head([t!("shop.day"), t!("shop.opens"), t!("shop.closes")])
+    .row([t!("shop.weekdays"), "09:00".into(), "18:00".into()])
+    .row([t!("shop.saturday"), "10:00".into(), "14:00".into()])
+    .row_headers()
+```
+
+@live table
+
+## Heatmap
+
+Son haftaların her günü için bir sayı, örneğin alınan siparişler ya da kaydedilen saatler, karelerden oluşan bir takvim olarak: her sütun bir hafta, her satır bir hafta günü, sayı büyüdükçe daha koyu. `Heatmap::ending(label, end)`, genellikle bugün olan `end` gününün haftasıyla biter ve ondan sonraki günler boş kalır. `.weeks(n)` kaç hafta gösterileceğini belirler: verilmedikçe 17, en fazla 53; `.value(day, n)` ya da `.values(days)` sayıları, `.tone(...)` ise rengi verir. Gösterilen en büyük sayı dört tonun en koyusunu alır. Hafta, kullanıcının dilinde haftanın başladığı günle başlar.
+
+```rust
+Heatmap::ending(t!("sales.orders_a_day"), ctx.today())
+    .weeks(12)
+    .values(orders.iter().map(|o| (o.day, o.count)))
+    .tone(Tone::Success)
+```
+
+@live heatmap
+
+Sunucunun çizdiği, script gerektirmeyen bir tablodur. Ekran okuyucular bir satırın hafta gününü ve her gün için tarihini ve sayısını kullanıcının dilinde okur; böylece ton yalnızca metnin söylediğini yineler. Bir karenin üzerine gelindiğinde aynı metin görünür. Dar ekranlarda tablo kendi kutusunun içinde yana doğru kayar ve kutu odak alır, böylece ok tuşları onu kaydırır. Her gün iki öğedir: varsayılan 17 hafta, bir bileşen için 300 öğelik bütçenin içinde kalır; tam bir yıl ise kalmaz.
+
 ## Anahtar göstergeler, sparkline ve bullet
 
 `Kpi` bir değeri kartın en büyük metni olarak gösterir (30 px, sabit genişlikli rakamlar, para birimi simgesi ya da birim daha küçük ve soluk). Önceki döneme göre değişimini `+48.8%` gibi küçük bir çip olarak, yanında "önceki döneme göre" yazısıyla gösterir (değişim iyiyse yeşil, değilse kırmızı, yüzde yarımın altındaysa gri; maliyetler ve bekleme süreleri için `.lower_is_better()`; ekran okuyucular cümlenin tamamını duyar). Bunlara ulaşılan payla birlikte bir hedef ve son değerlerin çipin renginde, solan bir alan üzerinde tam genişlikte bir eğilimi eklenir. Yedi ve daha fazla basamaklı değerler kısaltılır (İngilizcede `$1.23M`, Türkçede `1,23 Mn`); tam değer tooltip içinde ve ekran okuyucular için yer alır.

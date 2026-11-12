@@ -509,6 +509,118 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                 )),
             )
             .into(),
+        "pieces" => Stack::new()
+            .gap(4)
+            .add(
+                AvatarGroup::new("Assignees")
+                    .add(zeyn::ui::Avatar::new("Ada Lovelace"))
+                    .add(zeyn::ui::Avatar::new("Alan Turing"))
+                    .add(zeyn::ui::Avatar::new("Grace Hopper"))
+                    .add(zeyn::ui::Avatar::new("Edsger Dijkstra"))
+                    .max(3),
+            )
+            .add(
+                Quote::new("It can do whatever we know how to order it to perform.")
+                    .author("Ada Lovelace")
+                    .source("Notes on the Analytical Engine"),
+            )
+            .add(Divider::new().label("or"))
+            .add(
+                Row::new()
+                    .compact()
+                    .col(Paragraph::new("Search every page with"))
+                    .col(Kbd::new("Alt+Shift+P")),
+            )
+            .into(),
+        "stepper" => Stepper::new("Order progress")
+            .step("Placed")
+            .step("Packed")
+            .step("Shipped")
+            .description("Left the warehouse on Monday")
+            .step("Delivered")
+            .current(2)
+            .into(),
+        "accordion" => Accordion::new()
+            .section(
+                "How do I reset my password?",
+                Paragraph::new("Use the link on the sign in page."),
+            )
+            .open()
+            .section(
+                "Where are my invoices?",
+                Paragraph::new("Under Billing, then Invoices."),
+            )
+            .section("Can I change my plan?", Paragraph::new("Yes, at any time."))
+            .single()
+            .into(),
+        "rings" => Row::new()
+            .compact()
+            .col(ProgressRing::new("Import", 64, 100))
+            .col(ProgressRing::new("Storage", 92, 100).tone(Tone::Warning))
+            .col(CopyButton::new("1Z999AA10123456784").shown())
+            .into(),
+        "heatmap" => {
+            let today = ctx.today();
+            let days = (0..84i64).filter_map(|back| {
+                let day = today.add_days(-back)?;
+                Some((day, ((back * 7 + back / 3) % 9) as u32))
+            });
+            Heatmap::ending("Orders a day", today)
+                .weeks(12)
+                .values(days)
+                .into()
+        }
+        "table" => Table::new("Opening hours")
+            .head(["Day", "Opens", "Closes"])
+            .row(["Monday to Friday", "09:00", "18:00"])
+            .row(["Saturday", "10:00", "14:00"])
+            .row(["Sunday", "Closed", ""])
+            .row_headers()
+            .into(),
+        "meters" => Stack::new()
+            .add(
+                Meter::new("Disk used", 412, 0, 500)
+                    .high(400)
+                    .better(zeyn::ui::Better::Lower)
+                    .unit("GB"),
+            )
+            .add(
+                Meter::new("Room temperature", 21, 0, 40)
+                    .low(18)
+                    .high(26)
+                    .unit("°C"),
+            )
+            .add(
+                Row::new()
+                    .compact()
+                    .col(
+                        Indicator::on(zeyn::ui::Avatar::new("Ada Lovelace"))
+                            .count(3)
+                            .label("3 unread messages"),
+                    )
+                    .col(
+                        Indicator::on(zeyn::ui::Avatar::new("Grace Hopper"))
+                            .dot()
+                            .tone(Tone::Success)
+                            .label("Online"),
+                    ),
+            )
+            .into(),
+        "marks" => Row::new()
+            .col(
+                Toc::new("On this page")
+                    .item("Green tea", "live-green")
+                    .item("Black tea", "live-black"),
+            )
+            .col(
+                Stack::new()
+                    .add(Heading::h3("Green tea").id("live-green"))
+                    .add(Highlight::new("Green tea, loose leaf, 100 g", "tea leaf"))
+                    .add(Heading::h3("Black tea").id("live-black"))
+                    .add(Highlight::new("Black tea bags, 50 pieces", "tea leaf")),
+            )
+            .weight(3)
+            .into(),
         "week" => WeekSchedule::of(search_samples)
             .title("Deliveries")
             .day(|p: &Sample| (p.id.0 % 7 + 1) as u8)
@@ -757,6 +869,14 @@ pub const EXAMPLES: &[&str] = &[
     "autogrid",
     "list",
     "people",
+    "pieces",
+    "stepper",
+    "accordion",
+    "rings",
+    "heatmap",
+    "table",
+    "meters",
+    "marks",
     "week",
     "rating",
     "engage",

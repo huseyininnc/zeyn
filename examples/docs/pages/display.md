@@ -28,6 +28,39 @@ Stack::new()
 
 `Progress::new(label, value, max)` with an optional `.tone(...)`. It is a real `progressbar` with its label and value.
 
+## ProgressRing
+
+`ProgressRing::new(label, value, max)` shows the same progress as a ring with the percent in its middle and the label under it, for a share of a whole in little room: a quota used, a profile filled in. `.tone(...)` colors the ring and `.size(px)` sets its diameter, 64 unless set and kept between 32 and 160. The ring is an inline SVG drawn by the server, so it needs no script and stays sharp at every density. It is a real `progressbar` named by its label; a value above the maximum counts as the maximum.
+
+```rust
+ProgressRing::new(t!("account.storage_used"), used, quota).tone(Tone::Warning).size(96)
+```
+
+@live rings
+
+## Meter
+
+`Meter::new(label, value, min, max)` shows a measurement within a known range, such as disk space used or a stock level. Unlike `Progress` it is not a task moving to its end: the value can rise and fall, and `.low(n)` and `.high(n)` mark where it becomes low or high. The bar takes its color from that state: with no direction set, the range between the thresholds is good and both ends are a warning; `.better(Better::Higher)` makes a high value good and a low one bad, and `Better::Lower` the other way round. The state is never given by color alone: "low" or "high" is written next to the value in the user's language and is part of what screen readers hear from the ARIA `meter`. Values are whole numbers, grouped as the user's language groups them, and `.unit(text)` adds a unit.
+
+```rust
+Meter::new(t!("server.disk_used"), used_gb, 0, total_gb)
+    .high(total_gb * 8 / 10)
+    .better(Better::Lower)
+    .unit("GB")
+```
+
+## Indicator
+
+`Indicator::on(node)` puts a count or a dot on the corner of another component: unread messages on an avatar, something new on a link. `.count(n)` shows the number, "99+" above 99 and nothing at zero; `.dot()` shows a dot; `.tone(...)` sets the color, `Danger` unless set. The mark itself is hidden from screen readers, because a bare "3" after a name says little: `.label(text)` gives the words they hear instead, such as "3 unread messages". Give one whenever the mark carries meaning the component under it does not already state; without a label a count is read as its number and a dot is not read.
+
+```rust
+Indicator::on(Avatar::new(user.name.clone()))
+    .count(unread)
+    .label(t!("inbox.unread_count").arg("n", unread.to_string()))
+```
+
+@live meters
+
 ## DescriptionList
 
 Key value pairs, from a record's fields or by hand:

@@ -42,6 +42,27 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `.remember(KEY)`, kullanıcının açtığı sekmeyi bir choice anahtarı altında tutar (bkz. [İstemci tercihleri](security.md#client-preferences)); böylece sonraki sayfalarda aynı sekmeler onun üzerinde açılır. URL karmasında adı geçen sekme önceliklidir.
 
+## Accordion
+
+`Accordion::new()` ile `.section(title, node)`, bölümleri alt alta koyar; her biri başlığıyla açılıp kapanır: bir yardım sayfasının cevapları, uzun bir kaydın parçaları. Bölümler kapalı başlar; bir bölümden sonraki `.open()` onu açar. `.single()` aynı anda tek bir bölümü açık tutar ve o zaman yalnızca açık işaretlenen ilk bölüm açık başlar. Bir accordion en fazla 50 bölüm tutar (`MAX_ACCORDION_SECTIONS`).
+
+```rust
+Accordion::new()
+    .section(t!("help.password"), Paragraph::new(t!("help.password_answer")))
+    .open()
+    .section(t!("help.invoices"), Paragraph::new(t!("help.invoices_answer")))
+    .single()
+```
+
+@live accordion
+
+Her bölüm yerel bir açılır bölümdür (`<details>` ve `<summary>`), başlık ve düğmelerden oluşan ARIA accordion deseni değil; çünkü yerel öğe script gerektirmez, kapalı içeriği okuma sırasının dışında tutar ve tarayıcının sayfada bul özelliğinin eşleşmeyi içeren bölümü açmasını sağlar. Tekli kipte bölümler bir `name` paylaşır ve bir başkası açıldığında tarayıcı açık olanı kapatır. `Tabs`'tan farklı olarak, kapalı bir bölümün içeriği baştan beri sayfadadır.
+
+| Tuş | Ne yapar |
+|---|---|
+| `Tab` | Sonraki bölüm başlığına geçer |
+| `Enter` ya da `Space` | Bölümü açar ya da kapatır; odak başlığında kalır |
+
 ## Split
 
 `Split::new(start, end)` aralarında bir tutamaç olan iki düğüm gösterir. `.ratio(percent)` başlangıç boyutunu belirler. Tutamaç işaretçiyle veya ok tuşlarıyla hareket eder.

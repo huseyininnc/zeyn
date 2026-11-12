@@ -109,6 +109,108 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## AvatarGroup
+
+작업의 담당자처럼 한 가지 일에 속한 사람들을 한 줄로 겹쳐진 아바타로 보여 줍니다. 레이블은 스크린 리더를 위해 그룹의 이름이 됩니다. 그룹은 처음 몇 개의 아바타를 보여 줍니다. `.max(n)`으로 따로 정하지 않으면 5개이고 12개를 넘지 않습니다. 나머지 인원수는 "+3"으로 표시되고 사용자의 언어로 "외 3명"이라고 읽힙니다. `.size(...)`는 그룹에 있는 모든 아바타의 크기를 정합니다.
+
+```rust
+AvatarGroup::new(t!("task.assignees"))
+    .add(Avatar::new(a.name.clone()).image(a.photo.clone()))
+    .add(Avatar::new(b.name.clone()))
+    .max(3)
+    .size(AvatarSize::Small)
+```
+
+## Quote
+
+사람이나 작품에서 인용한 말을 `figure` 안의 `blockquote`로 보여 줍니다. `.author(name)`은 누가 한 말인지 알려 주고, `.source(title)`은 작품을 알려 주며 제목으로 표기됩니다(`cite`).
+
+```rust
+Quote::new(review.text.clone()).author(review.name.clone()).source(t!("shop.verified_buyer"))
+```
+
+## Kbd
+
+눌러야 할 키를 키보드 입력으로 표기합니다(`kbd`). `Kbd::new("Ctrl+K")`는 키 사이에 `+`가 있는 조합을 읽습니다. `Kbd::keys(["Ctrl", "+"])`는 키를 하나씩 받으며, 더하기 키 자체가 들어 있는 조합에 씁니다. 키 이름은 주어진 그대로 표기되고 최대 6개입니다. 키를 보여 주기만 합니다. 실제로 동작하는 단축키는 `PrevNext::shortcut`처럼 명령이 있는 곳에서 설정합니다.
+
+```rust
+Kbd::new("Alt+Shift+P")
+```
+
+## Divider
+
+페이지의 두 부분 사이에 놓이는 선입니다. `Divider::new()`는 주제 구분(`hr`)입니다. `.label(text)`는 선 가운데에 텍스트를 넣습니다. 예를 들어 두 가지 로그인 방법 사이의 "또는"입니다. 이때 구분선은 그 텍스트를 이름으로 갖는 `separator`가 됩니다. `.vertical()`은 선을 위에서 아래로 그리며, 간격이 좁은 `Row`의 열 사이에 씁니다.
+
+```rust
+Divider::new().label(t!("signin.or"))
+```
+
+@live pieces
+
+## Highlight
+
+`Highlight::new(text, query)`는 검색어를 표시(`mark`)한 텍스트를 출력합니다. 결과 목록의 상품 이름 등에 씁니다. 검색어는 공백으로 나뉘고, 그 가운데 최대 8개의 단어를 찾으며, 그중 하나가 발견된 모든 곳을 대소문자 구분 없이 표시합니다. 빈 검색어는 아무것도 표시하지 않습니다. 텍스트와 검색어는 모두 사용자 데이터입니다. 텍스트는 이스케이프되고, 검색어는 비교에만 쓰이며 페이지에 기록되지 않습니다. 글자는 유니코드가 정의한 소문자로 비교되므로 터키어의 `I ı`와 `İ i` 쌍은 같은 글자로 취급되지 않습니다.
+
+```rust
+Highlight::new(product.name.clone(), p.q.clone())
+```
+
+## Toc
+
+목차입니다. 표시 중인 페이지의 제목으로 가는 링크이며, 글이나 정책처럼 긴 페이지에 씁니다. `Toc::new(label)`은 레이블을 이름으로 갖는 `nav`입니다. `.item(title, id)`는 `Heading::id`로 같은 앵커를 준 제목에 연결하고, `.sub(title, id)`는 바로 앞 항목의 한 단계 아래에 항목을 추가합니다. 앵커는 `Heading::id`와 같은 방식으로 정리되므로 같은 문자열을 두 곳에서 쓸 수 있고, 정리한 뒤 앵커가 비게 되는 항목은 빠집니다. 목차는 최대 100개의 항목을 가집니다. 링크는 `#anchor`로 가는 일반 링크이므로 스크립트 없이 동작하고, 브라우저가 제목까지 스크롤하며, 주소를 공유할 수 있습니다. 읽고 있는 구역은 표시하지 않습니다. 그러려면 스크립트가 필요하기 때문입니다.
+
+```rust
+Toc::new(t!("page.contents"))
+    .item(t!("policy.delivery"), "delivery")
+    .sub(t!("policy.abroad"), "delivery-abroad")
+    .item(t!("policy.returns"), "returns")
+Heading::h2(t!("policy.delivery")).id("delivery")
+```
+
+@live marks
+
+## Stepper
+
+프로세스가 어디까지 왔는지 보여 줍니다. 순서대로 놓인 단계 가운데 완료된 단계, 현재 단계, 앞으로 남은 단계입니다. 예를 들어 주문이 접수된 뒤 배송이 끝날 때까지의 과정입니다. `.step(title)`은 단계를 추가하고, `.description(text)`은 마지막에 추가한 단계 아래에 한 줄을 넣습니다. `.current(index)`는 0부터 세며 그 앞의 단계를 완료로 표시합니다. `.finished()`는 모든 단계를 완료로 표시합니다. `.vertical()`은 단계를 위아래로 놓으며, 좁은 화면에서도 이렇게 보입니다. stepper는 최대 12개의 단계를 가집니다.
+
+```rust
+Stepper::new(t!("order.progress"))
+    .step(t!("order.placed"))
+    .step(t!("order.packed"))
+    .step(t!("order.shipped"))
+    .description(order.shipped_note.clone())
+    .step(t!("order.delivered"))
+    .current(order.stage as usize)
+```
+
+@live stepper
+
+단계들은 레이블을 이름으로 갖는 순서 있는 목록입니다. 현재 단계에는 `aria-current="step"`이 있고, 완료된 단계는 스크린 리더에 사용자의 언어로 "완료"라고 알려 주므로 상태가 색으로만 전달되지 않습니다. stepper는 서버가 준 상태를 보여 주기만 하며 누를 수 있는 것이 없습니다. 단계별로 채우는 양식은 자체 단계를 가진 `Form`입니다([양식](forms.md) 참고).
+
+## Pagination
+
+화면이 직접 페이지를 나누는 목록, 예를 들어 블로그 글의 페이지로 가는 링크입니다. 이전, 페이지 번호, 다음이 놓입니다. 각각은 페이지 번호를 매개변수로 갖는 같은 화면으로 가는 링크이므로, 서버는 요청받은 페이지를 렌더링하고, 주소를 공유할 수 있으며, 브라우저에는 아무것도 저장되지 않습니다. 링크는 `nav.js`를 통해 페이지를 다시 불러오지 않고 열리며 스크립트 없이도 동작합니다. `DataGrid`, `List`, `CardGrid`는 `.paging(...)`으로 스스로 페이지를 나눕니다. 이것은 화면이 자신의 콘텐츠를 직접 구성하는 곳에서만 쓰십시오.
+
+```rust
+#[screen(route = "/blog", public)]
+pub fn blog(p: BlogParams) -> Screen {
+    Screen::new(t!("blog.title")).body(
+        Pagination::new(blog, |page| BlogParams { page })
+            .pages(page_count)
+            .current(p.page),
+    )
+}
+```
+
+페이지는 1부터 셉니다. 첫 페이지와 마지막 페이지는 항상 보이고, 현재 페이지의 양쪽에 한 페이지씩 보입니다. `.around(n)`으로 더 많이, 최대 4페이지까지 보여 줄 수 있습니다. 빠진 페이지는 줄임표가 되며, 줄임표가 한 페이지만 가리는 일은 없습니다. 페이지 번호는 주소에서 오므로 화면은 데이터를 불러오기 전에 번호를 범위 안으로 맞춥니다. 컴포넌트도 현재 페이지로 표시하는 번호에 대해 같은 일을 합니다. 페이지가 하나이거나 없으면 아무것도 렌더링하지 않습니다.
+
+링크는 사용자의 언어로 "페이지 탐색"이라는 이름을 가진 `nav`입니다. 현재 페이지에는 `aria-current="page"`가 있고, 각 번호는 스크린 리더를 위해 "3페이지"라는 이름을 가지며, 이전과 다음에는 `rel="prev"`와 `rel="next"`가 있습니다. 양 끝에서는 갈 곳이 없는 링크 대신 `aria-disabled`가 표시된 일반 텍스트가 됩니다.
+
+| 키 | 동작 |
+|---|---|
+| `Tab` | 이전, 페이지 번호, 다음 순서로 이동합니다 |
+| `Enter` | 페이지를 엽니다. 포커스와 스크롤 위치는 `nav.js`를 따릅니다 |
+
 ## Chips
 
 여러 줄로 이어지는 작은 둥근 링크의 한 줄입니다. `Chips::links(label)`은 문서의 태그처럼 화면으로 연결되는 일반 링크를 label로 이름 붙인 `nav` 안에 담습니다. `Chips::filter(label, screen, params)`는 화면 파라미터에 대한 토글 버튼을 만듭니다. 각 chip은 같은 화면으로 연결되는 링크이며 해당 값이 파라미터에 추가되거나 제거되므로, 서버가 받은 파라미터로 `aria-pressed`를 렌더링하고 브라우저에는 아무것도 저장되지 않습니다. chip을 누르면 `nav.js`를 통해 페이지 새로고침 없이 새 주소가 열리고, 포커스와 스크롤 위치는 chip에 남습니다. `.multiple()`을 호출하지 않으면 한 번에 하나의 값만 눌립니다. 파라미터에서 옵션이 아닌 값은 무시됩니다. 키보드: Tab은 chip 사이를 이동하고, Enter 또는 Space로 누르며, 링크 chip에는 자체 단축키를 지정할 수 있습니다([링크 단축키](#link-shortcuts) 참고). 눌린 chip은 체크 표시도 보여 주므로 상태가 색에만 의존하지 않습니다. 스크립트(`chips.js`, 1 KB 미만)는 필터 chip이 있는 페이지에서만 로드됩니다.
@@ -189,6 +291,15 @@ Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_artic
 
 @live engage
 
+
+## CopyButton
+
+텍스트를 클립보드에 복사하는 버튼입니다. 운송장 번호, API 주소, 초대 링크 등에 씁니다. `.shown()`은 텍스트를 버튼 옆에 고정 폭 글꼴로 적어 주므로 읽고 선택할 수도 있습니다. 지정하지 않으면 텍스트는 페이지에 있지만 숨겨져 있습니다. 레이블은 `.label`로 정하지 않으면 사용자의 언어로 "복사"이며, 복사가 되었는지는 toast가 알려 줍니다. `Share`와 같은 작은 스크립트를 사용하며, 이 스크립트는 이런 버튼이 있는 페이지에서만 불러옵니다. 버튼은 숨겨진 채로 렌더링되고 그 스크립트가 보여 주므로, 스크립트가 없는 페이지에 아무 일도 하지 않는 버튼이 생기지 않습니다. 텍스트는 4096바이트에서 잘립니다. 또한 페이지의 일부이므로 사용자가 보아도 되는 텍스트여야 하며, 마스킹된 값은 절대 넣으면 안 됩니다.
+
+```rust
+CopyButton::new(order.tracking.clone()).shown()
+CopyButton::new(invite_url).label(t!("team.copy_invitation"))
+```
 
 ## AlphaIndex
 

@@ -33,6 +33,7 @@ pub struct Demo {
     #[serde(default)]
     pub kinds: Vec<String>,
     pub room: Option<String>,
+    pub page: Option<u32>,
 }
 
 /// One live example: the function of the component's file that builds it.
@@ -151,6 +152,7 @@ catalog! {
         panel "/ui/panel";
         tabs "/ui/tabs";
         split "/ui/split";
+        accordion "/ui/accordion";
         auto_grid "/ui/auto-grid";
         screen_header "/ui/screen-header";
     }
@@ -160,23 +162,32 @@ catalog! {
         meta_line "/ui/meta-line";
         badge "/ui/badge";
         avatar "/ui/avatar";
+        avatar_group "/ui/avatar-group";
         icon "/ui/icon";
         description_list "/ui/description-list";
         timeline "/ui/timeline";
         markdown "/ui/markdown";
         spoiler "/ui/spoiler";
+        quote "/ui/quote";
+        highlight "/ui/highlight";
+        kbd "/ui/kbd";
+        divider "/ui/divider";
+        stepper "/ui/stepper";
         relative_time "/ui/relative-time";
     }
     "navigation" Home {
         breadcrumb "/ui/breadcrumb";
         link_button "/ui/link-button";
         prev_next "/ui/prev-next";
+        pagination "/ui/pagination" (Demo);
+        toc "/ui/toc";
         alpha_index "/ui/alpha-index";
         chips "/ui/chips";
         menu_button "/ui/menu-button";
         menu_bar "/ui/menu-bar";
         external_link "/ui/external-link";
         share "/ui/share";
+        copy_button "/ui/copy-button";
     }
     "forms" Edit {
         form "/ui/form";
@@ -192,6 +203,7 @@ catalog! {
     }
     "data" Table {
         data_grid "/ui/data-grid";
+        table "/ui/table";
         card_grid "/ui/card-grid";
         image_card "/ui/image-card";
         rail "/ui/rail";
@@ -220,6 +232,9 @@ catalog! {
     "feedback" Bell {
         alert "/ui/alert";
         progress "/ui/progress";
+        progress_ring "/ui/progress-ring";
+        meter "/ui/meter";
+        indicator "/ui/indicator";
         skeleton "/ui/skeleton";
         empty_state "/ui/empty-state";
         popover "/ui/popover";
@@ -231,6 +246,7 @@ catalog! {
     "charts" ChartBar {
         chart "/ui/chart";
         kpi "/ui/kpi";
+        heatmap "/ui/heatmap";
     }
     "shell" Sidebar {
         toolbox "/ui/toolbox";

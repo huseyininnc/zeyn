@@ -28,6 +28,39 @@ Stack::new()
 
 `Progress::new(label, value, max)`，可选 `.tone(...)`。它是一个真正的 `progressbar`，带有标签和数值。
 
+## ProgressRing
+
+`ProgressRing::new(label, value, max)` 把同样的进度显示为一个圆环，中间是百分比，下方是标签，用于在很小的空间里表示整体中的一部分：已用的配额、已填写的资料。`.tone(...)` 为圆环着色，`.size(px)` 设置其直径，未设置时为 64，并保持在 32 到 160 之间。圆环是由服务器绘制的内联 SVG，因此不需要脚本，在任何像素密度下都保持清晰。它是一个由其标签命名的真正的 `progressbar`；超过最大值的值按最大值计算。
+
+```rust
+ProgressRing::new(t!("account.storage_used"), used, quota).tone(Tone::Warning).size(96)
+```
+
+@live rings
+
+## Meter
+
+`Meter::new(label, value, min, max)` 显示已知范围内的一个测量值，例如已用的磁盘空间或库存水平。与 `Progress` 不同，它不是一个走向终点的任务：数值可以上升也可以下降，`.low(n)` 和 `.high(n)` 标出数值从哪里开始算偏低或偏高。进度条的颜色取自这个状态：没有设置方向时，两个阈值之间的范围是良好的，两端都是警告；`.better(Better::Higher)` 让高数值为好、低数值为差，`Better::Lower` 则相反。状态绝不只靠颜色表达：数值旁边会用用户的语言写出"偏低"或"偏高"，这也是屏幕阅读器从 ARIA `meter` 读到的内容的一部分。数值是整数，按用户语言的方式分组，`.unit(text)` 添加一个单位。
+
+```rust
+Meter::new(t!("server.disk_used"), used_gb, 0, total_gb)
+    .high(total_gb * 8 / 10)
+    .better(Better::Lower)
+    .unit("GB")
+```
+
+## Indicator
+
+`Indicator::on(node)` 在另一个组件的角上放置一个计数或一个圆点：头像上的未读消息数、链接上的新内容提示。`.count(n)` 显示数字，超过 99 时显示 "99+"，为零时什么都不显示；`.dot()` 显示一个圆点；`.tone(...)` 设置颜色，未设置时为 `Danger`。标记本身对屏幕阅读器是隐藏的，因为名字后面一个单独的 "3" 说明不了什么：`.label(text)` 给出它们代之读出的文字，例如"3 条未读消息"。只要标记带有其下方组件尚未表达的含义，就应当提供标签；没有标签时，计数按数字读出，圆点则不读出。
+
+```rust
+Indicator::on(Avatar::new(user.name.clone()))
+    .count(unread)
+    .label(t!("inbox.unread_count").arg("n", unread.to_string()))
+```
+
+@live meters
+
 ## DescriptionList
 
 键值对，可以来自记录的字段，也可以手动添加：

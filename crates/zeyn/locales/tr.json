@@ -561,6 +561,27 @@
         "label": "Harfe göre gözat",
         "other": "Diğer karakterler"
       },
+      "avatar": {
+        "more": "{n} kişi daha"
+      },
+      "stepper": {
+        "done": "tamamlandı"
+      },
+      "heat": {
+        "day": "{date}: {n}",
+        "less": "Az",
+        "more": "Çok"
+      },
+      "meter": {
+        "low": "düşük",
+        "high": "yüksek"
+      },
+      "pagination": {
+        "label": "Sayfalama",
+        "previous": "Önceki",
+        "next": "Sonraki",
+        "page": "Sayfa {n}"
+      },
       "week": {
         "label": "Hafta",
         "today": "Bugün",

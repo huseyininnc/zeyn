@@ -61,6 +61,35 @@ Every bar, point, slice, stage and gauge value is a mark with its label and valu
 
 Hover, focus and a tap show the same text in a tooltip, which is hidden from screen readers so nothing is read twice. Without the script the marks are still named and the table stays. Small marks (8 px points) are below the 24 px target size; the table under *Show data* is the equivalent path (WCAG 2.5.8).
 
+## Table
+
+A small table of text the screen already holds: the plans of a price list, the opening hours of a shop, the totals of a report. `Table::new(caption)` takes a caption that names the table, `.head([...])` the column headers and `.row([...])` each row; `.row_headers()` makes the first cell of every row its header, so screen readers say the column and the row of each cell, `.numeric(index)` lines a column of numbers up at the end, and `.striped()` shades every second row. A row shorter than the head is filled with empty cells and a longer one is cut; a table holds at most 200 rows and 12 columns. It has no paging, sorting or filters and makes no request: rows that come from an action, or that the user works with, belong in `DataGrid`. On narrow screens it scrolls sideways inside its own box, which takes focus so the arrow keys scroll it.
+
+```rust
+Table::new(t!("shop.opening_hours"))
+    .head([t!("shop.day"), t!("shop.opens"), t!("shop.closes")])
+    .row([t!("shop.weekdays"), "09:00".into(), "18:00".into()])
+    .row([t!("shop.saturday"), "10:00".into(), "14:00".into()])
+    .row_headers()
+```
+
+@live table
+
+## Heatmap
+
+A number for each day of the last weeks, such as orders taken or hours logged, as a calendar of squares: one column a week, one row a weekday, darker for more. `Heatmap::ending(label, end)` ends with the week of `end`, usually today, and days after it stay empty. `.weeks(n)` sets how many weeks show, 17 unless set and at most 53; `.value(day, n)` or `.values(days)` give the numbers, and `.tone(...)` the color. The largest number shown gets the darkest of four shades. The week starts on the day the user's language starts it.
+
+```rust
+Heatmap::ending(t!("sales.orders_a_day"), ctx.today())
+    .weeks(12)
+    .values(orders.iter().map(|o| (o.day, o.count)))
+    .tone(Tone::Success)
+```
+
+@live heatmap
+
+It is a table drawn by the server with no script. Screen readers read the weekday of a row and, for each day, its date and number in the user's language, so the shade only repeats what the text says; pointing at a square shows the same text. The table scrolls sideways inside its own box on narrow screens, and the box takes focus so the arrow keys scroll it. Each day is two elements: the default of 17 weeks stays within the budget of 300 elements for a component, and a full year does not.
+
 ## Key figures, sparklines and bullets
 
 `Kpi` shows a value as the card's largest text (30 px, tabular figures, the currency symbol or unit smaller and muted), its change against the previous period as a small chip such as `+48.8%` with "vs previous period" beside it (green when the change is good, red when not, grey under half a percent; `.lower_is_better()` for costs and waits; screen readers hear the full sentence), a target with the share reached, and a full width trend of recent values in the chip's color over a fading area. Values of seven digits and more are shortened (`$1.23M`, `1,23 Mn` in Turkish) with the full value in the tooltip and for screen readers.

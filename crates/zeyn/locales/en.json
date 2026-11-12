@@ -561,6 +561,27 @@
         "label": "Browse by letter",
         "other": "Other characters"
       },
+      "avatar": {
+        "more": "{n} more"
+      },
+      "stepper": {
+        "done": "completed"
+      },
+      "heat": {
+        "day": "{date}: {n}",
+        "less": "Less",
+        "more": "More"
+      },
+      "meter": {
+        "low": "low",
+        "high": "high"
+      },
+      "pagination": {
+        "label": "Pagination",
+        "previous": "Previous",
+        "next": "Next",
+        "page": "Page {n}"
+      },
       "week": {
         "label": "Week",
         "today": "Today",

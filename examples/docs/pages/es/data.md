@@ -61,6 +61,35 @@ Cada barra, punto, porción, etapa y valor de gauge es una marca con su etiqueta
 
 El cursor, el foco y un toque muestran el mismo texto en un tooltip, que se oculta a los lectores de pantalla para que nada se lea dos veces. Sin el script las marcas siguen teniendo nombre y la tabla permanece. Las marcas pequeñas (puntos de 8 px) están por debajo del tamaño de objetivo de 24 px; la tabla bajo *Show data* es el camino equivalente (WCAG 2.5.8).
 
+## Table
+
+Una tabla pequeña de texto que la pantalla ya tiene: los planes de una lista de precios, el horario de una tienda, los totales de un informe. `Table::new(caption)` toma un título que da nombre a la tabla, `.head([...])` los encabezados de columna y `.row([...])` cada fila; `.row_headers()` convierte la primera celda de cada fila en su encabezado, de modo que los lectores de pantalla dicen la columna y la fila de cada celda, `.numeric(index)` alinea una columna de números al final y `.striped()` sombrea una de cada dos filas. Una fila más corta que el encabezado se rellena con celdas vacías y una más larga se corta; una tabla contiene 200 filas y 12 columnas como máximo. No tiene paginación, orden ni filtros y no hace ninguna petición: las filas que vienen de una acción, o con las que el usuario trabaja, van en `DataGrid`. En pantallas estrechas se desplaza hacia los lados dentro de su propia caja, que recibe el foco para que las teclas de flecha la desplacen.
+
+```rust
+Table::new(t!("shop.opening_hours"))
+    .head([t!("shop.day"), t!("shop.opens"), t!("shop.closes")])
+    .row([t!("shop.weekdays"), "09:00".into(), "18:00".into()])
+    .row([t!("shop.saturday"), "10:00".into(), "14:00".into()])
+    .row_headers()
+```
+
+@live table
+
+## Heatmap
+
+Un número por cada día de las últimas semanas, como los pedidos recibidos o las horas registradas, en un calendario de cuadros: una columna por semana, una fila por día de la semana, más oscuro cuanto mayor es el número. `Heatmap::ending(label, end)` termina con la semana de `end`, normalmente hoy, y los días posteriores quedan vacíos. `.weeks(n)` fija cuántas semanas se muestran, 17 salvo que se indique y 53 como máximo; `.value(day, n)` o `.values(days)` dan los números, y `.tone(...)` el color. El número más alto que se muestra recibe el más oscuro de cuatro tonos. La semana empieza el día en que la empieza el idioma del usuario.
+
+```rust
+Heatmap::ending(t!("sales.orders_a_day"), ctx.today())
+    .weeks(12)
+    .values(orders.iter().map(|o| (o.day, o.count)))
+    .tone(Tone::Success)
+```
+
+@live heatmap
+
+Es una tabla dibujada por el servidor sin script. Los lectores de pantalla leen el día de la semana de una fila y, para cada día, su fecha y su número en el idioma del usuario, de modo que el tono solo repite lo que dice el texto; al señalar un cuadro se muestra el mismo texto. En pantallas estrechas la tabla se desplaza hacia los lados dentro de su propia caja, y la caja recibe el foco para que las teclas de flecha la desplacen. Cada día son dos elementos: las 17 semanas por defecto caben en el presupuesto de 300 elementos de un componente, y un año completo no.
+
 ## Cifras clave, sparklines y bullets
 
 `Kpi` muestra un valor como el texto más grande de la tarjeta (30 px, cifras tabulares, el símbolo de moneda o la unidad más pequeños y atenuados), su cambio frente al periodo anterior como una pequeña etiqueta como `+48.8%` con "vs previous period" al lado (verde cuando el cambio es bueno, rojo cuando no, gris por debajo de medio punto porcentual; `.lower_is_better()` para costes y esperas; los lectores de pantalla oyen la frase completa), un objetivo con la proporción alcanzada y una tendencia a todo el ancho de los valores recientes, del color de la etiqueta, sobre un área que se desvanece. Los valores de siete cifras o más se abrevian (`$1.23M`, `1,23 Mn` en turco), con el valor completo en el tooltip y para los lectores de pantalla.

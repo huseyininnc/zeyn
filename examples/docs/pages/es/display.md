@@ -28,6 +28,39 @@ Stack::new()
 
 `Progress::new(label, value, max)` con un `.tone(...)` opcional. Es un `progressbar` real con su etiqueta y su valor.
 
+## ProgressRing
+
+`ProgressRing::new(label, value, max)` muestra el mismo progreso como un anillo con el porcentaje en el centro y la etiqueta debajo, para una parte de un todo en poco espacio: una cuota usada, un perfil completado. `.tone(...)` da color al anillo y `.size(px)` fija su diámetro, 64 salvo que se indique y mantenido entre 32 y 160. El anillo es un SVG en línea dibujado por el servidor, así que no necesita script y se ve nítido en cualquier densidad. Es un `progressbar` real nombrado por su etiqueta; un valor por encima del máximo cuenta como el máximo.
+
+```rust
+ProgressRing::new(t!("account.storage_used"), used, quota).tone(Tone::Warning).size(96)
+```
+
+@live rings
+
+## Meter
+
+`Meter::new(label, value, min, max)` muestra una medida dentro de un rango conocido, como el espacio de disco usado o un nivel de existencias. A diferencia de `Progress`, no es una tarea que avanza hacia su final: el valor puede subir y bajar, y `.low(n)` y `.high(n)` marcan dónde pasa a ser bajo o alto. La barra toma su color de ese estado: sin dirección, el rango entre los umbrales es bueno y los dos extremos son una advertencia; `.better(Better::Higher)` hace bueno un valor alto y malo uno bajo, y `Better::Lower` lo contrario. El estado nunca se da solo con el color: "bajo" o "alto" se escribe junto al valor en el idioma del usuario y forma parte de lo que los lectores de pantalla oyen del `meter` de ARIA. Los valores son números enteros, agrupados como los agrupa el idioma del usuario, y `.unit(text)` añade una unidad.
+
+```rust
+Meter::new(t!("server.disk_used"), used_gb, 0, total_gb)
+    .high(total_gb * 8 / 10)
+    .better(Better::Lower)
+    .unit("GB")
+```
+
+## Indicator
+
+`Indicator::on(node)` pone un contador o un punto en la esquina de otro componente: mensajes sin leer sobre un avatar, algo nuevo en un enlace. `.count(n)` muestra el número, "99+" por encima de 99 y nada en cero; `.dot()` muestra un punto; `.tone(...)` fija el color, `Danger` salvo que se indique. La marca en sí está oculta para los lectores de pantalla, porque un "3" suelto después de un nombre dice poco: `.label(text)` da las palabras que oyen en su lugar, como "3 mensajes sin leer". Dé una siempre que la marca tenga un significado que el componente de debajo no exprese ya; sin etiqueta, un contador se lee como su número y un punto no se lee.
+
+```rust
+Indicator::on(Avatar::new(user.name.clone()))
+    .count(unread)
+    .label(t!("inbox.unread_count").arg("n", unread.to_string()))
+```
+
+@live meters
+
 ## DescriptionList
 
 Pares clave valor, a partir de los campos de un registro o a mano:
