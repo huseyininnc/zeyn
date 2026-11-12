@@ -35,6 +35,24 @@ Feature::new("sales")
 - **Klavye.** Yukarı ve Aşağı görünen başlıklar ve bağlantılar arasında gezer, Home ve End ilkine ve sonuncusuna gider. Sağ kapalı bir grubu açar ya da açık bir grubun içine geçer; Sol açık bir grubu kapatır ya da çevreleyen grubun başlığına gider. Enter ve Space grubu açıp kapatır. Sağdan sola dillerde Sol ve Sağ yer değiştirir.
 - **İzinler ve birleştirme.** Aynı etiketli gruplar her seviyede feature'lar arasında birleşir; kullanıcının açamayacağı öğelerden oluşan bir grup, iç içe gruplar dahil, dışarıda kalır. `App::header(|h| h.breadcrumb())` içerik yolu grubun bütün yolunu gösterir. Site shell'i iç içe grupların bağlantılarını en üst gruplarında listeler.
 
+### İkon şeridi, rozetler, filtre ve telefonlar
+
+```rust
+.menu(|m| {
+    m.group(t!("mail.menu"), Icon::Mail)
+        .item(t!("mail.inbox"), inbox)
+        .count(unread)
+        .count_listens("mail")
+        .item(t!("mail.rules"), rules)
+        .badge(t!("menu.new"))
+})
+```
+
+- **İkon şeridi.** 1024 px ve üstü ekranlarda menü çubuğundaki bir düğme menüyü üst düzey grupların ikonlarına (ya da ilk harflerine) katlar. Grubun adı ipucu olarak görünür ve grup şeridin yanında açılan bir panel olarak açılır; Escape, dışarıya tıklama ve gezinme onu kapatır. Seçim `zeyn_rail` çerezinde tutulur, böylece sonraki sayfa sıçrama olmadan aynı biçimde çizilir.
+- **Rozetler ve sayılar.** Bir öğeden sonra `.badge(text)` "Yeni" gibi kısa, sabit bir metin ekler. `.count(action)`, `()` alıp `u64` döndüren bir action'ın saydığı bir sayı ekler: sayfa göründükten sonra menüsündeki tüm sayıları tek istekte ister (`GET /_zeyn/menu/counts`), böylece yavaş bir sayım sayfayı geciktirmez. Action'ın yetkisi olmayan kullanıcılar sayı görmez, 0 hiçbir şey göstermez ve 99'dan büyük sayılar "99+" olarak görünür. `.count_listens(topics)`, bir action `ui.refresh(..)` ile konulardan birini andığında ya da canlı socket haber verdiğinde yeniden sayar.
+- **Filtre ve favoriler.** 10 veya daha fazla bağlantısı olan bir yan menü (`MENU_FILTER_FROM`) bir filtre kutusu alır: yazdıkça eşleşmeyen bağlantılar gizlenir (büyük küçük harf ve aksanlar yok sayılır), eşleşenlerin grupları açılır ve kaç bağlantı kaldığı söylenir; Escape kutuyu temizler. Her bağlantıya bir sabitleme düğmesi gelir ve sabitlenen bağlantılar üstteki Favoriler grubunda görünür; tarayıcıda kullanıcı başına tutulur.
+- **Telefonlar.** 1024 px altında menü, çubuğundaki bir düğmenin arkasına katlanır ve ekranın üzerinde bir çekmece olarak açılır. Odak çekmeceye geçer ve çekmece ile düğme arasında kalır, arkadaki ekran etkisizdir ve kaymaz; düğme, Escape, arka plan, bir bağlantı ya da menünün kenarına doğru kaydırma onu kapatır ve odağı düğmeye geri verir.
+
 ### İstek başına kurulan menüler
 
 `App::menu_source(source)` her istek için kurulan menü girdileri ekler; örneğin kullanıcının rollerine göre süzülen bir menü tablosundan. Bir kaynak, `Ctx`'i (kimlik, tenant, dil) alan ve `MenuNode` döndüren async bir fonksiyondur: en üstte `MenuNode::group(label, children)`, içinde `MenuNode::screen(label, "screen_name")` bağlantıları (`.params(json)` yol parçalarını ve sorguyu `screen_url` gibi doldurur), `MenuNode::path(label, "/reports/sales")` bağlantıları ve iç içe gruplar. `.icon(...)`, `.open()` ve `.permission("menu.reports")` her düğümde çalışır. Etiket, diğer metinler gibi kaçışlanan düz metin ya da `Text::key` ile bir katalog anahtarıdır.

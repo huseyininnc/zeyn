@@ -12,8 +12,8 @@ into_node!(Tour, TourStop);
 /// The most stops a tour visits; the browser leaves out the ones after it.
 pub const MAX_TOUR_STOPS: usize = 30;
 
-/// A button that starts a guided tour of the page: a small dialog visits every [`TourStop`] in
-/// the order of the page, with Back, Next and Close. The `tour.js` module shows the button, so
+/// A button that starts a guided tour of the page: a small dialog visits every [`TourStop`] of
+/// its screen in the order of the page, with Back, Next and Close. Use one tour per screen. The `tour.js` module shows the button, so
 /// without script there is no tour and the page reads as it is.
 ///
 /// ```

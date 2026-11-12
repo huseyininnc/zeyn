@@ -62,7 +62,7 @@ function show(index) {
 function open(tour) {
   const dialog = tour.querySelector('.z-tour-card');
   if (run && !run.dialog.isConnected) finish();
-  const stops = [...document.querySelectorAll('.z-tourstop')].filter((s) => s.getClientRects().length > 0).slice(0, MAX_STOPS);
+  const stops = [...(tour.closest('.z-screen') ?? document).querySelectorAll('.z-tourstop')].filter((s) => s.getClientRects().length > 0).slice(0, MAX_STOPS);
   if (!dialog || stops.length === 0 || run) return;
   run = { tour, dialog, stops, index: 0 };
   dialog.showModal();

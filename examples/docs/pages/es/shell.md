@@ -35,6 +35,24 @@ Feature::new("sales")
 - **Teclado.** Arriba y Abajo recorren los encabezados y enlaces visibles, Inicio y Fin van al primero y al último. Derecha abre un grupo cerrado o entra en uno abierto; Izquierda cierra un grupo abierto o va al encabezado del grupo que lo rodea. Enter y Espacio abren o cierran un grupo. Izquierda y Derecha se intercambian en los idiomas de derecha a izquierda.
 - **Permisos y fusión.** Los grupos con la misma etiqueta se fusionan entre features en todos los niveles, y un grupo cuyos elementos el usuario no puede abrir se omite, incluidos los grupos anidados. La ruta de navegación de `App::header(|h| h.breadcrumb())` muestra la ruta completa de grupos. El site shell lista los enlaces de los grupos anidados en su grupo de primer nivel.
 
+### Riel de iconos, insignias, filtro y teléfonos
+
+```rust
+.menu(|m| {
+    m.group(t!("mail.menu"), Icon::Mail)
+        .item(t!("mail.inbox"), inbox)
+        .count(unread)
+        .count_listens("mail")
+        .item(t!("mail.rules"), rules)
+        .badge(t!("menu.new"))
+})
+```
+
+- **Riel de iconos.** En pantallas desde 1024 px, un botón en la barra del menú lo pliega a los iconos de sus grupos de primer nivel (o su primera letra). El nombre de un grupo aparece como información emergente y el grupo se abre como un panel junto al riel; Escape, un clic fuera y una navegación lo cierran. La elección se guarda en la cookie `zeyn_rail`, así la página siguiente se dibuja igual sin saltos.
+- **Insignias y contadores.** `.badge(text)` tras un elemento añade un texto fijo corto como "Nuevo". `.count(action)` añade un número contado por una action que recibe `()` y devuelve `u64`: la página pide todos los contadores de su menú en una sola petición después de mostrarse (`GET /_zeyn/menu/counts`), así un conteo lento nunca retrasa la página. Los usuarios sin el permiso de la action no ven número, 0 no muestra nada y más de 99 muestra "99+". `.count_listens(topics)` vuelve a contar cuando una action nombra uno de los temas con `ui.refresh(..)` o el socket en vivo lo notifica.
+- **Filtro y favoritos.** Un menú lateral con 10 o más enlaces (`MENU_FILTER_FROM`) recibe un cuadro de filtro: al escribir oculta los enlaces que no coinciden (sin distinguir mayúsculas ni acentos), abre los grupos de los que sí y dice cuántos quedan; Escape lo vacía. Cada enlace recibe un botón para fijarlo, y los enlaces fijados aparecen en un grupo Favoritos arriba, guardados en el navegador por usuario.
+- **Teléfonos.** Por debajo de 1024 px el menú se pliega tras un botón de su barra y se abre como un cajón sobre la pantalla. El foco entra en el cajón y queda entre él y el botón, la pantalla de detrás queda inerte y no se desplaza, y el botón, Escape, el fondo, un enlace o un deslizamiento hacia el borde del menú lo cierran y devuelven el foco al botón.
+
 ### Menús construidos en cada petición
 
 `App::menu_source(source)` añade entradas de menú que se construyen en cada petición, por ejemplo a partir de una tabla de menú filtrada por los roles del usuario. Una fuente es una función async que recibe el `Ctx` (identidad, tenant, idioma) y devuelve `MenuNode`s: `MenuNode::group(label, children)` en el nivel superior, con enlaces `MenuNode::screen(label, "screen_name")` (`.params(json)` rellena los segmentos de la ruta y la consulta, como hace `screen_url`), enlaces `MenuNode::path(label, "/reports/sales")` y grupos anidados dentro. `.icon(...)`, `.open()` y `.permission("menu.reports")` funcionan en cualquier nodo. Una etiqueta es texto plano, escapado como cualquier otro texto, o una clave del catálogo con `Text::key`.
