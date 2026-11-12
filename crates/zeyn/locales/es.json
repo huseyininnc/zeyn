@@ -129,7 +129,9 @@
       "rate_limited": "Demasiadas solicitudes. Inténtalo de nuevo en un momento.",
       "confirmation_required": "Esto requiere tu confirmación en la aplicación antes de ejecutarse.",
       "cursor": "La lista cambió desde que se cargó. Recárgala e inténtalo de nuevo.",
-      "duplicate": "Este registro ya existe."
+      "duplicate": "Este registro ya existe.",
+      "too_large": "La solicitud es demasiado grande.",
+      "bad_request": "No se pudo leer la solicitud."
     },
     "grid": {
       "pagination": "Paginación",

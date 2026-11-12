@@ -240,6 +240,18 @@ async function post(url, body, { quiet = false, signal } = {}) {
   return { status: res.status, ok: res.ok, data };
 }
 
+/**
+ * Sign out links (`a[data-zeyn-signout]`) first end the session with a `POST` and the CSRF
+ * token, then follow their address (the provider's sign out or the sign in page).
+ */
+document.addEventListener('click', async (e) => {
+  const a = e.target instanceof Element ? e.target.closest('a[data-zeyn-signout]') : null;
+  if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  await post(a.dataset.zeynSignout, {}, { quiet: true });
+  location.assign(a.href);
+});
+
 /** Builds the `?params=` query string; empty when the screen has no params. */
 function paramsQuery(params) {
   return params == null ? '' : `?params=${encodeURIComponent(JSON.stringify(params))}`;
