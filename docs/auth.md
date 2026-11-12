@@ -109,14 +109,13 @@ App::new("Stock").oidc(oidc)
 ```
 
 `App::oidc` makes it the authenticator, the `login_url`, the idle sign out address and the
-re authentication address. It adds these routes:
+re authentication address. It adds three routes:
 
 | Route | What it does |
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | starts a sign in and redirects to the provider |
 | `GET /_zeyn/auth/callback` | the provider's redirect back |
-| `POST /_zeyn/auth/logout` | ends the session here; needs the CSRF token |
-| `GET /_zeyn/auth/logout` | sends a signed out browser on to the provider's sign out |
+| `POST`, then `GET /_zeyn/auth/logout` | `POST` with the CSRF token ends the session here, `GET` then signs out at the provider |
 
 At the provider, register `<public url>/_zeyn/auth/callback` as the redirect URI and
 `<public url>/` as the post logout redirect URI. The public URL is configured, never taken from
