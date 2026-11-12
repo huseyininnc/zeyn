@@ -1516,6 +1516,45 @@ async fn posts_need_json_and_cookie_sessions_need_the_csrf_token() {
 }
 
 #[tokio::test]
+async fn any_cookie_needs_the_csrf_token_and_a_bearer_token_needs_none() {
+    let a = accounts();
+    user(&a, "bearer@example.com").await;
+    let router = app(a.clone());
+    let other_cookie = Request::post("/_zeyn/account/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, "zeyn_theme=dark")
+        .body(Body::from(
+            json!({ "email": "bearer@example.com", "password": PASSWORD }).to_string(),
+        ))
+        .unwrap();
+    assert_eq!(
+        send(&router, other_cookie).await.status,
+        StatusCode::FORBIDDEN,
+        "a cookie other than the session still needs the CSRF token"
+    );
+    let no_cookie = Request::post("/_zeyn/account/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({ "email": "bearer@example.com", "password": PASSWORD }).to_string(),
+        ))
+        .unwrap();
+    let tokens = send(&router, no_cookie).await;
+    assert_eq!(tokens.status, StatusCode::OK, "{}", tokens.body);
+    let access: Json = serde_json::from_str(&tokens.body).unwrap();
+    let access = access["accessToken"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let with_bearer = Request::post("/_zeyn/account/manage/2fa")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::AUTHORIZATION, format!("Bearer {access}"))
+        .header(header::COOKIE, "zeyn_theme=dark")
+        .body(Body::from("{}"))
+        .unwrap();
+    assert_eq!(send(&router, with_bearer).await.status, StatusCode::OK);
+}
+
+#[tokio::test]
 async fn sign_in_attempts_are_rate_limited_per_account() {
     let a = accounts().options(|o| {
         o.hasher = light();

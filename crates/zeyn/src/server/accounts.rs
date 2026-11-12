@@ -253,6 +253,14 @@ fn accounts(st: &AppState) -> Accounts {
         .expect("routes exist only with accounts")
 }
 
+/// Whether a `POST` must carry the CSRF token: every request that sends cookies, unless it signs
+/// in with a bearer token. Only the browser sends cookies by itself, so any cookie based sign in
+/// (today the session cookie, later any other) is covered; clients that sign in for tokens send
+/// no cookies and need none.
+fn needs_csrf(headers: &HeaderMap) -> bool {
+    bearer(headers).is_none() && headers.contains_key(header::COOKIE)
+}
+
 /// A JSON body, after the content type and, for cookie sessions, CSRF checks.
 #[allow(
     clippy::result_large_err,
@@ -270,7 +278,7 @@ fn body<T: serde::de::DeserializeOwned>(
     if !json {
         return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE.into_response());
     }
-    if cookie(headers, SESSION).is_some() && st.check_csrf(headers).is_err() {
+    if needs_csrf(headers) && st.check_csrf(headers).is_err() {
         return Err(problem(
             StatusCode::FORBIDDEN,
             "csrf",
@@ -670,7 +678,7 @@ async fn login(
 }
 
 async fn logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    if cookie(&headers, SESSION).is_some() && st.check_csrf(&headers).is_err() {
+    if needs_csrf(&headers) && st.check_csrf(&headers).is_err() {
         return problem(
             StatusCode::FORBIDDEN,
             "csrf",
@@ -1188,7 +1196,7 @@ async fn passkey_creation_options(accounts: &Accounts, st: &AppState, user: &Use
 }
 
 async fn passkey_creation(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    if cookie(&headers, SESSION).is_some() && st.check_csrf(&headers).is_err() {
+    if needs_csrf(&headers) && st.check_csrf(&headers).is_err() {
         return problem(
             StatusCode::FORBIDDEN,
             "csrf",

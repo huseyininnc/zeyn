@@ -129,7 +129,9 @@
       "rate_limited": "요청이 너무 많습니다. 잠시 후 다시 시도하십시오.",
       "confirmation_required": "실행하기 전에 앱에서 확인이 필요합니다.",
       "cursor": "불러온 이후 목록이 변경되었습니다. 다시 불러온 후 시도하십시오.",
-      "duplicate": "이 레코드는 이미 존재합니다."
+      "duplicate": "이 레코드는 이미 존재합니다.",
+      "too_large": "요청이 너무 큽니다.",
+      "bad_request": "요청을 읽을 수 없습니다."
     },
     "grid": {
       "pagination": "페이지 이동",
