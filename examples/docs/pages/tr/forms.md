@@ -130,4 +130,6 @@ Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:
 
 `DiskStore`, `{id}.bin` ve `{id}.json` dosyalarını tek bir klasörde tutar ve yüklemeleri önce `{id}.part` olarak yazar. `MemoryStore` dosyaları bayt üst sınırıyla bellekte tutar; testler ve demolar içindir. Form değeri yalnızca dosyaları adlandırır: bir dosyanın var olduğundan emin olması gereken bir kaydetme action'ı, showcase'in yaptığı gibi `store.meta(id)` çağırır.
 
+`FileRules::quota(bytes, window)` bir kullanıcının bir depoya belirli bir sürede yükleyebileceği miktarı sınırlar ve uygulamanın rate store'u ile sayılır; sınırı aşan yükleme yine kaydedilir, sonraki `429` alır. `DiskStore`, bir saatten eski `.part` dosyalarını (çökme nedeniyle yarım kalan yüklemeler) saatte en fazla bir kez siler. `ZipGuard`, ZIP tabanlı yüklemeler (ZIP, Word, Excel, PowerPoint) için bir tarayıcıdır: merkezi dizini 10.000'den fazla girdi, toplam 1 GiB'tan fazla veya dosya boyutunun 200 katından fazla açılacağını söyleyen arşivleri ve ZIP64 arşivlerini reddeder; kabul edilen bir arşivi açan kod da bu sınırlarda durmalıdır.
+
 Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 12 KB ve gzip 4 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.

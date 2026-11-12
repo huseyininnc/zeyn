@@ -1114,6 +1114,7 @@
     },
     "files": {
       "too_large": "Dosya çok büyük. İzin verilen en büyük dosya {max}.",
+      "quota": "Şimdilik yükleme sınırına ulaştınız. Daha sonra tekrar deneyin.",
       "too_many": "{label} en fazla {n} dosya alır.",
       "type": "Bu dosya türü kabul edilmiyor ya da içeriği adıyla uyuşmuyor.",
       "refused": "Dosya güvenlik denetiminden geçmedi.",
