@@ -13,6 +13,7 @@
 | `zeyn routes` | Feature、画面、ルート、API、アクセス権を一覧表示します |
 | `zeyn check` | コンパイルし、構造上の問題と翻訳の欠落を報告します |
 | `zeyn check --fix` | `src`、`tests`、`examples` 内で名前が変わった Zeyn API を書き換えてから検査します |
+| `zeyn check --json` | 安定したコード、理由、修正方法つきでレポートを JSON で出力します |
 | `zeyn mcp` | AI エージェント向けに標準入出力で MCP サーバーを起動します |
 
 crates.io からインストールします。
@@ -85,6 +86,30 @@ Zeyn のリリースで API の名前が変わったときは、`zeyn check --fi
 
 ```sh
 zeyn check --fix
+```
+
+どの問題にも安定したコードがあります。アプリ、フィーチャー、ルート、サービスは `Z01xx`、セキュリティは `Z02xx`、公開ページは `Z03xx`、メニュー、コマンド、ショートカットは `Z04xx`、データは `Z05xx`、ページ検査は `Z06xx`、警告は `W01xx` です。テキスト出力は各問題を理由 (`why`)、修正方法 (`help`)、このドキュメントへのリンク、コードとともに表示します。`zeyn check --json` は同じレポートをエージェントと CI 向けに 1 つの JSON ドキュメントとして出力し、`ok` が false のときはエラーで終了します。
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
 ```
 
 ## Docker

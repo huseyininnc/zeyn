@@ -480,11 +480,25 @@ where
     fn page_check(&self, check: &mut super::PageCheck) {
         if self.state.is_none() {
             check.problem(
-                "a Kanban needs `.state(field)`, the field that holds a record's workflow state",
+                crate::Problem::new(
+                    "Z0617",
+                    "a Kanban needs `.state(field)`, the field that holds a record's workflow state",
+                )
+                .why("the board puts each card in the column of its state, so without the field no card has a column")
+                .fix("add `.state(field)` with the model's state field")
+                .docs("components/admin#kanban"),
             );
         }
         if self.card.is_none() {
-            check.problem("a Kanban needs `.card(|row| node)`, how a record is drawn on its card");
+            check.problem(
+                crate::Problem::new(
+                    "Z0618",
+                    "a Kanban needs `.card(|row| node)`, how a record is drawn on its card",
+                )
+                .why("the board does not know what to show on a card, so the cards would be empty")
+                .fix("add `.card(|row| node)`")
+                .docs("components/admin#kanban"),
+            );
         }
     }
 }

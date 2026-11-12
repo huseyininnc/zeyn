@@ -292,10 +292,11 @@ impl ClientPrefs {
                     .any(|o| o.name == k.name)
             })
             .map(|(_, k)| {
-                format!(
-                    "client preference `{}` is registered twice\n  = help: register each key once with App::client_prefs",
-                    k.name
-                )
+crate::Problem::new("Z0120", format!("client preference `{}` is registered twice", k.name))
+    .why("the privacy table and the browser store would show the key twice, with possibly different purposes and lifetimes")
+    .fix("register each key once with App::client_prefs")
+    .docs("guides/security#client-preferences")
+    .to_string()
             })
             .collect()
     }

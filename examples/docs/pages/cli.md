@@ -13,6 +13,7 @@ The `zeyn` command creates projects, adds features, checks an app and runs an MC
 | `zeyn routes` | Lists features, screens, routes, APIs and access |
 | `zeyn check` | Compiles and reports structural problems and missing translations |
 | `zeyn check --fix` | Rewrites renamed Zeyn APIs in `src`, `tests` and `examples`, then checks |
+| `zeyn check --json` | Prints the report as JSON with stable codes, reasons and fixes |
 | `zeyn mcp` | Runs an MCP server on stdio for AI agents |
 
 Install it from crates.io:
@@ -87,6 +88,30 @@ When a Zeyn release renames an API, `zeyn check --fix` rewrites the old names, f
 
 ```sh
 zeyn check --fix
+```
+
+Every problem has a stable code: `Z01xx` for the app, features, routes and services, `Z02xx` for security, `Z03xx` for public pages, `Z04xx` for menus, commands and shortcuts, `Z05xx` for data, `Z06xx` for page checks and `W01xx` for warnings. The text output shows each problem with its reason (`why`), its fix (`help`), a link to these docs and its code. `zeyn check --json` prints the same report as one JSON document for agents and CI, and exits with an error when `ok` is false.
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
 ```
 
 ## Docker

@@ -512,7 +512,15 @@ impl<E: Model> Component for Inbox<E> {
             check.listens(t);
         }
         if self.when.is_none() {
-            check.problem("an Inbox needs `.when(field)`, the time a notification arrived, to sort and group by day");
+            check.problem(
+                crate::Problem::new(
+                    "Z0616",
+                    "an Inbox needs `.when(field)`, the time a notification arrived",
+                )
+                .why("the inbox sorts and groups notifications by day from this field")
+                .fix("add `.when(field)` with the model's time field")
+                .docs("components/admin#inbox-and-notificationcenter"),
+            );
         }
     }
 }
