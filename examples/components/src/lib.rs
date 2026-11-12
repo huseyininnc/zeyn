@@ -204,6 +204,7 @@ catalog! {
     "data" Table {
         data_grid "/ui/data-grid";
         table "/ui/table";
+        comparison_table "/ui/comparison-table";
         card_grid "/ui/card-grid";
         image_card "/ui/image-card";
         rail "/ui/rail";
@@ -226,6 +227,7 @@ catalog! {
     }
     "media" Image {
         image "/ui/image";
+        image_compare "/ui/image-compare";
         embed "/ui/embed";
         hero "/ui/hero";
     }
@@ -247,6 +249,10 @@ catalog! {
         chart "/ui/chart";
         kpi "/ui/kpi";
         heatmap "/ui/heatmap";
+        funnel "/ui/funnel";
+        activity_rings "/ui/activity-rings";
+        gantt "/ui/gantt";
+        org_chart "/ui/org-chart";
     }
     "shell" Sidebar {
         toolbox "/ui/toolbox";

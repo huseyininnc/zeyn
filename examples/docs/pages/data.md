@@ -61,6 +61,66 @@ Every bar, point, slice, stage and gauge value is a mark with its label and valu
 
 Hover, focus and a tap show the same text in a tooltip, which is hidden from screen readers so nothing is read twice. Without the script the marks are still named and the table stays. Small marks (8 px points) are below the 24 px target size; the table under *Show data* is the equivalent path (WCAG 2.5.8).
 
+## Gantt
+
+Tasks as bars over a span of days, such as the plan of a project. `Gantt::new(label, start, end)` sets the span, at most two years; `.task(title, from, to)` adds a task, `.done(percent)` and `.tone(...)` apply to the task added last, and `.today(day)` draws a line at that day. It is a table that gives the first and last day of every task as text, so the bars only repeat it; bars are cut at the ends of the span.
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+A hierarchy as boxes joined by lines, from one box at the top: the people of a company, the parts of a product. `OrgNode::new(name)` is a box, `.role(text)` a quieter line under the name and `.child(node)` a box below it. It is nested lists, so screen readers get the levels; a chart draws at most 200 boxes on 8 levels and scrolls inside its own box when it is wide.
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## Funnel
+
+The stages of a process that loses some at each step, such as visits, carts and orders. `Funnel::new(label)` with `.stage(title, value)` draws each stage as a centered bar as wide as its share of the first stage, with its number and that share as text. A funnel holds at most 10 stages.
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+Up to four shares of a whole as rings inside one another, such as the goals of a day. `.ring(title, value, max, tone)` adds a ring from the outside in, and `.size(px)` sets the diameter. Each name and percent is written next to the rings, so the picture is hidden from screen readers.
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+Plans or products side by side, one column each and one row a feature. `.plan(name)` adds a column and `.featured()` sets the plan added last apart; `.row(feature, cells)` takes a cell for each plan: `true` and `false` become a check and a cross, read as "Included" and "Not included", and a text is written as it is. It holds at most 6 plans and 100 rows.
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
 ## Table
 
 A small table of text the screen already holds: the plans of a price list, the opening hours of a shop, the totals of a report. `Table::new(caption)` takes a caption that names the table, `.head([...])` the column headers and `.row([...])` each row; `.row_headers()` makes the first cell of every row its header, so screen readers say the column and the row of each cell, `.numeric(index)` lines a column of numbers up at the end, and `.striped()` shades every second row. A row shorter than the head is filled with empty cells and a longer one is cut; a table holds at most 200 rows and 12 columns. It has no paging, sorting or filters and makes no request: rows that come from an action, or that the user works with, belong in `DataGrid`. On narrow screens it scrolls sideways inside its own box, which takes focus so the arrow keys scroll it.

@@ -572,6 +572,15 @@
         "less": "Less",
         "more": "More"
       },
+      "compare": {
+        "yes": "Included",
+        "no": "Not included"
+      },
+      "gantt": {
+        "task": "Task",
+        "from": "Starts",
+        "to": "Ends"
+      },
       "meter": {
         "low": "low",
         "high": "high"

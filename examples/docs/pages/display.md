@@ -200,6 +200,17 @@ Image::new(p.photo_800.clone())
 - `.fit(Fit::Cover)` fills the box and cuts what overflows; `Fit::Contain` shows the whole file.
 - `low`, `fallback` and `Placeholder::image` follow the same address rules as `src`; others are left out. The box always keeps the image's size, so nothing moves while files load or fail.
 
+## ImageCompare
+
+Two pictures of the same size on top of one another with a slider that uncovers one over the other, such as before and after. `.before(src, alt)` and `.after(src, alt)` give the pictures, which follow the rules of `Image`, and `.size(width, height)` gives the box its shape. The slider is a range input named by the label, so the arrow keys move it; a small script, loaded only on pages that hold one, shows it, and without script the pictures show half and half.
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` links to another site with `rel="noopener noreferrer"`, so the other site gets neither the page address nor a handle on the window. Screen readers hear "external site" after the text; an arrow marks it visually.

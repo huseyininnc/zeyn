@@ -200,6 +200,17 @@ Image::new(p.photo_800.clone())
 - `.fit(Fit::Cover)` 填满图片框并裁掉溢出部分；`Fit::Contain` 显示整个文件。
 - `low`、`fallback` 和 `Placeholder::image` 遵循与 `src` 相同的地址规则；其他地址会被省略。图片框始终保持图片的尺寸，因此文件加载或失败时页面不会跳动。
 
+## ImageCompare
+
+两张尺寸相同的图片叠放在一起，用一个滑块让其中一张覆盖在另一张上露出，例如前后对比。`.before(src, alt)` 和 `.after(src, alt)` 给出图片，它们遵循 `Image` 的规则，`.size(width, height)` 决定框的形状。滑块是一个以标签命名的范围输入框，因此可以用方向键移动；一个只在包含此组件的页面上加载的小脚本会显示它，没有脚本时两张图片各显示一半。
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` 以 `rel="noopener noreferrer"` 链接到其他站点，因此对方站点既得不到页面地址，也无法获得窗口的句柄。屏幕阅读器会在文字之后读出“外部站点”；视觉上用箭头标记。

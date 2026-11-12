@@ -572,6 +572,15 @@
         "less": "Az",
         "more": "Çok"
       },
+      "compare": {
+        "yes": "Var",
+        "no": "Yok"
+      },
+      "gantt": {
+        "task": "Görev",
+        "from": "Başlangıç",
+        "to": "Bitiş"
+      },
       "meter": {
         "low": "düşük",
         "high": "yüksek"

@@ -200,6 +200,17 @@ Image::new(p.photo_800.clone())
 - `.fit(Fit::Cover)` はボックスを埋め、はみ出した部分を切り取ります。`Fit::Contain` はファイル全体を表示します。
 - `low`、`fallback`、`Placeholder::image` は `src` と同じアドレス規則に従い、それ以外は除外されます。ボックスは常に画像のサイズを保つため、ファイルの読み込み中や失敗時にも何も動きません。
 
+## ImageCompare
+
+同じサイズの 2 枚の画像を重ね、スライダーで一方をもう一方の上に現します。ビフォーアフターなどに使います。`.before(src, alt)` と `.after(src, alt)` で画像を指定します。画像は `Image` のルールに従います。`.size(width, height)` は枠の形を決めます。スライダーはラベルを名前に持つ範囲入力なので、矢印キーで動かせます。このコンポーネントのあるページでだけ読み込まれる小さなスクリプトがスライダーを表示し、スクリプトがない場合は画像が半分ずつ表示されます。
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` は、`rel="noopener noreferrer"` 付きで別のサイトへリンクするため、相手のサイトにはページのアドレスもウィンドウへの参照も渡りません。スクリーンリーダーはテキストの後に「external site」と読み上げ、視覚的には矢印で示されます。

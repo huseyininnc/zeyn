@@ -200,6 +200,17 @@ Image::new(p.photo_800.clone())
 - `.fit(Fit::Cover)` rellena la caja y recorta lo que sobra; `Fit::Contain` muestra el archivo entero.
 - `low`, `fallback` y `Placeholder::image` siguen las mismas reglas de dirección que `src`; los demás se omiten. La caja conserva siempre el tamaño de la imagen, así que nada se mueve mientras los archivos se cargan o fallan.
 
+## ImageCompare
+
+Dos imágenes del mismo tamaño una sobre otra con un control deslizante que descubre una sobre la otra, como antes y después. `.before(src, alt)` y `.after(src, alt)` dan las imágenes, que siguen las reglas de `Image`, y `.size(width, height)` da su forma a la caja. El control es una entrada de rango nombrada por la etiqueta, así que las teclas de flecha lo mueven; un script pequeño, cargado solo en las páginas que contienen uno, lo muestra, y sin script las imágenes se ven mitad y mitad.
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` enlaza con otro sitio con `rel="noopener noreferrer"`, de modo que el otro sitio no recibe ni la dirección de la página ni un control sobre la ventana. Los lectores de pantalla oyen "external site" tras el texto; una flecha lo marca visualmente.

@@ -1076,3 +1076,240 @@ fn tocs_link_headings_by_their_cleaned_anchors_and_nest_sub_entries() {
         r#"<nav class="z-toc" aria-label="Empty"><ol class="z-toc-list"></ol></nav>"#
     );
 }
+
+#[test]
+fn funnels_size_each_stage_by_its_share_of_the_first() {
+    let f = zeyn::ui::Funnel::new("Sales <funnel>")
+        .stage("Visits", 12_400)
+        .stage("Carts <b>", 3_100)
+        .stage("Refunds", 99_999)
+        .tone(Tone::Success);
+    let out = html(&f, "en");
+    assert!(
+        out.starts_with(
+            r#"<ol class="z-funnel z-tone-success" aria-label="Sales &lt;funnel&gt;">"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            r#"<span class="z-funnel-name">Carts &lt;b&gt;</span><span class="z-funnel-track"><span class="z-funnel-bar" style="--z-funnel:25%"></span></span><span class="z-funnel-value">3,100</span><span class="z-funnel-share">25%</span>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains("--z-funnel:100%") && !out.contains("--z-funnel:806%"),
+        "a stage larger than the first is never wider than it: {out}"
+    );
+    assert!(html(&f, "tr").contains(">12.400<"));
+    let empty = html(&zeyn::ui::Funnel::new("None").stage("Zero", 0), "en");
+    assert!(empty.contains("--z-funnel:0%"), "{empty}");
+    let capped = (0..30).fold(zeyn::ui::Funnel::new("Many"), |f, i| {
+        f.stage(i.to_string(), i)
+    });
+    assert_eq!(
+        capped.schema()["stages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        zeyn::ui::MAX_FUNNEL_STAGES
+    );
+}
+
+#[test]
+fn activity_rings_draw_a_ring_and_a_legend_line_for_each_goal() {
+    let rings = zeyn::ui::ActivityRings::new("Today <now>")
+        .ring("Packed <b>", 42, 60, Tone::Brand)
+        .ring("Calls", 30, 20, Tone::Success)
+        .size(9);
+    let out = html(&rings, "en");
+    assert!(
+        out.starts_with(
+            r#"<div class="z-rings" role="group" aria-label="Today &lt;now&gt;"><svg class="z-rings-svg" viewBox="0 0 36 36" width="64" height="64" aria-hidden="true" focusable="false">"#
+        ),
+        "{out}"
+    );
+    assert!(out.contains(r#"class="z-rings-bar z-tone-brand" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="70 100""#));
+    assert!(
+        out.contains(r#"r="12" pathLength="100" stroke-dasharray="100 100""#),
+        "a value over its goal is the goal: {out}"
+    );
+    assert!(out.contains(
+        r#"<span class="z-rings-name">Packed &lt;b&gt;</span><span class="z-rings-value">70%</span>"#
+    ));
+    let capped = (0..9).fold(zeyn::ui::ActivityRings::new("Many"), |r, i| {
+        r.ring(i.to_string(), 1, 2, Tone::Info)
+    });
+    assert_eq!(
+        capped.schema()["rings"]
+            .as_array()
+            .unwrap()
+            .len(),
+        zeyn::ui::MAX_RINGS
+    );
+}
+
+#[test]
+fn comparison_tables_say_included_or_not_and_mark_the_featured_plan() {
+    let t = zeyn::ui::ComparisonTable::new("Plans <2026>")
+        .plan("Free")
+        .plan("Team <b>")
+        .featured()
+        .row("Users", ["3", "25"])
+        .row("Audit log", [false, true])
+        .row("Short", [true]);
+    let out = html(&t, "en");
+    assert!(out.contains(
+        r#"<caption class="z-table-caption" id="s-compare-">Plans &lt;2026&gt;</caption>"#
+    ));
+    assert!(out.contains(
+        r#"<thead><tr><td></td><th scope="col">Free</th><th scope="col" class="z-compare-featured">Team &lt;b&gt;</th></tr></thead>"#
+    ));
+    assert!(
+        out.contains(
+            r#"<tr><th scope="row">Users</th><td>3</td><td class="z-compare-featured">25</td></tr>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            r#"<td><span class="z-compare-no" aria-hidden="true">&#10005;</span><span class="z-sr-only">Not included</span></td><td class="z-compare-featured"><span class="z-compare-yes" aria-hidden="true">&#10003;</span><span class="z-sr-only">Included</span></td>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"<span class="z-sr-only">Included</span></td><td class="z-compare-featured"></td></tr>"#),
+        "a short row leaves the rest empty: {out}"
+    );
+    assert!(html(&t, "tr").contains(r#"<span class="z-sr-only">Yok</span>"#));
+    let capped = (0..20).fold(zeyn::ui::ComparisonTable::new("Many"), |t, i| {
+        t.plan(i.to_string())
+    });
+    assert_eq!(
+        capped.schema()["plans"]
+            .as_array()
+            .unwrap()
+            .len(),
+        zeyn::ui::MAX_COMPARE_PLANS
+    );
+}
+
+#[test]
+fn image_compares_hold_two_allowed_pictures_and_a_hidden_slider() {
+    let c = zeyn::ui::ImageCompare::new("Before and <after>")
+        .before("/img/before.png", "The old <floor>")
+        .after("/img/after.png", "The new floor")
+        .size(1200, 800);
+    let out = html(&c, "en");
+    assert!(
+        out.starts_with(r#"<div class="z-imgcompare" data-zeyn-imgcompare style="--z-imgcompare-ratio:1200 / 800">"#),
+        "{out}"
+    );
+    assert!(out.contains(
+        r#"<img class="z-imgcompare-img z-imgcompare-before" src="/img/before.png" alt="The old &lt;floor&gt;" width="1200" height="800""#
+    ));
+    assert!(
+        out.find("z-imgcompare-after").unwrap() < out.find("z-imgcompare-before").unwrap(),
+        "the first picture lies on top"
+    );
+    assert!(
+        out.contains(
+            r#"<input class="z-imgcompare-range" type="range" min="0" max="100" value="50" aria-label="Before and &lt;after&gt;" data-testid="s.imgcompare" hidden>"#
+        ),
+        "{out}"
+    );
+    let outside = html(
+        &zeyn::ui::ImageCompare::new("Compare")
+            .before("https://elsewhere.example/a.png", "A")
+            .after("/img/b.png", "B"),
+        "en",
+    );
+    assert!(
+        !outside.contains("elsewhere.example") && outside.contains("/img/b.png"),
+        "a picture outside img-src is left out: {outside}"
+    );
+}
+
+#[test]
+fn org_charts_are_nested_lists_with_caps_on_boxes_and_depth() {
+    use zeyn::ui::{OrgChart, OrgNode};
+    let chart = OrgChart::new(
+        "Company <org>",
+        OrgNode::new("Ada <L>")
+            .role("Director")
+            .child(OrgNode::new("Alan").role("Engineering <eng>"))
+            .child(OrgNode::new("Grace")),
+    );
+    let out = html(&chart, "en");
+    assert_eq!(
+        out,
+        concat!(
+            r#"<div class="z-org" role="group" aria-label="Company &lt;org&gt;" tabindex="0"><ul>"#,
+            r#"<li><div class="z-org-box"><span class="z-org-name">Ada &lt;L&gt;</span><span class="z-org-role">Director</span></div><ul>"#,
+            r#"<li><div class="z-org-box"><span class="z-org-name">Alan</span><span class="z-org-role">Engineering &lt;eng&gt;</span></div></li>"#,
+            r#"<li><div class="z-org-box"><span class="z-org-name">Grace</span></div></li>"#,
+            "</ul></li></ul></div>"
+        )
+    );
+    let deep = (0..40).fold(OrgNode::new("leaf"), |child, i| {
+        OrgNode::new(i.to_string()).child(child)
+    });
+    let out = html(&OrgChart::new("Deep", deep), "en");
+    assert_eq!(out.matches("z-org-box").count(), zeyn::ui::MAX_ORG_DEPTH);
+    let wide = (0..500).fold(OrgNode::new("root"), |root, i| {
+        root.child(OrgNode::new(i.to_string()))
+    });
+    let out = html(&OrgChart::new("Wide", wide), "en");
+    assert_eq!(out.matches("z-org-box").count(), zeyn::ui::MAX_ORG_NODES);
+}
+
+#[test]
+fn gantts_are_tables_with_dates_as_text_and_bars_cut_at_the_span() {
+    let day = |d: u8| Date::new(2026, 11, d).unwrap();
+    let g = zeyn::ui::Gantt::new("Launch <plan>", day(1), day(30))
+        .task("Design <d>", day(1), day(15))
+        .done(250)
+        .task("Build", day(16), Date::new(2027, 1, 9).unwrap())
+        .tone(Tone::Warning)
+        .task(
+            "Old",
+            Date::new(2026, 1, 1).unwrap(),
+            Date::new(2026, 2, 1).unwrap(),
+        )
+        .today(day(16));
+    let out = html(&g, "en");
+    assert!(out.contains(
+        r#"<caption class="z-table-caption" id="s-gantt-">Launch &lt;plan&gt;</caption>"#
+    ));
+    assert!(out.contains(
+        r#"<th scope="col">Task</th><th scope="col">Starts</th><th scope="col">Ends</th><td class="z-gantt-track" aria-hidden="true"><span class="z-gantt-month" style="--z-gantt-at:0.00%">November</span></td>"#
+    ), "{out}");
+    assert!(
+        out.contains(
+            r#"<tr><th scope="row">Design &lt;d&gt;</th><td class="z-gantt-date">11/1/2026</td><td class="z-gantt-date">11/15/2026</td><td class="z-gantt-track" aria-hidden="true"><span class="z-gantt-bar z-tone-brand" style="--z-gantt-at:0.00%;--z-gantt-width:50.00%"><span class="z-gantt-done" style="--z-gantt-done:100%"></span></span>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"z-tone-warning" style="--z-gantt-at:50.00%;--z-gantt-width:50.00%""#),
+        "a task that ends after the span is cut at its end: {out}"
+    );
+    assert_eq!(
+        out.matches("z-gantt-bar").count(),
+        2,
+        "a task outside the span has no bar but keeps its row: {out}"
+    );
+    assert!(out.contains(r#"<th scope="row">Old</th><td class="z-gantt-date">1/1/2026</td>"#));
+    assert_eq!(
+        out.matches(r#"<span class="z-gantt-today" style="--z-gantt-at:50.00%"></span>"#)
+            .count(),
+        3
+    );
+    let tr = html(&g, "tr");
+    assert!(tr.contains(">Kasım<") && tr.contains(r#"<th scope="col">Görev</th>"#));
+
+    let long = zeyn::ui::Gantt::new("Long", day(1), Date::new(2040, 1, 1).unwrap());
+    assert_eq!(long.schema()["end"], "2028-10-31", "the span is capped");
+    let back = zeyn::ui::Gantt::new("Back", day(9), day(2));
+    assert_eq!(back.schema()["end"], "2026-11-09");
+}

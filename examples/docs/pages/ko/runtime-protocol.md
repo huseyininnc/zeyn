@@ -56,6 +56,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 받은 편지함과 알림 종; Kanban 보드; 달력; 스크립트가 필요 없는 비교, 코드 보기, 바코드(코드 보기의 복사 버튼은 `share.js`에 있음) |
 | `codeedit.js`, `codeedit.css` | 코드 편집기(`data-zeyn-code`): 강조 표시한 사본, 줄 번호, 제안, 오류 표시. `/_zeyn/data`에는 입력이 멈춘 뒤에만 보냅니다 |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js`, `commerce.css` | 범위 슬라이더, 수량 선택기, 상품 갤러리, 카운트다운; 모든 쇼핑 컴포넌트의 스타일시트(가격, 옵션 선택기, 패싯 패널, 리뷰 요약) |
+| `imgcompare.js` | 그림 비교(`ImageCompare`): 슬라이더를 보여 주고 그 값을 `--z-imgcompare`에 기록합니다 |
 | `thread.js` 및 `thread.css`, `stream.js`, `composer.js` 및 `composer.css`, `typing.js` 및 `typing.css` | 메시지 스레드; 스레드와 어시스턴트가 함께 쓰는 스트리밍 Markdown과 JSON 줄; 채팅 composer; 입력 중 표시기 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 게시물 피드; 이미지와 동영상 라이트박스; 스토리 링과 그 행, 스크립트 필요 없음 |
 

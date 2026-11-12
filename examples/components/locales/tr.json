@@ -64,6 +64,12 @@
       "copy_button": "Bir metni panoya kopyalar.",
       "progress_ring": "İçinde yüzdesi yazan halka biçiminde ilerleme.",
       "heatmap": "Her gün için bir sayı, tonlu karelerden bir takvim olarak.",
+      "funnel": "İlkinden sonuncusuna daralan aşamalar.",
+      "activity_rings": "Birkaç hedefin payı, iç içe halkalar olarak.",
+      "gantt": "Günlere yayılmış çubuklar olarak görevler.",
+      "org_chart": "Çizgilerle bağlı kutulardan bir hiyerarşi.",
+      "comparison_table": "Planlar yan yana, her özellik için bir satır.",
+      "image_compare": "Bir sürgünün altında iki resim.",
       "table": "Ekranın zaten elinde olan metinlerden küçük bir tablo.",
       "indicator": "Başka bir bileşenin köşesinde bir sayı ya da nokta.",
       "meter": "Bir aralıktaki ölçüm, eşiklerine göre renklenir.",
@@ -196,6 +202,26 @@
         "several_words": "Birkaç kelime"
       },
       "toc": {
+        "overview": "Örnek"
+      },
+      "funnel": {
+        "overview": "Örnek",
+        "another_tone": "Başka bir ton"
+      },
+      "activity_rings": {
+        "overview": "Örnek",
+        "large": "Dört halka, daha büyük"
+      },
+      "gantt": {
+        "overview": "Örnek"
+      },
+      "org_chart": {
+        "overview": "Örnek"
+      },
+      "comparison_table": {
+        "overview": "Örnek"
+      },
+      "image_compare": {
         "overview": "Örnek"
       },
       "heatmap": {

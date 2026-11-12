@@ -13,6 +13,7 @@ mod chart;
 mod chips;
 mod code;
 mod code_edit;
+mod compare;
 mod composer;
 mod content;
 mod controls;
@@ -24,7 +25,9 @@ mod document;
 mod embed;
 mod facets;
 mod feed;
+mod funnel;
 mod gallery;
+mod gantt;
 mod heatmap;
 mod hero;
 mod inbox;
@@ -42,6 +45,7 @@ mod mark;
 mod markdown;
 mod media;
 mod menus;
+mod org;
 mod overlay;
 mod pagination;
 mod preview;
@@ -103,6 +107,9 @@ pub use code_edit::{
     CodeEditor, CodeError, CodeQuery, Completion, CompletionKind, MAX_CODE_ERRORS,
     MAX_CODE_MESSAGE_CHARS, MAX_CODE_QUERY_BYTES, MAX_COMPLETION_CHARS, MAX_COMPLETIONS,
 };
+pub use compare::{
+    CompareCell, ComparisonTable, ImageCompare, MAX_COMPARE_PLANS, MAX_COMPARE_ROWS,
+};
 pub use composer::{
     ChatSend, Composer, DEFAULT_MESSAGE_CHARS, MAX_MENTION_QUERY, MAX_MENTIONS,
     MAX_MESSAGE_MENTIONS, SendKey,
@@ -126,7 +133,9 @@ pub use document::{
 };
 pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
 pub use feed::{Feed, MAX_FEED_BATCH, MAX_POST_MEDIA, Post};
+pub use funnel::{ActivityRings, Funnel, MAX_FUNNEL_STAGES, MAX_RINGS};
 pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
+pub use gantt::{Gantt, MAX_GANTT_DAYS, MAX_GANTT_TASKS};
 pub use heatmap::{HEATMAP_LEVELS, Heatmap, MAX_HEATMAP_WEEKS, heat_level};
 pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use inbox::{Inbox, InboxSelection, MAX_INBOX, MAX_UNREAD, NotificationCenter, UnreadCount};
@@ -143,6 +152,7 @@ pub(crate) use lookup::{parse_ids, render_lookup};
 pub use mark::{Highlight, MAX_HIGHLIGHT_TERM_CHARS, MAX_HIGHLIGHT_TERMS, highlight_ranges};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use menus::MenuButton;
+pub use org::{MAX_ORG_DEPTH, MAX_ORG_NODES, OrgChart, OrgNode};
 pub(crate) use overlay::tip;
 pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
 pub use pagination::{MAX_PAGES_AROUND, Pagination, page_window};

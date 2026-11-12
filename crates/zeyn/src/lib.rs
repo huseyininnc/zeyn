@@ -269,6 +269,10 @@ pub mod prelude {
         WeekSchedule,
     };
     pub use crate::ui::{
+        ActivityRings, ComparisonTable, Funnel, Gantt, Highlight, ImageCompare, Indicator, Meter,
+        OrgChart, OrgNode, Table, Toc,
+    };
+    pub use crate::ui::{
         Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeEditor, CodeError,
         CodeLang, CodeQuery, CodeView, Completion, CompletionKind, DiffLayout, DiffView, Inbox,
         InboxSelection, JsonView, Kanban, NotificationCenter, QrCode, QrLevel, UnreadCount,
@@ -283,7 +287,6 @@ pub mod prelude {
     };
     pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
     pub use crate::ui::{FieldSpec, FormSchema, LengthUnit, SchemaForm};
-    pub use crate::ui::{Highlight, Indicator, Meter, Table, Toc};
     #[cfg(feature = "server")]
     pub use crate::ui::{Reply, ReplySender};
     pub use crate::{

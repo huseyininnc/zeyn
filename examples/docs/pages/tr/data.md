@@ -61,6 +61,66 @@ Her çubuk, nokta, dilim, aşama ve gauge değeri, etiketi ve değeri adı olan 
 
 Üzerine gelme, odaklanma ve dokunma aynı metni bir tooltip içinde gösterir; tooltip ekran okuyuculardan gizlenir, böylece hiçbir şey iki kez okunmaz. Betik olmadan da işaretler adlandırılmış kalır ve tablo durur. Küçük işaretler (8 px'lik noktalar) 24 px hedef boyutunun altındadır; *Show data* altındaki tablo eşdeğer yoldur (WCAG 2.5.8).
 
+## Gantt
+
+Günlere yayılmış çubuklar olarak görevler; örneğin bir projenin planı. `Gantt::new(label, start, end)` aralığı belirler, en fazla iki yıl; `.task(title, from, to)` bir görev ekler, `.done(percent)` ve `.tone(...)` son eklenen göreve uygulanır, `.today(day)` ise o güne bir çizgi çizer. Her görevin ilk ve son gününü metin olarak veren bir tablodur, çubuklar yalnızca bunu yineler; çubuklar aralığın uçlarında kesilir.
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+Tepedeki tek bir kutudan başlayan, çizgilerle bağlı kutulardan bir hiyerarşi: bir şirketin çalışanları, bir ürünün parçaları. `OrgNode::new(name)` bir kutudur, `.role(text)` adın altında daha silik bir satır, `.child(node)` ise altına bir kutu ekler. İç içe listelerden oluşur, böylece ekran okuyucular düzeyleri alır; bir şema en fazla 8 düzeyde 200 kutu çizer ve geniş olduğunda kendi kutusunun içinde kayar.
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## Funnel
+
+Her adımda bir kısmını kaybeden bir sürecin aşamaları; örneğin ziyaretler, sepetler ve siparişler. `Funnel::new(label)` ile `.stage(title, value)`, her aşamayı ilk aşamaya oranı kadar geniş, ortalanmış bir çubuk olarak çizer; sayısı ve bu oran metin olarak yazılır. Bir huni en fazla 10 aşama tutar.
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+Bir bütünün en fazla dört payı, iç içe halkalar olarak; örneğin bir günün hedefleri. `.ring(title, value, max, tone)` dıştan içe doğru bir halka ekler, `.size(px)` çapı belirler. Her ad ve yüzde halkaların yanına yazılır, bu yüzden çizim ekran okuyuculardan gizlidir.
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+Planlar ya da ürünler yan yana: her biri bir sütun, her özellik bir satır. `.plan(name)` bir sütun ekler, `.featured()` son eklenen planı öne çıkarır; `.row(feature, cells)` her plan için bir hücre alır: `true` ve `false` bir onay ve bir çarpı olur, "Var" ve "Yok" diye okunur, metin ise olduğu gibi yazılır. En fazla 6 plan ve 100 satır tutar.
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
 ## Table
 
 Ekranın zaten elinde olan metinlerden küçük bir tablo: bir fiyat listesinin planları, bir mağazanın açılış saatleri, bir raporun toplamları. `Table::new(caption)` tabloyu adlandıran bir başlık alır, `.head([...])` sütun başlıklarını, `.row([...])` ise her satırı verir; `.row_headers()` her satırın ilk hücresini o satırın başlığı yapar, böylece ekran okuyucular her hücrenin sütununu ve satırını söyler; `.numeric(index)` bir sayı sütununu sona hizalar, `.striped()` ise her ikinci satırı gölgelendirir. Başlıktan kısa bir satır boş hücrelerle doldurulur, uzun olan kesilir; bir tablo en fazla 200 satır ve 12 sütun tutar. Sayfalama, sıralama ya da filtre içermez ve istek göndermez: bir action'dan gelen ya da kullanıcının üzerinde çalıştığı satırların yeri `DataGrid`'dir. Dar ekranlarda kendi kutusunun içinde yana doğru kayar; kutu odak alır, böylece ok tuşları onu kaydırır.

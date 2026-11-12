@@ -61,6 +61,66 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 
 마우스 오버, 포커스, 탭은 같은 텍스트를 툴팁으로 보여 주며, 툴팁은 중복해서 읽히지 않도록 스크린 리더에서 숨겨집니다. 스크립트가 없어도 마크에는 이름이 있고 표가 남습니다. 작은 마크(8 px 점)는 24 px 대상 크기에 못 미칩니다. *Show data* 아래의 표가 동등한 대체 경로입니다(WCAG 2.5.8).
 
+## Gantt
+
+프로젝트 계획처럼 작업을 여러 날에 걸친 막대로 보여 줍니다. `Gantt::new(label, start, end)`는 기간을 정하며 최대 2년입니다. `.task(title, from, to)`는 작업을 추가하고, `.done(percent)`와 `.tone(...)`은 마지막에 추가한 작업에 적용되며, `.today(day)`는 그 날짜에 선을 긋습니다. 각 작업의 첫날과 마지막 날을 텍스트로 알려 주는 표이므로 막대는 그 내용을 되풀이할 뿐입니다. 막대는 기간의 양 끝에서 잘립니다.
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+회사의 사람들이나 제품의 부품 같은 계층을, 맨 위의 상자 하나에서 시작해 선으로 이어진 상자들로 보여 줍니다. `OrgNode::new(name)`은 상자이고, `.role(text)`는 이름 아래의 흐린 줄이며, `.child(node)`는 그 아래의 상자입니다. 중첩된 목록이므로 스크린 리더가 단계를 알 수 있습니다. 도표는 최대 8단계에 200개의 상자를 그리며, 넓을 때는 자신의 상자 안에서 스크롤됩니다.
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## Funnel
+
+방문, 장바구니, 주문처럼 단계마다 일부가 빠져나가는 과정의 단계들입니다. `Funnel::new(label)`과 `.stage(title, value)`는 각 단계를 첫 단계에 대한 비율만큼의 너비를 가진 가운데 정렬 막대로 그리고, 숫자와 그 비율을 텍스트로 보여 줍니다. 퍼널은 최대 10개의 단계를 가집니다.
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+하루의 목표처럼 전체에서 차지하는 몫을 최대 네 개까지 겹쳐진 고리로 보여 줍니다. `.ring(title, value, max, tone)`은 바깥에서 안쪽으로 고리를 추가하고, `.size(px)`는 지름을 정합니다. 각 이름과 백분율이 고리 옆에 적히므로 그림 자체는 스크린 리더에서 숨겨집니다.
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+요금제나 제품을 나란히 보여 줍니다. 각각이 한 열이고 기능마다 한 행입니다. `.plan(name)`은 열을 추가하고, `.featured()`는 마지막에 추가한 요금제를 돋보이게 합니다. `.row(feature, cells)`는 요금제마다 셀 하나를 받습니다. `true`와 `false`는 체크와 엑스 표시가 되어 "포함"과 "미포함"으로 읽히고, 텍스트는 그대로 적힙니다. 최대 6개의 요금제와 100개의 행을 가집니다.
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
 ## Table
 
 화면이 이미 가지고 있는 텍스트로 만든 작은 표입니다. 요금표의 요금제, 매장의 영업시간, 보고서의 합계 등에 씁니다. `Table::new(caption)`은 표의 이름이 되는 캡션을 받고, `.head([...])`는 열 머리글을, `.row([...])`는 각 행을 줍니다. `.row_headers()`는 각 행의 첫 번째 셀을 그 행의 머리글로 만들어 스크린 리더가 각 셀의 열과 행을 읽게 하고, `.numeric(index)`는 숫자 열을 끝쪽으로 맞추며, `.striped()`는 한 행 걸러 배경색을 넣습니다. 머리글보다 짧은 행은 빈 셀로 채워지고 더 긴 행은 잘립니다. 표는 최대 200개의 행과 12개의 열을 가집니다. 페이지 나누기, 정렬, 필터가 없고 요청도 보내지 않습니다. 액션에서 오는 행이나 사용자가 다루는 행은 `DataGrid`에 두어야 합니다. 좁은 화면에서는 자신의 상자 안에서 옆으로 스크롤되며, 상자가 포커스를 받으므로 화살표 키로 스크롤할 수 있습니다.

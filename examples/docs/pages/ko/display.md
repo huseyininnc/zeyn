@@ -200,6 +200,17 @@ Image::new(p.photo_800.clone())
 - `.fit(Fit::Cover)`는 상자를 채우고 넘치는 부분을 잘라 냅니다. `Fit::Contain`은 파일 전체를 보여 줍니다.
 - `low`, `fallback`, `Placeholder::image`는 `src`와 같은 주소 규칙을 따르며, 그 밖의 주소는 제외됩니다. 상자는 항상 이미지의 크기를 유지하므로 파일이 로드되거나 실패하는 동안 아무것도 움직이지 않습니다.
 
+## ImageCompare
+
+같은 크기의 그림 두 장을 겹쳐 놓고 슬라이더로 한 장을 다른 장 위에 드러냅니다. 전후 비교 등에 씁니다. `.before(src, alt)`와 `.after(src, alt)`로 그림을 주며, 그림은 `Image`의 규칙을 따릅니다. `.size(width, height)`는 상자의 모양을 정합니다. 슬라이더는 레이블을 이름으로 갖는 범위 입력이므로 화살표 키로 움직일 수 있습니다. 이 컴포넌트가 있는 페이지에서만 불러오는 작은 스크립트가 슬라이더를 보여 주며, 스크립트가 없으면 그림이 반반씩 보입니다.
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)`는 `rel="noopener noreferrer"`로 다른 사이트에 연결하므로, 다른 사이트는 페이지 주소도 창에 대한 핸들도 얻지 못합니다. 스크린 리더는 텍스트 뒤에 "external site"를 읽고, 시각적으로는 화살표가 이를 표시합니다.

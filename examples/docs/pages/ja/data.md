@@ -61,6 +61,66 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 
 ホバー、フォーカス、タップは同じテキストをツールチップに表示します。ツールチップはスクリーンリーダーからは隠されるため、二重に読み上げられることはありません。スクリプトがなくても、マークには名前が付いたままで、表も残ります。小さなマーク（8 px の点）は 24 px のターゲットサイズを下回りますが、*データを表示* の下の表が同等の手段になります（WCAG 2.5.8）。
 
+## Gantt
+
+プロジェクトの計画のように、タスクを日数の範囲にわたるバーとして表示します。`Gantt::new(label, start, end)` は範囲を設定します。最長 2 年です。`.task(title, from, to)` はタスクを追加し、`.done(percent)` と `.tone(...)` は最後に追加したタスクに適用され、`.today(day)` はその日に線を引きます。各タスクの開始日と終了日をテキストで示す表なので、バーはそれを繰り返しているだけです。バーは範囲の両端で切り詰められます。
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+会社の人員や製品の部品のような階層を、いちばん上の 1 つのボックスから線でつないだボックスとして表示します。`OrgNode::new(name)` はボックス、`.role(text)` は名前の下の控えめな行、`.child(node)` はその下のボックスです。入れ子のリストなので、スクリーンリーダーは階層を読み取れます。図は最大 8 階層、200 個のボックスまで描き、幅が広い場合は自身の枠の中でスクロールします。
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## Funnel
+
+訪問、カート、注文のように、段階ごとに一部が減っていくプロセスの各段階です。`Funnel::new(label)` と `.stage(title, value)` は、各段階を、最初の段階に対する割合の幅を持つ中央寄せのバーとして描き、数値とその割合をテキストで示します。ファネルが持てる段階は最大 10 個です。
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+1 日の目標のように、全体に対する割合を最大 4 つ、入れ子のリングとして表示します。`.ring(title, value, max, tone)` は外側から内側へリングを追加し、`.size(px)` は直径を設定します。それぞれの名前とパーセントはリングの横に書かれるので、図そのものはスクリーンリーダーから隠されます。
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+プランや製品を横に並べます。それぞれが 1 列、機能ごとに 1 行です。`.plan(name)` は列を追加し、`.featured()` は最後に追加したプランを目立たせます。`.row(feature, cells)` はプランごとにセルを受け取ります。`true` と `false` はチェックと × になり、「含まれる」「含まれない」と読み上げられ、テキストはそのまま書かれます。最大 6 プラン、100 行まで持てます。
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
 ## Table
 
 画面がすでに持っているテキストによる小さな表です。料金表のプラン、店舗の営業時間、レポートの合計などに使います。`Table::new(caption)` は表の名前になるキャプションを受け取り、`.head([...])` で列見出しを、`.row([...])` で各行を指定します。`.row_headers()` は各行の最初のセルをその行の見出しにするので、スクリーンリーダーは各セルの列と行を読み上げます。`.numeric(index)` は数値の列を末尾側にそろえ、`.striped()` は 1 行おきに背景色を付けます。見出しより短い行は空のセルで埋められ、長い行は切り詰められます。表が持てるのは最大 200 行、12 列です。ページ送り、並べ替え、フィルターはなく、リクエストも送りません。アクションから取得する行や、ユーザーが操作する行は `DataGrid` に置きます。狭い画面では自身の枠の中で横にスクロールし、その枠がフォーカスを受け取るので矢印キーでスクロールできます。

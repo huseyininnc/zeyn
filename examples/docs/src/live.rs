@@ -621,6 +621,41 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             )
             .weight(3)
             .into(),
+        "gantt" => {
+            let today = ctx.today();
+            let day = |offset: i64| today.add_days(offset).unwrap_or(today);
+            Gantt::new("Launch plan", day(-14), day(28))
+                .task("Design", day(-14), day(-2))
+                .done(100)
+                .tone(Tone::Success)
+                .task("Build", day(-4), day(18))
+                .done(30)
+                .task("Launch", day(20), day(28))
+                .tone(Tone::Warning)
+                .today(today)
+                .into()
+        }
+        "visuals" => Stack::new()
+            .gap(5)
+            .add(OrgChart::new(
+                "Company",
+                OrgNode::new("Ada Lovelace")
+                    .role("Director")
+                    .child(OrgNode::new("Alan Turing").role("Engineering"))
+                    .child(OrgNode::new("Grace Hopper").role("Operations")),
+            ))
+            .add(
+                Funnel::new("Sales funnel")
+                    .stage("Visits", 12_400)
+                    .stage("Carts", 3_100)
+                    .stage("Orders", 870),
+            )
+            .add(
+                ActivityRings::new("Today")
+                    .ring("Orders packed", 42, 60, Tone::Brand)
+                    .ring("Calls answered", 18, 20, Tone::Success),
+            )
+            .into(),
         "week" => WeekSchedule::of(search_samples)
             .title("Deliveries")
             .day(|p: &Sample| (p.id.0 % 7 + 1) as u8)
@@ -874,6 +909,8 @@ pub const EXAMPLES: &[&str] = &[
     "accordion",
     "rings",
     "heatmap",
+    "gantt",
+    "visuals",
     "table",
     "meters",
     "marks",

@@ -200,6 +200,17 @@ Image::new(p.photo_800.clone())
 - `.fit(Fit::Cover)` kutuyu doldurur ve taşan kısmı keser; `Fit::Contain` dosyanın tamamını gösterir.
 - `low`, `fallback` ve `Placeholder::image`, `src` ile aynı adres kurallarına uyar; diğerleri dışarıda bırakılır. Kutu her zaman görselin boyutunu korur, böylece dosyalar yüklenirken ya da yüklenemediğinde hiçbir şey kaymaz.
 
+## ImageCompare
+
+Aynı boyuttaki iki resim üst üste, birini ötekinin üzerinde açan bir sürgüyle; örneğin önce ve sonra. `.before(src, alt)` ve `.after(src, alt)` resimleri verir; bunlar `Image` kurallarına uyar. `.size(width, height)` kutuya biçimini verir. Sürgü, etiketle adlandırılmış bir aralık girdisidir, bu yüzden ok tuşları onu hareket ettirir; yalnızca bunlardan birini içeren sayfalarda yüklenen küçük bir script onu gösterir, script olmadan resimler yarı yarıya görünür.
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` başka bir siteye `rel="noopener noreferrer"` ile bağlanır; böylece diğer site ne sayfa adresini ne de pencere üzerinde bir tutamaç alır. Ekran okuyucular metinden sonra "external site" (harici site) der; görsel olarak bir ok bunu işaretler.

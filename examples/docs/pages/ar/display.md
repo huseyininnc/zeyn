@@ -200,6 +200,17 @@ Image::new(p.photo_800.clone())
 - يملأ `.fit(Fit::Cover)` الإطار ويقص ما يفيض؛ ويعرض `Fit::Contain` الملف كاملاً.
 - تتبع `low` و`fallback` و`Placeholder::image` قواعد العناوين نفسها التي يتبعها `src`؛ وغيرها يُترك. يحتفظ الإطار دائماً بحجم الصورة، فلا يتحرك شيء أثناء تحميل الملفات أو فشلها.
 
+## ImageCompare
+
+صورتان بالحجم نفسه إحداهما فوق الأخرى مع منزلق يكشف إحداهما فوق الأخرى، مثل قبل وبعد. `.before(src, alt)` و`.after(src, alt)` يعطيان الصورتين، وهما تتبعان قواعد `Image`، و`.size(width, height)` يعطي الصندوق شكله. المنزلق حقل نطاق اسمه التسمية، فتحركه مفاتيح الأسهم، ويظهره سكربت صغير يحمل فقط في الصفحات التي تحتوي عليه، ومن دون سكربت تظهر الصورتان مناصفة.
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
 ## ExternalLink
 
 يربط `ExternalLink::new(url, text)` بموقع آخر مع `rel="noopener noreferrer"`، فلا يحصل الموقع الآخر على عنوان الصفحة ولا على مقبض للنافذة. تسمع قارئات الشاشة "external site" بعد النص؛ ويدل سهم عليه بصرياً.

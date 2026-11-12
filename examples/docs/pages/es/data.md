@@ -61,6 +61,66 @@ Cada barra, punto, porción, etapa y valor de gauge es una marca con su etiqueta
 
 El cursor, el foco y un toque muestran el mismo texto en un tooltip, que se oculta a los lectores de pantalla para que nada se lea dos veces. Sin el script las marcas siguen teniendo nombre y la tabla permanece. Las marcas pequeñas (puntos de 8 px) están por debajo del tamaño de objetivo de 24 px; la tabla bajo *Show data* es el camino equivalente (WCAG 2.5.8).
 
+## Gantt
+
+Tareas como barras sobre un intervalo de días, como el plan de un proyecto. `Gantt::new(label, start, end)` fija el intervalo, de dos años como máximo; `.task(title, from, to)` añade una tarea, `.done(percent)` y `.tone(...)` se aplican a la última tarea añadida, y `.today(day)` dibuja una línea en ese día. Es una tabla que da el primer y el último día de cada tarea como texto, de modo que las barras solo lo repiten; las barras se cortan en los extremos del intervalo.
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+Una jerarquía en cajas unidas por líneas, desde una caja en lo alto: las personas de una empresa, las partes de un producto. `OrgNode::new(name)` es una caja, `.role(text)` una línea más discreta bajo el nombre y `.child(node)` una caja debajo. Son listas anidadas, así que los lectores de pantalla reciben los niveles; un organigrama dibuja 200 cajas en 8 niveles como máximo y se desplaza dentro de su propia caja cuando es ancho.
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## Funnel
+
+Las etapas de un proceso que pierde algo en cada paso, como visitas, carritos y pedidos. `Funnel::new(label)` con `.stage(title, value)` dibuja cada etapa como una barra centrada tan ancha como su parte de la primera etapa, con su número y esa parte como texto. Un embudo contiene 10 etapas como máximo.
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+Hasta cuatro partes de un todo como anillos uno dentro de otro, como los objetivos de un día. `.ring(title, value, max, tone)` añade un anillo de fuera hacia dentro, y `.size(px)` fija el diámetro. Cada nombre y porcentaje se escribe junto a los anillos, por lo que el dibujo está oculto para los lectores de pantalla.
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+Planes o productos uno al lado del otro, una columna cada uno y una fila por característica. `.plan(name)` añade una columna y `.featured()` destaca el último plan añadido; `.row(feature, cells)` toma una celda por cada plan: `true` y `false` se convierten en una marca y una cruz, leídas como "Incluido" y "No incluido", y un texto se escribe tal cual. Contiene 6 planes y 100 filas como máximo.
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
 ## Table
 
 Una tabla pequeña de texto que la pantalla ya tiene: los planes de una lista de precios, el horario de una tienda, los totales de un informe. `Table::new(caption)` toma un título que da nombre a la tabla, `.head([...])` los encabezados de columna y `.row([...])` cada fila; `.row_headers()` convierte la primera celda de cada fila en su encabezado, de modo que los lectores de pantalla dicen la columna y la fila de cada celda, `.numeric(index)` alinea una columna de números al final y `.striped()` sombrea una de cada dos filas. Una fila más corta que el encabezado se rellena con celdas vacías y una más larga se corta; una tabla contiene 200 filas y 12 columnas como máximo. No tiene paginación, orden ni filtros y no hace ninguna petición: las filas que vienen de una acción, o con las que el usuario trabaja, van en `DataGrid`. En pantallas estrechas se desplaza hacia los lados dentro de su propia caja, que recibe el foco para que las teclas de flecha la desplacen.

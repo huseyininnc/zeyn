@@ -64,6 +64,12 @@
       "copy_button": "Copies a text to the clipboard.",
       "progress_ring": "Progress as a ring with the percent inside.",
       "heatmap": "A number for each day as a calendar of shaded squares.",
+      "funnel": "Stages that narrow from the first to the last.",
+      "activity_rings": "Shares of several goals as rings inside one another.",
+      "gantt": "Tasks as bars over a span of days.",
+      "org_chart": "A hierarchy as boxes joined by lines.",
+      "comparison_table": "Plans side by side with a row for each feature.",
+      "image_compare": "Two pictures under a slider.",
       "table": "A small table of text the screen already holds.",
       "indicator": "A count or a dot on the corner of another component.",
       "meter": "A measurement within a range, colored by its thresholds.",
@@ -196,6 +202,26 @@
         "several_words": "Several words"
       },
       "toc": {
+        "overview": "Example"
+      },
+      "funnel": {
+        "overview": "Example",
+        "another_tone": "Another tone"
+      },
+      "activity_rings": {
+        "overview": "Example",
+        "large": "Four rings, larger"
+      },
+      "gantt": {
+        "overview": "Example"
+      },
+      "org_chart": {
+        "overview": "Example"
+      },
+      "comparison_table": {
+        "overview": "Example"
+      },
+      "image_compare": {
         "overview": "Example"
       },
       "heatmap": {

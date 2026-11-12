@@ -61,6 +61,66 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 
 悬停、聚焦和轻触会在提示框中显示相同的文字，提示框对屏幕阅读器隐藏，因此不会重复朗读。没有脚本时，标记仍然有名称，数据表格也仍然存在。较小的标记（8 px 的点）低于 24 px 的目标尺寸；*Show data* 下方的表格是等效的访问路径（WCAG 2.5.8）。
 
+## Gantt
+
+把任务显示为跨越若干天的条形，例如一个项目的计划。`Gantt::new(label, start, end)` 设置时间跨度，最长两年；`.task(title, from, to)` 添加一个任务，`.done(percent)` 和 `.tone(...)` 作用于最后添加的任务，`.today(day)` 在那一天画一条线。它是一个表格，以文字给出每个任务的第一天和最后一天，因此条形只是重复这些内容；条形在跨度的两端被截断。
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+以线条连接的方框表示的层级结构，从顶部的一个方框开始：公司的人员、产品的组成部分。`OrgNode::new(name)` 是一个方框，`.role(text)` 是名称下方较淡的一行，`.child(node)` 是它下面的一个方框。它是嵌套列表，因此屏幕阅读器可以得到层级；一张图最多在 8 层上绘制 200 个方框，过宽时在自己的框内滚动。
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## Funnel
+
+一个每一步都会流失一部分的流程的各个阶段，例如访问、购物车和订单。`Funnel::new(label)` 配合 `.stage(title, value)` 把每个阶段画成居中的条形，宽度等于它占第一阶段的比例，并以文字给出其数值和该比例。一个漏斗最多容纳 10 个阶段。
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+把整体中最多四个部分显示为层层嵌套的圆环，例如一天的目标。`.ring(title, value, max, tone)` 从外向内添加一个圆环，`.size(px)` 设置直径。每个名称和百分比都写在圆环旁边，因此图形对屏幕阅读器是隐藏的。
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+把套餐或产品并排显示，每个一列，每项功能一行。`.plan(name)` 添加一列，`.featured()` 突出显示最后添加的套餐；`.row(feature, cells)` 为每个套餐接收一个单元格：`true` 和 `false` 变成勾和叉，读作"包含"和"不包含"，文字则原样输出。它最多容纳 6 个套餐和 100 行。
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
 ## Table
 
 由屏幕已经持有的文字组成的小表格：价目表中的套餐、商店的营业时间、报表的合计。`Table::new(caption)` 接收一个为表格命名的标题，`.head([...])` 给出列标题，`.row([...])` 给出每一行；`.row_headers()` 把每一行的第一个单元格作为该行的标题，这样屏幕阅读器会读出每个单元格所在的列和行，`.numeric(index)` 让一列数字靠末端对齐，`.striped()` 为每隔一行加上底色。比表头短的行用空单元格补齐，比表头长的行会被截断；一个表格最多容纳 200 行和 12 列。它没有分页、排序或筛选，也不发出请求：来自 action 的行，或者用户要操作的行，应当放在 `DataGrid` 中。在窄屏上，它在自己的框内横向滚动，这个框可以获得焦点，以便用方向键滚动。
