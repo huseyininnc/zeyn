@@ -750,7 +750,15 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 
 @media (max-width: 640px) {
   .z-topbar-search { width: 32px; padding: 0; justify-content: center; }
-  .z-topbar-search > :not(.z-icon) { display: none; }
+  .z-topbar-search > kbd { display: none; }
+  .z-topbar-search > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -916,6 +924,45 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 @media (max-width: 1023px) and (scripting: enabled) {
   .z-nav-toggle[data-zeyn-nav-toggle] { display: inline-flex; }
   .z-nav-body:not([data-open]) { display: none; }
+}
+
+/**
+ * The open menu below 1024 px is a drawer over the screen: it starts under the menu's bar
+ * (`--z-drawer-top`, set by `nav.js`), a backdrop covers the rest and the page behind it does not
+ * scroll. The bar stays above the backdrop, so its button closes the drawer.
+ */
+@media (max-width: 1023px) {
+  .z-nav-body[data-open] {
+    position: fixed;
+    inset-block: var(--z-drawer-top, 0) 0;
+    inset-inline-start: 0;
+    z-index: 2;
+    width: min(20rem, 85vw);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: inherit;
+    border-inline-end: 1px solid var(--z-border);
+    box-shadow: var(--z-shadow-2);
+    animation: z-drawer-in 160ms ease-out;
+  }
+  [dir="rtl"] .z-nav-body[data-open] { animation-name: z-drawer-in-rtl; }
+  .z-nav:has(> .z-nav-body[data-open])::after {
+    content: "";
+    position: fixed;
+    inset: var(--z-drawer-top, 0) 0 0;
+    z-index: 1;
+    background: var(--z-backdrop);
+  }
+  .z-nav-bar { position: relative; z-index: 2; }
+  html:has(.z-nav-body[data-open]) { overflow: hidden; }
+}
+
+@keyframes z-drawer-in { from { translate: -100% 0; } }
+
+@keyframes z-drawer-in-rtl { from { translate: 100% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .z-nav-body[data-open] { animation: none; }
 }
 
 /**

@@ -357,10 +357,11 @@ window.addEventListener('popstate', () => {
 history.replaceState({ zeyn: true }, '', location.href);
 
 /**
- * Below 1024 px the side menu of the app shell folds behind the menu button under the app's name
- * (W3C APG disclosure). This shows the button; without the script the menu stays open. Pressing
- * the button opens or closes the menu, following a link or pressing Escape closes it, and Escape
- * moves focus back to the button.
+ * Below 1024 px the side menu of the app shell folds behind the menu button under the app's name.
+ * This shows the button; without the script the menu stays open. The button opens the menu as a
+ * drawer over the screen: focus moves into it and stays between the button and the drawer, the
+ * screen behind it is inert and does not scroll. The button, Escape, the backdrop, a link and a
+ * swipe toward the menu's edge close it; focus returns to the button.
  */
 function initAppMenu() {
   const toggle = document.querySelector('[data-zeyn-nav-toggle]');
@@ -374,8 +375,24 @@ function setAppMenu(open) {
   const toggle = document.querySelector('[data-zeyn-nav-toggle]');
   const body = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
   if (!toggle || !body) return;
+  const bar = toggle.closest('.z-nav-bar');
+  if (open && bar) toggle.closest('.z-nav')?.style.setProperty('--z-drawer-top', `${Math.round(bar.getBoundingClientRect().bottom)}px`);
   toggle.setAttribute('aria-expanded', String(open));
   body.toggleAttribute('data-open', open);
+  for (const el of document.querySelectorAll('.z-app > .z-main, .z-app > .z-app-header')) el.inert = open;
+  if (open) (body.querySelector('[aria-current="page"]') ?? drawerStops(body)[0])?.focus();
+}
+
+/** The focusable elements of the open drawer, in order. */
+function drawerStops(body) {
+  return [...body.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, [tabindex]:not([tabindex="-1"])')].filter((el) => el.checkVisibility());
+}
+
+/** The open drawer's toggle and body, or `null`. */
+function openDrawer() {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle][aria-expanded="true"]');
+  const body = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
+  return body ? { toggle, body } : null;
 }
 
 document.addEventListener('click', (e) => {
@@ -384,15 +401,47 @@ document.addEventListener('click', (e) => {
     setAppMenu(t.closest('[data-zeyn-nav-toggle]').getAttribute('aria-expanded') !== 'true');
   } else if (t?.closest('#z-nav-body[data-open] a[href]')) {
     setAppMenu(false);
+  } else if (t?.matches('.z-nav') && openDrawer()) {
+    setAppMenu(false);
+    document.querySelector('[data-zeyn-nav-toggle]')?.focus();
   }
 });
 
 document.addEventListener('keydown', (e) => {
-  const toggle = document.querySelector('[data-zeyn-nav-toggle][aria-expanded="true"]');
-  if (e.key !== 'Escape' || !toggle) return;
-  setAppMenu(false);
-  toggle.focus();
+  const open = openDrawer();
+  if (!open) return;
+  if (e.key === 'Escape') {
+    setAppMenu(false);
+    open.toggle.focus();
+  } else if (e.key === 'Tab') {
+    const stops = [open.toggle, ...drawerStops(open.body)];
+    const at = stops.indexOf(document.activeElement);
+    const next = e.shiftKey ? (at <= 0 ? stops.length - 1 : at - 1) : (at === stops.length - 1 || at < 0 ? 0 : at + 1);
+    stops[next].focus();
+    e.preventDefault();
+  }
 });
+
+/** Where a touch on the open drawer started, for swipe to close. */
+let swipe = null;
+
+document.addEventListener('pointerdown', (e) => {
+  swipe = e.pointerType === 'touch' && e.target instanceof Element && e.target.closest('#z-nav-body[data-open]') ? { x: e.clientX, y: e.clientY } : null;
+});
+
+document.addEventListener('pointerup', (e) => {
+  if (!swipe) return;
+  const rtl = document.documentElement.dir === 'rtl';
+  const dx = (e.clientX - swipe.x) * (rtl ? -1 : 1);
+  const dy = e.clientY - swipe.y;
+  swipe = null;
+  if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    setAppMenu(false);
+    document.querySelector('[data-zeyn-nav-toggle]')?.focus();
+  }
+});
+
+matchMedia('(min-width: 1024px)').addEventListener('change', (e) => e.matches && openDrawer() && setAppMenu(false));
 
 document.addEventListener('zeyn:content', initAppMenu);
 initAppMenu();
