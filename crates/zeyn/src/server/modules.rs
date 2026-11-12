@@ -221,6 +221,38 @@ pub(crate) const MODULES: &[Module] = &[
     script("quantity", &["data-zeyn-quantity"]),
     script("gallery", &["data-zeyn-gallery"]),
     script("countdown", &["data-zeyn-countdown"]),
+    style(
+        "display",
+        &[
+            "z-accordion",
+            "z-avatar-group",
+            "z-avatar-more",
+            "z-compare",
+            "z-copy",
+            "z-divider",
+            "z-flow",
+            "z-funnel",
+            "z-gantt",
+            "z-heat",
+            "z-highlight",
+            "z-imgcompare",
+            "z-indicator",
+            "z-keys",
+            "z-meter",
+            "z-org",
+            "z-pagelink",
+            "z-pagination",
+            "z-quote",
+            "z-ring",
+            "z-rings",
+            "z-stage",
+            "z-stepper",
+            "z-table",
+            "z-toc",
+            "z-tour",
+            "z-tourstop",
+        ],
+    ),
     script("imgcompare", &["data-zeyn-imgcompare"]),
     script("tour", &["data-zeyn-tour"]),
     Module {
@@ -287,10 +319,11 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 22] = [
+const STYLES: [&str; 23] = [
     "components",
     "catalog",
     "content",
+    "display",
     "media",
     "pro",
     "files",
@@ -474,7 +507,11 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 61] = [
+const FILES: [(&str, &str); 62] = [
+    (
+        "/_zeyn/display.css",
+        include_str!("../../assets/display.css"),
+    ),
     ("/_zeyn/drag.js", include_str!("../../assets/drag.js")),
     ("/_zeyn/net.js", include_str!("../../assets/net.js")),
     ("/_zeyn/colors.js", include_str!("../../assets/colors.js")),

@@ -88,6 +88,11 @@ pub fn drag_tree() -> Screen {
     )
 }
 
+#[screen(route = "/faq", permission = "trips.read")]
+pub fn faq() -> Screen {
+    Screen::new("Faq").body(Accordion::new().section("Shipping", Paragraph::new("Two days")))
+}
+
 #[screen(route = "/inspector", permission = "trips.read")]
 pub fn inspector() -> Screen {
     Screen::new("Inspector").body(PropertyInspector::island("designer"))
@@ -107,7 +112,8 @@ fn app() -> axum::Router {
                 .screen(photos)
                 .screen(plain_tree)
                 .screen(drag_tree)
-                .screen(inspector),
+                .screen(inspector)
+                .screen(faq),
         )
         .router()
         .unwrap()
@@ -364,4 +370,13 @@ async fn an_island_inspector_links_the_controls_of_its_field_templates() {
             "{name} on a plain form"
         );
     }
+}
+
+#[tokio::test]
+async fn display_styles_come_only_with_a_display_component() {
+    let (_, text_page) = get("/plain").await;
+    assert!(!links(&text_page).contains(&"display.css".to_string()));
+    let (status, faq_page) = get("/faq").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(links(&faq_page).contains(&"display.css".to_string()));
 }

@@ -1286,7 +1286,7 @@ fn gantts_are_tables_with_dates_as_text_and_bars_cut_at_the_span() {
     ), "{out}");
     assert!(
         out.contains(
-            r#"<tr><th scope="row">Design &lt;d&gt;</th><td class="z-gantt-date">11/1/2026</td><td class="z-gantt-date">11/15/2026</td><td class="z-gantt-track" aria-hidden="true"><span class="z-gantt-bar z-tone-brand" style="--z-gantt-at:0.00%;--z-gantt-width:50.00%"><span class="z-gantt-done" style="--z-gantt-done:100%"></span></span>"#
+            r#"<tr><th scope="row">Design &lt;d&gt;<span class="z-sr-only">, 100% done</span></th><td class="z-gantt-date">11/1/2026</td><td class="z-gantt-date">11/15/2026</td><td class="z-gantt-track" aria-hidden="true"><span class="z-gantt-bar z-tone-brand" style="--z-gantt-at:0.00%;--z-gantt-width:50.00%"><span class="z-gantt-done" style="--z-gantt-done:100%"></span></span>"#
         ),
         "{out}"
     );
@@ -1413,4 +1413,19 @@ fn flow_diagrams_place_steps_in_columns_and_name_what_each_leads_to() {
     let out = html(&many, "en");
     assert_eq!(out.matches("<li class=").count(), zeyn::ui::MAX_FLOW_NODES);
     assert!(html(&FlowDiagram::new("Empty"), "en").contains("--z-flow-w:0px;--z-flow-h:0px"));
+}
+
+#[test]
+fn org_chart_schemas_keep_the_limits_of_the_drawing() {
+    let mut root = OrgNode::new("Root");
+    for i in 0..300 {
+        root = root.child(OrgNode::new(format!("Person {i}")));
+    }
+    let chart = OrgChart::new("Company", root);
+    let schema = chart.schema();
+    let boxes = schema["root"]["children"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert_eq!(boxes + 1, zeyn::ui::MAX_ORG_NODES);
 }
