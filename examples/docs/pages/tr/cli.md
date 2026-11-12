@@ -112,6 +112,8 @@ zeyn check --json
 }
 ```
 
+`zeyn check` uygulamanın kaynağını da okur ve dosya ile satırıyla şu durumlarda uyarır: `W0106` `src` olmadan `<script>` ya da `onclick=` gibi satır içi bir olay işleyicisi tutan bir metin (CSP ikisini de engeller), `W0107` `escape(..)`, `r.text(..)` veya `r.value(..)` kullanmadan HTML yazan elle yazılmış bir bileşen, `W0108` onu sınırlayan bir sorgu olmadan bütün bir `Vec` döndüren bir action, `W0109` `.trusted()` işaretli bir `DocumentViewer`. Eksik `permission` veya `public` için uyarıya gerek yoktur: derlenmez.
+
 ## Docker
 
 Oluşturulan `Dockerfile` iki aşamada derler ve root yetkisi olmayan bir kullanıcıyla distroless bir imajda çalışır. İkili dosya kendi sağlığını `<app> health` ile denetler; `HEALTHCHECK` bunu kullanır.

@@ -114,6 +114,8 @@ zeyn check --json
 }
 ```
 
+`zeyn check` 还会读取应用的源代码，并附上文件和行号对以下情况发出警告：`W0106` 字符串包含没有 `src` 的 `<script>` 或 `onclick=` 这类内联事件处理器（CSP 会阻止两者），`W0107` 手写组件在没有 `escape(..)`、`r.text(..)` 或 `r.value(..)` 的情况下写出 HTML，`W0108` action 在没有限制范围的查询时返回整个 `Vec`，`W0109` 标记为 `.trusted()` 的 `DocumentViewer`。缺少 `permission` 或 `public` 不需要警告：它无法编译。
+
 ## Docker
 
 生成的 `Dockerfile` 分两个阶段构建，并在 distroless 镜像上以没有 root 权限的用户运行。二进制文件用 `<app> health` 检查自身的健康状况，`HEALTHCHECK` 使用它。

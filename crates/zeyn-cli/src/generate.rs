@@ -848,3 +848,96 @@ fn attributed_fns(text: &str) -> Vec<(&'static str, String)> {
     }
     out
 }
+
+/// Rule checks on the app's source, as `zeyn check` warnings with the file and line:
+///
+/// - `W0106`: a string holds a `<script` tag or an inline event handler (`onclick=` and the
+///   like); the page's CSP blocks both, and browser code belongs in a module.
+/// - `W0107`: a hand written component (`impl Component for`) writes HTML without
+///   `escape(..)`, `r.text(..)` or `r.value(..)`, so user data may reach the page unescaped.
+/// - `W0108`: an action returns a whole `Vec` without a query that bounds it (a `...Query`,
+///   `...Search` or `SitemapPart` input); lists that grow with data take a `DataQuery` and return
+///   a `Page`.
+/// - `W0109`: a document viewer is `.trusted()`, so its pages reach the browser uncleaned.
+///
+/// Missing access needs no check here: an action or screen without `permission` or `public`
+/// does not compile.
+pub fn rule_warnings(files: &[(PathBuf, String)]) -> Vec<(&'static str, String)> {
+    let mut out = Vec::new();
+    for (path, text) in files {
+        let shown = path
+            .display()
+            .to_string()
+            .replace('\\', "/");
+        let code = text
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or(text);
+        let lines: Vec<&str> = code.lines().collect();
+        let component = text.contains("impl Component for")
+            || text.contains("impl zeyn::Component for")
+            || text.contains("impl ::zeyn::Component for");
+        let escapes =
+            text.contains("escape(") || text.contains(".text(") || text.contains(".value(");
+        for (i, raw) in lines.iter().enumerate() {
+            let line = raw.trim_start();
+            if line.starts_with("//") {
+                continue;
+            }
+            let at = format!("{shown}:{}", i + 1);
+            let lower = line.to_ascii_lowercase();
+            let script = lower.contains("<script") && !lower.contains("src=");
+            if lower.contains('"') && (script || inline_handler(&lower)) {
+                out.push((
+                    "W0106",
+                    format!("{at}: a string holds a script or an inline event handler; the CSP blocks it, put browser code in a module"),
+                ));
+            }
+            if component && !escapes && line.contains("impl") && line.contains("Component for") {
+                out.push((
+                    "W0107",
+                    format!("{at}: this component writes HTML without escape(..), r.text(..) or r.value(..); escape every value that comes from data"),
+                ));
+            }
+            if line.starts_with("#[action") {
+                let joined = lines[i + 1..]
+                    .iter()
+                    .take(8)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let sig = joined.split('{').next().unwrap_or("");
+                let returns = sig.split("->").nth(1).unwrap_or("");
+                let bounded = ["Query", "Search", "query", "SitemapPart"]
+                    .iter()
+                    .any(|w| sig.contains(w));
+                if returns.contains("Vec<") && !bounded {
+                    out.push((
+                        "W0108",
+                        format!("{at}: this action returns a whole Vec; take a DataQuery and return a Page so the list stays bounded"),
+                    ));
+                }
+            }
+            if line.contains(".trusted()") && text.contains("DocumentViewer") {
+                out.push((
+                    "W0109",
+                    format!("{at}: a trusted document reaches the browser uncleaned; keep it only for pages the app renders itself"),
+                ));
+            }
+        }
+    }
+    out
+}
+
+/// Whether a lower case line holds an inline event handler attribute such as ` onclick=`.
+fn inline_handler(line: &str) -> bool {
+    line.match_indices(" on")
+        .any(|(at, _)| {
+            let rest = &line[at + 3..];
+            let name: String = rest
+                .chars()
+                .take_while(char::is_ascii_lowercase)
+                .collect();
+            name.len() >= 3 && rest[name.len()..].starts_with('=')
+        })
+}
