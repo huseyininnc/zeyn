@@ -28,66 +28,68 @@ Rules that fail the build or the tests if broken: every action and screen declar
 
 These docs are written in English, and the English pages below are the source. Every page is also translated into Turkish, Simplified Chinese, Russian, Spanish, Korean, Japanese, Hindi and Arabic, at the same path behind the language code: https://docs.zeynsoft.com/tr/, /zh/, /ru/, /es/, /ko/, /ja/, /hi/ and /ar/ (for example https://docs.zeynsoft.com/tr/language/datagrid). A page whose translation is behind the English source is shown in English there. Prefer the English pages.
 
+Every page is also served as Markdown: add `.md` to its address (`/index.md` for the start page, `/tr/language/datagrid.md` in a language). The links below point to the Markdown. All English pages in one file: https://docs.zeynsoft.com/llms-full.txt
+
 ## Start
 
-- [Introduction](https://docs.zeynsoft.com/): what an app looks like
-- [CLI and projects](https://docs.zeynsoft.com/start/cli): `zeyn new`, generators, checks, Docker, hot reload
-- [Project structure](https://docs.zeynsoft.com/start/structure)
+- [Introduction](https://docs.zeynsoft.com/index.md): what an app looks like
+- [CLI and projects](https://docs.zeynsoft.com/start/cli.md): `zeyn new`, generators, checks, Docker, hot reload
+- [Project structure](https://docs.zeynsoft.com/start/structure.md)
 
 ## Language
 
-- [Entities and models](https://docs.zeynsoft.com/language/entities)
-- [Actions](https://docs.zeynsoft.com/language/actions)
-- [Screens and params](https://docs.zeynsoft.com/language/screens)
-- [Effects and windows](https://docs.zeynsoft.com/language/effects)
-- [Forms](https://docs.zeynsoft.com/language/forms)
-- [DataGrid](https://docs.zeynsoft.com/language/datagrid) and its [reference](https://docs.zeynsoft.com/language/datagrid-reference)
-- [Texts and t!](https://docs.zeynsoft.com/language/texts)
+- [Entities and models](https://docs.zeynsoft.com/language/entities.md)
+- [Actions](https://docs.zeynsoft.com/language/actions.md)
+- [Screens and params](https://docs.zeynsoft.com/language/screens.md)
+- [Effects and windows](https://docs.zeynsoft.com/language/effects.md)
+- [Forms](https://docs.zeynsoft.com/language/forms.md)
+- [DataGrid](https://docs.zeynsoft.com/language/datagrid.md) and its [reference](https://docs.zeynsoft.com/language/datagrid-reference.md)
+- [Texts and t!](https://docs.zeynsoft.com/language/texts.md)
 
 ## Components
 
-- [Layouts](https://docs.zeynsoft.com/components/layouts)
-- [Controls and pickers](https://docs.zeynsoft.com/components/controls)
-- [Line editor](https://docs.zeynsoft.com/components/lines)
-- [Display](https://docs.zeynsoft.com/components/display)
-- [Text and content](https://docs.zeynsoft.com/components/content): headings, lists, avatars, chips, reactions, share buttons
-- [Tree and charts](https://docs.zeynsoft.com/components/data)
-- [Cards, rails and search](https://docs.zeynsoft.com/components/catalog)
-- [Admin views](https://docs.zeynsoft.com/components/admin): record diffs, code and JSON views, barcodes, inbox, Kanban, calendar
-- [Shop components](https://docs.zeynsoft.com/components/commerce): prices, facets, variants, galleries, quantities, reviews, countdowns
-- [Chat](https://docs.zeynsoft.com/components/chat): message threads, the composer, typing indicators, streamed AI replies
-- [Social](https://docs.zeynsoft.com/components/social): feeds of posts, lightbox, story rings
-- [Shell and commands](https://docs.zeynsoft.com/components/shell)
-- [Media](https://docs.zeynsoft.com/components/media)
+- [Layouts](https://docs.zeynsoft.com/components/layouts.md)
+- [Controls and pickers](https://docs.zeynsoft.com/components/controls.md)
+- [Line editor](https://docs.zeynsoft.com/components/lines.md)
+- [Display](https://docs.zeynsoft.com/components/display.md)
+- [Text and content](https://docs.zeynsoft.com/components/content.md): headings, lists, avatars, chips, reactions, share buttons
+- [Tree and charts](https://docs.zeynsoft.com/components/data.md)
+- [Cards, rails and search](https://docs.zeynsoft.com/components/catalog.md)
+- [Admin views](https://docs.zeynsoft.com/components/admin.md): record diffs, code and JSON views, barcodes, inbox, Kanban, calendar
+- [Shop components](https://docs.zeynsoft.com/components/commerce.md): prices, facets, variants, galleries, quantities, reviews, countdowns
+- [Chat](https://docs.zeynsoft.com/components/chat.md): message threads, the composer, typing indicators, streamed AI replies
+- [Social](https://docs.zeynsoft.com/components/social.md): feeds of posts, lightbox, story rings
+- [Shell and commands](https://docs.zeynsoft.com/components/shell.md)
+- [Media](https://docs.zeynsoft.com/components/media.md)
 
 ## Guides
 
-- [Time and languages](https://docs.zeynsoft.com/guides/time-and-languages)
-- [Security](https://docs.zeynsoft.com/guides/security)
-- [Public pages](https://docs.zeynsoft.com/guides/public-pages): no cookies, HTTP caching, SEO tags, sitemap
-- [User accounts](https://docs.zeynsoft.com/guides/accounts)
-- [Sign in: OIDC, JWT and MFA](https://docs.zeynsoft.com/guides/sign-in)
-- [Audit, masking and jobs](https://docs.zeynsoft.com/guides/enterprise)
-- [API and OpenAPI](https://docs.zeynsoft.com/guides/api)
-- [MCP and AI agents](https://docs.zeynsoft.com/guides/mcp)
-- [Data and databases](https://docs.zeynsoft.com/guides/database)
-- [Theming](https://docs.zeynsoft.com/guides/theming)
-- [Shared libraries](https://docs.zeynsoft.com/guides/polyrepo)
-- [Operations](https://docs.zeynsoft.com/guides/operations): Docker, tracing, Redis, licenses
-- [AI assistant](https://docs.zeynsoft.com/guides/assistant)
-- [WASM islands](https://docs.zeynsoft.com/guides/islands)
-- [ZeynSocket](https://docs.zeynsoft.com/guides/socket)
-- [Realtime and CRDT](https://docs.zeynsoft.com/guides/realtime)
-- [Desktop apps](https://docs.zeynsoft.com/guides/desktop)
+- [Time and languages](https://docs.zeynsoft.com/guides/time-and-languages.md)
+- [Security](https://docs.zeynsoft.com/guides/security.md)
+- [Public pages](https://docs.zeynsoft.com/guides/public-pages.md): no cookies, HTTP caching, SEO tags, sitemap
+- [User accounts](https://docs.zeynsoft.com/guides/accounts.md)
+- [Sign in: OIDC, JWT and MFA](https://docs.zeynsoft.com/guides/sign-in.md)
+- [Audit, masking and jobs](https://docs.zeynsoft.com/guides/enterprise.md)
+- [API and OpenAPI](https://docs.zeynsoft.com/guides/api.md)
+- [MCP and AI agents](https://docs.zeynsoft.com/guides/mcp.md)
+- [Data and databases](https://docs.zeynsoft.com/guides/database.md)
+- [Theming](https://docs.zeynsoft.com/guides/theming.md)
+- [Shared libraries](https://docs.zeynsoft.com/guides/polyrepo.md)
+- [Operations](https://docs.zeynsoft.com/guides/operations.md): Docker, tracing, Redis, licenses
+- [AI assistant](https://docs.zeynsoft.com/guides/assistant.md)
+- [WASM islands](https://docs.zeynsoft.com/guides/islands.md)
+- [ZeynSocket](https://docs.zeynsoft.com/guides/socket.md)
+- [Realtime and CRDT](https://docs.zeynsoft.com/guides/realtime.md)
+- [Desktop apps](https://docs.zeynsoft.com/guides/desktop.md)
 
 ## Reference
 
-- [Runtime protocol](https://docs.zeynsoft.com/reference/runtime-protocol)
-- [Database reference](https://docs.zeynsoft.com/reference/database)
+- [Runtime protocol](https://docs.zeynsoft.com/reference/runtime-protocol.md)
+- [Database reference](https://docs.zeynsoft.com/reference/database.md)
 
 ## Project
 
-- [Source, license and security](https://docs.zeynsoft.com/project): the GitHub repository, the license, tests and CI, and how to report a vulnerability
+- [Source, license and security](https://docs.zeynsoft.com/project.md): the GitHub repository, the license, tests and CI, and how to report a vulnerability
 
 ## Optional
 
