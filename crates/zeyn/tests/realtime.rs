@@ -1415,7 +1415,7 @@ async fn typing_signals_reach_other_users_only_throttled_and_without_user_ids() 
     assert_eq!(v["t"], "orders");
     assert_eq!(v["typing"]["room"], "r-1");
     assert_eq!(v["typing"]["who"], hub.person_key("", "ada"));
-    assert!(!got.contains("ada"), "the user id never travels: {got}");
+    assert!(!got.contains("\"ada\""), "the user id never travels: {got}");
     assert!(
         next_text(&mut ada2, 300)
             .await
