@@ -246,6 +246,9 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   border: 0;
 }
 
+/** A drag handle (`drag.js`): touch drags it after a long press instead of panning the page. */
+.z-drag-handle { touch-action: none; }
+
 .z-skip {
   position: absolute;
   inset-inline-start: 8px;

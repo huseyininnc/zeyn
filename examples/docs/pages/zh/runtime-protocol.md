@@ -58,6 +58,9 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `range.js`、`quantity.js`、`gallery.js`、`countdown.js` 和 `commerce.css` | 范围滑块、数量步进器、商品图库和倒计时；所有商店组件的样式表（价格、规格选择器、分面面板、评价汇总） |
 | `thread.js` 和 `thread.css`, `stream.js`, `composer.js` 和 `composer.css`, `typing.js` 和 `typing.css` | 消息线程；线程和助手共用的流式 Markdown 和 JSON 行；聊天 composer；正在输入指示器 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 帖子信息流；图片和视频的灯箱；故事环及其行，无需脚本 |
+| `drag.js`, `net.js` | 没有自身标记的共享辅助模块，随导入它们的模块一起链接（见下文） |
+
+两个辅助模块收纳了原本会被多个模块复制的代码。`net.js`（由 `kanban.js`、`files.js` 和 `vlist.js` 导入）导出 `BASE`、`csrf()`、`parse(text)` 和 `post(path, body)`；`post` 在页面同源上带 `x-zeyn-csrf` 请求头发送 JSON，并返回 `{ ok, body }`。`drag.js`（由 `grid.js` 用于移动列、由 `catalog.js` 用于拖动滚动轨道导入）是之后可排序列表、看板和画布的拖动核心：`press(e, { threshold, longPress, tolerance, axis, onStart })` 在鼠标或笔移动 6 px，或触摸在 5 px 范围内按住 250 ms 时，把 `pointerdown` 变为拖动（滑动仍然滚动，先滚动会取消按下）；`capture(el, e, move, end)` 用指针捕获跟随拖动，每个动画帧最多调用一次 `move`，在松开、取消或按 Escape 时调用 `end(event, cancelled)`；`swallowClick()` 取消松开后的点击；`announce(text)` 在每页一个 polite 实时区域中朗读本地化文本，最多每 500 ms 一次。`.z-drag-handle`（在 `zeyn.css` 中）只在拖动手柄上关闭触摸平移。每个可拖动的组件也提供用键盘和单指针移动的方式（移动菜单，WCAG 2.5.7）。两个模块都不写入 HTML。
 
 完整页面在 head 中链接所有页面都用的样式表（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、其 HTML 中出现标记的模块的样式表，以及这些模块的脚本（放在它们导入的模块之后）。`zeyn.js` 带着同一张表（`[name, script selector, style selector]`）提供，并在之后到来的内容中加载缺少的部分：`nav.js` 在替换屏幕前发出带 `{ root, waits }` 的 `zeyn:need` 并等待新的样式表，窗口在打开前同样等待，`zeyn:content`、grid 页和 grid 筛选会加载其内容所需的脚本。浏览器对每个 URL 只保留一个实例，因此模块只运行一次。模块运行时设置它在文档中找到的内容，之后监听 `zeyn:content`；它从不扫描或监听页面上不存在的组件。模块用自身 URL 的 `?v=` 导入共享部分。当页面链接了它不使用的模块，或某个模块的样式表为其标记之外的类设置样式时，`tests/ui_modules.rs` 会失败。
 

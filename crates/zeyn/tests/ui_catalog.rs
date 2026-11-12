@@ -741,7 +741,7 @@ async fn rails_hide_their_scrollbar_unless_kept_and_drag_only_with_a_mouse() {
         js.contains("e.pointerType !== 'mouse'"),
         "touch and pen keep native scrolling"
     );
-    assert!(js.contains("const DRAG_PX = 5;"));
+    assert!(js.contains("const DRAG_PX = 6;") && js.contains("D.press(e, {"));
     assert!(
         js.contains("if (scrolled && entry.isIntersecting)"),
         "more cards load by themselves only after the user scrolled, so the first page does not shift"
