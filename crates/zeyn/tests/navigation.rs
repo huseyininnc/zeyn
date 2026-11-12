@@ -1188,11 +1188,11 @@ async fn menu_items_show_badges_and_counts_loaded_after_the_page() {
     let r = router(&["mail.read"]);
     let (_, _, page) = get(&r, "/one", false).await;
     assert!(
-        page.contains(r#"<span>One</span> <span class="z-nav-badge">New</span> <span class="z-nav-count" data-zeyn-count="unread" data-zeyn-count-topics="mail" hidden></span></a>"#),
+        page.contains(r#"<span>One</span> <span class="z-nav-badge">New</span> <span class="z-nav-count" data-zeyn-menu-count="unread" data-zeyn-menu-count-topics="mail" hidden></span></a>"#),
         "{page}"
     );
     assert!(
-        !page.contains(r#"data-zeyn-count="flagged""#),
+        !page.contains(r#"data-zeyn-menu-count="flagged""#),
         "a count the user may not run is not shown"
     );
     let (status, _, body) = get(&r, "/_zeyn/menu/counts", false).await;
