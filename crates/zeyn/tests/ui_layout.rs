@@ -443,3 +443,36 @@ fn two_or_more_exports_fold_into_one_export_menu_button() {
     assert!(html.contains(r#"<li role="none"><button type="button" class="z-menu-entry" role="menuitem" tabindex="-1" data-zeyn-export="csv" data-testid="orders_head.toolbar.export-csv">CSV</button></li><li role="none"><button type="button" class="z-menu-entry" role="menuitem" tabindex="-1" data-zeyn-export="xlsx" data-testid="orders_head.toolbar.export-xlsx">Excel</button></li></ul></div>"#), "{html}");
     assert_eq!(html.matches("z-menu-trigger").count(), 1);
 }
+
+#[screen(route = "/mail", public)]
+pub fn mail_list() -> Screen {
+    Screen::new("Mail")
+}
+
+#[test]
+fn list_detail_shows_the_detail_or_its_empty_state_and_a_back_link_for_phones() {
+    use zeyn::ui::ListDetail;
+    let render = |c: &ListDetail| {
+        let mut html = String::new();
+        zeyn::Component::render(c, &mut html, &zeyn::Render::english("mail"));
+        html
+    };
+    let none = ListDetail::new("Inbox", Alert::info("rows"))
+        .detail(None::<Alert>)
+        .back(LinkButton::new("Back", mail_list, ()))
+        .empty(EmptyState::new("Pick a message"));
+    let html = render(&none);
+    assert!(html.starts_with(r#"<div class="z-list-detail" data-detail="false"><section class="z-ld-list" aria-labelledby="#), "{html}");
+    assert!(html.contains("Pick a message"));
+    assert!(!html.contains("z-ld-back"), "no back link without a detail");
+
+    let one = ListDetail::new("Inbox", Alert::info("rows"))
+        .detail(Some(Alert::info("Message 7")))
+        .back(LinkButton::new("Back", mail_list, ()))
+        .empty(EmptyState::new("Pick a message"));
+    let html = render(&one);
+    assert!(html.contains(r#"data-detail="true""#));
+    assert!(html.contains("Message 7") && !html.contains("Pick a message"));
+    assert!(html.contains(r#"<div class="z-ld-back"><a"#), "{html}");
+    assert!(html.contains(r#">Inbox</h2>"#), "the list region is named");
+}

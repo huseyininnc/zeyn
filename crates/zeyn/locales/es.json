@@ -215,6 +215,12 @@
     "shell": {
       "skip": "Saltar al contenido",
       "menu": "Principal",
+      "menu_filter": "Filtrar el menú",
+      "menu_results": "{n} elementos",
+      "menu_none": "Ningún elemento del menú coincide",
+      "menu_favorites": "Favoritos",
+      "menu_pin": "Fijar {label}",
+      "menu_unpin": "Quitar {label} de fijados",
       "rail_collapse": "Contraer el menú",
       "rail_expand": "Expandir el menú",
       "language": "Idioma",
@@ -940,7 +946,7 @@
     "files": {
       "too_large": "El archivo es demasiado grande. El tamaño máximo permitido es {max}.",
       "quota": "Alcanzaste el límite de subida por ahora. Inténtalo más tarde.",
-      "too_many": "{label} admite como máximo {n} archivos.",
+      "too_many": "{label} admite como máximo {n, plural, one {# archivo} other {# archivos}}.",
       "type": "Este tipo de archivo no se acepta, o su contenido no coincide con su nombre.",
       "refused": "La comprobación de seguridad rechazó el archivo.",
       "aborted": "La subida se detuvo antes de que llegara todo el archivo. Inténtalo de nuevo.",

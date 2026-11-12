@@ -13,6 +13,29 @@ pub struct MenuItem {
     pub screen: &'static str,
     /// The icon before the label in the side menu, set with [`Menu::icon`].
     pub icon: Option<Icon>,
+    /// A short fixed text after the label, set with [`Menu::badge`].
+    pub badge: Option<Text>,
+    /// A number after the label, counted per request, set with [`Menu::count`].
+    #[serde(skip)]
+    pub count: Option<MenuCount>,
+    /// Topics that make the browser count again, set with [`Menu::count_listens`].
+    pub topics: Vec<&'static str>,
+}
+
+/// The action that counts a menu item's number: it takes `()` and returns a `u64`, and runs with
+/// its permission, once per page and again when one of the item's topics is named.
+#[derive(Clone, Copy)]
+pub struct MenuCount {
+    pub action: crate::action::ActionMeta,
+    pub run: fn(crate::Ctx) -> crate::BoxFuture<crate::Result<u64>>,
+}
+
+impl std::fmt::Debug for MenuCount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MenuCount")
+            .field("action", &self.action.name)
+            .finish()
+    }
 }
 
 /// Menu group: a heading over items and, after them, nested groups (see [`Menu::sub`]).
@@ -175,6 +198,9 @@ impl Menu {
             label: label.into(),
             screen: S::META.name,
             icon: None,
+            badge: None,
+            count: None,
+            topics: Vec::new(),
         });
         self
     }
@@ -196,14 +222,57 @@ impl Menu {
     /// assert!(feature.menu_groups()[0].items[0].icon.is_some());
     /// ```
     pub fn icon(mut self, icon: Icon) -> Self {
-        if let Some(item) = self
-            .groups
-            .last_mut()
-            .and_then(|g| g.items.last_mut())
-        {
+        if let Some(item) = self.last_item() {
             item.icon = Some(icon);
         }
         self
+    }
+
+    /// A short fixed text after the last item's label, such as "New" or "Beta".
+    pub fn badge(mut self, text: impl Into<Text>) -> Self {
+        if let Some(item) = self.last_item() {
+            item.badge = Some(text.into());
+        }
+        self
+    }
+
+    /// A number after the last item's label, such as unread messages, counted by an action that
+    /// takes `()` and returns `u64`. The page asks for every count of its menu in one request
+    /// after it shows (`GET /_zeyn/menu/counts`), so a slow count never delays the page; users
+    /// without the action's permission see no number; 0 shows nothing and more than 99 shows
+    /// "99+".
+    ///
+    /// ```ignore
+    /// #[action(permission = "mail.read")]
+    /// pub async fn unread(_: (), mail: Mail, ctx: Ctx) -> Result<u64> { mail.unread(&ctx).await }
+    /// m.group(t!("menu.mail"), Icon::Mail).item(t!("menu.inbox"), inbox).count(unread)
+    /// ```
+    pub fn count<A>(mut self, _action: A) -> Self
+    where
+        A: crate::action::Action<Input = (), Output = crate::Result<u64>>,
+    {
+        if let Some(item) = self.last_item() {
+            item.count = Some(MenuCount {
+                action: A::META,
+                run: |ctx| Box::pin(async move { A::call(ctx, ()).await? }),
+            });
+        }
+        self
+    }
+
+    /// Topics that make the page count the last item again, when an action names one with
+    /// `ui.refresh(..)` or the live socket notifies it.
+    pub fn count_listens(mut self, topics: impl crate::ui::Topics) -> Self {
+        if let Some(item) = self.last_item() {
+            item.topics = crate::ui::topic_list(topics);
+        }
+        self
+    }
+
+    fn last_item(&mut self) -> Option<&mut MenuItem> {
+        self.groups
+            .last_mut()
+            .and_then(|g| g.items.last_mut())
     }
 }
 

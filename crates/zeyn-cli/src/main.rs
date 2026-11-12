@@ -80,6 +80,10 @@ const TEMPLATES: &[(&str, &str)] = &[
         "locales/tr.json",
         include_str!("../templates/locales/tr.json"),
     ),
+    (
+        "public/favicon.svg",
+        include_str!("../templates/public/favicon.svg"),
+    ),
     ("src/main.rs", include_str!("../templates/src/main.rs")),
     ("src/app.rs", include_str!("../templates/src/app.rs")),
     (

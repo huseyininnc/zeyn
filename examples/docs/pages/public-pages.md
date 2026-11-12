@@ -120,3 +120,12 @@ App::new(t!("app.name"))
 ```
 
 Both are served as plain text to everyone.
+
+## The public folder
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+Files in the crate's `public/` folder are embedded in the binary by `zeyn::public_files!()` and served from the site's root: `public/favicon.svg` answers `/favicon.svg`, and a page links the first of `/favicon.svg`, `/favicon.png` and `/favicon.ico` it finds as its icon. Images, icons, fonts, text, XML, JSON, web manifests and PDF files are taken; HTML and scripts stop the build, because they would run under the app's origin. Files carry an entity tag and are cached for an hour. A file may be 256 KB and the folder 2 MB unless `max_public_file_kb` and `max_public_total_kb` under `[package.metadata.zeyn]` say otherwise. `App::check` reports a file whose path a screen, `/robots.txt`, `/llms.txt`, `/sitemap.xml` or `/_zeyn/` already uses. `zeyn new` adds a `public/favicon.svg`.

@@ -222,6 +222,12 @@
     "shell": {
       "skip": "Skip to content",
       "menu": "Main",
+      "menu_filter": "Filter the menu",
+      "menu_results": "{n} items",
+      "menu_none": "No menu items match",
+      "menu_favorites": "Favorites",
+      "menu_pin": "Pin {label}",
+      "menu_unpin": "Unpin {label}",
       "rail_collapse": "Collapse the menu",
       "rail_expand": "Expand the menu",
       "language": "Language",
@@ -1115,7 +1121,7 @@
     "files": {
       "too_large": "The file is too large. The largest file allowed is {max}.",
       "quota": "You reached the upload limit for now. Try again later.",
-      "too_many": "{label} takes at most {n} files.",
+      "too_many": "{label} takes at most {n, plural, one {# file} other {# files}}.",
       "type": "This type of file is not accepted, or its content does not match its name.",
       "refused": "The file was refused by the security check.",
       "aborted": "The upload stopped before the whole file arrived. Try again.",

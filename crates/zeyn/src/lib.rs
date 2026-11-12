@@ -164,7 +164,11 @@ pub use grid::{
     MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT, MAX_PINNED, MAX_SORT, MemoryViewStore,
     Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS, position_cursor, total,
 };
-pub use i18n::{I18n, NumberFormat, Text};
+#[doc(hidden)]
+pub use i18n::__plural;
+pub use i18n::{
+    I18n, NumberFormat, PluralCount, Text, format_message, parse_cases, plural_category,
+};
 pub use import::{
     Checked, CsvError, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource,
     MAX_CSV_BYTES, RowError, check_csv, check_file, error_report, parse_csv,
@@ -225,8 +229,8 @@ pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
     CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MAX_MENU_CACHE, MAX_MENU_LABEL,
     MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL, Mcp, MemoryAudit, MenuNode, MenuSource,
-    Menus, Plugin, Prefetch, READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant,
-    TenantResolver, Theme, TimePolicy, probe,
+    Menus, Plugin, Prefetch, PublicFile, READY_CACHE, StaticCredentials, StderrAudit,
+    SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
 pub use site::{
     BottomNavItem, CenterOnPhone, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell,
@@ -247,7 +251,7 @@ pub use workflow::{
 };
 #[cfg(feature = "xlsx")]
 pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
-pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
+pub use zeyn_macros::{action, choice, entity, model, params, public_files, screen, t};
 
 #[doc(hidden)]
 pub use feature::read_params as __read_params;

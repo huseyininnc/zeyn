@@ -533,8 +533,8 @@ pub fn build_id() -> &'static str {
             });
         from_env.unwrap_or_else(|| {
             let seed = 0xcbf2_9ce4_8422_2325;
-            let hash = match std::env::current_exe().and_then(std::fs::read) {
-                Ok(bytes) => fnv(&bytes, seed),
+            let hash = match std::env::current_exe().and_then(|p| hash_file(&p, seed)) {
+                Ok(hash) => hash,
                 Err(_) => [
                     super::JS,
                     super::GRID_JS,
@@ -549,6 +549,30 @@ pub fn build_id() -> &'static str {
             format!("{hash:016x}")
         })
     })
+}
+
+/// FNV-1a of a file, read in 64 KiB pieces so hashing a large executable does not hold it in
+/// memory.
+fn hash_file(path: &std::path::Path, seed: u64) -> std::io::Result<u64> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut hash = seed;
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            return Ok(hash);
+        }
+        hash = fnv(&buf[..n], hash);
+    }
+}
+
+/// Computes the [`build_id`] on a background thread at startup, so no request waits for the
+/// executable to be hashed.
+pub(super) fn warm_build_id() {
+    let _ = std::thread::Builder::new()
+        .name("zeyn-build-id".into())
+        .spawn(|| build_id().len());
 }
 
 /// Adds the build id header to a response, so the runtime notices a new deploy.

@@ -87,7 +87,12 @@ pub(crate) const MODULES: &[Module] = &[
     ),
     control(
         "tabs",
-        &["data-zeyn-toggle", "data-zeyn-tabs", "data-zeyn-split"],
+        &[
+            "data-zeyn-toggle",
+            "data-zeyn-tabs",
+            "data-zeyn-split",
+            "data-zeyn-defer",
+        ],
     ),
     control("dates", &["data-zeyn-date", "data-zeyn-filter-date"]),
     control(
@@ -113,7 +118,10 @@ pub(crate) const MODULES: &[Module] = &[
     control("overlays", &["data-zeyn-tip", "z-popover-button"]),
     control("menubutton", &["z-menu-trigger", "z-split-button"]),
     script("busy", &["data-zeyn-busy"]),
-    script("menu", &["data-zeyn-menu"]),
+    script(
+        "menu",
+        &["data-zeyn-menu", "data-zeyn-menu-filter", "data-zeyn-count"],
+    ),
     script(
         "palette",
         &[

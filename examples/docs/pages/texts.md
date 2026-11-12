@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+A count that changes the words goes in a plural placeholder; a word picked by a value goes in a select one. The plural case comes from the language's rules (`one`, `few`, `many` and the rest, as CLDR names them), an exact case such as `=0` wins, `#` is the number, and every placeholder needs an `other` case. A plural argument must be an integer: `n = "two"` or a float does not compile.
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## Labels of fields and choices
 
 Field labels use the key `<Model>.<field>`, such as `Product.code`. Choice labels use `<Choice>.<Variant>`. When a key is missing the label falls back to `#[label("...")]` or a readable form of the name. `zeyn check` reports keys that some languages have and others lack.

@@ -31,6 +31,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub(crate) mod accounts;
 mod agent;
 mod auth;
+mod checks;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod charts;
@@ -62,6 +63,7 @@ mod pdf;
 #[cfg(feature = "xlsx")]
 mod xlsx;
 
+pub use checks::render_checks;
 pub use ops::{READY_CACHE, build_id, probe};
 
 /// Sent on sign out with the value `"storage"`: the browser drops what the runtime kept for the
@@ -759,6 +761,7 @@ pub struct App {
     llms_txt: Option<&'static str>,
     csp: crate::csp::Csp,
     robots_txt: Option<&'static str>,
+    public: &'static [PublicFile],
     site_url: String,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
@@ -818,6 +821,7 @@ impl App {
             llms_txt: None,
             csp: crate::csp::Csp::new(),
             robots_txt: None,
+            public: &[],
             site_url: String::new(),
             time: TimePolicy::User {
                 default: TimeZone::UTC,
@@ -1286,6 +1290,18 @@ impl App {
     /// ```
     pub fn robots_txt(mut self, text: &'static str) -> Self {
         self.robots_txt = Some(text);
+        self
+    }
+
+    /// Serves the files of the crate's `public/` folder from the site's root, embedded with
+    /// [`public_files!`](crate::public_files): `public/favicon.svg` answers `/favicon.svg`. They
+    /// need no sign in, carry an entity tag and are cached for an hour.
+    ///
+    /// ```ignore
+    /// App::new("Shop").public(zeyn::public_files!())
+    /// ```
+    pub fn public(mut self, files: &'static [PublicFile]) -> Self {
+        self.public = files;
         self
     }
 
@@ -1769,6 +1785,28 @@ impl App {
             }
             _ => {}
         }
+        for file in self.public {
+            let taken = file.path.starts_with("/_zeyn/")
+                || file.path == "/sitemap.xml"
+                || (file.path == "/robots.txt" && self.robots_txt.is_some())
+                || (file.path == "/llms.txt" && self.llms_txt.is_some())
+                || paths.contains_key(file.path);
+            if taken {
+                problems.push(
+                    crate::Problem::new(
+                        "Z0306",
+                        format!(
+                            "the public file `{}` answers a path the app already serves",
+                            file.path
+                        ),
+                    )
+                    .why("two handlers on one path stop the router from starting, or one of them is never reached")
+                    .fix("rename or remove the file in `public/`, or drop the other route")
+                    .docs("guides/public-pages#the-public-folder")
+                    .to_string(),
+                );
+            }
+        }
         problems.extend(self.theme_problems());
         problems.extend(self.client_prefs.problems());
         problems.dedup();
@@ -1822,6 +1860,7 @@ impl App {
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
+        ops::warm_build_id();
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self
@@ -1886,6 +1925,14 @@ impl App {
             fixed_now: self.fixed_now,
             zone_picker: self.zone_picker,
             api_prefix: self.api_prefix,
+            favicon: ["/favicon.svg", "/favicon.png", "/favicon.ico"]
+                .iter()
+                .find_map(|p| {
+                    self.public
+                        .iter()
+                        .find(|f| f.path == *p)
+                })
+                .map(|f| (f.path, f.content_type)),
             config: self.config,
             tenancy: self.tenancy,
             license: self.license,
@@ -2002,6 +2049,27 @@ impl App {
                 get(move || async move { asset(text, "text/plain; charset=utf-8") }),
             );
         }
+        for file in self.public {
+            let tag = format!(
+                "\"p{:016x}\"",
+                file.bytes
+                    .iter()
+                    .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+                        (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3)
+                    })
+            );
+            router = router.route(
+                file.path,
+                get(move |headers: HeaderMap| async move { public_file(file, &tag, &headers) }),
+            );
+        }
+        if !self
+            .public
+            .iter()
+            .any(|f| f.path == "/favicon.ico")
+        {
+            router = router.route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }));
+        }
         let router = seo::routes(router, &state);
         let router = router
             .route(
@@ -2025,11 +2093,11 @@ impl App {
                 get(|| async { asset(NAV, "text/javascript; charset=utf-8") }),
             )
             .route("/_zeyn/theme.css", get(theme_css))
-            .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
             .route("/_zeyn/csrf", get(csrf_token))
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/menu", post(menu_call))
+            .route("/_zeyn/menu/counts", get(menu_counts))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone));
@@ -2211,6 +2279,8 @@ struct AppState {
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
+    /// The icon of the app's `public/` folder the page head links: path and content type.
+    favicon: Option<(&'static str, &'static str)>,
     api_prefix: String,
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
@@ -3052,11 +3122,36 @@ impl AppState {
                     page = Some(label.clone());
                 }
                 let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                let mut extra = String::new();
+                if let Some(badge) = &item.badge {
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-badge">{}</span>"#,
+                        r.text(badge)
+                    ));
+                }
+                if let Some(count) = item
+                    .count
+                    .filter(|c| !site && ctx.identity().can(&c.action.access))
+                {
+                    let topics = if item.topics.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            r#" data-zeyn-count-topics="{}""#,
+                            escape(&item.topics.join(","))
+                        )
+                    };
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-count" data-zeyn-count="{}"{topics} hidden></span>"#,
+                        escape(count.action.name)
+                    ));
+                }
                 Some(nav_link(
                     &href,
                     current,
                     item.icon.filter(|_| !site),
                     &label,
+                    &extra,
                 ))
             })
             .collect();
@@ -3242,7 +3337,7 @@ impl AppState {
         };
         let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title>{icon}<link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -3264,6 +3359,12 @@ impl AppState {
             },
             title = escape(title),
             extra = ops::head(self, ctx),
+            icon = self
+                .favicon
+                .map(|(path, kind)| format!(
+                    r#"<link rel="icon" href="{base}{path}" type="{kind}">"#
+                ))
+                .unwrap_or_default(),
             prefetch = if self.prefetch == Prefetch::Moderate {
                 r#"<meta name="zeyn-prefetch" content="moderate">"#
             } else {
@@ -3295,6 +3396,13 @@ impl AppState {
         let mut groups = self.menu_links(ctx, &r, current, false);
         for g in self.dynamic_groups(dynamic, ctx, &r, current) {
             NavGroup::merge(&mut groups, g);
+        }
+        let links: usize = groups
+            .iter()
+            .map(NavGroup::link_count)
+            .sum();
+        if links >= MENU_FILTER_FROM {
+            nav.push_str(&menu_filter(&r));
         }
         let rail = ctx.rail();
         for (i, g) in groups.iter().enumerate() {
@@ -3451,6 +3559,16 @@ impl NavGroup {
         links
     }
 
+    /// The links of this group and its nested groups.
+    fn link_count(&self) -> usize {
+        self.links.len()
+            + self
+                .groups
+                .iter()
+                .map(NavGroup::link_count)
+                .sum::<usize>()
+    }
+
     /// Writes the group into the side menu: a `<div>` at the top level, an `<li>` below it, with
     /// a heading of `level`. A collapsible group's heading holds a button with `aria-expanded`
     /// and `aria-controls` (W3C APG disclosure); it starts expanded when the group holds the
@@ -3501,6 +3619,24 @@ impl NavGroup {
     }
 }
 
+/// Side menus with at least this many links get a filter box and favorites.
+pub const MENU_FILTER_FROM: usize = 10;
+
+/// The filter box of a long side menu, with the texts `menu.js` needs for it and for the pin
+/// buttons and the Favorites group it adds.
+fn menu_filter(r: &Render) -> String {
+    let t = |k: &str| r.text(&Text::key(format!("zeyn.shell.{k}")));
+    format!(
+        r#"<div class="z-nav-filter" data-zeyn-menu-filter data-text-results="{}" data-text-none="{}" data-text-favorites="{}" data-text-pin="{}" data-text-unpin="{}"><input type="search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false"><p class="z-sr-only" role="status" aria-live="polite"></p></div>"#,
+        t("menu_results"),
+        t("menu_none"),
+        t("menu_favorites"),
+        t("menu_pin"),
+        t("menu_unpin"),
+        label = t("menu_filter")
+    )
+}
+
 /// The button that folds the side menu to an icon rail and back, on wide screens. `aria-pressed`
 /// says whether the rail is on; its name says what pressing it does.
 fn rail_toggle(r: &Render, rail: bool) -> String {
@@ -3513,7 +3649,14 @@ fn rail_toggle(r: &Render, rail: bool) -> String {
 }
 
 /// A side menu link: `href` is escaped, and so is `label`.
-fn nav_link(href: &str, current: bool, icon: Option<crate::screen::Icon>, label: &str) -> String {
+/// `extra` is HTML after the label (a badge or a count), already escaped.
+fn nav_link(
+    href: &str,
+    current: bool,
+    icon: Option<crate::screen::Icon>,
+    label: &str,
+    extra: &str,
+) -> String {
     let aria = if current {
         r#" aria-current="page""#
     } else {
@@ -3521,10 +3664,11 @@ fn nav_link(href: &str, current: bool, icon: Option<crate::screen::Icon>, label:
     };
     match icon {
         Some(icon) => format!(
-            r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
+            r#"<li><a href="{href}"{aria}>{}<span>{label}</span>{extra}</a></li>"#,
             icon.html()
         ),
-        None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+        None if extra.is_empty() => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+        None => format!(r#"<li><a href="{href}"{aria}><span>{label}</span>{extra}</a></li>"#),
     }
 }
 
@@ -3808,6 +3952,38 @@ async fn identity_for_ranges(mut req: axum::extract::Request) -> axum::extract::
     req
 }
 
+/// A file of the app's `public/` folder, embedded by [`public_files!`](crate::public_files).
+#[derive(Clone, Copy, Debug)]
+pub struct PublicFile {
+    /// The path it answers, such as `/favicon.svg`.
+    pub path: &'static str,
+    pub bytes: &'static [u8],
+    pub content_type: &'static str,
+}
+
+/// Serves a public file: `304` when the browser holds this version, otherwise the bytes,
+/// cached for an hour and `nosniff`.
+fn public_file(file: &PublicFile, tag: &str, headers: &HeaderMap) -> Response {
+    let fresh = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.split(',').any(|t| t.trim() == tag));
+    let mut r = if fresh {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        ([(header::CONTENT_TYPE, file.content_type)], file.bytes).into_response()
+    };
+    let h = r.headers_mut();
+    h.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=3600"),
+    );
+    if let Ok(v) = HeaderValue::from_str(tag) {
+        h.insert(header::ETAG, v);
+    }
+    r
+}
+
 fn asset(body: &'static str, content_type: &'static str) -> Response {
     (
         [
@@ -3951,6 +4127,7 @@ async fn page(
             }
         }
         Ok((title, html, head)) => {
+            checks::log(name, &html);
             let menu = st.dynamic_menu(&ctx, Some(name)).await;
             let mut page = st.shell_menu(&ctx, &csrf, &title, &html, Some(name), &menu);
             if !head.is_empty() {
@@ -4310,6 +4487,56 @@ impl AppState {
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }
+}
+
+/// `GET /_zeyn/menu/counts`: the numbers of the side menu's counted items, by the name of the
+/// action that counts them, for the actions the user may run in features whose guards pass. The
+/// counts run at the same time, each within the app's time limit; one that fails is left out.
+async fn menu_counts(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    fn collect(g: &crate::feature::MenuGroup, ctx: &Ctx, out: &mut Vec<crate::feature::MenuCount>) {
+        for item in &g.items {
+            if let Some(c) = item.count
+                && ctx.identity().can(&c.action.access)
+                && !out
+                    .iter()
+                    .any(|o| o.action.name == c.action.name)
+            {
+                out.push(c);
+            }
+        }
+        for sub in &g.groups {
+            collect(sub, ctx, out);
+        }
+    }
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    let mut counts = Vec::new();
+    for f in &st.features {
+        if f.site_shell().is_some() || f.check_guards(&ctx).is_err() {
+            continue;
+        }
+        for g in f.menu_groups() {
+            collect(g, &ctx, &mut counts);
+        }
+    }
+    let runs = counts.iter().map(|c| {
+        let st = &st;
+        let ctx = ctx.clone();
+        async move {
+            st.timed((c.run)(ctx))
+                .await
+                .ok()
+                .map(|n| (c.action.name.to_string(), json!(n)))
+        }
+    });
+    let found: serde_json::Map<String, Json> = futures_util::future::join_all(runs)
+        .await
+        .into_iter()
+        .flatten()
+        .collect();
+    let mut r = axum::Json(Json::Object(found)).into_response();
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r
 }
 
 async fn menu_call(

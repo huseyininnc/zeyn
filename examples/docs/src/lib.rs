@@ -665,6 +665,7 @@ pub fn app(docs: Docs, versions: Versions) -> Result<App, String> {
         .base_path(versions.base())
         .site_url(SITE)
         .robots_txt(include_str!("../robots.txt"))
+        .public(zeyn::public_files!())
         .llms_txt(include_str!("../llms.txt"));
     let picker = versions::picker(&versions);
     Ok(app

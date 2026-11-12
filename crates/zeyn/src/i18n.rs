@@ -62,6 +62,215 @@ impl Text {
     }
 }
 
+/// Fills a message: `{name}` takes the argument's text; `{n, plural, one {# file} other {# files}}`
+/// picks a case by the CLDR plural category of the integer `n` in `locale` (`=0` style cases
+/// match exactly and win), with `#` standing for the number; `{g, select, female {..} other {..}}`
+/// picks the case named by the argument's text. `other` is the case when nothing else matches.
+/// Cases may hold further placeholders. A placeholder without its argument stays as written.
+///
+/// ```
+/// use zeyn::format_message;
+/// let m = "{n, plural, =0 {No files} one {# file} other {# files}}";
+/// assert_eq!(format_message("en", m, &[("n", "0".into())]), "No files");
+/// assert_eq!(format_message("en", m, &[("n", "1".into())]), "1 file");
+/// assert_eq!(format_message("en", m, &[("n", "5".into())]), "5 files");
+/// let r = "{n, plural, one {# файл} few {# файла} many {# файлов} other {# файла}}";
+/// assert_eq!(format_message("ru", r, &[("n", "21".into())]), "21 файл");
+/// assert_eq!(format_message("ru", r, &[("n", "3".into())]), "3 файла");
+/// assert_eq!(format_message("ru", r, &[("n", "11".into())]), "11 файлов");
+/// let s = "{who, select, ada {Ada wrote} other {Someone wrote}}";
+/// assert_eq!(format_message("en", s, &[("who", "ada".into())]), "Ada wrote");
+/// ```
+pub fn format_message(locale: &str, template: &str, args: &[(&str, String)]) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        let Some(len) = closing(&rest[start..]) else {
+            out.push_str(&rest[start..]);
+            return out;
+        };
+        let inner = &rest[start + 1..start + len];
+        match expand(locale, inner, args) {
+            Some(text) => out.push_str(&text),
+            None => out.push_str(&rest[start..=start + len]),
+        }
+        rest = &rest[start + len + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The length up to the brace that closes the one at the start of `s`, nested braces counted.
+fn closing(s: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (i, c) in s.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The text of one placeholder's inside, or `None` when its argument is missing.
+fn expand(locale: &str, inner: &str, args: &[(&str, String)]) -> Option<String> {
+    let value = |name: &str| {
+        args.iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v.as_str())
+    };
+    let mut parts = inner.splitn(3, ',');
+    let name = parts.next()?.trim();
+    let Some(kind) = parts.next() else {
+        return value(name).map(str::to_string);
+    };
+    let cases = parse_cases(parts.next().unwrap_or(""));
+    let arg = value(name)?;
+    let pick = |key: &str| {
+        cases
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| *v)
+    };
+    match kind.trim() {
+        "plural" => {
+            let n: i64 = arg.trim().parse().ok()?;
+            let body = pick(&format!("={n}"))
+                .or_else(|| pick(plural_category(locale, n)))
+                .or_else(|| pick("other"))?;
+            Some(format_message(
+                locale,
+                &body.replace('#', &n.to_string()),
+                args,
+            ))
+        }
+        "select" => {
+            let body = pick(arg.trim()).or_else(|| pick("other"))?;
+            Some(format_message(locale, body, args))
+        }
+        _ => None,
+    }
+}
+
+/// The cases of a plural or select placeholder: `one {..} other {..}` as `(key, text)` pairs.
+pub fn parse_cases(s: &str) -> Vec<(&str, &str)> {
+    let mut cases = Vec::new();
+    let mut rest = s.trim_start();
+    while let Some(open) = rest.find('{') {
+        let key = rest[..open].trim();
+        let Some(len) = closing(&rest[open..]) else {
+            break;
+        };
+        cases.push((key, &rest[open + 1..open + len]));
+        rest = rest[open + len + 1..].trim_start();
+    }
+    cases
+}
+
+/// The CLDR cardinal plural category of an integer in a language: `zero`, `one`, `two`, `few`,
+/// `many` or `other`, for the languages Zeyn ships; other languages use `one` for 1.
+pub fn plural_category(locale: &str, n: i64) -> &'static str {
+    let lang = locale
+        .split(['-', '_'])
+        .next()
+        .unwrap_or(locale);
+    let i = n.unsigned_abs();
+    let (m10, m100) = (i % 10, i % 100);
+    match lang {
+        "ja" | "ko" | "zh" => "other",
+        "hi" => {
+            if i <= 1 {
+                "one"
+            } else {
+                "other"
+            }
+        }
+        "ru" => {
+            if m10 == 1 && m100 != 11 {
+                "one"
+            } else if (2..=4).contains(&m10) && !(12..=14).contains(&m100) {
+                "few"
+            } else {
+                "many"
+            }
+        }
+        "ar" => match i {
+            0 => "zero",
+            1 => "one",
+            2 => "two",
+            _ if (3..=10).contains(&m100) => "few",
+            _ if (11..=99).contains(&m100) => "many",
+            _ => "other",
+        },
+        _ => {
+            if i == 1 {
+                "one"
+            } else {
+                "other"
+            }
+        }
+    }
+}
+
+/// An integer a plural message counts. `t!` passes plural arguments through it, so a text or a
+/// float is a compile error that says what to pass.
+///
+/// ```
+/// let one = zeyn::t!("zeyn.files.too_many", label = "Photos", n = 1u32);
+/// assert_eq!(one.english(), "Photos takes at most 1 file.");
+/// let many = zeyn::t!("zeyn.files.too_many", label = "Photos", n = 4usize);
+/// assert_eq!(many.english(), "Photos takes at most 4 files.");
+/// ```
+///
+/// ```compile_fail
+/// let _ = zeyn::t!("zeyn.files.too_many", label = "Photos", n = "two");
+/// ```
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a whole number, and a plural message counts whole numbers",
+    label = "a plural argument must be an integer",
+    note = "pass the count as an integer, such as `n = items.len()`; format money and decimals in a plain `{{name}}` placeholder"
+)]
+pub trait PluralCount {
+    fn count(&self) -> String;
+}
+
+macro_rules! plural_count {
+    ($($t:ty),*) => {
+        $(impl PluralCount for $t {
+            fn count(&self) -> String {
+                self.to_string()
+            }
+        })*
+    };
+}
+
+plural_count!(
+    i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize
+);
+
+impl<T: PluralCount + ?Sized> PluralCount for &T {
+    fn count(&self) -> String {
+        (**self).count()
+    }
+}
+
+/// Used by `t!` for plural arguments.
+///
+/// ```compile_fail
+/// let _ = zeyn::__plural(&"five");
+/// ```
+#[doc(hidden)]
+pub fn __plural<T: PluralCount + ?Sized>(value: &T) -> String {
+    value.count()
+}
+
 impl From<&'static str> for Text {
     fn from(s: &'static str) -> Self {
         Text::Literal(Cow::Borrowed(s))
@@ -285,11 +494,11 @@ impl I18n {
                     .lookup(locale, key)
                     .or(fallback.as_deref())
                     .unwrap_or(key);
-                let mut out = template.to_string();
-                for (name, value) in args {
-                    out = out.replace(&format!("{{{name}}}"), &self.text(locale, value));
-                }
-                out
+                let values: Vec<(&str, String)> = args
+                    .iter()
+                    .map(|(n, v)| (*n, self.text(locale, v)))
+                    .collect();
+                format_message(locale, template, &values)
             }
         }
     }
