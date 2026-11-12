@@ -187,18 +187,23 @@ impl PageCheck {
             .push((self.path.clone(), topic));
     }
 
-    /// A problem of the node's configuration, written for whoever fixes it. The node's path is
-    /// put in front.
-    pub fn problem(&mut self, message: impl AsRef<str>) {
+    /// A problem of the node's configuration, written for whoever fixes it (see
+    /// [`crate::Problem`]; page checks use the codes `Z06xx`). The node's path is put in front
+    /// of its summary.
+    pub fn problem(&mut self, problem: crate::Problem) {
+        let prefix = format!("node {}: ", self.path);
         self.problems
-            .push(format!("node {}: {}", self.path, message.as_ref()));
+            .push(problem.prefixed(&prefix).to_string());
     }
 
     fn topic(&mut self, topic: &str) {
         if !valid_topic(topic) {
-            self.problem(format!(
-                "topic `{topic}` is not a valid name; use 1 to 64 letters, digits, `-`, `_` or `.`"
-            ));
+            self.problem(
+                crate::Problem::new("Z0601", format!("topic `{topic}` is not a valid name"))
+                    .why("topic names travel in HTML attributes and runtime messages, so other characters are refused there")
+                    .fix("use 1 to 64 letters, digits, `-`, `_` or `.`")
+                    .docs("language/effects#topics"),
+            );
         }
     }
 
@@ -207,9 +212,16 @@ impl PageCheck {
     pub(crate) fn finish(mut self) -> Vec<String> {
         for (path, topic) in &self.drives {
             if !self.listens.contains(topic) {
-                self.problems.push(format!(
-                    "node {path} drives topic `{topic}`, but nothing on this page listens to it; add `.listens(\"{topic}\")` to the nodes that should refresh"
-                ));
+                self.problems.push(
+                    crate::Problem::new(
+                        "Z0602",
+                        format!("node {path} drives topic `{topic}`, but nothing on this page listens to it"),
+                    )
+                    .why("driving a topic only refreshes the nodes that listen to it, so the change would show nowhere")
+                    .fix(format!("add `.listens(\"{topic}\")` to the nodes that should refresh"))
+                    .docs("language/effects#topics")
+                    .to_string(),
+                );
             }
         }
         self.problems
