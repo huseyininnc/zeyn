@@ -1385,7 +1385,10 @@ fn public_tokens() -> Result<Ts, String> {
 /// Catalog text checked at compile time: `t!("products.title")` or `t!("orders.count", n = count)`.
 ///
 /// Every JSON file in the crate's `locales/` folder must have the key, and the message's `{name}`
-/// placeholders must match the arguments exactly.
+/// placeholders must match the arguments exactly. Messages may hold plural and select
+/// placeholders, `{n, plural, one {# order} other {# orders}}` and
+/// `{role, select, admin {..} other {..}}`; each needs an `other` case, and a plural argument
+/// must be an integer.
 #[proc_macro]
 pub fn t(input: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(input as TArgs);
@@ -1422,24 +1425,75 @@ fn lookup_key<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
         .as_str()
 }
 
-fn placeholders(message: &str) -> std::collections::BTreeSet<String> {
-    let mut found = std::collections::BTreeSet::new();
+/// The length up to the brace that closes the one at the start of `s`, nested braces counted.
+fn closing(s: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (i, c) in s.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The arguments a message uses, each with whether it is counted by a plural placeholder; `Err`
+/// with the problem when a plural or select placeholder has no `other` case.
+fn placeholders(message: &str) -> Result<std::collections::BTreeMap<String, bool>, String> {
+    let mut found = std::collections::BTreeMap::new();
     let mut rest = message;
     while let Some(start) = rest.find('{') {
-        let Some(len) = rest[start..].find('}') else {
+        let Some(len) = closing(&rest[start..]) else {
             break;
         };
-        let name = &rest[start + 1..start + len];
-        if !name.is_empty()
+        let inner = &rest[start + 1..start + len];
+        let mut parts = inner.splitn(3, ',');
+        let name = parts.next().unwrap_or("").trim();
+        let plain = !name.is_empty()
             && name
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_')
-        {
-            found.insert(name.to_string());
+                .all(|c| c.is_ascii_alphanumeric() || c == '_');
+        match (plain, parts.next().map(str::trim)) {
+            (true, None) => {
+                found
+                    .entry(name.to_string())
+                    .or_insert(false);
+            }
+            (true, Some(kind @ ("plural" | "select"))) => {
+                let plural = kind == "plural";
+                let entry = found
+                    .entry(name.to_string())
+                    .or_insert(false);
+                *entry |= plural;
+                let mut cases = parts.next().unwrap_or("").trim_start();
+                let mut other = false;
+                while let Some(open) = cases.find('{') {
+                    other |= cases[..open].trim() == "other";
+                    let Some(n) = closing(&cases[open..]) else {
+                        break;
+                    };
+                    for (inner_name, p) in placeholders(&cases[open + 1..open + n])? {
+                        *found.entry(inner_name).or_insert(false) |= p;
+                    }
+                    cases = cases[open + n + 1..].trim_start();
+                }
+                if !other {
+                    return Err(format!(
+                        "the {kind} placeholder of `{name}` has no `other` case"
+                    ));
+                }
+            }
+            _ => {}
         }
-        rest = &rest[start + len..];
+        rest = &rest[start + len + 1..];
     }
-    found
+    Ok(found)
 }
 
 fn expand_t(t: TArgs) -> syn::Result<Ts> {
@@ -1476,6 +1530,7 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
         .map(|(n, _)| n.to_string())
         .collect();
     let mut tracked = Vec::new();
+    let mut counted = std::collections::BTreeSet::new();
     for path in &files {
         let text = std::fs::read_to_string(path)
             .map_err(|e| syn::Error::new(span, format!("t!: {}: {e}", path.display())))?;
@@ -1497,7 +1552,15 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
                 ),
             ));
         };
-        let wanted = placeholders(message);
+        let found = placeholders(message).map_err(|why| {
+            syn::Error::new(span, format!("t!: `{key}` in locales/{file}: {why}"))
+        })?;
+        for (name, plural) in &found {
+            if *plural {
+                counted.insert(name.clone());
+            }
+        }
+        let wanted: std::collections::BTreeSet<String> = found.into_keys().collect();
         if let Some(missing) = wanted.difference(&given).next() {
             return Err(syn::Error::new(
                 span,
@@ -1518,8 +1581,12 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
         ));
     }
     let args = t.args.iter().map(|(n, v)| {
-        let n = n.to_string();
-        quote!(.arg(#n, ::zeyn::Text::from(::std::string::ToString::to_string(&#v))))
+        let name = n.to_string();
+        if counted.contains(&name) {
+            quote!(.arg(#name, ::zeyn::Text::from(::zeyn::__plural(&#v))))
+        } else {
+            quote!(.arg(#name, ::zeyn::Text::from(::std::string::ToString::to_string(&#v))))
+        }
     });
     Ok(quote!({
         #(#tracked)*
