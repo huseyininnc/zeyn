@@ -47,6 +47,7 @@ pub mod lightbox;
 pub mod line_editor;
 pub mod link_button;
 pub mod list;
+pub mod list_detail;
 pub mod lookup;
 pub mod markdown;
 pub mod masked_inputs;
