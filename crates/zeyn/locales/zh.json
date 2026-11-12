@@ -215,6 +215,12 @@
     "shell": {
       "skip": "跳到正文",
       "menu": "主菜单",
+      "menu_filter": "筛选菜单",
+      "menu_results": "{n} 项",
+      "menu_none": "没有匹配的菜单项",
+      "menu_favorites": "收藏",
+      "menu_pin": "固定 {label}",
+      "menu_unpin": "取消固定 {label}",
       "rail_collapse": "收起菜单",
       "rail_expand": "展开菜单",
       "language": "语言",

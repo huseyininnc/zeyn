@@ -215,6 +215,12 @@
     "shell": {
       "skip": "Saltar al contenido",
       "menu": "Principal",
+      "menu_filter": "Filtrar el menú",
+      "menu_results": "{n} elementos",
+      "menu_none": "Ningún elemento del menú coincide",
+      "menu_favorites": "Favoritos",
+      "menu_pin": "Fijar {label}",
+      "menu_unpin": "Quitar {label} de fijados",
       "rail_collapse": "Contraer el menú",
       "rail_expand": "Expandir el menú",
       "language": "Idioma",

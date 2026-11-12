@@ -118,7 +118,10 @@ pub(crate) const MODULES: &[Module] = &[
     control("overlays", &["data-zeyn-tip", "z-popover-button"]),
     control("menubutton", &["z-menu-trigger", "z-split-button"]),
     script("busy", &["data-zeyn-busy"]),
-    script("menu", &["data-zeyn-menu", "data-zeyn-count"]),
+    script(
+        "menu",
+        &["data-zeyn-menu", "data-zeyn-menu-filter", "data-zeyn-count"],
+    ),
     script(
         "palette",
         &[

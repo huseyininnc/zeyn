@@ -215,6 +215,12 @@
     "shell": {
       "skip": "本文へスキップ",
       "menu": "メイン",
+      "menu_filter": "メニューを絞り込む",
+      "menu_results": "{n} 件",
+      "menu_none": "一致するメニュー項目はありません",
+      "menu_favorites": "お気に入り",
+      "menu_pin": "{label} をピン留め",
+      "menu_unpin": "{label} のピン留めを外す",
       "rail_collapse": "メニューを折りたたむ",
       "rail_expand": "メニューを広げる",
       "language": "言語",
