@@ -20,7 +20,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - 키는 설정에서 가져오며, 길이는 최소 32바이트이고 절대 바꾸지 않습니다.

@@ -849,11 +849,20 @@ impl<E: Model> DataGrid<E> {
         self
     }
 
-    /// The order rows come in before the user sorts: `.sort_by(Order::id, true)` for newest
+    /// The order rows come in before the user sorts: `.sort_by_desc(Order::id)` for newest
     /// first. The header shows it, and clicking that column only switches between ascending and
     /// descending; other columns go back to this order on their third click. Call it again to add
     /// further keys. The action still receives it in `DataQuery::sort`.
-    pub fn sort_by<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
+    pub fn sort_by<T: FieldType>(self, field: Field<E, T>) -> Self {
+        self.sort_field(field, false)
+    }
+
+    /// Same as [`DataGrid::sort_by`], falling: newest, largest or last first.
+    pub fn sort_by_desc<T: FieldType>(self, field: Field<E, T>) -> Self {
+        self.sort_field(field, true)
+    }
+
+    fn sort_field<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
         self.default_sort
             .push(crate::action::Sort {
                 field: field.meta().name.to_string(),

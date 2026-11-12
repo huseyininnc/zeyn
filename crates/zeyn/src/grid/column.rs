@@ -344,8 +344,12 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.scope(field, value)
     }
 
-    pub fn sort_by<U: FieldType>(self, field: Field<E, U>, desc: bool) -> DataGrid<E> {
-        self.grid.sort_by(field, desc)
+    pub fn sort_by<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {
+        self.grid.sort_by(field)
+    }
+
+    pub fn sort_by_desc<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {
+        self.grid.sort_by_desc(field)
     }
 
     pub fn group_by<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {

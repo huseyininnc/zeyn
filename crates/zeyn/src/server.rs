@@ -538,7 +538,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
 ///
 /// ```ignore
 /// App::new("Shop").mcp(Mcp::read_only())          // agents may read
-/// App::new("Shop").mcp(Mcp::on().webmcp(false))   // read and write, server endpoint only
+/// App::new("Shop").mcp(Mcp::on().no_webmcp())   // read and write, server endpoint only
 /// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mcp {
@@ -576,15 +576,15 @@ impl Mcp {
         Mcp::on()
     }
 
-    /// `false` turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
-    pub fn server(mut self, on: bool) -> Self {
-        self.server = on;
+    /// Turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
+    pub fn no_server(mut self) -> Self {
+        self.server = false;
         self
     }
 
-    /// `false` turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
-    pub fn webmcp(mut self, on: bool) -> Self {
-        self.browser = on;
+    /// Turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
+    pub fn no_webmcp(mut self) -> Self {
+        self.browser = false;
         self
     }
 
@@ -885,13 +885,13 @@ impl App {
         self
     }
 
-    /// `false` stops the browser's own context menu everywhere except in text inputs, text areas
-    /// and editable text. This protects nothing (any user can still view the source, use the
+    /// Stops the browser's own context menu everywhere except in text inputs, text areas and
+    /// editable text. This protects nothing (any user can still view the source, use the
     /// developer tools or turn scripts off) and it takes away spell check, copy link, translate
-    /// and accessibility tools. Keep the default (`true`) unless a kiosk or a strict brief asks
-    /// for it; Zeyn's own menus work either way.
-    pub fn browser_context_menu(mut self, allow: bool) -> Self {
-        self.native_menu = allow;
+    /// and accessibility tools. Leave it out unless a kiosk or a strict brief asks for it; Zeyn's
+    /// own menus work either way.
+    pub fn no_browser_context_menu(mut self) -> Self {
+        self.native_menu = false;
         self
     }
 
@@ -1357,9 +1357,9 @@ impl App {
         self
     }
 
-    /// Marks cookies `Secure`. Turn on whenever the app is served over HTTPS.
-    pub fn secure_cookies(mut self, secure: bool) -> Self {
-        self.secure_cookies = secure;
+    /// Marks cookies `Secure`. Call it whenever the app is served over HTTPS.
+    pub fn secure_cookies(mut self) -> Self {
+        self.secure_cookies = true;
         self
     }
 

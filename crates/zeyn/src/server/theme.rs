@@ -406,9 +406,9 @@ impl App {
         self
     }
 
-    /// `false` hides the theme picker: everyone sees the default theme.
-    pub fn theme_picker(mut self, show: bool) -> Self {
-        self.looks.picker = show;
+    /// Hides the theme picker: everyone sees the default theme.
+    pub fn no_theme_picker(mut self) -> Self {
+        self.looks.picker = false;
         self
     }
 

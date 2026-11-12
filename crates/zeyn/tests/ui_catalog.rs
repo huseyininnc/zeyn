@@ -88,8 +88,8 @@ pub fn shop() -> Screen {
                         .badge(Badge::new("New"))
                         .link(results, SearchParams { q: g.name.clone() })
                 })
-                .sort_option("Cheapest", Good::price, false)
-                .sort_option("Dearest", Good::price, true)
+                .sort_option("Cheapest", Good::price)
+                .sort_option_desc("Dearest", Good::price)
                 .paging(Paging::infinite(4)),
         )
         .body(
@@ -141,7 +141,7 @@ pub fn picks() -> Screen {
                     .horizontal()
                     .link(good_page, GoodParams { id: g.id.0 })
             })
-            .scrollbar(true)
+            .scrollbar()
             .paging(Paging::infinite(2)),
     )
 }
@@ -163,7 +163,7 @@ pub fn goods_list() -> Screen {
                         .meta(format!("{} TL", g.price))
                         .link(results, SearchParams { q: g.name.clone() })
                 })
-                .sort_option("Cheapest", Good::price, false)
+                .sort_option("Cheapest", Good::price)
                 .paging(Paging::infinite(3)),
         )
         .body(

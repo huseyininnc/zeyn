@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -92,13 +92,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 rail 是排成一行并可横向滚动的卡片网格，带有滚动吸附，以及按一个视图宽度滚动的上一个和下一个按钮（除非用户要求减少动画，否则为平滑滚动）。当用户滚动到接近末尾时，它每次加载下一批，每批 12 张。卡片是处于 Tab 顺序中的链接，获得焦点时会滚动到视野中。
 
-滚动条默认隐藏；触摸、触控板和 Shift+滚轮仍可滚动，`.scrollbar(true)` 会保留一条细滚动条。可以用鼠标按住并左右拖动 rail。移动超过 5 像素后，松开时的点击会被取消，因此指针下的卡片不会打开，rail 会停在最近的卡片上；更小的移动则是普通点击。拖动期间不会选中文本，图片不会被拖出，也不会打开卡片预览。触摸设备保留浏览器自身的滚动。上一个和下一个按钮始终存在，到达两端时被禁用，因为隐藏的滚动条无法供键盘滚动。没有 JavaScript 时按钮被隐藏，rail 使用浏览器原生滚动。
+滚动条默认隐藏；触摸、触控板和 Shift+滚轮仍可滚动，`.scrollbar()` 会保留一条细滚动条。可以用鼠标按住并左右拖动 rail。移动超过 5 像素后，松开时的点击会被取消，因此指针下的卡片不会打开，rail 会停在最近的卡片上；更小的移动则是普通点击。拖动期间不会选中文本，图片不会被拖出，也不会打开卡片预览。触摸设备保留浏览器自身的滚动。上一个和下一个按钮始终存在，到达两端时被禁用，因为隐藏的滚动条无法供键盘滚动。没有 JavaScript 时按钮被隐藏，rail 使用浏览器原生滚动。
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## Search box
