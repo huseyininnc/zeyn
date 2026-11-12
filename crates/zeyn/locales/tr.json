@@ -222,6 +222,12 @@
     "shell": {
       "skip": "İçeriğe geç",
       "menu": "Ana menü",
+      "menu_filter": "Menüde ara",
+      "menu_results": "{n} öğe",
+      "menu_none": "Eşleşen menü öğesi yok",
+      "menu_favorites": "Favoriler",
+      "menu_pin": "{label} sabitle",
+      "menu_unpin": "{label} sabitlemesini kaldır",
       "language": "Dil",
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)",

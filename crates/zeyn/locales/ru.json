@@ -215,6 +215,12 @@
     "shell": {
       "skip": "Перейти к содержимому",
       "menu": "Главное меню",
+      "menu_filter": "Фильтр меню",
+      "menu_results": "Пунктов: {n}",
+      "menu_none": "Нет подходящих пунктов меню",
+      "menu_favorites": "Избранное",
+      "menu_pin": "Закрепить {label}",
+      "menu_unpin": "Открепить {label}",
       "language": "Язык",
       "time_zone": "Часовой пояс",
       "time_zone_auto": "Автоматически (это устройство)",

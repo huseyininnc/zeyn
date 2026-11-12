@@ -222,6 +222,12 @@
     "shell": {
       "skip": "Skip to content",
       "menu": "Main",
+      "menu_filter": "Filter the menu",
+      "menu_results": "{n} items",
+      "menu_none": "No menu items match",
+      "menu_favorites": "Favorites",
+      "menu_pin": "Pin {label}",
+      "menu_unpin": "Unpin {label}",
       "language": "Language",
       "time_zone": "Time zone",
       "time_zone_auto": "Automatic (this device)",

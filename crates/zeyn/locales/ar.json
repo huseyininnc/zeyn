@@ -215,6 +215,12 @@
     "shell": {
       "skip": "تخطي إلى المحتوى",
       "menu": "الرئيسية",
+      "menu_filter": "تصفية القائمة",
+      "menu_results": "{n} عنصر",
+      "menu_none": "لا توجد عناصر مطابقة في القائمة",
+      "menu_favorites": "المفضلة",
+      "menu_pin": "تثبيت {label}",
+      "menu_unpin": "إلغاء تثبيت {label}",
       "language": "اللغة",
       "time_zone": "المنطقة الزمنية",
       "time_zone_auto": "تلقائي (هذا الجهاز)",
