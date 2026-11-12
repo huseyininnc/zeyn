@@ -18,6 +18,8 @@ into_node!(
     EmptyState,
     Skeleton,
     Progress,
+    Meter,
+    ProgressRing,
     Breadcrumb,
     Timeline,
     LinkButton,
@@ -524,6 +526,231 @@ impl Component for Progress {
 
     fn schema(&self) -> Json {
         json!({ "type": "progress", "label": self.label, "value": self.value, "max": self.max, "tone": self.tone })
+    }
+}
+
+/// Smallest and largest diameter of a [`ProgressRing`], in CSS pixels.
+pub const RING_SIZES: (u16, u16) = (32, 160);
+
+/// Progress as a ring with the percent in its middle and the label under it (ARIA progressbar),
+/// for a share of a whole in little room: a quota used, a profile filled in. The ring is an
+/// inline SVG drawn by the server, so it needs no script and stays sharp at every density.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::ProgressRing;
+/// let quota = ProgressRing::new("Storage used", 64, 100)
+///     .tone(Tone::Warning)
+///     .size(96);
+/// ```
+pub struct ProgressRing {
+    label: Text,
+    value: u64,
+    max: u64,
+    tone: Tone,
+    size: u16,
+}
+
+impl ProgressRing {
+    pub fn new(label: impl Into<Text>, value: u64, max: u64) -> Self {
+        Self {
+            label: label.into(),
+            value: value.min(max.max(1)),
+            max: max.max(1),
+            tone: Tone::Info,
+            size: 64,
+        }
+    }
+
+    pub fn tone(mut self, tone: Tone) -> Self {
+        self.tone = tone;
+        self
+    }
+
+    /// The diameter in CSS pixels, kept within [`RING_SIZES`]. The default is 64.
+    pub fn size(mut self, px: u16) -> Self {
+        self.size = px.clamp(RING_SIZES.0, RING_SIZES.1);
+        self
+    }
+}
+
+impl Component for ProgressRing {
+    fn render(&self, out: &mut String, r: &Render) {
+        let id = dom_id(r, "ring");
+        let percent = self.value * 100 / self.max;
+        out.push_str(&format!(
+            r#"<div class="z-ring z-tone-{}" style="--z-ring-size:{}px"><div class="z-ring-dial" role="progressbar" aria-labelledby="{id}" aria-valuemin="0" aria-valuemax="{}" aria-valuenow="{}" aria-valuetext="{percent}%"><svg class="z-ring-svg" viewBox="0 0 36 36" aria-hidden="true" focusable="false"><circle class="z-ring-track" cx="18" cy="18" r="15.5" pathLength="100"/><circle class="z-ring-bar" cx="18" cy="18" r="15.5" pathLength="100" stroke-dasharray="{percent} 100"/></svg><span class="z-ring-value" aria-hidden="true">{percent}%</span></div><span class="z-ring-label" id="{id}">{}</span></div>"#,
+            self.tone.code(),
+            self.size,
+            self.max,
+            self.value,
+            r.text(&self.label)
+        ));
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "progress_ring", "label": self.label, "value": self.value, "max": self.max, "tone": self.tone, "size": self.size })
+    }
+}
+
+/// Where the value of a [`Meter`] lies against its thresholds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeterState {
+    Low,
+    Normal,
+    High,
+}
+
+/// A measurement within a known range, such as disk space used or a stock level (ARIA meter).
+/// Unlike [`Progress`] it is not a task moving to its end: the value can rise and fall, and
+/// `.low(n)` and `.high(n)` mark where it becomes low or high. The bar takes its color from
+/// that state: with no direction set, the range between the thresholds is good and both ends
+/// are a warning; `.better(Better::Higher)` makes a high value good and a low one bad, and
+/// `Better::Lower` the other way round.
+///
+/// The state is never given by color alone: "low" or "high" is written next to the value and
+/// is part of what screen readers hear. Values are whole numbers, grouped as the user's
+/// language groups them; `.unit` adds a unit after the value.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::{Better, Meter};
+/// let disk = Meter::new("Disk used", 412, 0, 500)
+///     .high(400)
+///     .better(Better::Lower)
+///     .unit("GB");
+/// ```
+pub struct Meter {
+    label: Text,
+    value: i64,
+    min: i64,
+    max: i64,
+    low: Option<i64>,
+    high: Option<i64>,
+    better: Option<super::Better>,
+    unit: Option<Text>,
+}
+
+impl Meter {
+    /// A meter of `value` between `min` and `max`. A value outside the range is brought inside.
+    pub fn new(label: impl Into<Text>, value: i64, min: i64, max: i64) -> Self {
+        let max = max.max(min.saturating_add(1));
+        Self {
+            label: label.into(),
+            value: value.clamp(min, max),
+            min,
+            max,
+            low: None,
+            high: None,
+            better: None,
+            unit: None,
+        }
+    }
+
+    /// Values under this are low.
+    pub fn low(mut self, low: i64) -> Self {
+        self.low = Some(low);
+        self
+    }
+
+    /// Values over this are high.
+    pub fn high(mut self, high: i64) -> Self {
+        self.high = Some(high);
+        self
+    }
+
+    /// Which end of the range is the good one.
+    pub fn better(mut self, better: super::Better) -> Self {
+        self.better = Some(better);
+        self
+    }
+
+    /// A unit written after the value, such as "GB".
+    pub fn unit(mut self, unit: impl Into<Text>) -> Self {
+        self.unit = Some(unit.into());
+        self
+    }
+
+    /// Where the value lies against the thresholds.
+    pub fn state(&self) -> MeterState {
+        if self
+            .low
+            .is_some_and(|low| self.value < low)
+        {
+            MeterState::Low
+        } else if self
+            .high
+            .is_some_and(|high| self.value > high)
+        {
+            MeterState::High
+        } else {
+            MeterState::Normal
+        }
+    }
+
+    fn tone(&self) -> Tone {
+        use super::Better;
+        let state = self.state();
+        match (self.better, state) {
+            (None, MeterState::Normal) => Tone::Success,
+            (None, _) => Tone::Warning,
+            (Some(Better::Higher), MeterState::Low) | (Some(Better::Lower), MeterState::High) => {
+                Tone::Danger
+            }
+            (Some(Better::Higher), MeterState::Normal) if self.high.is_some() => Tone::Warning,
+            (Some(Better::Lower), MeterState::Normal) if self.low.is_some() => Tone::Warning,
+            (Some(_), _) => Tone::Success,
+        }
+    }
+}
+
+impl Component for Meter {
+    fn render(&self, out: &mut String, r: &Render) {
+        let id = dom_id(r, "meter");
+        let span = i128::from(self.max) - i128::from(self.min);
+        let percent = (i128::from(self.value) - i128::from(self.min)) * 100 / span;
+        let mut value = String::new();
+        crate::render::push_grouped(&mut value, self.value, r.locale);
+        if let Some(unit) = &self.unit {
+            value.push(' ');
+            value.push_str(&r.text(unit));
+        }
+        let state = match self.state() {
+            MeterState::Low => Some(r.text(&Text::key("zeyn.ui.meter.low"))),
+            MeterState::High => Some(r.text(&Text::key("zeyn.ui.meter.high"))),
+            MeterState::Normal => None,
+        };
+        let spoken = match &state {
+            Some(state) => format!("{value}, {state}"),
+            None => value.clone(),
+        };
+        let word = state
+            .map(|s| format!(r#"<span class="z-meter-state">{s}</span>"#))
+            .unwrap_or_default();
+        out.push_str(&format!(
+            r#"<div class="z-meter z-tone-{}"><div class="z-meter-head"><span id="{id}">{}</span><span class="z-meter-value">{value}{word}</span></div><div class="z-meter-track" role="meter" aria-labelledby="{id}" aria-valuemin="{}" aria-valuemax="{}" aria-valuenow="{}" aria-valuetext="{spoken}"><span class="z-meter-bar" style="--z-meter:{percent}%"></span></div></div>"#,
+            self.tone().code(),
+            r.text(&self.label),
+            self.min,
+            self.max,
+            self.value
+        ));
+    }
+
+    fn schema(&self) -> Json {
+        json!({
+            "type": "meter",
+            "label": self.label,
+            "value": self.value,
+            "min": self.min,
+            "max": self.max,
+            "low": self.low,
+            "high": self.high,
+            "better": self.better,
+            "unit": self.unit,
+            "state": self.state(),
+        })
     }
 }
 

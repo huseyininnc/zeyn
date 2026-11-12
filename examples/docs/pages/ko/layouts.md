@@ -42,6 +42,27 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `.remember(KEY)`는 사용자가 연 탭을 choice 키로 보관하므로([클라이언트 환경설정](security.md#client-preferences) 참고) 이후 페이지에서도 같은 탭이 열립니다. URL 해시에 지정된 탭이 우선합니다.
 
+## Accordion
+
+`Accordion::new()`와 `.section(title, node)`는 섹션을 위아래로 놓으며, 각 섹션은 제목으로 열고 닫습니다. 도움말 페이지의 답변이나 긴 레코드의 각 부분에 씁니다. 섹션은 닫힌 상태로 시작합니다. 섹션 뒤의 `.open()`은 그 섹션을 엽니다. `.single()`은 한 번에 한 섹션만 열려 있게 하며, 그때는 열림으로 표시된 첫 번째 섹션만 열린 상태로 시작합니다. accordion은 최대 50개의 섹션을 가집니다(`MAX_ACCORDION_SECTIONS`).
+
+```rust
+Accordion::new()
+    .section(t!("help.password"), Paragraph::new(t!("help.password_answer")))
+    .open()
+    .section(t!("help.invoices"), Paragraph::new(t!("help.invoices_answer")))
+    .single()
+```
+
+@live accordion
+
+각 섹션은 네이티브 펼침 요소(`<details>`와 `<summary>`)이며, 제목과 버튼으로 이루어진 ARIA accordion 패턴이 아닙니다. 네이티브 요소는 스크립트가 필요 없고, 닫힌 콘텐츠를 읽기 순서 밖에 두며, 브라우저의 페이지 내 찾기가 일치하는 내용이 있는 섹션을 열 수 있게 해 주기 때문입니다. 단일 모드에서는 섹션들이 `name`을 공유하고, 다른 섹션이 열리면 브라우저가 열려 있던 섹션을 닫습니다. `Tabs`와 달리 닫힌 섹션의 콘텐츠는 처음부터 페이지에 있습니다.
+
+| 키 | 동작 |
+|---|---|
+| `Tab` | 다음 섹션의 제목으로 이동합니다 |
+| `Enter` 또는 `Space` | 섹션을 열거나 닫습니다. 포커스는 제목에 남습니다 |
+
 ## Split
 
 `Split::new(start, end)`는 두 노드를 그 사이의 핸들과 함께 보여 줍니다. `.ratio(percent)`는 시작 쪽의 크기를 설정합니다. 핸들은 포인터나 화살표 키로 움직입니다.

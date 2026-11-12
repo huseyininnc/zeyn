@@ -28,6 +28,39 @@ Stack::new()
 
 `Progress::new(label, value, max)`，可选 `.tone(...)`。它是一个真正的 `progressbar`，带有标签和数值。
 
+## ProgressRing
+
+`ProgressRing::new(label, value, max)` 把同样的进度显示为一个圆环，中间是百分比，下方是标签，用于在很小的空间里表示整体中的一部分：已用的配额、已填写的资料。`.tone(...)` 为圆环着色，`.size(px)` 设置其直径，未设置时为 64，并保持在 32 到 160 之间。圆环是由服务器绘制的内联 SVG，因此不需要脚本，在任何像素密度下都保持清晰。它是一个由其标签命名的真正的 `progressbar`；超过最大值的值按最大值计算。
+
+```rust
+ProgressRing::new(t!("account.storage_used"), used, quota).tone(Tone::Warning).size(96)
+```
+
+@live rings
+
+## Meter
+
+`Meter::new(label, value, min, max)` 显示已知范围内的一个测量值，例如已用的磁盘空间或库存水平。与 `Progress` 不同，它不是一个走向终点的任务：数值可以上升也可以下降，`.low(n)` 和 `.high(n)` 标出数值从哪里开始算偏低或偏高。进度条的颜色取自这个状态：没有设置方向时，两个阈值之间的范围是良好的，两端都是警告；`.better(Better::Higher)` 让高数值为好、低数值为差，`Better::Lower` 则相反。状态绝不只靠颜色表达：数值旁边会用用户的语言写出"偏低"或"偏高"，这也是屏幕阅读器从 ARIA `meter` 读到的内容的一部分。数值是整数，按用户语言的方式分组，`.unit(text)` 添加一个单位。
+
+```rust
+Meter::new(t!("server.disk_used"), used_gb, 0, total_gb)
+    .high(total_gb * 8 / 10)
+    .better(Better::Lower)
+    .unit("GB")
+```
+
+## Indicator
+
+`Indicator::on(node)` 在另一个组件的角上放置一个计数或一个圆点：头像上的未读消息数、链接上的新内容提示。`.count(n)` 显示数字，超过 99 时显示 "99+"，为零时什么都不显示；`.dot()` 显示一个圆点；`.tone(...)` 设置颜色，未设置时为 `Danger`。标记本身对屏幕阅读器是隐藏的，因为名字后面一个单独的 "3" 说明不了什么：`.label(text)` 给出它们代之读出的文字，例如"3 条未读消息"。只要标记带有其下方组件尚未表达的含义，就应当提供标签；没有标签时，计数按数字读出，圆点则不读出。
+
+```rust
+Indicator::on(Avatar::new(user.name.clone()))
+    .count(unread)
+    .label(t!("inbox.unread_count").arg("n", unread.to_string()))
+```
+
+@live meters
+
 ## DescriptionList
 
 键值对，可以来自记录的字段，也可以手动添加：
@@ -166,6 +199,30 @@ Image::new(p.photo_800.clone())
 - `.sizes(...)` 说明图片在布局中的宽度，使浏览器选择合适的 `srcset` 宽度。没有它时，懒加载图片会得到 `sizes="auto"`，由浏览器测量所在位置。
 - `.fit(Fit::Cover)` 填满图片框并裁掉溢出部分；`Fit::Contain` 显示整个文件。
 - `low`、`fallback` 和 `Placeholder::image` 遵循与 `src` 相同的地址规则；其他地址会被省略。图片框始终保持图片的尺寸，因此文件加载或失败时页面不会跳动。
+
+## ImageCompare
+
+两张尺寸相同的图片叠放在一起，用一个滑块让其中一张覆盖在另一张上露出，例如前后对比。`.before(src, alt)` 和 `.after(src, alt)` 给出图片，它们遵循 `Image` 的规则，`.size(width, height)` 决定框的形状。滑块是一个以标签命名的范围输入框，因此可以用方向键移动；一个只在包含此组件的页面上加载的小脚本会显示它，没有脚本时两张图片各显示一半。
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
+## Tour
+
+页面的分步导览。`Tour::new(label)` 是开始导览的按钮，`TourStop::on(node).title(text).body(text)` 标记导览停留的组件；站点原样绘制它的组件。导览按页面顺序访问可见的站点，最多 30 个，使用一个带有“上一步”“下一步”和“关闭”的小对话框；按 Escape 关闭它，焦点回到按钮。只有包含导览的页面才加载的一小段脚本负责显示按钮，因此没有脚本时页面保持原样。
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
 
 ## ExternalLink
 

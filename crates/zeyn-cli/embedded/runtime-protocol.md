@@ -57,6 +57,8 @@ A page loads and runs only the browser code its screen uses. Every page runs the
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | the inbox and the notification bell; Kanban boards; calendars; diffs, code views and barcodes, which need no script (the copy button of a code view is in `share.js`) |
 | `codeedit.js`, `codeedit.css` | code editors (`data-zeyn-code`): the highlighted copy, the gutter, suggestions and error markers; it posts to `/_zeyn/data` only after a pause in typing |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js` and `commerce.css` | range sliders, quantity steppers, product galleries and countdowns; the stylesheet of every shop component (prices, variant pickers, facet panels, review summaries) |
+| `imgcompare.js` | picture comparisons (`ImageCompare`): shows the slider and writes its value to `--z-imgcompare` |
+| `tour.js` | guided tours (`Tour`): shows the start button and walks a dialog over the stops of the page |
 | `thread.js` and `thread.css`, `stream.js`, `composer.js` and `composer.css`, `typing.js` and `typing.css` | message threads; the streamed Markdown and JSON lines shared by threads and the assistant; chat composers; typing indicators |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | feeds of posts; the lightbox of images and videos; story rings and their rows, which need no script |
 | `drag.js`, `net.js` | shared helpers without markers of their own, linked with the modules that import them (below) |

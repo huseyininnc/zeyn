@@ -61,6 +61,110 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 
 悬停、聚焦和轻触会在提示框中显示相同的文字，提示框对屏幕阅读器隐藏，因此不会重复朗读。没有脚本时，标记仍然有名称，数据表格也仍然存在。较小的标记（8 px 的点）低于 24 px 的目标尺寸；*Show data* 下方的表格是等效的访问路径（WCAG 2.5.8）。
 
+## Gantt
+
+把任务显示为跨越若干天的条形，例如一个项目的计划。`Gantt::new(label, start, end)` 设置时间跨度，最长两年；`.task(title, from, to)` 添加一个任务，`.done(percent)` 和 `.tone(...)` 作用于最后添加的任务，`.today(day)` 在那一天画一条线。它是一个表格，以文字给出每个任务的第一天和最后一天，因此条形只是重复这些内容；条形在跨度的两端被截断。
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+以线条连接的方框表示的层级结构，从顶部的一个方框开始：公司的人员、产品的组成部分。`OrgNode::new(name)` 是一个方框，`.role(text)` 是名称下方较淡的一行，`.child(node)` 是它下面的一个方框。它是嵌套列表，因此屏幕阅读器可以得到层级；一张图最多在 8 层上绘制 200 个方框，过宽时在自己的框内滚动。
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## FlowDiagram
+
+把流程的各个步骤显示为用箭头连接的方框，从起始一侧到结束一侧：从购物车到送达的订单、带分支的审批。`.node(id, title)` 添加一个步骤，`.tone(...)` 为最后添加的步骤着色，`.edge(from, to)` 按 id 在两个步骤之间画一个箭头，`.edge_with(from, to, label)` 画一个带文字的箭头。服务器按步骤与起始步骤的距离把它们排成若干列，指向较早步骤的箭头从方框下方绕过。步骤是一个有序列表，每个步骤都为屏幕阅读器说明它通向哪些步骤；一个图最多绘制 40 个步骤和 80 个箭头，较宽时在自己的框内滚动。
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
+## Funnel
+
+一个每一步都会流失一部分的流程的各个阶段，例如访问、购物车和订单。`Funnel::new(label)` 配合 `.stage(title, value)` 把每个阶段画成居中的条形，宽度等于它占第一阶段的比例，并以文字给出其数值和该比例。一个漏斗最多容纳 10 个阶段。
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+把整体中最多四个部分显示为层层嵌套的圆环，例如一天的目标。`.ring(title, value, max, tone)` 从外向内添加一个圆环，`.size(px)` 设置直径。每个名称和百分比都写在圆环旁边，因此图形对屏幕阅读器是隐藏的。
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+把套餐或产品并排显示，每个一列，每项功能一行。`.plan(name)` 添加一列，`.featured()` 突出显示最后添加的套餐；`.row(feature, cells)` 为每个套餐接收一个单元格：`true` 和 `false` 变成勾和叉，读作"包含"和"不包含"，文字则原样输出。它最多容纳 6 个套餐和 100 行。
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
+## Table
+
+由屏幕已经持有的文字组成的小表格：价目表中的套餐、商店的营业时间、报表的合计。`Table::new(caption)` 接收一个为表格命名的标题，`.head([...])` 给出列标题，`.row([...])` 给出每一行；`.row_headers()` 把每一行的第一个单元格作为该行的标题，这样屏幕阅读器会读出每个单元格所在的列和行，`.numeric(index)` 让一列数字靠末端对齐，`.striped()` 为每隔一行加上底色。比表头短的行用空单元格补齐，比表头长的行会被截断；一个表格最多容纳 200 行和 12 列。它没有分页、排序或筛选，也不发出请求：来自 action 的行，或者用户要操作的行，应当放在 `DataGrid` 中。在窄屏上，它在自己的框内横向滚动，这个框可以获得焦点，以便用方向键滚动。
+
+```rust
+Table::new(t!("shop.opening_hours"))
+    .head([t!("shop.day"), t!("shop.opens"), t!("shop.closes")])
+    .row([t!("shop.weekdays"), "09:00".into(), "18:00".into()])
+    .row([t!("shop.saturday"), "10:00".into(), "14:00".into()])
+    .row_headers()
+```
+
+@live table
+
+## Heatmap
+
+最近几周中每一天的一个数字，例如接到的订单数或记录的工时，以方格组成的日历呈现：每列是一周，每行是星期几，数字越大颜色越深。`Heatmap::ending(label, end)` 以 `end` 所在的那一周结束，`end` 通常是今天，其后的日子保持为空。`.weeks(n)` 设置显示多少周，未设置时为 17 周，最多 53 周；`.value(day, n)` 或 `.values(days)` 提供数字，`.tone(...)` 提供颜色。所显示的最大数字使用四个色阶中最深的一个。一周从用户语言中一周开始的那一天开始。
+
+```rust
+Heatmap::ending(t!("sales.orders_a_day"), ctx.today())
+    .weeks(12)
+    .values(orders.iter().map(|o| (o.day, o.count)))
+    .tone(Tone::Success)
+```
+
+@live heatmap
+
+它是由服务器绘制的表格，不需要脚本。屏幕阅读器会读出每一行是星期几，并按用户的语言读出每一天的日期和数字，因此色阶只是重复文字所表达的内容；指向某个方格时会显示同样的文字。在窄屏上，表格在自己的框内横向滚动，这个框可以获得焦点，以便用方向键滚动。每一天是两个元素：默认的 17 周保持在单个组件 300 个元素的预算之内，而一整年则超出。
+
 ## 关键指标、迷你图与子弹图
 
 `Kpi` 把一个值显示为卡片中最大的文字（30 px，等宽数字，货币符号或单位更小且弱化），把与上一周期相比的变化显示为一个小标签，例如 `+48.8%`，旁边写着“与上一周期相比”（变化为好时为绿色，否则为红色，低于百分之零点五时为灰色；成本和等待时间使用 `.lower_is_better()`；屏幕阅读器会听到完整的句子），还显示目标及已达成的比例，以及一条通栏的近期数值趋势线，颜色与该标签相同，下方是渐隐的面积。七位及以上的数值会被缩写（`$1.23M`，土耳其语中为 `1,23 Mn`），完整数值显示在提示框中并提供给屏幕阅读器。

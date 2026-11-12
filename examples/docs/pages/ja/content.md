@@ -109,6 +109,108 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## AvatarGroup
+
+タスクの担当者のように、ひとつの物事に関わる人々を、一列に重なり合うアバターとして表示します。ラベルはスクリーンリーダー向けにグループの名前になります。グループは最初のアバターを表示します。`.max(n)` で指定しない限り 5 個で、12 個を超えることはありません。残りの人数は "+3" と表示され、ユーザーの言語で「他 3 人」と読み上げられます。`.size(...)` はグループ内のすべてのアバターのサイズを設定します。
+
+```rust
+AvatarGroup::new(t!("task.assignees"))
+    .add(Avatar::new(a.name.clone()).image(a.photo.clone()))
+    .add(Avatar::new(b.name.clone()))
+    .max(3)
+    .size(AvatarSize::Small)
+```
+
+## Quote
+
+人や作品から引用した言葉を、`figure` の中の `blockquote` として表示します。`.author(name)` は誰の言葉かを示し、`.source(title)` は作品名を示します。作品名はタイトルとして書かれます（`cite`）。
+
+```rust
+Quote::new(review.text.clone()).author(review.name.clone()).source(t!("shop.verified_buyer"))
+```
+
+## Kbd
+
+押すキーを、キーボード入力として表示します（`kbd`）。`Kbd::new("Ctrl+K")` はキーの間に `+` がある組み合わせを読み取ります。`Kbd::keys(["Ctrl", "+"])` はキーをひとつずつ受け取り、プラスキーそのものを含む組み合わせに使います。キー名は渡されたとおりに書かれ、最大 6 個です。キーを表示するだけです。実際に何かを行うショートカットは、`PrevNext::shortcut` のように、コマンドのある場所で設定します。
+
+```rust
+Kbd::new("Alt+Shift+P")
+```
+
+## Divider
+
+ページの 2 つの部分の間の線です。`Divider::new()` は主題の区切り（`hr`）です。`.label(text)` は線の中央にテキストを置きます。たとえば 2 つのサインイン方法の間の「または」です。このとき区切り線は、そのテキストを名前に持つ `separator` になります。`.vertical()` は線を上から下に引きます。コンパクトな `Row` の列の間に使います。
+
+```rust
+Divider::new().label(t!("signin.or"))
+```
+
+@live pieces
+
+## Highlight
+
+`Highlight::new(text, query)` は、検索語を印付き（`mark`）にしてテキストを出力します。検索結果の一覧に表示する商品名などに使います。クエリは空白で分割され、そのうち最大 8 語を探し、いずれかの語が見つかったすべての箇所に、大文字と小文字を区別せずに印を付けます。空のクエリでは何も印を付けません。テキストもクエリもユーザーデータです。テキストはエスケープされ、クエリは比較に使われるだけで、ページに書き出されることはありません。文字は Unicode の定義する小文字で比較されるため、トルコ語の `I ı` と `İ i` の組は同じ文字として扱われません。
+
+```rust
+Highlight::new(product.name.clone(), p.q.clone())
+```
+
+## Toc
+
+目次です。表示中のページの見出しへのリンクで、記事やポリシーのような長いページに使います。`Toc::new(label)` はラベルを名前に持つ `nav` です。`.item(title, id)` は、`Heading::id` で同じアンカーを指定した見出しにリンクし、`.sub(title, id)` は直前の項目の 1 段下に項目を追加します。アンカーは `Heading::id` と同じ方法で整えられるので、同じ文字列を両方で使えます。整えた結果アンカーが空になった項目は省かれます。目次が持てる項目は最大 100 個です。リンクは `#anchor` へのただのリンクなので、スクリプトなしで動作し、ブラウザーが見出しまでスクロールし、アドレスを共有できます。読んでいる箇所に印を付けることはしません。それにはスクリプトが必要になるからです。
+
+```rust
+Toc::new(t!("page.contents"))
+    .item(t!("policy.delivery"), "delivery")
+    .sub(t!("policy.abroad"), "delivery-abroad")
+    .item(t!("policy.returns"), "returns")
+Heading::h2(t!("policy.delivery")).id("delivery")
+```
+
+@live marks
+
+## Stepper
+
+プロセスがどこまで進んだかを示します。順に並んだステップのうち、完了したもの、現在のもの、これからのものです。たとえば注文が確定してから配達されるまでの流れです。`.step(title)` はステップを追加し、`.description(text)` は最後に追加したステップの下に 1 行を置きます。`.current(index)` は 0 から数え、それより前のステップを完了として示します。`.finished()` はすべてのステップを完了として示します。`.vertical()` はステップを縦に並べます。狭い画面でも同じ並びになります。stepper が持てるステップは最大 12 個です。
+
+```rust
+Stepper::new(t!("order.progress"))
+    .step(t!("order.placed"))
+    .step(t!("order.packed"))
+    .step(t!("order.shipped"))
+    .description(order.shipped_note.clone())
+    .step(t!("order.delivered"))
+    .current(order.stage as usize)
+```
+
+@live stepper
+
+ステップは、ラベルを名前に持つ順序付きリストです。現在のステップは `aria-current="step"` を持ち、完了したステップはスクリーンリーダーにユーザーの言語で「完了」と伝えるので、状態が色だけで示されることはありません。stepper はサーバーが渡した状態を表示するだけで、押せるものは何もありません。ステップごとに入力するフォームは、独自のステップを持つ `Form` です（[フォーム](forms.md)を参照）。
+
+## Pagination
+
+画面が自分でページ分けするリスト、たとえばブログの記事のページへのリンクです。前へ、ページ番号、次へ、が並びます。それぞれは、ページ番号をパラメーターに持つ同じ画面へのリンクなので、サーバーは求められたページを描画し、アドレスは共有でき、ブラウザーには何も保持されません。リンクは `nav.js` を通じてページを再読み込みせずに開き、スクリプトがなくても動作します。`DataGrid`、`List`、`CardGrid` は `.paging(...)` で自分でページ分けします。これは画面が自分でコンテンツを組み立てる場合にだけ使ってください。
+
+```rust
+#[screen(route = "/blog", public)]
+pub fn blog(p: BlogParams) -> Screen {
+    Screen::new(t!("blog.title")).body(
+        Pagination::new(blog, |page| BlogParams { page })
+            .pages(page_count)
+            .current(p.page),
+    )
+}
+```
+
+ページは 1 から数えます。最初のページと最後のページは常に表示され、現在のページの両側に 1 ページずつ表示されます。`.around(n)` でさらに多く、最大 4 ページまで表示できます。省略されたページは省略記号になり、省略記号が 1 ページだけを隠すことはありません。ページ番号はアドレスから来るので、画面はデータを読み込む前にそれを範囲内に収めます。コンポーネントも、現在のページとして示すものについて同じことを行います。ページが 1 つ以下の場合は何も描画しません。
+
+リンクは、ユーザーの言語で「ページ送り」という名前の `nav` です。現在のページは `aria-current="page"` を持ち、各番号はスクリーンリーダー向けに「3 ページ」という名前になり、前へと次へは `rel="prev"` と `rel="next"` を持ちます。両端では、どこにも行かないリンクの代わりに、`aria-disabled` の付いたただのテキストになります。
+
+| キー | 動作 |
+|---|---|
+| `Tab` | 前へ、ページ番号、次へ、の順に移動します |
+| `Enter` | ページを開きます。フォーカスとスクロール位置は `nav.js` に従います |
+
 ## Chips
 
 複数行に折り返す、小さな丸いリンクの列です。`Chips::links(label)` は、記事のタグなど画面への通常のリンクを、label で名前が付いた `nav` の中に持ちます。`Chips::filter(label, screen, params)` は画面パラメーターに対するトグルボタンを作ります。各 chip は同じ画面へのリンクで、その値がパラメーターに追加または削除されるため、サーバーは受け取ったパラメーターから `aria-pressed` を描画し、ブラウザーには何も保持されません。chip を押すと `nav.js` を通じてページを再読み込みせずに新しいアドレスが開き、フォーカスとスクロール位置は chip に残ります。`.multiple()` を呼ばない限り、一度に押せる値は一つです。パラメーター内の選択肢でない値は無視されます。キーボード: Tab で chip 間を移動し、Enter または Space で押し、リンク chip には独自のショートカットを付けられます（[リンクのショートカット](#link-shortcuts) を参照）。押された chip にはチェックマークも表示されるので、状態が色だけに頼りません。スクリプト（`chips.js`、1 KB 未満）はフィルター chip があるページでのみ読み込まれます。
@@ -189,6 +291,15 @@ Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_artic
 
 @live engage
 
+
+## CopyButton
+
+テキストをクリップボードにコピーするボタンです。追跡番号、API のアドレス、招待リンクなどに使います。`.shown()` はテキストをボタンの横に等幅フォントで表示するので、読んだり選択したりもできます。指定しない場合、テキストはページ内にありますが非表示です。ラベルは `.label` で設定しない限りユーザーの言語の「コピー」で、コピーが成功したかどうかは toast で伝えます。`Share` と同じ小さなスクリプトを使います。このスクリプトは、こうしたボタンのあるページでだけ読み込まれます。ボタンは非表示で描画され、そのスクリプトによって表示されるので、スクリプトのないページに何もしないボタンが出ることはありません。テキストは 4096 バイトで切られます。またページの一部になるので、ユーザーが見てよいテキストでなければならず、マスクされた値は決して渡してはいけません。
+
+```rust
+CopyButton::new(order.tracking.clone()).shown()
+CopyButton::new(invite_url).label(t!("team.copy_invitation"))
+```
 
 ## AlphaIndex
 

@@ -572,6 +572,43 @@
         "label": "Browse by letter",
         "other": "Other characters"
       },
+      "avatar": {
+        "more": "{n} more"
+      },
+      "stepper": {
+        "done": "completed"
+      },
+      "heat": {
+        "day": "{date}: {n}",
+        "less": "Less",
+        "more": "More"
+      },
+      "tour": {
+        "close": "Close",
+        "finish": "Finish"
+      },
+      "compare": {
+        "yes": "Included",
+        "no": "Not included"
+      },
+      "flow": {
+        "next": "Next: {steps}"
+      },
+      "gantt": {
+        "task": "Task",
+        "from": "Starts",
+        "to": "Ends"
+      },
+      "meter": {
+        "low": "low",
+        "high": "high"
+      },
+      "pagination": {
+        "label": "Pagination",
+        "previous": "Previous",
+        "next": "Next",
+        "page": "Page {n}"
+      },
       "week": {
         "label": "Week",
         "today": "Today",

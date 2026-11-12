@@ -509,6 +509,180 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                 )),
             )
             .into(),
+        "pieces" => Stack::new()
+            .gap(4)
+            .add(
+                AvatarGroup::new("Assignees")
+                    .add(zeyn::ui::Avatar::new("Ada Lovelace"))
+                    .add(zeyn::ui::Avatar::new("Alan Turing"))
+                    .add(zeyn::ui::Avatar::new("Grace Hopper"))
+                    .add(zeyn::ui::Avatar::new("Edsger Dijkstra"))
+                    .max(3),
+            )
+            .add(
+                Quote::new("It can do whatever we know how to order it to perform.")
+                    .author("Ada Lovelace")
+                    .source("Notes on the Analytical Engine"),
+            )
+            .add(Divider::new().label("or"))
+            .add(
+                Row::new()
+                    .compact()
+                    .col(Paragraph::new("Search every page with"))
+                    .col(Kbd::new("Alt+Shift+P")),
+            )
+            .into(),
+        "stepper" => Stepper::new("Order progress")
+            .step("Placed")
+            .step("Packed")
+            .step("Shipped")
+            .description("Left the warehouse on Monday")
+            .step("Delivered")
+            .current(2)
+            .into(),
+        "accordion" => Accordion::new()
+            .section(
+                "How do I reset my password?",
+                Paragraph::new("Use the link on the sign in page."),
+            )
+            .open()
+            .section(
+                "Where are my invoices?",
+                Paragraph::new("Under Billing, then Invoices."),
+            )
+            .section("Can I change my plan?", Paragraph::new("Yes, at any time."))
+            .single()
+            .into(),
+        "rings" => Row::new()
+            .compact()
+            .col(ProgressRing::new("Import", 64, 100))
+            .col(ProgressRing::new("Storage", 92, 100).tone(Tone::Warning))
+            .col(CopyButton::new("1Z999AA10123456784").shown())
+            .into(),
+        "heatmap" => {
+            let today = ctx.today();
+            let days = (0..84i64).filter_map(|back| {
+                let day = today.add_days(-back)?;
+                Some((day, ((back * 7 + back / 3) % 9) as u32))
+            });
+            Heatmap::ending("Orders a day", today)
+                .weeks(12)
+                .values(days)
+                .into()
+        }
+        "table" => Table::new("Opening hours")
+            .head(["Day", "Opens", "Closes"])
+            .row(["Monday to Friday", "09:00", "18:00"])
+            .row(["Saturday", "10:00", "14:00"])
+            .row(["Sunday", "Closed", ""])
+            .row_headers()
+            .into(),
+        "meters" => Stack::new()
+            .add(
+                Meter::new("Disk used", 412, 0, 500)
+                    .high(400)
+                    .better(zeyn::ui::Better::Lower)
+                    .unit("GB"),
+            )
+            .add(
+                Meter::new("Room temperature", 21, 0, 40)
+                    .low(18)
+                    .high(26)
+                    .unit("°C"),
+            )
+            .add(
+                Row::new()
+                    .compact()
+                    .col(
+                        Indicator::on(zeyn::ui::Avatar::new("Ada Lovelace"))
+                            .count(3)
+                            .label("3 unread messages"),
+                    )
+                    .col(
+                        Indicator::on(zeyn::ui::Avatar::new("Grace Hopper"))
+                            .dot()
+                            .tone(Tone::Success)
+                            .label("Online"),
+                    ),
+            )
+            .into(),
+        "marks" => Row::new()
+            .col(
+                Toc::new("On this page")
+                    .item("Green tea", "live-green")
+                    .item("Black tea", "live-black"),
+            )
+            .col(
+                Stack::new()
+                    .add(Heading::h3("Green tea").id("live-green"))
+                    .add(Highlight::new("Green tea, loose leaf, 100 g", "tea leaf"))
+                    .add(Heading::h3("Black tea").id("live-black"))
+                    .add(Highlight::new("Black tea bags, 50 pieces", "tea leaf")),
+            )
+            .weight(3)
+            .into(),
+        "gantt" => {
+            let today = ctx.today();
+            let day = |offset: i64| today.add_days(offset).unwrap_or(today);
+            Gantt::new("Launch plan", day(-14), day(28))
+                .task("Design", day(-14), day(-2))
+                .done(100)
+                .tone(Tone::Success)
+                .task("Build", day(-4), day(18))
+                .done(30)
+                .task("Launch", day(20), day(28))
+                .tone(Tone::Warning)
+                .today(today)
+                .into()
+        }
+        "tour" => Stack::new()
+            .gap(4)
+            .add(Tour::new("Show me around"))
+            .add(
+                TourStop::on(Kpi::new("Orders", 1_284.0).delta(3.1))
+                    .title("Orders")
+                    .body("How many orders came in this month."),
+            )
+            .add(
+                TourStop::on(Badge::new("Draft"))
+                    .title("Status")
+                    .body("An order stays a draft until it is sent."),
+            )
+            .into(),
+        "flow" => FlowDiagram::new("Order process")
+            .node("cart", "Cart")
+            .node("pay", "Payment")
+            .node("pack", "Packing")
+            .node("ship", "Shipping")
+            .tone(Tone::Success)
+            .node("cancel", "Cancelled")
+            .tone(Tone::Danger)
+            .edge("cart", "pay")
+            .edge_with("pay", "pack", "Paid")
+            .edge_with("pay", "cancel", "Declined")
+            .edge("pack", "ship")
+            .into(),
+        "visuals" => Stack::new()
+            .gap(5)
+            .add(OrgChart::new(
+                "Company",
+                OrgNode::new("Ada Lovelace")
+                    .role("Director")
+                    .child(OrgNode::new("Alan Turing").role("Engineering"))
+                    .child(OrgNode::new("Grace Hopper").role("Operations")),
+            ))
+            .add(
+                Funnel::new("Sales funnel")
+                    .stage("Visits", 12_400)
+                    .stage("Carts", 3_100)
+                    .stage("Orders", 870),
+            )
+            .add(
+                ActivityRings::new("Today")
+                    .ring("Orders packed", 42, 60, Tone::Brand)
+                    .ring("Calls answered", 18, 20, Tone::Success),
+            )
+            .into(),
         "week" => WeekSchedule::of(search_samples)
             .title("Deliveries")
             .day(|p: &Sample| (p.id.0 % 7 + 1) as u8)
@@ -757,6 +931,18 @@ pub const EXAMPLES: &[&str] = &[
     "autogrid",
     "list",
     "people",
+    "pieces",
+    "stepper",
+    "accordion",
+    "rings",
+    "heatmap",
+    "gantt",
+    "visuals",
+    "flow",
+    "tour",
+    "table",
+    "meters",
+    "marks",
     "week",
     "rating",
     "engage",

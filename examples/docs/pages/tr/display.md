@@ -28,6 +28,39 @@ Stack::new()
 
 `Progress::new(label, value, max)` ve isteğe bağlı `.tone(...)`. Etiketi ve değeriyle gerçek bir `progressbar` öğesidir.
 
+## ProgressRing
+
+`ProgressRing::new(label, value, max)` aynı ilerlemeyi, ortasında yüzdesi ve altında etiketi olan bir halka olarak gösterir; az yerde bir bütünün payı içindir: kullanılan bir kota, doldurulan bir profil. `.tone(...)` halkayı renklendirir, `.size(px)` çapını belirler: verilmedikçe 64, 32 ile 160 arasında tutulur. Halka, sunucunun çizdiği satır içi bir SVG'dir; bu yüzden script gerektirmez ve her yoğunlukta keskin kalır. Etiketiyle adlandırılmış gerçek bir `progressbar` öğesidir; en büyük değerin üzerindeki bir değer en büyük değer sayılır.
+
+```rust
+ProgressRing::new(t!("account.storage_used"), used, quota).tone(Tone::Warning).size(96)
+```
+
+@live rings
+
+## Meter
+
+`Meter::new(label, value, min, max)`, bilinen bir aralıktaki bir ölçümü gösterir; örneğin kullanılan disk alanı ya da bir stok düzeyi. `Progress`'ten farklı olarak sonuna doğru ilerleyen bir iş değildir: değer yükselip düşebilir ve `.low(n)` ile `.high(n)` değerin nerede düşük ya da yüksek sayılacağını belirler. Çubuk rengini bu durumdan alır: yön verilmediğinde eşikler arasındaki aralık iyidir ve iki uç da uyarıdır; `.better(Better::Higher)` yüksek değeri iyi, düşük değeri kötü yapar, `Better::Lower` ise tersini. Durum hiçbir zaman yalnızca renkle verilmez: değerin yanına kullanıcının dilinde "düşük" ya da "yüksek" yazılır ve bu, ekran okuyucuların ARIA `meter` öğesinden duyduklarının bir parçasıdır. Değerler tam sayıdır, kullanıcının dilindeki gibi gruplanır ve `.unit(text)` bir birim ekler.
+
+```rust
+Meter::new(t!("server.disk_used"), used_gb, 0, total_gb)
+    .high(total_gb * 8 / 10)
+    .better(Better::Lower)
+    .unit("GB")
+```
+
+## Indicator
+
+`Indicator::on(node)`, başka bir bileşenin köşesine bir sayı ya da nokta koyar: bir avatarın üzerindeki okunmamış mesajlar, bir bağlantıdaki yenilik. `.count(n)` sayıyı gösterir, 99'un üzerinde "99+", sıfırda ise hiçbir şey; `.dot()` bir nokta gösterir; `.tone(...)` rengi belirler, verilmedikçe `Danger`. İşaretin kendisi ekran okuyuculardan gizlidir, çünkü bir addan sonra gelen yalın bir "3" pek bir şey söylemez: `.label(text)` onun yerine duyulacak sözleri verir, örneğin "3 okunmamış mesaj". İşaret, altındaki bileşenin zaten belirtmediği bir anlam taşıdığında mutlaka bir etiket verin; etiketsiz bir sayı sayı olarak okunur, bir nokta ise okunmaz.
+
+```rust
+Indicator::on(Avatar::new(user.name.clone()))
+    .count(unread)
+    .label(t!("inbox.unread_count").arg("n", unread.to_string()))
+```
+
+@live meters
+
 ## DescriptionList
 
 Anahtar değer çiftleri, bir kaydın alanlarından ya da elle:
@@ -166,6 +199,30 @@ Image::new(p.photo_800.clone())
 - `.sizes(...)` görselin yerleşimde ne kadar geniş olduğunu söyler, böylece tarayıcı doğru `srcset` genişliğini seçer. O olmadan tembel bir görsel `sizes="auto"` alır ve tarayıcı yuvayı ölçer.
 - `.fit(Fit::Cover)` kutuyu doldurur ve taşan kısmı keser; `Fit::Contain` dosyanın tamamını gösterir.
 - `low`, `fallback` ve `Placeholder::image`, `src` ile aynı adres kurallarına uyar; diğerleri dışarıda bırakılır. Kutu her zaman görselin boyutunu korur, böylece dosyalar yüklenirken ya da yüklenemediğinde hiçbir şey kaymaz.
+
+## ImageCompare
+
+Aynı boyuttaki iki resim üst üste, birini ötekinin üzerinde açan bir sürgüyle; örneğin önce ve sonra. `.before(src, alt)` ve `.after(src, alt)` resimleri verir; bunlar `Image` kurallarına uyar. `.size(width, height)` kutuya biçimini verir. Sürgü, etiketle adlandırılmış bir aralık girdisidir, bu yüzden ok tuşları onu hareket ettirir; yalnızca bunlardan birini içeren sayfalarda yüklenen küçük bir script onu gösterir, script olmadan resimler yarı yarıya görünür.
+
+```rust
+ImageCompare::new(t!("repair.before_after"))
+    .before(job.before.clone(), t!("repair.before"))
+    .after(job.after.clone(), t!("repair.after"))
+    .size(1200, 800)
+```
+
+## Tour
+
+Bir sayfanın adım adım tanıtımı. `Tour::new(label)` turu başlatan düğmedir; `TourStop::on(node).title(text).body(text)` turun durduğu bir bileşeni işaretler ve bileşenini değiştirmeden çizer. Tur, görünür durakları sayfadaki sırayla, en fazla 30 tane, Geri, İleri ve Kapat düğmeleri olan küçük bir iletişim kutusunda gezer; Escape turu kapatır ve odak düğmeye döner. Yalnızca tur bulunan sayfalarda yüklenen küçük bir betik düğmeyi gösterir; betik yoksa sayfa olduğu gibi okunur.
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
 
 ## ExternalLink
 

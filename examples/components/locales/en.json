@@ -56,6 +56,29 @@
       "timeline": "Events in order, each with a tone.",
       "markdown": "Safe Markdown rendered on the server.",
       "spoiler": "Content hidden until the reader opens it.",
+      "accordion": "Sections that open and close under their titles.",
+      "avatar_group": "The people of one thing, with a count for the rest.",
+      "quote": "Quoted words with who said them and where.",
+      "kbd": "Keys to press, one or a combination.",
+      "divider": "A line between parts, with an optional label.",
+      "stepper": "Where a process stands, step by step.",
+      "pagination": "Links to the pages of a list.",
+      "copy_button": "Copies a text to the clipboard.",
+      "progress_ring": "Progress as a ring with the percent inside.",
+      "heatmap": "A number for each day as a calendar of shaded squares.",
+      "funnel": "Stages that narrow from the first to the last.",
+      "activity_rings": "Shares of several goals as rings inside one another.",
+      "gantt": "Tasks as bars over a span of days.",
+      "flow_diagram": "The steps of a process as boxes joined by arrows.",
+      "org_chart": "A hierarchy as boxes joined by lines.",
+      "comparison_table": "Plans side by side with a row for each feature.",
+      "tour": "A guided tour of the page.",
+      "image_compare": "Two pictures under a slider.",
+      "table": "A small table of text the screen already holds.",
+      "indicator": "A count or a dot on the corner of another component.",
+      "meter": "A measurement within a range, colored by its thresholds.",
+      "highlight": "The words of a search marked in a text.",
+      "toc": "Links to the headings of the page.",
       "breadcrumb": "The trail of links to the current page.",
       "prev_next": "Links to the previous and the next item.",
       "alpha_index": "A letter bar from the user's alphabet.",
@@ -130,6 +153,96 @@
       "property_inspector": "Edits what an island selects, from a schema the island sends."
     },
     "ex": {
+      "accordion": {
+        "overview": "Example",
+        "one_at_a_time": "One section at a time"
+      },
+      "avatar_group": {
+        "overview": "Example",
+        "small_and_short": "Small, with fewer shown",
+        "with_pictures": "With pictures"
+      },
+      "quote": {
+        "overview": "Example",
+        "text_only": "Text only"
+      },
+      "kbd": {
+        "overview": "Example",
+        "single_keys": "Single keys",
+        "plus_key": "The plus key"
+      },
+      "divider": {
+        "overview": "Example",
+        "plain": "Plain",
+        "between_columns": "Between columns"
+      },
+      "stepper": {
+        "overview": "Example",
+        "vertical": "Vertical",
+        "finished": "Finished"
+      },
+      "pagination": {
+        "overview": "Example",
+        "more_numbers": "More page numbers"
+      },
+      "copy_button": {
+        "overview": "Example",
+        "own_label": "Own label, hidden text"
+      },
+      "table": {
+        "overview": "Example",
+        "numbers_and_stripes": "Numbers and stripes"
+      },
+      "indicator": {
+        "overview": "Example",
+        "tones_and_sizes": "Tones, sizes and zero"
+      },
+      "meter": {
+        "overview": "Example",
+        "a_good_middle": "A good middle"
+      },
+      "highlight": {
+        "overview": "Example",
+        "several_words": "Several words"
+      },
+      "toc": {
+        "overview": "Example"
+      },
+      "funnel": {
+        "overview": "Example",
+        "another_tone": "Another tone"
+      },
+      "activity_rings": {
+        "overview": "Example",
+        "large": "Four rings, larger"
+      },
+      "gantt": {
+        "overview": "Example"
+      },
+      "flow_diagram": {
+        "overview": "Example",
+        "branches": "Branches and a way back"
+      },
+      "org_chart": {
+        "overview": "Example"
+      },
+      "comparison_table": {
+        "overview": "Example"
+      },
+      "tour": {
+        "overview": "Example"
+      },
+      "image_compare": {
+        "overview": "Example"
+      },
+      "heatmap": {
+        "overview": "Example",
+        "a_few_weeks": "A few weeks"
+      },
+      "progress_ring": {
+        "overview": "Example",
+        "sizes": "Sizes"
+      },
       "action_button": {
         "overview": "Example"
       },
