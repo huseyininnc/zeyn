@@ -149,24 +149,15 @@ impl MemoryRateStore {
         let Ok(mut buckets) = self.buckets.lock() else {
             return Ok(());
         };
-        if buckets.len() >= self.max_keys && !buckets.contains_key(key) {
-            buckets.retain(|_, (tokens, at)| {
-                let refilled = *tokens + now.duration_since(*at).as_secs_f64() * per_sec;
-                refilled < capacity
-            });
+        if !buckets.contains_key(key) {
             if buckets.len() >= self.max_keys {
-                let oldest = buckets
-                    .iter()
-                    .min_by_key(|(_, (_, at))| *at)
-                    .map(|(k, _)| k.clone());
-                if let Some(k) = oldest {
-                    buckets.remove(&k);
-                }
+                evict(&mut buckets, self.max_keys, now, per_sec, capacity);
             }
+            buckets.insert(key.to_string(), (capacity, now));
         }
-        let (tokens, at) = buckets
-            .entry(key.to_string())
-            .or_insert((capacity, now));
+        let Some((tokens, at)) = buckets.get_mut(key) else {
+            return Ok(());
+        };
         *tokens = (*tokens + now.duration_since(*at).as_secs_f64() * per_sec).min(capacity);
         *at = now;
         if use_tokens(tokens) {
@@ -175,6 +166,43 @@ impl MemoryRateStore {
             Err(Duration::from_secs_f64((1.0 - *tokens).max(0.0) / per_sec))
         }
     }
+}
+
+/// Makes room in a full bucket map: drops the buckets that refilled, and when that is not enough
+/// the oldest eighth, so the next inserts find room without scanning the map each time.
+fn evict(
+    buckets: &mut HashMap<String, (f64, Instant)>,
+    max_keys: usize,
+    now: Instant,
+    per_sec: f64,
+    capacity: f64,
+) {
+    buckets.retain(|_, (tokens, at)| {
+        *tokens + now.duration_since(*at).as_secs_f64() * per_sec < capacity
+    });
+    let room = (max_keys / 8).max(1);
+    if buckets.len() + room <= max_keys {
+        return;
+    }
+    let mut ats: Vec<Instant> = buckets
+        .values()
+        .map(|(_, at)| *at)
+        .collect();
+    let drop = (buckets.len() + room - max_keys).min(ats.len());
+    if drop == 0 {
+        return;
+    }
+    let (_, cut, _) = ats.select_nth_unstable(drop - 1);
+    let cut = *cut;
+    let mut left = drop;
+    buckets.retain(|_, (_, at)| {
+        if left > 0 && *at <= cut {
+            left -= 1;
+            false
+        } else {
+            true
+        }
+    });
 }
 
 /// An address range such as `10.0.0.0/8`, `192.168.1.10` or `2001:db8::/32`.

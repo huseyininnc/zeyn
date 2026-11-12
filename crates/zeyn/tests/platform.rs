@@ -776,6 +776,28 @@ fn memory_rate_store_caps_its_size() {
     assert!(store.len() <= 100);
 }
 
+#[test]
+fn a_full_rate_store_makes_room_in_batches_so_a_flood_stays_cheap() {
+    let store = zeyn::MemoryRateStore::with_max_keys(10_000);
+    let limit = RateLimit::per_ip(5, Duration::from_secs(60));
+    let started = std::time::Instant::now();
+    for i in 0..200_000 {
+        let _ = store.take(&format!("ip:{i}"), &limit);
+    }
+    assert!(store.len() <= 10_000);
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "200,000 new keys into a full store took {:?}; evicting one key per insert scans the map each time",
+        started.elapsed()
+    );
+    store.take("ip:199999", &limit).unwrap();
+    assert!(
+        (0..3).all(|_| store.take("ip:199999", &limit).is_ok())
+            && store.take("ip:199999", &limit).is_err(),
+        "a recent key keeps its bucket"
+    );
+}
+
 #[tokio::test]
 async fn api_docs_can_be_closed_open_password_or_permission_protected() {
     let build = |docs: Option<ApiDocs>| {
