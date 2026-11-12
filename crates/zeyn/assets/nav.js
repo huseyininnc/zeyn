@@ -41,9 +41,14 @@ function sameOrigin(res) {
 
 /**
  * Opens the side menu groups around `link` (their heading buttons, see `menu.js`); in an
- * accordion menu it closes their open siblings.
+ * accordion menu it closes their open siblings. In the icon rail the groups are flyouts, so it
+ * closes them instead.
  */
 function openBranch(link) {
+  if (link.closest('[data-zeyn-rail]')) {
+    for (const b of document.querySelectorAll('[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading')) b.setAttribute('aria-expanded', 'false');
+    return;
+  }
   const accordion = link.closest('[data-zeyn-accordion]');
   const heading = (el) => el.querySelector(':scope > :is(h2, h3, h4, h5) > .z-nav-heading');
   for (let g = link.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {

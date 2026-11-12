@@ -222,6 +222,8 @@
     "shell": {
       "skip": "İçeriğe geç",
       "menu": "Ana menü",
+      "rail_collapse": "Menüyü daralt",
+      "rail_expand": "Menüyü genişlet",
       "language": "Dil",
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)",

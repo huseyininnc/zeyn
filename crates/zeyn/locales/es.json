@@ -215,6 +215,8 @@
     "shell": {
       "skip": "Saltar al contenido",
       "menu": "Principal",
+      "rail_collapse": "Contraer el menú",
+      "rail_expand": "Expandir el menú",
       "language": "Idioma",
       "time_zone": "Zona horaria",
       "time_zone_auto": "Automática (este dispositivo)",

@@ -215,6 +215,8 @@
     "shell": {
       "skip": "跳到正文",
       "menu": "主菜单",
+      "rail_collapse": "收起菜单",
+      "rail_expand": "展开菜单",
       "language": "语言",
       "time_zone": "时区",
       "time_zone_auto": "自动（此设备）",

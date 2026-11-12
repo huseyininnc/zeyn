@@ -971,6 +971,37 @@ async fn set_density(
     )
 }
 
+#[derive(Deserialize)]
+struct RailCall {
+    rail: bool,
+}
+
+/// `POST /_zeyn/rail {"rail": true}`: stores whether the side menu is folded to an icon rail in
+/// the `zeyn_rail` cookie, so the next page renders it that way without a jump.
+async fn set_rail(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<RailCall>,
+) -> Response {
+    let ctx = st.ctx(&headers);
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let secure = if st.secure_cookies { "; Secure" } else { "" };
+    let (value, age) = if call.rail {
+        ("1", 31_536_000)
+    } else {
+        ("", 0)
+    };
+    with_cookie(
+        StatusCode::NO_CONTENT.into_response(),
+        Some(format!(
+            "zeyn_rail={value}; Path={}; Max-Age={age}; SameSite=Lax{secure}",
+            st.cookie_path()
+        )),
+    )
+}
+
 /// The density picker of the account menu: comfortable or compact.
 pub(super) fn density_picker(r: &Render, compact: bool) -> String {
     let t = |k: &str| r.text(&Text::key(format!("zeyn.shell.{k}")));
@@ -991,6 +1022,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route("/_zeyn/theme", post(set_theme))
         .route("/_zeyn/density", post(set_density))
+        .route("/_zeyn/rail", post(set_rail))
 }
 
 #[cfg(test)]

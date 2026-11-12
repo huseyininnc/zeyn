@@ -222,6 +222,8 @@
     "shell": {
       "skip": "Skip to content",
       "menu": "Main",
+      "rail_collapse": "Collapse the menu",
+      "rail_expand": "Expand the menu",
       "language": "Language",
       "time_zone": "Time zone",
       "time_zone_auto": "Automatic (this device)",

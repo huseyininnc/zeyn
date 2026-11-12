@@ -2462,6 +2462,11 @@ impl AppState {
             self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
+        let ctx = if cookie(headers, "zeyn_rail") == Some("1") {
+            ctx.with_rail()
+        } else {
+            ctx
+        };
         let ctx = if cookie(headers, "zeyn_density") == Some("compact") {
             ctx.with_compact()
         } else {
@@ -3186,10 +3191,11 @@ impl AppState {
         for g in self.dynamic_groups(dynamic, ctx, &r, current) {
             NavGroup::merge(&mut groups, g);
         }
+        let rail = ctx.rail();
         for (i, g) in groups.iter().enumerate() {
-            g.render(&mut nav, &format!("z-nav-g{i}"), 2);
+            g.render(&mut nav, &format!("z-nav-g{i}"), 2, rail);
         }
-        let marker = if !groups.iter().any(NavGroup::collapsible) {
+        let marker = if groups.is_empty() {
             ""
         } else if self
             .features
@@ -3253,7 +3259,13 @@ impl AppState {
             })
             .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"{rail_attr}><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p>{rail_button}<button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            rail_attr = if rail { " data-zeyn-rail" } else { "" },
+            rail_button = if marker.is_empty() {
+                String::new()
+            } else {
+                rail_toggle(&r, rail)
+            },
             palette = if self
                 .header
                 .as_ref()
@@ -3334,45 +3346,65 @@ impl NavGroup {
         links
     }
 
-    /// Whether this group or a nested one has a toggle button.
-    fn collapsible(&self) -> bool {
-        !self.open
-            || self
-                .groups
-                .iter()
-                .any(NavGroup::collapsible)
-    }
-
     /// Writes the group into the side menu: a `<div>` at the top level, an `<li>` below it, with
     /// a heading of `level`. A collapsible group's heading holds a button with `aria-expanded`
     /// and `aria-controls` (W3C APG disclosure); it starts expanded when the group holds the
     /// current screen. `id` is the id of the group's list.
-    fn render(&self, out: &mut String, id: &str, level: usize) {
+    ///
+    /// In the icon rail (`rail`) every top level group is collapsible and starts closed: its
+    /// heading shows the icon (or the label's first letter) and opens the group as a flyout.
+    fn render(&self, out: &mut String, id: &str, level: usize, rail: bool) {
         let label = &self.label;
-        let icon = &self.icon;
+        let top = level == 2;
+        let icon = if top && self.icon.is_empty() {
+            format!(
+                r#"<span class="z-nav-initial" aria-hidden="true">{}</span>"#,
+                self.label
+                    .chars()
+                    .find(|c| c.is_alphanumeric())
+                    .map(|c| c.to_uppercase().to_string())
+                    .unwrap_or_default()
+            )
+        } else {
+            self.icon.clone()
+        };
+        let open = self.open && !(rail && top);
+        let expanded = self.here && !(rail && top);
         let (open_tag, close_tag) = if level == 2 {
             (r#"<div class="z-nav-group">"#, "</div>")
         } else {
             (r#"<li class="z-nav-group z-nav-sub">"#, "</li>")
         };
         out.push_str(open_tag);
-        if self.open {
-            out.push_str(&format!("<h{level}>{icon}{label}</h{level}><ul>"));
+        if open {
+            out.push_str(&format!(
+                "<h{level}>{icon}<span>{label}</span></h{level}><ul>"
+            ));
         } else {
             out.push_str(&format!(
-                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#,
-                self.here
+                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{expanded}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#
             ));
         }
         for link in &self.links {
             out.push_str(link);
         }
         for (i, g) in self.groups.iter().enumerate() {
-            g.render(out, &format!("{id}-{i}"), level + 1);
+            g.render(out, &format!("{id}-{i}"), level + 1, rail);
         }
         out.push_str("</ul>");
         out.push_str(close_tag);
     }
+}
+
+/// The button that folds the side menu to an icon rail and back, on wide screens. `aria-pressed`
+/// says whether the rail is on; its name says what pressing it does.
+fn rail_toggle(r: &Render, rail: bool) -> String {
+    let collapse = r.text(&Text::key("zeyn.shell.rail_collapse"));
+    let expand = r.text(&Text::key("zeyn.shell.rail_expand"));
+    format!(
+        r#"<button type="button" class="z-nav-rail" data-zeyn-rail-toggle aria-pressed="{rail}" aria-label="{}" data-text-collapse="{collapse}" data-text-expand="{expand}"><span class="z-nav-rail-icon" aria-hidden="true"></span></button>"#,
+        if rail { &expand } else { &collapse }
+    )
 }
 
 /// A side menu link: `href` is escaped, and so is `label`.

@@ -857,8 +857,8 @@ async fn the_side_menu_starts_with_the_logo_and_draws_item_icons() {
         "{page}"
     );
     assert!(
-        page.contains(r#"<h2><button type="button" class="z-nav-heading" aria-expanded="true" aria-controls="z-nav-g0"><span>Group</span>"#),
-        "the group label drops its icon"
+        page.contains(r#"<h2><button type="button" class="z-nav-heading" aria-expanded="true" aria-controls="z-nav-g0"><span class="z-nav-initial" aria-hidden="true">G</span><span>Group</span>"#),
+        "the group label drops its icon; the icon rail shows its first letter instead"
     );
     assert!(page.contains(r#"aria-current="page"><span class="z-icon z-icon-home" aria-hidden="true"></span><span>One</span></a>"#));
 
@@ -1036,7 +1036,7 @@ async fn an_accordion_menu_marks_the_side_menu() {
 }
 
 #[tokio::test]
-async fn an_open_group_has_no_toggle_and_loads_no_menu_script() {
+async fn an_open_group_has_no_toggle_button() {
     let router = App::new("Nav")
         .feature(Feature::new("n").screen(one).menu(|m| {
             m.group("Group", Icon::Box)
@@ -1047,9 +1047,57 @@ async fn an_open_group_has_no_toggle_and_loads_no_menu_script() {
         .unwrap();
     let (_, _, page) = get(&router, "/one", false).await;
     let nav = side_menu(&page);
-    assert!(nav.starts_with(r#"<nav class="z-nav" aria-label="Main">"#));
-    assert!(nav.contains(r#"<div class="z-nav-group"><h2><span class="z-icon z-icon-box" aria-hidden="true"></span>Group</h2><ul><li>"#), "{nav}");
-    assert!(!page.contains("/_zeyn/menu.js"));
+    assert!(nav.contains(r#"<div class="z-nav-group"><h2><span class="z-icon z-icon-box" aria-hidden="true"></span><span>Group</span></h2><ul><li>"#), "{nav}");
+    assert!(
+        !nav.contains("z-nav-heading"),
+        "an open group has no toggle button"
+    );
+    assert!(
+        nav.contains(r#"data-zeyn-rail-toggle aria-pressed="false""#),
+        "the menu can still fold to an icon rail, so menu.js loads"
+    );
+}
+
+#[tokio::test]
+async fn the_side_menu_folds_to_an_icon_rail_remembered_in_a_cookie() {
+    let router = App::new("Nav")
+        .feature(Feature::new("n").screen(one).menu(|m| {
+            m.group("Group", Icon::Box)
+                .item("One", one)
+        }))
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/one", false).await;
+    assert!(page.contains(r#"<div class="z-app" data-zeyn-shell="app"><nav"#));
+    assert!(page.contains(r#"aria-pressed="false" aria-label="Collapse the menu""#));
+    assert!(
+        page.contains(r#"aria-expanded="true" aria-controls="z-nav-g0""#),
+        "unfolded, the group of the current screen is open"
+    );
+    let rail = router
+        .clone()
+        .oneshot(
+            axum::http::Request::get("/one")
+                .header("cookie", "zeyn_rail=1")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let rail = String::from_utf8(
+        http_body_util::BodyExt::collect(rail.into_body())
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(rail.contains(r#"<div class="z-app" data-zeyn-shell="app" data-zeyn-rail><nav"#));
+    assert!(rail.contains(r#"aria-pressed="true" aria-label="Expand the menu""#));
+    assert!(
+        rail.contains(r#"aria-expanded="false" aria-controls="z-nav-g0""#),
+        "in the rail every group starts closed; it opens as a flyout"
+    );
 }
 
 #[tokio::test]

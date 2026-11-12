@@ -215,6 +215,8 @@
     "shell": {
       "skip": "본문으로 건너뛰기",
       "menu": "메인",
+      "rail_collapse": "메뉴 접기",
+      "rail_expand": "메뉴 펼치기",
       "language": "언어",
       "time_zone": "시간대",
       "time_zone_auto": "자동 (이 기기)",
