@@ -89,6 +89,15 @@ ve gridde bulunmayan sütunlardaki sıralamaları düşürür; ayrıca filtreler
 (200 karakter), seçenekleri (100) ve sıralama anahtarlarını (4) sınırlar. Okunamayan bir değer
 yok sayılır. Tarih filtrelerinin saat dilimi sunucudaki kullanıcı ayarlarından gelir.
 
+`filter_builder()` tablonun üstüne, etkin koşul sayısını gösteren bir "Süz" düğmesi ekler. Düğme
+süzgeç oluşturucuyu açar: her koşul için bir satırı olan bir iletişim kutusu; her satır `filter()`
+taşıyan bir sütun ve o sütunun süzgeç satırındaki giriş kutularıdır. "Koşul ekle", "Tümünü temizle"
+ve "Uygula" listeyi düzenler; Escape ya da Vazgeç listeyi olduğu gibi bırakır ve odak düğmeye döner.
+Koşullar birlikte geçerlidir; aynı sütundaki sonraki koşul öncekinin yerini alır. Uygulamak
+koşulları tablonun süzgeçlerine yazar; böylece süzgeç satırı, kayıtlı görünümler, dışa aktarmalar ve
+bir yapay zekâ ajanının `zeyn:filter` olayı tek bir listeyi paylaşır ve sunucu onu yukarıdaki gibi
+temizler.
+
 Bir başlığa Shift+tıklamak, o sütunu sıralama anahtarlarına ekler. Başlıktaki bir sayı sırayı gösterir.
 
 ## Sütunlar: sabitleme, yeniden boyutlandırma, gizleme, taşıma

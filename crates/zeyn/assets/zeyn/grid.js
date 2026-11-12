@@ -68,6 +68,7 @@ function initGrid(grid) {
   setupHead(grid, state);
   initColumns(grid, state);
   groupChips(grid);
+  showFilters(grid, state);
   if (saved.local) queueMicrotask(() => loadGrid(grid, 'layout'));
   new ResizeObserver(() => {
     const width = grid.clientWidth;

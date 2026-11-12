@@ -256,6 +256,7 @@ pub fn product_list() -> Screen {
                 .mode(DataMode::Server)
                 .paging(Paging::pages(25))
                 .search()
+                .filter_builder()
                 .empty_filtered(
                     EmptyState::new(t!("stock.no_match")).text(t!("stock.no_match_help")),
                 )

@@ -304,7 +304,7 @@
         "numbers": "Numbers grouped by locale, a plain year",
         "search_and_bands": "A search box and columns grouped under a band",
         "add_delete_batch": "Adding, deleting and batch editing rows (nothing is stored)",
-        "user_grouping": "Grouping by the user and a custom summary",
+        "user_grouping": "Grouping by the user, a custom summary and the filter builder",
         "computed_million": "A million computed rows, built a page at a time",
         "dynamic_columns": "Columns that come with the rows: 10,000 rows of 30 columns"
       },
