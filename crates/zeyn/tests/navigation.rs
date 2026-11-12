@@ -1214,6 +1214,33 @@ async fn menu_items_show_badges_and_counts_loaded_after_the_page() {
 }
 
 #[tokio::test]
+async fn long_menus_get_a_filter_box_and_short_ones_do_not() {
+    let router = |n: usize| {
+        App::new("Nav")
+            .feature(
+                Feature::new("n")
+                    .screen(one)
+                    .menu(move |m| {
+                        let mut m = m.group("Many", Icon::Box);
+                        for _ in 0..n {
+                            m = m.item("One", one);
+                        }
+                        m
+                    }),
+            )
+            .router()
+            .unwrap()
+    };
+    let (_, _, long) = get(&router(zeyn::server::MENU_FILTER_FROM), "/one", false).await;
+    assert!(long.contains(r#"<div class="z-nav-filter" data-zeyn-menu-filter"#));
+    assert!(long.contains(r#"aria-label="Filter the menu""#));
+    assert!(long.contains(r#"data-text-pin="Pin {label}""#));
+    assert!(long.contains("/_zeyn/menu.js"));
+    let (_, _, short) = get(&router(zeyn::server::MENU_FILTER_FROM - 1), "/one", false).await;
+    assert!(!short.contains("data-zeyn-menu-filter"));
+}
+
+#[tokio::test]
 async fn nested_groups_with_the_same_label_merge_across_features() {
     let router = App::new("Nav")
         .feature(Feature::new("a").screen(one).menu(|m| {

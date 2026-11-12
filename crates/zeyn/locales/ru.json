@@ -215,6 +215,12 @@
     "shell": {
       "skip": "Перейти к содержимому",
       "menu": "Главное меню",
+      "menu_filter": "Фильтр меню",
+      "menu_results": "Пунктов: {n}",
+      "menu_none": "Нет подходящих пунктов меню",
+      "menu_favorites": "Избранное",
+      "menu_pin": "Закрепить {label}",
+      "menu_unpin": "Открепить {label}",
       "rail_collapse": "Свернуть меню",
       "rail_expand": "Развернуть меню",
       "language": "Язык",

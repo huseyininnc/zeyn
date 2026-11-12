@@ -215,6 +215,12 @@
     "shell": {
       "skip": "본문으로 건너뛰기",
       "menu": "메인",
+      "menu_filter": "메뉴 필터",
+      "menu_results": "{n}개 항목",
+      "menu_none": "일치하는 메뉴 항목이 없습니다",
+      "menu_favorites": "즐겨찾기",
+      "menu_pin": "{label} 고정",
+      "menu_unpin": "{label} 고정 해제",
       "rail_collapse": "메뉴 접기",
       "rail_expand": "메뉴 펼치기",
       "language": "언어",

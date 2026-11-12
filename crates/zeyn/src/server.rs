@@ -3220,6 +3220,13 @@ impl AppState {
         for g in self.dynamic_groups(dynamic, ctx, &r, current) {
             NavGroup::merge(&mut groups, g);
         }
+        let links: usize = groups
+            .iter()
+            .map(NavGroup::link_count)
+            .sum();
+        if links >= MENU_FILTER_FROM {
+            nav.push_str(&menu_filter(&r));
+        }
         let rail = ctx.rail();
         for (i, g) in groups.iter().enumerate() {
             g.render(&mut nav, &format!("z-nav-g{i}"), 2, rail);
@@ -3375,6 +3382,16 @@ impl NavGroup {
         links
     }
 
+    /// The links of this group and its nested groups.
+    fn link_count(&self) -> usize {
+        self.links.len()
+            + self
+                .groups
+                .iter()
+                .map(NavGroup::link_count)
+                .sum::<usize>()
+    }
+
     /// Writes the group into the side menu: a `<div>` at the top level, an `<li>` below it, with
     /// a heading of `level`. A collapsible group's heading holds a button with `aria-expanded`
     /// and `aria-controls` (W3C APG disclosure); it starts expanded when the group holds the
@@ -3423,6 +3440,24 @@ impl NavGroup {
         out.push_str("</ul>");
         out.push_str(close_tag);
     }
+}
+
+/// Side menus with at least this many links get a filter box and favorites.
+pub const MENU_FILTER_FROM: usize = 10;
+
+/// The filter box of a long side menu, with the texts `menu.js` needs for it and for the pin
+/// buttons and the Favorites group it adds.
+fn menu_filter(r: &Render) -> String {
+    let t = |k: &str| r.text(&Text::key(format!("zeyn.shell.{k}")));
+    format!(
+        r#"<div class="z-nav-filter" data-zeyn-menu-filter data-text-results="{}" data-text-none="{}" data-text-favorites="{}" data-text-pin="{}" data-text-unpin="{}"><input type="search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false"><p class="z-sr-only" role="status" aria-live="polite"></p></div>"#,
+        t("menu_results"),
+        t("menu_none"),
+        t("menu_favorites"),
+        t("menu_pin"),
+        t("menu_unpin"),
+        label = t("menu_filter")
+    )
 }
 
 /// The button that folds the side menu to an icon rail and back, on wide screens. `aria-pressed`
