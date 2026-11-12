@@ -38,6 +38,7 @@ pub mod empty_state;
 pub mod external_link;
 pub mod facet_panel;
 pub mod feed;
+pub mod flow_diagram;
 pub mod form;
 pub mod funnel;
 pub mod gantt;

@@ -1530,3 +1530,67 @@ dialog.z-tour-card::backdrop { background: transparent; }
 .z-tour-close { margin-inline-end: auto; }
 
 .z-button[hidden] { display: none; }
+
+.z-flow { max-width: 100%; margin: 0 0 16px; padding: 4px; overflow-x: auto; }
+
+.z-flow:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 2px;
+}
+
+.z-flow-canvas {
+  position: relative;
+  width: var(--z-flow-w);
+  height: var(--z-flow-h);
+}
+
+.z-flow-lines {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  transform: scaleX(var(--z-dir, 1));
+  fill: var(--z-border-strong);
+}
+
+.z-flow-line { fill: none; stroke: var(--z-border-strong); stroke-width: 1.5; }
+
+.z-flow-nodes { margin: 0; padding: 0; list-style: none; }
+
+.z-flow-node {
+  position: absolute;
+  inset-block-start: var(--z-flow-y);
+  inset-inline-start: var(--z-flow-x);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 168px;
+  height: 56px;
+  padding: 4px 10px;
+  border: 1px solid var(--z-tone, var(--z-border-strong));
+  border-radius: var(--z-radius-lg);
+  background: var(--z-tone-bg, var(--z-surface));
+  text-align: center;
+  font-size: var(--z-font-size-sm);
+  font-weight: 600;
+}
+
+.z-flow-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.z-flow-label {
+  position: absolute;
+  inset-block-start: var(--z-flow-y);
+  inset-inline-start: var(--z-flow-x);
+  padding: 0 6px;
+  translate: calc(-50% * var(--z-dir, 1)) -50%;
+  border-radius: 999px;
+  background: var(--z-bg, var(--z-surface));
+  color: var(--z-text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}

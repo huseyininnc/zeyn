@@ -87,6 +87,21 @@ OrgChart::new(
 )
 ```
 
+## FlowDiagram
+
+把流程的各个步骤显示为用箭头连接的方框，从起始一侧到结束一侧：从购物车到送达的订单、带分支的审批。`.node(id, title)` 添加一个步骤，`.tone(...)` 为最后添加的步骤着色，`.edge(from, to)` 按 id 在两个步骤之间画一个箭头，`.edge_with(from, to, label)` 画一个带文字的箭头。服务器按步骤与起始步骤的距离把它们排成若干列，指向较早步骤的箭头从方框下方绕过。步骤是一个有序列表，每个步骤都为屏幕阅读器说明它通向哪些步骤；一个图最多绘制 40 个步骤和 80 个箭头，较宽时在自己的框内滚动。
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
 ## Funnel
 
 一个每一步都会流失一部分的流程的各个阶段，例如访问、购物车和订单。`Funnel::new(label)` 配合 `.stage(title, value)` 把每个阶段画成居中的条形，宽度等于它占第一阶段的比例，并以文字给出其数值和该比例。一个漏斗最多容纳 10 个阶段。

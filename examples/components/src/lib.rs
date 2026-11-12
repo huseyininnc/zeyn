@@ -254,6 +254,7 @@ catalog! {
         activity_rings "/ui/activity-rings";
         gantt "/ui/gantt";
         org_chart "/ui/org-chart";
+        flow_diagram "/ui/flow-diagram";
     }
     "shell" Sidebar {
         toolbox "/ui/toolbox";

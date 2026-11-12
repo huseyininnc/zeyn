@@ -87,6 +87,21 @@ OrgChart::new(
 )
 ```
 
+## FlowDiagram
+
+Bir sürecin adımları, oklarla bağlı kutular olarak, baş taraftan son tarafa doğru: sepetten teslimata bir sipariş, dallarıyla bir onay. `.node(id, title)` bir adım ekler, `.tone(...)` son eklenen adımı renklendirir, `.edge(from, to)` iki adım arasına kimlikleriyle bir ok çizer, `.edge_with(from, to, label)` ise üzerinde bir sözcük olan bir ok çizer. Sunucu adımları, ilk adımlara uzaklıklarına göre sütunlara yerleştirir; önceki bir adıma giden ok kutuların altından geçer. Adımlar sıralı bir listedir ve her biri, ekran okuyucular için gittiği adımları adlandırır; bir diyagram en fazla 40 adım ve 80 ok çizer, geniş olduğunda kendi kutusunun içinde kayar.
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
 ## Funnel
 
 Her adımda bir kısmını kaybeden bir sürecin aşamaları; örneğin ziyaretler, sepetler ve siparişler. `Funnel::new(label)` ile `.stage(title, value)`, her aşamayı ilk aşamaya oranı kadar geniş, ortalanmış bir çubuk olarak çizer; sayısı ve bu oran metin olarak yazılır. Bir huni en fazla 10 aşama tutar.

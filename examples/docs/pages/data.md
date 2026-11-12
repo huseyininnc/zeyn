@@ -87,6 +87,21 @@ OrgChart::new(
 )
 ```
 
+## FlowDiagram
+
+The steps of a process as boxes joined by arrows, from the start side to the end side: an order from cart to delivery, an approval with its branches. `.node(id, title)` adds a step, `.tone(...)` colors the step added last, `.edge(from, to)` draws an arrow between two steps by their ids and `.edge_with(from, to, label)` one with a word on it. The server places the steps in columns by how far they are from the first steps, and an arrow to an earlier step runs under the boxes. The steps are an ordered list and each one names the steps it leads to for screen readers; a diagram draws at most 40 steps and 80 arrows and scrolls inside its own box when it is wide.
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
 ## Funnel
 
 The stages of a process that loses some at each step, such as visits, carts and orders. `Funnel::new(label)` with `.stage(title, value)` draws each stage as a centered bar as wide as its share of the first stage, with its number and that share as text. A funnel holds at most 10 stages.

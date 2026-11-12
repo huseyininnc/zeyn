@@ -87,6 +87,21 @@ OrgChart::new(
 )
 ```
 
+## FlowDiagram
+
+Los pasos de un proceso como cajas unidas por flechas, del lado inicial al lado final: un pedido desde el carrito hasta la entrega, una aprobación con sus ramas. `.node(id, title)` añade un paso, `.tone(...)` colorea el último paso añadido, `.edge(from, to)` dibuja una flecha entre dos pasos por sus ids y `.edge_with(from, to, label)` una con una palabra encima. El servidor coloca los pasos en columnas según lo lejos que están de los primeros pasos, y una flecha hacia un paso anterior pasa por debajo de las cajas. Los pasos son una lista ordenada y cada uno nombra los pasos a los que lleva para los lectores de pantalla; un diagrama dibuja 40 pasos y 80 flechas como máximo y se desplaza dentro de su propia caja cuando es ancho.
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
 ## Funnel
 
 Las etapas de un proceso que pierde algo en cada paso, como visitas, carritos y pedidos. `Funnel::new(label)` con `.stage(title, value)` dibuja cada etapa como una barra centrada tan ancha como su parte de la primera etapa, con su número y esa parte como texto. Un embudo contiene 10 etapas como máximo.

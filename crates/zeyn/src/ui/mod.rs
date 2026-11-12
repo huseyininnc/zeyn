@@ -25,6 +25,7 @@ mod document;
 mod embed;
 mod facets;
 mod feed;
+mod flow;
 mod funnel;
 mod gallery;
 mod gantt;
@@ -134,6 +135,7 @@ pub use document::{
 };
 pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
 pub use feed::{Feed, MAX_FEED_BATCH, MAX_POST_MEDIA, Post};
+pub use flow::{FlowDiagram, MAX_FLOW_EDGES, MAX_FLOW_NODES};
 pub use funnel::{ActivityRings, Funnel, MAX_FUNNEL_STAGES, MAX_RINGS};
 pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
 pub use gantt::{Gantt, MAX_GANTT_DAYS, MAX_GANTT_TASKS};

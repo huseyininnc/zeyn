@@ -269,8 +269,8 @@ pub mod prelude {
         WeekSchedule,
     };
     pub use crate::ui::{
-        ActivityRings, ComparisonTable, Funnel, Gantt, Highlight, ImageCompare, Indicator, Meter,
-        OrgChart, OrgNode, Table, Toc, Tour, TourStop,
+        ActivityRings, ComparisonTable, FlowDiagram, Funnel, Gantt, Highlight, ImageCompare,
+        Indicator, Meter, OrgChart, OrgNode, Table, Toc, Tour, TourStop,
     };
     pub use crate::ui::{
         Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeEditor, CodeError,

@@ -649,6 +649,19 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .body("An order stays a draft until it is sent."),
             )
             .into(),
+        "flow" => FlowDiagram::new("Order process")
+            .node("cart", "Cart")
+            .node("pay", "Payment")
+            .node("pack", "Packing")
+            .node("ship", "Shipping")
+            .tone(Tone::Success)
+            .node("cancel", "Cancelled")
+            .tone(Tone::Danger)
+            .edge("cart", "pay")
+            .edge_with("pay", "pack", "Paid")
+            .edge_with("pay", "cancel", "Declined")
+            .edge("pack", "ship")
+            .into(),
         "visuals" => Stack::new()
             .gap(5)
             .add(OrgChart::new(
@@ -925,6 +938,7 @@ pub const EXAMPLES: &[&str] = &[
     "heatmap",
     "gantt",
     "visuals",
+    "flow",
     "tour",
     "table",
     "meters",

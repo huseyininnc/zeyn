@@ -67,6 +67,7 @@
       "funnel": "Stages that narrow from the first to the last.",
       "activity_rings": "Shares of several goals as rings inside one another.",
       "gantt": "Tasks as bars over a span of days.",
+      "flow_diagram": "The steps of a process as boxes joined by arrows.",
       "org_chart": "A hierarchy as boxes joined by lines.",
       "comparison_table": "Plans side by side with a row for each feature.",
       "tour": "A guided tour of the page.",
@@ -215,6 +216,10 @@
       },
       "gantt": {
         "overview": "Example"
+      },
+      "flow_diagram": {
+        "overview": "Example",
+        "branches": "Branches and a way back"
       },
       "org_chart": {
         "overview": "Example"

@@ -67,6 +67,7 @@
       "funnel": "İlkinden sonuncusuna daralan aşamalar.",
       "activity_rings": "Birkaç hedefin payı, iç içe halkalar olarak.",
       "gantt": "Günlere yayılmış çubuklar olarak görevler.",
+      "flow_diagram": "Bir sürecin adımları, oklarla bağlı kutular olarak.",
       "org_chart": "Çizgilerle bağlı kutulardan bir hiyerarşi.",
       "comparison_table": "Planlar yan yana, her özellik için bir satır.",
       "tour": "Sayfanın adım adım tanıtımı.",
@@ -215,6 +216,10 @@
       },
       "gantt": {
         "overview": "Örnek"
+      },
+      "flow_diagram": {
+        "overview": "Örnek",
+        "branches": "Dallar ve geri dönüş"
       },
       "org_chart": {
         "overview": "Örnek"

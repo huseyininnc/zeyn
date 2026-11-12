@@ -580,6 +580,9 @@
         "yes": "Included",
         "no": "Not included"
       },
+      "flow": {
+        "next": "Next: {steps}"
+      },
       "gantt": {
         "task": "Task",
         "from": "Starts",

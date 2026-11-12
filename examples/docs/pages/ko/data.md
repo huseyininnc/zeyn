@@ -87,6 +87,21 @@ OrgChart::new(
 )
 ```
 
+## FlowDiagram
+
+프로세스의 단계를 화살표로 이은 상자로, 시작 쪽에서 끝 쪽으로 그립니다. 장바구니에서 배송까지의 주문, 분기가 있는 승인 등입니다. `.node(id, title)`은 단계를 추가하고, `.tone(...)`은 마지막에 추가한 단계에 색을 입히며, `.edge(from, to)`는 id로 지정한 두 단계 사이에 화살표를 그리고, `.edge_with(from, to, label)`은 낱말이 붙은 화살표를 그립니다. 서버는 첫 단계들에서 얼마나 먼지에 따라 단계를 열에 배치하며, 이전 단계로 돌아가는 화살표는 상자 아래로 지나갑니다. 단계는 순서 있는 목록이고 각 단계는 화면 읽기 프로그램을 위해 다음 단계들을 알려 줍니다. 다이어그램은 최대 40개의 단계와 80개의 화살표를 그리며, 넓으면 자기 상자 안에서 스크롤됩니다.
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
 ## Funnel
 
 방문, 장바구니, 주문처럼 단계마다 일부가 빠져나가는 과정의 단계들입니다. `Funnel::new(label)`과 `.stage(title, value)`는 각 단계를 첫 단계에 대한 비율만큼의 너비를 가진 가운데 정렬 막대로 그리고, 숫자와 그 비율을 텍스트로 보여 줍니다. 퍼널은 최대 10개의 단계를 가집니다.

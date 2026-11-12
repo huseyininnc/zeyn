@@ -580,6 +580,9 @@
         "yes": "Var",
         "no": "Yok"
       },
+      "flow": {
+        "next": "Sonraki: {steps}"
+      },
       "gantt": {
         "task": "Görev",
         "from": "Başlangıç",

@@ -87,6 +87,21 @@ OrgChart::new(
 )
 ```
 
+## FlowDiagram
+
+プロセスのステップを、矢印でつないだボックスとして開始側から終了側へ描きます。カートから配達までの注文や、分岐のある承認などです。`.node(id, title)` はステップを追加し、`.tone(...)` は最後に追加したステップに色を付け、`.edge(from, to)` は id で指定した二つのステップの間に矢印を描き、`.edge_with(from, to, label)` は言葉の付いた矢印を描きます。サーバーは最初のステップからの距離に応じてステップを列に配置し、前のステップへ戻る矢印はボックスの下を通ります。ステップは順序付きリストで、それぞれがスクリーンリーダー向けに次のステップを示します。図は最大 40 ステップと 80 本の矢印を描き、幅が広いときは自身のボックス内でスクロールします。
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
 ## Funnel
 
 訪問、カート、注文のように、段階ごとに一部が減っていくプロセスの各段階です。`Funnel::new(label)` と `.stage(title, value)` は、各段階を、最初の段階に対する割合の幅を持つ中央寄せのバーとして描き、数値とその割合をテキストで示します。ファネルが持てる段階は最大 10 個です。

@@ -1351,3 +1351,66 @@ fn tours_render_a_hidden_button_and_stops_keep_their_component() {
     assert!(out.contains("Draft") && out.ends_with("</div>"));
     assert_eq!(stop.children().len(), 1);
 }
+
+#[test]
+fn flow_diagrams_place_steps_in_columns_and_name_what_each_leads_to() {
+    use zeyn::ui::FlowDiagram;
+    let flow = FlowDiagram::new("Order <process>")
+        .node("cart", "Cart")
+        .node("pay", "Payment <p>")
+        .node("ship", "Shipping")
+        .tone(Tone::Success)
+        .node("cancel", "Cancelled")
+        .node("cart", "Twice")
+        .edge("cart", "pay")
+        .edge_with("pay", "ship", "Paid <ok>")
+        .edge("pay", "cancel")
+        .edge("ship", "cart")
+        .edge("pay", "nowhere")
+        .edge("pay", "pay");
+    let out = html(&flow, "en");
+    assert!(
+        out.starts_with(
+            r#"<div class="z-flow" role="group" aria-label="Order &lt;process&gt;" tabindex="0"><div class="z-flow-canvas" style="--z-flow-w:648px;--z-flow-h:192px">"#
+        ),
+        "three columns, two rows and room for the arrow back: {out}"
+    );
+    assert_eq!(
+        out.matches("<li class=").count(),
+        4,
+        "a repeated id is left out: {out}"
+    );
+    assert_eq!(
+        out.matches(r#"<path class="z-flow-line""#)
+            .count(),
+        4,
+        "arrows to an unknown step or to the step itself are left out: {out}"
+    );
+    assert!(
+        out.contains(r#"<li class="z-flow-node" style="--z-flow-x:0px;--z-flow-y:40px"><span class="z-flow-title">Cart</span><span class="z-sr-only">Next: Payment &lt;p&gt;</span></li>"#),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"<li class="z-flow-node z-tone-success" style="--z-flow-x:480px;--z-flow-y:0px"><span class="z-flow-title">Shipping</span><span class="z-sr-only">Next: Cart</span></li>"#),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            r#"<span class="z-sr-only">Next: Shipping (Paid &lt;ok&gt;), Cancelled</span>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"aria-hidden="true">Paid &lt;ok&gt;</span>"#),
+        "{out}"
+    );
+    assert!(html(&flow, "tr").contains("Sonraki: Cart"));
+
+    let mut many = FlowDiagram::new("Many");
+    for i in 0..60 {
+        many = many.node(format!("n{i}"), "Step");
+    }
+    let out = html(&many, "en");
+    assert_eq!(out.matches("<li class=").count(), zeyn::ui::MAX_FLOW_NODES);
+    assert!(html(&FlowDiagram::new("Empty"), "en").contains("--z-flow-w:0px;--z-flow-h:0px"));
+}
