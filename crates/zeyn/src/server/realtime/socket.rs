@@ -440,6 +440,10 @@ struct Hello {
     seq: u64,
 }
 
+/// Read buffer of a page socket. Frames are small and most sockets sit idle, so the 128 KiB
+/// default would be most of a connection's memory; larger frames still arrive in pieces.
+const READ_BUFFER: usize = 4 * 1024;
+
 /// Most topics one connection listens to.
 const MAX_TOPICS: usize = 16;
 
@@ -521,6 +525,9 @@ pub(super) async fn page_socket(
     }
     ws.protocols([PROTOCOL])
         .max_message_size(limits.message_bytes)
+        .read_buffer_size(READ_BUFFER)
+        .write_buffer_size(0)
+        .max_write_buffer_size(limits.message_bytes.max(1024 * 1024) * 2)
         .on_upgrade(move |ws| async move {
             run(st, ctx, socket.clone(), peer.clone(), rx, ws, limits).await;
             socket.release_user(&user);
@@ -548,6 +555,7 @@ async fn run(
     beat.tick().await;
     let mut heard = Instant::now();
     let mut window = (Instant::now(), 0u32);
+    let mut flood = (Instant::now(), 0u32);
     let mut first = true;
     let ending = loop {
         tokio::select! {
@@ -567,6 +575,13 @@ async fn run(
             incoming = stream.next() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     heard = Instant::now();
+                    if flood.0.elapsed().as_secs() >= 1 {
+                        flood = (Instant::now(), 0);
+                    }
+                    flood.1 += 1;
+                    if flood.1 > limits.frames {
+                        break Ending::Clean(Some((CLOSE_POLICY, "too many frames")));
+                    }
                     let Ok(frame) = serde_json::from_str::<Incoming>(&text) else {
                         break Ending::Clean(Some((CLOSE_POLICY, "bad frame")));
                     };
@@ -624,6 +639,7 @@ async fn run(
                 }
                 Some(Ok(Message::Binary(_))) => break Ending::Clean(Some((CLOSE_POLICY, "text only"))),
                 Some(Ok(Message::Close(Some(f)))) if matches!(f.code, 1000 | 1001) => break Ending::Clean(None),
+                Some(Err(e)) if too_long(&e) => break Ending::Clean(Some((super::CLOSE_TOO_BIG, "too big"))),
                 Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break Ending::Dropped,
                 Some(Ok(_)) => heard = Instant::now(),
             },
@@ -651,6 +667,12 @@ async fn run(
         }
         Ending::Dropped => detach(socket, peer, limits.detached),
     }
+}
+
+/// Whether a read failed because the frame was over `Limits::message_bytes`. The WebSocket
+/// library reports it only as a capacity error whose text says "too long".
+fn too_long(e: &axum::Error) -> bool {
+    e.to_string().contains("too long")
 }
 
 /// Keeps a dropped peer, numbering and holding its messages, until it resumes or

@@ -12,6 +12,7 @@
  * An element with `data-zeyn-live-self` only subscribes: it refreshes itself on `zeyn:topics`.
  * Typing signals of other users are passed on as `zeyn:signal`.
  *
+ * Nodes made with `.on_event` (`[data-zeyn-on]`) refresh or show a toast when their event arrives.
  * `zeyn.socket.on(name, fn)` listens for events (`{"s":n,"e":name,"d":data}`) and returns a
  * function that stops listening; `zeyn.socket.call(action, input)` calls a published action and
  * resolves with its answer or rejects with its problem; `zeyn.socket.state` is `connected`,
@@ -62,7 +63,23 @@ function wanted() {
 
 /** Whether anything in the page needs the socket. */
 function needed() {
-  return wanted().size > 0 || listeners.size > 0 || calls.size > 0;
+  return wanted().size > 0 || listeners.size > 0 || calls.size > 0 || !!document.querySelector('[data-zeyn-on]');
+}
+
+/**
+ * Nodes made with `.on_event` (`[data-zeyn-on="name"]`): a refreshing one listens to a topic named
+ * after the event, so the event joins the next `zeyn:topics`; one with `data-zeyn-on-toast` shows
+ * its text.
+ */
+function react(name) {
+  for (const el of document.querySelectorAll('[data-zeyn-on]')) {
+    if (el.dataset.zeynOn !== name) continue;
+    if (el.dataset.zeynOnToast) document.dispatchEvent(new CustomEvent('zeyn:toast', { detail: { message: el.dataset.zeynOnToast } }));
+    else {
+      pending.add(name);
+      flush ||= setTimeout(refresh, 300);
+    }
+  }
 }
 
 function setState(next) {
@@ -138,6 +155,7 @@ function receive(e) {
     calls.delete(msg.r);
     if (call) 'err' in msg ? call.reject(msg.err) : call.resolve(msg.ok);
   } else if (typeof msg?.e === 'string') {
+    react(msg.e);
     for (const fn of listeners.get(msg.e) ?? []) {
       try {
         fn(msg.d);

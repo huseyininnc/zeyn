@@ -1,8 +1,9 @@
 # ZeynSocket: design
 
 Status: ZEYN-272 (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events, groups,
-`Conn`, actions over the socket) and ZEYN-273 (resume, replay, heartbeat, backoff) are built.
-ZEYN-274 to ZEYN-278 follow in the order of section 8.
+`Conn`, actions over the socket), ZEYN-273 (resume, replay, heartbeat, backoff) and ZEYN-277
+(limits, tenant isolation, memory) and ZEYN-276 (`on_event`, `zeyn.socket`, `TestSocket`) are
+built. ZEYN-274, ZEYN-275 and ZEYN-278 follow in the order of section 8.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,
@@ -81,7 +82,8 @@ App::new("Chat")
   (`#[diagnostic::on_unimplemented]` says what to add); emitting an event that was never declared
   with `.event::<E>()` returns an error.
 
-Screens, no JavaScript:
+Screens, no JavaScript (`OnEvent::Refresh` and `OnEvent::Toast` are built; a refresh reloads grids in
+place, so a separate `Reload` is not needed):
 
 ```rust
 List::of(messages)
@@ -103,9 +105,10 @@ zeyn.socket.state;  // 'connected' | 'reconnecting' | 'offline'
 Rust client, for tests and services:
 
 ```rust
-let mut c = TestSocket::connect(&router, user("ayse")).await;
-c.call(join_room, RoomId("1".into())).await?;
-let m: MessageSent = c.next_event().await;
+let addr = TestSocket::serve(app.router()?).await;          // feature `socket-client`
+let mut c = TestSocket::connect(addr, &[("authorization", "Bearer ..")]).await?;
+c.call("join_room", json!({ "room": "1" })).await?;
+let m: MessageSent = c.next_event().await?;
 ```
 
 ## 3. Wire protocol
@@ -169,6 +172,7 @@ Existing `Limits` stay. New fields, defaults in brackets:
 | `detached` time a dropped connection is kept | 60 s | groups and buffer dropped |
 | `groups` per connection | 32 | `join` answers `429` |
 | `calls` per connection per second | 20 | the call answers `429`; the write limit applies to write actions as for HTTP |
+| `frames` per connection per second | 100 | the socket is closed with 1008 |
 | `event_bytes` | 16 KB | `emit` returns an error and sends nothing |
 
 Worst case per user: `per_user (8) * (queue + replay_bytes)`, about 1 MB. An event is serialized
