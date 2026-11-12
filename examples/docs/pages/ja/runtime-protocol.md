@@ -60,6 +60,9 @@ head にあるフレームワークのスクリプトとスタイルシートに
 | `tour.js` | ページのツアー（`Tour`）：開始ボタンを表示し、ダイアログをページの各ストップへ順に移動します |
 | `thread.js` と `thread.css`, `stream.js`, `composer.js` と `composer.css`, `typing.js` と `typing.css` | メッセージスレッド、スレッドとアシスタントが共有するストリーミングの Markdown と JSON 行、チャットの composer、入力中インジケーター |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 投稿のフィード、画像と動画のライトボックス、ストーリーリングとその行、スクリプト不要 |
+| `drag.js`, `net.js` | 独自のマーカーを持たない共有ヘルパー。インポートするモジュールと一緒にリンクされる(下記) |
+
+2つのヘルパーモジュールは、複数のモジュールが本来コピーするはずのコードをまとめています。`net.js`(`kanban.js`、`files.js`、`vlist.js` がインポート)は `BASE`、`csrf()`、`parse(text)`、`post(path, body)` をエクスポートします。`post` はページのオリジンで `x-zeyn-csrf` ヘッダー付きの JSON を送り、`{ ok, body }` を返します。`drag.js`(列の移動に `grid.js`、レールのドラッグスクロールに `catalog.js` がインポート)は、今後の並べ替えリスト、ボード、サーフェスの土台となるドラッグコアです。`press(e, { threshold, longPress, tolerance, axis, onStart })` は、マウスやペンが 6 px 動いたとき、またはタッチが 5 px 以内で 250 ms 押し続けられたときに `pointerdown` をドラッグに変えます(スワイプはそのままスクロールし、先にスクロールすると押下は取り消されます)。`capture(el, e, move, end)` はポインターキャプチャでドラッグを追い、`move` をアニメーションフレームごとに最大1回、離したとき・キャンセル時・Escape で `end(event, cancelled)` を呼びます。`swallowClick()` は離した後のクリックを取り消します。`announce(text)` はローカライズされたテキストを、ページに1つの polite ライブリージョンで最大 500 ms に1回読み上げます。`.z-drag-handle`(`zeyn.css` 内)はドラッグハンドル上でだけタッチのパンを止めます。ドラッグするすべてのコンポーネントは、キーボードと単一ポインターで移動する方法(移動メニュー、WCAG 2.5.7)も提供します。どちらのモジュールも HTML を書きません。
 
 完全なページは head に、すべてのページが使うスタイルシート（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、HTML にマーカーがあるモジュールのスタイルシート、そしてそれらのスクリプトを、それぞれが import するモジュールの後にリンクします。`zeyn.js` は同じ表（`[name, script selector, style selector]`）付きで配信され、後から届くコンテンツに足りないものを読み込みます。`nav.js` は画面を差し替える前に `{ root, waits }` 付きの `zeyn:need` を発行して新しいスタイルシートを待ち、ウィンドウも開く前に同じように待ちます。`zeyn:content`、グリッドのページ、グリッドのフィルターは、含むもののスクリプトを読み込みます。ブラウザーは URL ごとに 1 つのインスタンスを保つので、モジュールは一度だけ実行されます。モジュールは実行時にドキュメントで見つけたものを設定し、その後は `zeyn:content` を待ち受けます。ページにないコンポーネントを探したり待ち受けたりすることはありません。モジュールは共有部分を自分の URL の `?v=` 付きで import します。`tests/ui_modules.rs` は、ページが使わないモジュールをリンクしたとき、またはモジュールのスタイルシートがマーカー外のクラスにスタイルを付けたときに失敗します。
 
@@ -352,7 +355,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナー�
 
 | エンドポイント | 動作 |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket。テキストフレーム `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket。テキストフレーム `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket。双方向でバイナリフレーム `0x01` + Y update (v1) |
 
 ハンドシェイクは、アップグレードの前に、origin、Cookie に対する CSRF トークン、サインインしているユーザー、権限を確認します。`docs/realtime.md` を参照してください。
@@ -422,7 +425,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナー�
 | `Mcp::read_only()` | 有効 | 有効 | なし |
 | `Mcp::on()` | 有効 | 有効 | form の保存と、書き込みを行う API action |
 
-`.server(false)` と `.webmcp(false)` で、片方の入口を無効にできます。`zeyn new` で作られる新しいプロジェクトは `Mcp::read_only()` で始まります。
+`.no_server()` と `.no_webmcp()` で、片方の入口を無効にできます。`zeyn new` で作られる新しいプロジェクトは `Mcp::read_only()` で始まります。
 
 無効がデフォルトの理由: このエンドポイントでは、有効な `Authorization` ヘッダーを持つ誰もが、モデルを通してアプリを操作できてしまい、モデルは読み込んだデータによって誘導されうるからです。フレームワークはすべてのアプリをエージェント対応にします（ツールはコードから生成され、書くものはありません）が、アプリがその入口を開くかどうか、そしてエージェントに書き込みを許すかどうかは、運用する人々が決めることです。読み取り専用は 1 行で有効にできます。
 

@@ -88,8 +88,8 @@ pub fn shop() -> Screen {
                         .badge(Badge::new("New"))
                         .link(results, SearchParams { q: g.name.clone() })
                 })
-                .sort_option("Cheapest", Good::price, false)
-                .sort_option("Dearest", Good::price, true)
+                .sort_option("Cheapest", Good::price)
+                .sort_option_desc("Dearest", Good::price)
                 .paging(Paging::infinite(4)),
         )
         .body(
@@ -141,7 +141,7 @@ pub fn picks() -> Screen {
                     .horizontal()
                     .link(good_page, GoodParams { id: g.id.0 })
             })
-            .scrollbar(true)
+            .scrollbar()
             .paging(Paging::infinite(2)),
     )
 }
@@ -163,7 +163,7 @@ pub fn goods_list() -> Screen {
                         .meta(format!("{} TL", g.price))
                         .link(results, SearchParams { q: g.name.clone() })
                 })
-                .sort_option("Cheapest", Good::price, false)
+                .sort_option("Cheapest", Good::price)
                 .paging(Paging::infinite(3)),
         )
         .body(
@@ -741,7 +741,7 @@ async fn rails_hide_their_scrollbar_unless_kept_and_drag_only_with_a_mouse() {
         js.contains("e.pointerType !== 'mouse'"),
         "touch and pen keep native scrolling"
     );
-    assert!(js.contains("const DRAG_PX = 5;"));
+    assert!(js.contains("const DRAG_PX = 6;") && js.contains("D.press(e, {"));
     assert!(
         js.contains("if (scrolled && entry.isIntersecting)"),
         "more cards load by themselves only after the user scrolled, so the first page does not shift"

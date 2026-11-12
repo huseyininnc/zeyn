@@ -252,11 +252,72 @@ impl Db {
 
     /// One page of entities matching the query: filters, sort, offset or keyset paging, a capped
     /// total when asked, totals and groups. See [`Page`].
+    ///
+    /// When the query asks for a total or column totals and the pool has idle connections for
+    /// them, the rows, the count and the totals run at the same time on separate connections, so
+    /// the page waits for the slowest query instead of their sum. Otherwise they run one after
+    /// the other on one connection.
     pub async fn find<E: Entity>(&self, q: &DataQuery) -> Result<Page<E>> {
-        self.link()
-            .await?
-            .find(self.dialect(), q, self.inner.count_cap)
-            .await
+        let d = self.dialect();
+        let plan = build::plan_find::<E>(d, q, self.inner.count_cap)?;
+        let extra = usize::from(plan.count.is_some()) + usize::from(plan.totals.is_some());
+        if extra == 0 || self.idle() < extra {
+            return self
+                .link()
+                .await?
+                .run_find::<E>(d, plan)
+                .await;
+        }
+        let FindPlan {
+            main,
+            limit,
+            skip,
+            shape,
+            count,
+            totals,
+        } = plan;
+        let rows = async {
+            self.link()
+                .await?
+                .find_rows::<E>(d, main, limit, skip, shape)
+                .await
+        };
+        let total = async {
+            match count {
+                Some(sql) => self
+                    .link()
+                    .await?
+                    .count::<E>(sql)
+                    .await
+                    .map(Some),
+                None => Ok(None),
+            }
+        };
+        let sums = async {
+            match totals {
+                Some((sql, aggs)) => {
+                    self.link()
+                        .await?
+                        .totals::<E>(sql, &aggs)
+                        .await
+                }
+                None => Ok(Vec::new()),
+            }
+        };
+        let (mut page, total, sums) = tokio::try_join!(rows, total, sums)?;
+        page.total = total;
+        page.totals = sums;
+        Ok(page)
+    }
+
+    /// Connections the pool holds open and unused right now; 0 where the driver does not say.
+    fn idle(&self) -> usize {
+        match &self.inner.backend {
+            #[cfg(feature = "postgres")]
+            Backend::Postgres(pool) => pool.num_idle(),
+            #[cfg(feature = "oracle")]
+            Backend::Oracle(..) => 0,
+        }
     }
 
     /// The entity with this key, or [`Error::NotFound`].
@@ -657,6 +718,12 @@ impl Link {
         q: &DataQuery,
         cap: u64,
     ) -> Result<Page<E>> {
+        let plan = build::plan_find::<E>(d, q, cap)?;
+        self.run_find::<E>(d, plan).await
+    }
+
+    /// Runs a planned find on this one connection: rows, then the count, then the totals.
+    async fn run_find<E: Entity>(&mut self, d: &dyn Dialect, plan: FindPlan) -> Result<Page<E>> {
         let FindPlan {
             main,
             limit,
@@ -664,7 +731,28 @@ impl Link {
             shape,
             count,
             totals,
-        } = build::plan_find::<E>(d, q, cap)?;
+        } = plan;
+        let mut page = self
+            .find_rows::<E>(d, main, limit, skip, shape)
+            .await?;
+        if let Some(sql) = count {
+            page.total = Some(self.count::<E>(sql).await?);
+        }
+        if let Some((sql, aggs)) = totals {
+            page.totals = self.totals::<E>(sql, &aggs).await?;
+        }
+        Ok(page)
+    }
+
+    /// The rows or groups of a page and its next cursor.
+    async fn find_rows<E: Entity>(
+        &mut self,
+        d: &dyn Dialect,
+        main: Sql,
+        limit: usize,
+        skip: u64,
+        shape: Shape,
+    ) -> Result<Page<E>> {
         let fields = E::fields();
         let mut page = Page::default();
         match shape {
@@ -716,27 +804,36 @@ impl Link {
                 page.groups = groups;
             }
         }
-        if let Some(count) = count {
-            let mut total = 0;
-            self.fetch(count, on_error::<E>, &mut |cells| {
-                if let Some(Cell::Int(n)) = cells.drain(..).next() {
-                    total = u64::try_from(n).unwrap_or(0);
-                }
-                Ok(())
-            })
-            .await?;
-            page.total = Some(total);
-        }
-        if let Some((sql, aggs)) = totals {
-            let mut out = Vec::new();
-            self.fetch(sql, on_error::<E>, &mut |cells| {
-                out = build::read_aggs(fields, &aggs, &mut cells.drain(..));
-                Ok(())
-            })
-            .await?;
-            page.totals = out;
-        }
         Ok(page)
+    }
+
+    /// The capped row count of a find.
+    async fn count<E: Entity>(&mut self, sql: Sql) -> Result<u64> {
+        let mut total = 0;
+        self.fetch(sql, on_error::<E>, &mut |cells| {
+            if let Some(Cell::Int(n)) = cells.drain(..).next() {
+                total = u64::try_from(n).unwrap_or(0);
+            }
+            Ok(())
+        })
+        .await?;
+        Ok(total)
+    }
+
+    /// The column totals of a find over the whole filtered result.
+    async fn totals<E: Entity>(
+        &mut self,
+        sql: Sql,
+        aggs: &[build::Agg],
+    ) -> Result<Vec<crate::action::Total>> {
+        let fields = E::fields();
+        let mut out = Vec::new();
+        self.fetch(sql, on_error::<E>, &mut |cells| {
+            out = build::read_aggs(fields, aggs, &mut cells.drain(..));
+            Ok(())
+        })
+        .await?;
+        Ok(out)
     }
 
     /// Rows of a hand written query as `M`, at most `max`; reading stops at the first row over.

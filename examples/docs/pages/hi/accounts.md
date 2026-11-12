@@ -20,7 +20,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - कुंजी कॉन्फ़िगरेशन से आती है, कम से कम 32 बाइट की होती है और कभी नहीं बदलती।

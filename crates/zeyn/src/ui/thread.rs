@@ -221,7 +221,7 @@ fn clip(text: &str, max: usize) -> &str {
 ///
 /// New messages are fetched when one of the thread's topics is named (after a [`Composer`]
 /// sends, after `ui.refresh("chat")`, or with [`MessageThread::live`] and the `realtime`
-/// feature, `hub.notify(&ctx, "chat")`) and announced in a polite live region.
+/// feature, `socket.notify(&ctx, "chat")`) and announced in a polite live region.
 ///
 /// [`Composer`]: crate::ui::Composer
 ///

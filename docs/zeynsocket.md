@@ -1,6 +1,10 @@
 # ZeynSocket: design
 
-Status: proposal (ZEYN-271). Tickets ZEYN-272 to ZEYN-278 build it in this order.
+Status: ZEYN-272 (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events, groups,
+`Conn`, actions over the socket), ZEYN-273 (resume, replay, heartbeat, backoff) and ZEYN-277
+(limits, tenant isolation, memory), ZEYN-276 (`on_event`, `zeyn.socket`, `TestSocket`) and
+ZEYN-274 (Server-Sent Events fallback), ZEYN-275 (Redis) and ZEYN-278 (guide `docs/socket.md`,
+skill, showcase) are built.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,
@@ -23,8 +27,8 @@ notification bell or a job progress bar without learning a second model.
 | Names | `Realtime` becomes `ZeynSocket`, `Hub` becomes `Socket` | One name per idea. Alpha: no deprecated aliases, `zeyn check --fix` rewrites old calls. |
 | Sockets per page | One, shared by every component on the page | Fewer connections per user; the `per_user` limit stays meaningful. |
 | Server state | Only open connections, groups and short replay buffers, all capped | Screens stay stateless; a lost server loses no data, clients resync. |
-| CSRF | Sent in the first frame, not in the URL | URLs land in proxy and server logs (ZEYN-258). The handshake still checks `Origin`. |
-| Fallback | Server-Sent Events down, `POST` up | Works through proxies that strip `Upgrade`; same envelope, same resume. Long polling is not built. |
+| CSRF | Sent as the subprotocol `csrf.TOKEN` next to `zeyn`, never in the URL | URLs land in proxy and server logs (ZEYN-258). The subprotocol keeps it out of them and is checked before the upgrade, so no unauthenticated socket is ever opened. The handshake also checks `Origin`. |
+| Fallback | Server-Sent Events down, `POST` up | Works through proxies that strip `Upgrade`; same envelope, same resume. Long polling is not built. `POST /_zeyn/socket/open` with the CSRF token returns a single use ticket (30 s, same user) for `GET /_zeyn/socket/events?ticket=`; the ticket is the only thing in a URL. `POST /_zeyn/socket/send` takes one frame with the CSRF token and `x-zeyn-socket: <resume token>`. |
 | Scale out | Redis pub/sub behind the `redis` feature | Already a dependency of the `redis` feature; no sticky sessions needed. |
 
 Not built: server to client calls that wait for an answer (SignalR client results), binary
@@ -72,13 +76,15 @@ App::new("Chat")
   `to_tenant(&ctx)` and `notify(&ctx, topic)` all stay inside the caller's tenant;
   `to_tenant_id(Some(id))` names one explicitly, the same as `notify_tenant`.
 - `Conn` is the calling connection. It exists only when the action was called over the socket;
-  asking for it in a plain HTTP call answers `400`. `join` and `leave` change its groups. Joining is
+  asking for it in a plain HTTP call answers `422` with a validation message. `join` and `leave` change its groups. Joining is
   never automatic: the action that calls `join` is where the app checks membership.
 - `.event::<E>(permission)` declares an event and the permission a receiver needs. A send to a user
-  without it is dropped on the server; an undeclared event type does not compile
-  (`#[diagnostic::on_unimplemented]` names the missing `.event::<E>()` call).
+  without it is dropped on the server. A type without `#[derive(Event)]` does not compile
+  (`#[diagnostic::on_unimplemented]` says what to add); emitting an event that was never declared
+  with `.event::<E>()` returns an error.
 
-Screens, no JavaScript:
+Screens, no JavaScript (`OnEvent::Refresh` and `OnEvent::Toast` are built; a refresh reloads grids in
+place, so a separate `Reload` is not needed):
 
 ```rust
 List::of(messages)
@@ -100,9 +106,10 @@ zeyn.socket.state;  // 'connected' | 'reconnecting' | 'offline'
 Rust client, for tests and services:
 
 ```rust
-let mut c = TestSocket::connect(&router, user("ayse")).await;
-c.call(join_room, RoomId("1".into())).await?;
-let m: MessageSent = c.next_event().await;
+let addr = TestSocket::serve(app.router()?).await;          // feature `socket-client`
+let mut c = TestSocket::connect(addr, &[("authorization", "Bearer ..")]).await?;
+c.call("join_room", json!({ "room": "1" })).await?;
+let m: MessageSent = c.next_event().await?;
 ```
 
 ## 3. Wire protocol
@@ -113,16 +120,18 @@ Client to server:
 
 | Frame | Meaning |
 |---|---|
-| `{"hello":{"csrf":"..","resume":"..","seq":41}}` | First frame. `resume` and `seq` only when reconnecting. |
+| `{"hello":{"resume":"..","seq":41}}` | First frame; `resume` and `seq` only when reconnecting. Any other frame first starts a new session without one. |
 | `{"c":7,"a":"send_message","d":{..}}` | Call action `a` with input `d`; `c` is the caller's id. |
-| `{"sub":["orders"]}` / `{"unsub":[..]}` | Topics of the page, checked like today. |
+| `{"sub":["orders"]}` / `{"unsub":[..]}` | Topics of the page; the server answers `{"denied":[..]}` with the ones the user may not read. |
+| `{"t":"typing","topic":"chat","room":".."}` | A typing signal on a subscribed topic. |
 | `{"ack":41}` | Highest event sequence received, sent at most once a second. Lets the server trim the replay buffer early. |
 
 Server to client:
 
 | Frame | Meaning |
 |---|---|
-| `{"welcome":{"resume":"..","seq":0,"replayed":3}}` | After `hello`. `resume` is a signed token: connection id, user, tenant, expiry. |
+| `{"welcome":{"resume":"..","seq":0,"resumed":true,"replayed":3}}` | After `hello`. `resume` is the connection id and a random secret; it resumes only a dropped connection of the same user and tenant. |
+| `{"p":1}` | Heartbeat every 20 s, so the page can tell a dead connection. |
 | `{"s":42,"e":"chat.message","d":{..}}` | Event with sequence `s`. |
 | `{"s":43,"t":"orders"}` | Topic notification (no data). |
 | `{"r":7,"ok":..}` / `{"r":7,"err":{problem}}` | Answer to call `c:7`; `err` is the same problem JSON as HTTP. |
@@ -137,7 +146,6 @@ Close codes:
 | 1009 | Too big | Stop |
 | 1013 | Too slow, queue full | Reconnect and resume |
 | 4401 | Signed out or session expired | Stop, `zeyn:signed-out` |
-| 4409 | Resume refused | Reconnect without resume, resync |
 
 ## 4. A connection that does not drop
 
@@ -147,8 +155,9 @@ Close codes:
   visible retry at once. Codes that say stop never retry.
 - **Resume:** after a drop the server keeps the connection's groups and a replay buffer for 60 s.
   The client sends `resume` and its last `seq`; the server replays what is newer and keeps the same
-  groups. If the buffer no longer holds `seq + 1`, or the token is for another user, it answers
-  `resync`. Calls in flight during the drop are rejected on the client with `offline`; actions are
+  groups and topics. If the buffer no longer holds `seq + 1`, or the token is for another user or
+  expired, it answers `welcome` with `resumed: false` and `resync` on the open socket. A close with
+  1000 or 1001 (the page closed the socket on purpose) forgets the connection at once. Calls in flight during the drop are rejected on the client with `offline`; actions are
   not retried automatically, because they are not known to be idempotent.
 - **State in the page:** `zeyn:socket-state` events and an optional `SocketStatus` component
   (hidden while connected, a polite live region otherwise).
@@ -164,17 +173,19 @@ Existing `Limits` stay. New fields, defaults in brackets:
 | `detached` time a dropped connection is kept | 60 s | groups and buffer dropped |
 | `groups` per connection | 32 | `join` answers `429` |
 | `calls` per connection per second | 20 | the call answers `429`; the write limit applies to write actions as for HTTP |
-| `event_bytes` | 16 KB | `emit` returns an error in debug builds, the event is dropped in release |
+| `frames` per connection per second | 100 | the socket is closed with 1008 |
+| `event_bytes` | 16 KB | `emit` returns an error and sends nothing |
 
 Worst case per user: `per_user (8) * (queue + replay_bytes)`, about 1 MB. An event is serialized
 once and shared between receivers' queues (`Arc<str>`).
 
 ## 6. Security
 
-- Handshake order from `docs/realtime.md` stays; the CSRF check moves to the `hello` frame, which
-  must arrive within 5 s.
+- Handshake order from `docs/realtime.md` stays: origin, CSRF token in the subprotocol, a signed
+  in user, the per user limit, the interceptors with call kind `Live`.
 - Every call runs the action's full pipeline: permission, guards, interceptors (call kind `Live`),
-  validation, write rate limit, audit.
+  validation, audit. Actions that are not reads also take a token of the app's write limit, keyed
+  by user. Only actions published with `Feature::api` can be called.
 - Every event delivery checks the receiver's permission for that event. Group membership alone
   never grants it.
 - Group and user names are prefixed with the tenant on the server; a client never sends a group
@@ -187,7 +198,10 @@ once and shared between receivers' queues (`Arc<str>`).
 
 ## 7. Scale out
 
-With `ZeynSocket::redis(url)` every `emit` and `notify` is published on a channel per tenant.
+With `ZeynSocket::redis(&store)` (a `RedisStore`, so its prefix and connection settings are reused)
+every `emit`, `notify` and typing signal is published on one channel, `zeyn:<prefix>:socket`, with
+the tenant inside the message; one channel keeps subscriptions fixed, and every instance would get
+every tenant's messages anyway when users of a tenant are spread over instances.
 Each instance delivers to its own connections. Sequence numbers are per connection, so they are
 assigned by the instance that holds the connection. A resume that lands on another instance has no
 buffer there and gets `resync`. Redis being down turns sends into local delivery and logs a warning

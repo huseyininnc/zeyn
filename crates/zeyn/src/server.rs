@@ -31,6 +31,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub(crate) mod accounts;
 mod agent;
 mod auth;
+mod checks;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod charts;
@@ -62,6 +63,7 @@ mod pdf;
 #[cfg(feature = "xlsx")]
 mod xlsx;
 
+pub use checks::render_checks;
 pub use ops::{READY_CACHE, build_id, probe};
 
 /// Sent on sign out with the value `"storage"`: the browser drops what the runtime kept for the
@@ -538,7 +540,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
 ///
 /// ```ignore
 /// App::new("Shop").mcp(Mcp::read_only())          // agents may read
-/// App::new("Shop").mcp(Mcp::on().webmcp(false))   // read and write, server endpoint only
+/// App::new("Shop").mcp(Mcp::on().no_webmcp())   // read and write, server endpoint only
 /// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mcp {
@@ -576,15 +578,15 @@ impl Mcp {
         Mcp::on()
     }
 
-    /// `false` turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
-    pub fn server(mut self, on: bool) -> Self {
-        self.server = on;
+    /// Turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
+    pub fn no_server(mut self) -> Self {
+        self.server = false;
         self
     }
 
-    /// `false` turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
-    pub fn webmcp(mut self, on: bool) -> Self {
-        self.browser = on;
+    /// Turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
+    pub fn no_webmcp(mut self) -> Self {
+        self.browser = false;
         self
     }
 
@@ -759,6 +761,7 @@ pub struct App {
     llms_txt: Option<&'static str>,
     csp: crate::csp::Csp,
     robots_txt: Option<&'static str>,
+    public: &'static [PublicFile],
     site_url: String,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
@@ -798,7 +801,7 @@ pub struct App {
     #[cfg(feature = "islands")]
     islands_dir: Option<std::path::PathBuf>,
     #[cfg(feature = "realtime")]
-    realtime: Option<realtime::Hub>,
+    realtime: Option<realtime::Socket>,
 }
 
 impl App {
@@ -818,6 +821,7 @@ impl App {
             llms_txt: None,
             csp: crate::csp::Csp::new(),
             robots_txt: None,
+            public: &[],
             site_url: String::new(),
             time: TimePolicy::User {
                 default: TimeZone::UTC,
@@ -863,14 +867,16 @@ impl App {
         }
     }
 
-    /// Turns on the realtime channel: collaborative documents and change topics over WebSocket
-    /// (see `docs/realtime.md`). The hub is also registered as a service, so actions can take
-    /// `hub: Hub` and call `hub.notify(&ctx, "topic")`.
+    /// Turns on the live socket: topics, typed events, actions called over one WebSocket per
+    /// page, and collaborative documents (see `docs/zeynsocket.md` and `docs/realtime.md`). The
+    /// [`Socket`](realtime::Socket) is also registered as a service, so actions can take
+    /// `socket: Socket` and call `socket.notify(&ctx, "topic")` or
+    /// `socket.to_user(&ctx, id).emit(&event)`.
     #[cfg(feature = "realtime")]
-    pub fn realtime(mut self, realtime: realtime::Realtime) -> Self {
-        let hub = realtime.install();
-        self.realtime = Some(hub.clone());
-        self.service(hub)
+    pub fn socket(mut self, live: realtime::ZeynSocket) -> Self {
+        let socket = live.install();
+        self.realtime = Some(socket.clone());
+        self.service(socket)
     }
 
     /// Serves the WASM islands that `zeyn build-islands` wrote to `dir` (usually `dist/islands`).
@@ -883,13 +889,13 @@ impl App {
         self
     }
 
-    /// `false` stops the browser's own context menu everywhere except in text inputs, text areas
-    /// and editable text. This protects nothing (any user can still view the source, use the
+    /// Stops the browser's own context menu everywhere except in text inputs, text areas and
+    /// editable text. This protects nothing (any user can still view the source, use the
     /// developer tools or turn scripts off) and it takes away spell check, copy link, translate
-    /// and accessibility tools. Keep the default (`true`) unless a kiosk or a strict brief asks
-    /// for it; Zeyn's own menus work either way.
-    pub fn browser_context_menu(mut self, allow: bool) -> Self {
-        self.native_menu = allow;
+    /// and accessibility tools. Leave it out unless a kiosk or a strict brief asks for it; Zeyn's
+    /// own menus work either way.
+    pub fn no_browser_context_menu(mut self) -> Self {
+        self.native_menu = false;
         self
     }
 
@@ -1278,6 +1284,18 @@ impl App {
         self
     }
 
+    /// Serves the files of the crate's `public/` folder from the site's root, embedded with
+    /// [`public_files!`](crate::public_files): `public/favicon.svg` answers `/favicon.svg`. They
+    /// need no sign in, carry an entity tag and are cached for an hour.
+    ///
+    /// ```ignore
+    /// App::new("Shop").public(zeyn::public_files!())
+    /// ```
+    pub fn public(mut self, files: &'static [PublicFile]) -> Self {
+        self.public = files;
+        self
+    }
+
     /// The `https` origin the site is reached at, such as `https://shop.example`. App paths in
     /// canonical URLs, preview images and the sitemap are written behind it (and the base path),
     /// because search engines need absolute URLs. Without it, head tags keep app paths and the
@@ -1355,9 +1373,9 @@ impl App {
         self
     }
 
-    /// Marks cookies `Secure`. Turn on whenever the app is served over HTTPS.
-    pub fn secure_cookies(mut self, secure: bool) -> Self {
-        self.secure_cookies = secure;
+    /// Marks cookies `Secure`. Call it whenever the app is served over HTTPS.
+    pub fn secure_cookies(mut self) -> Self {
+        self.secure_cookies = true;
         self
     }
 
@@ -1667,6 +1685,19 @@ impl App {
             }
             _ => {}
         }
+        for file in self.public {
+            let taken = file.path.starts_with("/_zeyn/")
+                || file.path == "/sitemap.xml"
+                || (file.path == "/robots.txt" && self.robots_txt.is_some())
+                || (file.path == "/llms.txt" && self.llms_txt.is_some())
+                || paths.contains_key(file.path);
+            if taken {
+                problems.push(format!(
+                    "the public file `{}` answers a path the app already serves\n  = help: rename or remove the file in `public/`, or drop the other route",
+                    file.path
+                ));
+            }
+        }
         problems.extend(self.theme_problems());
         problems.extend(self.client_prefs.problems());
         problems.dedup();
@@ -1715,6 +1746,7 @@ impl App {
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
+        ops::warm_build_id();
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self
@@ -1779,6 +1811,14 @@ impl App {
             fixed_now: self.fixed_now,
             zone_picker: self.zone_picker,
             api_prefix: self.api_prefix,
+            favicon: ["/favicon.svg", "/favicon.png", "/favicon.ico"]
+                .iter()
+                .find_map(|p| {
+                    self.public
+                        .iter()
+                        .find(|f| f.path == *p)
+                })
+                .map(|f| (f.path, f.content_type)),
             config: self.config,
             tenancy: self.tenancy,
             license: self.license,
@@ -1895,6 +1935,27 @@ impl App {
                 get(move || async move { asset(text, "text/plain; charset=utf-8") }),
             );
         }
+        for file in self.public {
+            let tag = format!(
+                "\"p{:016x}\"",
+                file.bytes
+                    .iter()
+                    .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+                        (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3)
+                    })
+            );
+            router = router.route(
+                file.path,
+                get(move |headers: HeaderMap| async move { public_file(file, &tag, &headers) }),
+            );
+        }
+        if !self
+            .public
+            .iter()
+            .any(|f| f.path == "/favicon.ico")
+        {
+            router = router.route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }));
+        }
         let router = seo::routes(router, &state);
         let router = router
             .route(
@@ -1918,11 +1979,11 @@ impl App {
                 get(|| async { asset(NAV, "text/javascript; charset=utf-8") }),
             )
             .route("/_zeyn/theme.css", get(theme_css))
-            .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
             .route("/_zeyn/csrf", get(csrf_token))
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/menu", post(menu_call))
+            .route("/_zeyn/menu/counts", get(menu_counts))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone));
@@ -1941,7 +2002,11 @@ impl App {
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(
             data::routes(ops::routes(agent::routes(grid::routes(router)))),
         )))))
-        .fallback(not_found);
+        .fallback(not_found)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            guard::remember_identity,
+        ));
         #[cfg(feature = "accounts")]
         let router = if state.sign_in.accounts.is_some() {
             router.layer(axum::middleware::from_fn_with_state(
@@ -2100,6 +2165,8 @@ struct AppState {
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
+    /// The icon of the app's `public/` folder the page head links: path and content type.
+    favicon: Option<(&'static str, &'static str)>,
     api_prefix: String,
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
@@ -2132,7 +2199,7 @@ struct AppState {
     #[cfg(feature = "islands")]
     islands: Option<islands::Islands>,
     #[cfg(feature = "realtime")]
-    realtime: Option<realtime::Hub>,
+    realtime: Option<realtime::Socket>,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -2379,10 +2446,13 @@ impl AppState {
     }
 
     fn ctx(&self, headers: &HeaderMap) -> Ctx {
-        let mut identity = self
-            .auth
-            .as_ref()
-            .and_then(|a| a.authenticate(headers))
+        let mut identity = guard::IDENTITY
+            .try_with(Clone::clone)
+            .unwrap_or_else(|_| {
+                self.auth
+                    .as_ref()
+                    .and_then(|a| a.authenticate(headers))
+            })
             .unwrap_or_default();
         auth::adjust(self, headers, &mut identity);
         let accept = headers
@@ -2453,6 +2523,11 @@ impl AppState {
             self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
+        let ctx = if cookie(headers, "zeyn_rail") == Some("1") {
+            ctx.with_rail()
+        } else {
+            ctx
+        };
         let ctx = if cookie(headers, "zeyn_density") == Some("compact") {
             ctx.with_compact()
         } else {
@@ -2710,35 +2785,40 @@ impl AppState {
     }
 
     /// Loads the first page of every grid the user may read, in the user's saved view.
+    /// The grids of a screen load at the same time, so a screen with several grids waits for the
+    /// slowest one, not for their sum.
     async fn preload(
         &self,
         ctx: &Ctx,
         nodes: Vec<(NodePath, &crate::screen::Node)>,
         name: &str,
     ) -> HashMap<String, LoadedPage> {
-        let mut loaded = HashMap::new();
         let saved = self.views.is_some() && ctx.identity().is_signed_in();
-        for (i, node) in nodes {
-            let Some(grid) = node.grid() else { continue };
-            if !ctx
-                .identity()
-                .can(&grid.action().access)
-            {
-                continue;
-            }
-            let view = self
-                .saved_view(ctx, grid, name, &i)
-                .await;
-            if let Ok(mut page) = self
-                .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
-                .await
-            {
+        let loads = nodes
+            .into_iter()
+            .filter_map(|(i, node)| {
+                let grid = node.grid()?;
+                ctx.identity()
+                    .can(&grid.action().access)
+                    .then_some((i, grid))
+            })
+            .map(|(i, grid)| async move {
+                let view = self
+                    .saved_view(ctx, grid, name, &i)
+                    .await;
+                let mut page = self
+                    .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
+                    .await
+                    .ok()?;
                 page.view = view;
                 page.saved_views = saved;
-                loaded.insert(i.to_string(), page);
-            }
-        }
-        loaded
+                Some((i.to_string(), page))
+            });
+        futures_util::future::join_all(loads)
+            .await
+            .into_iter()
+            .flatten()
+            .collect()
     }
 
     fn error_response(&self, ctx: &Ctx, failure: Failure) -> Response {
@@ -2928,11 +3008,36 @@ impl AppState {
                     page = Some(label.clone());
                 }
                 let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                let mut extra = String::new();
+                if let Some(badge) = &item.badge {
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-badge">{}</span>"#,
+                        r.text(badge)
+                    ));
+                }
+                if let Some(count) = item
+                    .count
+                    .filter(|c| !site && ctx.identity().can(&c.action.access))
+                {
+                    let topics = if item.topics.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            r#" data-zeyn-count-topics="{}""#,
+                            escape(&item.topics.join(","))
+                        )
+                    };
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-count" data-zeyn-count="{}"{topics} hidden></span>"#,
+                        escape(count.action.name)
+                    ));
+                }
                 Some(nav_link(
                     &href,
                     current,
                     item.icon.filter(|_| !site),
                     &label,
+                    &extra,
                 ))
             })
             .collect();
@@ -3118,7 +3223,7 @@ impl AppState {
         };
         let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title>{icon}<link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -3140,6 +3245,12 @@ impl AppState {
             },
             title = escape(title),
             extra = ops::head(self, ctx),
+            icon = self
+                .favicon
+                .map(|(path, kind)| format!(
+                    r#"<link rel="icon" href="{base}{path}" type="{kind}">"#
+                ))
+                .unwrap_or_default(),
             prefetch = if self.prefetch == Prefetch::Moderate {
                 r#"<meta name="zeyn-prefetch" content="moderate">"#
             } else {
@@ -3172,10 +3283,18 @@ impl AppState {
         for g in self.dynamic_groups(dynamic, ctx, &r, current) {
             NavGroup::merge(&mut groups, g);
         }
-        for (i, g) in groups.iter().enumerate() {
-            g.render(&mut nav, &format!("z-nav-g{i}"), 2);
+        let links: usize = groups
+            .iter()
+            .map(NavGroup::link_count)
+            .sum();
+        if links >= MENU_FILTER_FROM {
+            nav.push_str(&menu_filter(&r));
         }
-        let marker = if !groups.iter().any(NavGroup::collapsible) {
+        let rail = ctx.rail();
+        for (i, g) in groups.iter().enumerate() {
+            g.render(&mut nav, &format!("z-nav-g{i}"), 2, rail);
+        }
+        let marker = if groups.is_empty() {
             ""
         } else if self
             .features
@@ -3239,7 +3358,13 @@ impl AppState {
             })
             .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"{rail_attr}><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p>{rail_button}<button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            rail_attr = if rail { " data-zeyn-rail" } else { "" },
+            rail_button = if marker.is_empty() {
+                String::new()
+            } else {
+                rail_toggle(&r, rail)
+            },
             palette = if self
                 .header
                 .as_ref()
@@ -3320,49 +3445,104 @@ impl NavGroup {
         links
     }
 
-    /// Whether this group or a nested one has a toggle button.
-    fn collapsible(&self) -> bool {
-        !self.open
-            || self
+    /// The links of this group and its nested groups.
+    fn link_count(&self) -> usize {
+        self.links.len()
+            + self
                 .groups
                 .iter()
-                .any(NavGroup::collapsible)
+                .map(NavGroup::link_count)
+                .sum::<usize>()
     }
 
     /// Writes the group into the side menu: a `<div>` at the top level, an `<li>` below it, with
     /// a heading of `level`. A collapsible group's heading holds a button with `aria-expanded`
     /// and `aria-controls` (W3C APG disclosure); it starts expanded when the group holds the
     /// current screen. `id` is the id of the group's list.
-    fn render(&self, out: &mut String, id: &str, level: usize) {
+    ///
+    /// In the icon rail (`rail`) every top level group is collapsible and starts closed: its
+    /// heading shows the icon (or the label's first letter) and opens the group as a flyout.
+    fn render(&self, out: &mut String, id: &str, level: usize, rail: bool) {
         let label = &self.label;
-        let icon = &self.icon;
+        let top = level == 2;
+        let icon = if top && self.icon.is_empty() {
+            format!(
+                r#"<span class="z-nav-initial" aria-hidden="true">{}</span>"#,
+                self.label
+                    .chars()
+                    .find(|c| c.is_alphanumeric())
+                    .map(|c| c.to_uppercase().to_string())
+                    .unwrap_or_default()
+            )
+        } else {
+            self.icon.clone()
+        };
+        let open = self.open && !(rail && top);
+        let expanded = self.here && !(rail && top);
         let (open_tag, close_tag) = if level == 2 {
             (r#"<div class="z-nav-group">"#, "</div>")
         } else {
             (r#"<li class="z-nav-group z-nav-sub">"#, "</li>")
         };
         out.push_str(open_tag);
-        if self.open {
-            out.push_str(&format!("<h{level}>{icon}{label}</h{level}><ul>"));
+        if open {
+            out.push_str(&format!(
+                "<h{level}>{icon}<span>{label}</span></h{level}><ul>"
+            ));
         } else {
             out.push_str(&format!(
-                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#,
-                self.here
+                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{expanded}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#
             ));
         }
         for link in &self.links {
             out.push_str(link);
         }
         for (i, g) in self.groups.iter().enumerate() {
-            g.render(out, &format!("{id}-{i}"), level + 1);
+            g.render(out, &format!("{id}-{i}"), level + 1, rail);
         }
         out.push_str("</ul>");
         out.push_str(close_tag);
     }
 }
 
+/// Side menus with at least this many links get a filter box and favorites.
+pub const MENU_FILTER_FROM: usize = 10;
+
+/// The filter box of a long side menu, with the texts `menu.js` needs for it and for the pin
+/// buttons and the Favorites group it adds.
+fn menu_filter(r: &Render) -> String {
+    let t = |k: &str| r.text(&Text::key(format!("zeyn.shell.{k}")));
+    format!(
+        r#"<div class="z-nav-filter" data-zeyn-menu-filter data-text-results="{}" data-text-none="{}" data-text-favorites="{}" data-text-pin="{}" data-text-unpin="{}"><input type="search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false"><p class="z-sr-only" role="status" aria-live="polite"></p></div>"#,
+        t("menu_results"),
+        t("menu_none"),
+        t("menu_favorites"),
+        t("menu_pin"),
+        t("menu_unpin"),
+        label = t("menu_filter")
+    )
+}
+
+/// The button that folds the side menu to an icon rail and back, on wide screens. `aria-pressed`
+/// says whether the rail is on; its name says what pressing it does.
+fn rail_toggle(r: &Render, rail: bool) -> String {
+    let collapse = r.text(&Text::key("zeyn.shell.rail_collapse"));
+    let expand = r.text(&Text::key("zeyn.shell.rail_expand"));
+    format!(
+        r#"<button type="button" class="z-nav-rail" data-zeyn-rail-toggle aria-pressed="{rail}" aria-label="{}" data-text-collapse="{collapse}" data-text-expand="{expand}"><span class="z-nav-rail-icon" aria-hidden="true"></span></button>"#,
+        if rail { &expand } else { &collapse }
+    )
+}
+
 /// A side menu link: `href` is escaped, and so is `label`.
-fn nav_link(href: &str, current: bool, icon: Option<crate::screen::Icon>, label: &str) -> String {
+/// `extra` is HTML after the label (a badge or a count), already escaped.
+fn nav_link(
+    href: &str,
+    current: bool,
+    icon: Option<crate::screen::Icon>,
+    label: &str,
+    extra: &str,
+) -> String {
     let aria = if current {
         r#" aria-current="page""#
     } else {
@@ -3370,10 +3550,11 @@ fn nav_link(href: &str, current: bool, icon: Option<crate::screen::Icon>, label:
     };
     match icon {
         Some(icon) => format!(
-            r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
+            r#"<li><a href="{href}"{aria}>{}<span>{label}</span>{extra}</a></li>"#,
             icon.html()
         ),
-        None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+        None if extra.is_empty() => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+        None => format!(r#"<li><a href="{href}"{aria}><span>{label}</span>{extra}</a></li>"#),
     }
 }
 
@@ -3653,6 +3834,38 @@ async fn identity_for_ranges(mut req: axum::extract::Request) -> axum::extract::
     req
 }
 
+/// A file of the app's `public/` folder, embedded by [`public_files!`](crate::public_files).
+#[derive(Clone, Copy, Debug)]
+pub struct PublicFile {
+    /// The path it answers, such as `/favicon.svg`.
+    pub path: &'static str,
+    pub bytes: &'static [u8],
+    pub content_type: &'static str,
+}
+
+/// Serves a public file: `304` when the browser holds this version, otherwise the bytes,
+/// cached for an hour and `nosniff`.
+fn public_file(file: &PublicFile, tag: &str, headers: &HeaderMap) -> Response {
+    let fresh = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.split(',').any(|t| t.trim() == tag));
+    let mut r = if fresh {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        ([(header::CONTENT_TYPE, file.content_type)], file.bytes).into_response()
+    };
+    let h = r.headers_mut();
+    h.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=3600"),
+    );
+    if let Ok(v) = HeaderValue::from_str(tag) {
+        h.insert(header::ETAG, v);
+    }
+    r
+}
+
 fn asset(body: &'static str, content_type: &'static str) -> Response {
     (
         [
@@ -3796,6 +4009,7 @@ async fn page(
             }
         }
         Ok((title, html, head)) => {
+            checks::log(name, &html);
             let menu = st.dynamic_menu(&ctx, Some(name)).await;
             let mut page = st.shell_menu(&ctx, &csrf, &title, &html, Some(name), &menu);
             if !head.is_empty() {
@@ -4157,6 +4371,56 @@ impl AppState {
     }
 }
 
+/// `GET /_zeyn/menu/counts`: the numbers of the side menu's counted items, by the name of the
+/// action that counts them, for the actions the user may run in features whose guards pass. The
+/// counts run at the same time, each within the app's time limit; one that fails is left out.
+async fn menu_counts(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    fn collect(g: &crate::feature::MenuGroup, ctx: &Ctx, out: &mut Vec<crate::feature::MenuCount>) {
+        for item in &g.items {
+            if let Some(c) = item.count
+                && ctx.identity().can(&c.action.access)
+                && !out
+                    .iter()
+                    .any(|o| o.action.name == c.action.name)
+            {
+                out.push(c);
+            }
+        }
+        for sub in &g.groups {
+            collect(sub, ctx, out);
+        }
+    }
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    let mut counts = Vec::new();
+    for f in &st.features {
+        if f.site_shell().is_some() || f.check_guards(&ctx).is_err() {
+            continue;
+        }
+        for g in f.menu_groups() {
+            collect(g, &ctx, &mut counts);
+        }
+    }
+    let runs = counts.iter().map(|c| {
+        let st = &st;
+        let ctx = ctx.clone();
+        async move {
+            st.timed((c.run)(ctx))
+                .await
+                .ok()
+                .map(|n| (c.action.name.to_string(), json!(n)))
+        }
+    });
+    let found: serde_json::Map<String, Json> = futures_util::future::join_all(runs)
+        .await
+        .into_iter()
+        .flatten()
+        .collect();
+    let mut r = axum::Json(Json::Object(found)).into_response();
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r
+}
+
 async fn menu_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -4221,7 +4485,19 @@ async fn set_locale(
 
 /// RFC 9457 problem details response.
 fn problem(ctx: &Ctx, failure: Failure) -> Response {
-    let (status, code, message) = match &failure {
+    let (status, body) = problem_body(ctx, &failure);
+    let mut response = (status, body.to_string()).into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/problem+json"),
+    );
+    response
+}
+
+/// The status and the `application/problem+json` body (RFC 9457) of a failure, in the user's
+/// language. HTTP answers and answers over the live socket share it.
+fn problem_body(ctx: &Ctx, failure: &Failure) -> (StatusCode, Json) {
+    let (status, code, message) = match failure {
         Failure::Timeout => (
             StatusCode::GATEWAY_TIMEOUT,
             "timeout",
@@ -4261,12 +4537,7 @@ fn problem(ctx: &Ctx, failure: Failure) -> Response {
             .map(|e| json!({ "field": e.field, "rule": e.rule, "message": ctx.t(&e.message) }))
             .collect();
     }
-    let mut response = (status, body.to_string()).into_response();
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/problem+json"),
-    );
-    response
+    (status, body)
 }
 
 #[derive(Deserialize)]

@@ -54,7 +54,7 @@ Which page answers what:
 | AI assistant, MCP, AI attributes | `guides/mcp` (`mcp.md`), `docs/assistant.md` |
 | Shared libraries in other repositories | `guides/polyrepo` (`docs/polyrepo.md`) |
 | Operations: Docker, tracing, Redis, licenses | `docs/operations.md` |
-| Desktop exe, WASM islands, realtime | `docs/desktop.md`, `docs/islands.md`, `docs/realtime.md` |
+| Desktop exe, WASM islands, live socket | `docs/desktop.md`, `docs/islands.md`, `docs/socket.md`, `docs/realtime.md` |
 
 ## 2. The rules
 
@@ -225,10 +225,20 @@ What to remember:
 - Refresh other parts of a screen with topics, never with JavaScript: mark what shows the data
   with `.listens("sales")` (last call, any component), then name the topic with
   `ui.refresh("sales")` in `on_success`, a filter that `.drives("sales")` (`Chips::filter`,
-  `SearchBox`, a `Form` without submit whose fields are screen params) or `hub.notify`. Listeners
+  `SearchBox`, a `Form` without submit whose fields are screen params) or `socket.notify`. Listeners
   read filters from the screen params. `zeyn check` warns about topics nobody listens to.
+- Push to browsers with the live socket (feature `realtime`, `App::socket(ZeynSocket::new()...)`,
+  guide `docs/socket.md`). Topics refresh screens (`Live::new("orders")`, `socket.notify(&ctx, "orders")`).
+  Data for some users is an event: `#[derive(Serialize, Event)] #[event(name = "chat.message")]`,
+  declared with `.event::<MessageSent>("chat.read")`, sent with `socket.to_user(&ctx, id)`,
+  `.to_group(&ctx, name)` or `.to_tenant(&ctx)` and `.emit(&e)?`; screens react with
+  `.on_event::<MessageSent>(OnEvent::Refresh)` or `OnEvent::Toast(t!(..))`. Groups are joined only in
+  an action that takes `conn: Conn` and checks membership first. Events carry ids, never masked data.
 - A lookup whose options depend on another field: `.depends_on(Address::city, Address::country)`;
   the action filters by `q.parent_id()` and the submit checks the pair again.
+- Empty data: `.empty(EmptyState::new(t!(..)).text(t!(..)).opens(t!(..), new_screen, ()))` and
+  `.empty_filtered(EmptyState::new(t!(..)))` on `DataGrid`, `CardGrid` and `List::of`; the filtered one
+  shows while a filter or a search is on.
 - Rows of another shape: `List::of(action).builder(|row| node)` (or on `CardGrid`, `Rail`), with
   `.separator(node)`; `Repeat::of(items, |item| node)` for in memory data. Virtual lists with a
   builder need `.row_height(px)`. Keep `.item`/`.card` when they fit.
@@ -304,8 +314,8 @@ What to remember:
   `.remember(DRAFT)` (a `ClientPref::draft` key registered with `App::client_prefs`) and
   `.send_key(SendKey::CtrlEnter)` for long text; the send action takes `ChatSend` and must check
   membership and mentions itself.
-  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::realtime`
-  with `Realtime::topic("chat", perm)`; without it, it renders nothing.
+  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::socket`
+  with `ZeynSocket::topic("chat", perm)`; without it, it renders nothing.
 - Stories: `StoryRow::new().add(StoryRing::new(name, StoryState::Unseen).image(src).link(screen, params))`;
   the state comes from what the server stored about the viewer, never from the browser.
 - Full screen images: `Image::new(thumb).alt(..).size(w, h).full(large).caption(..)` (or `.lightbox()`);
@@ -333,6 +343,8 @@ What to remember:
 | Writing JavaScript for a behavior | Effects, components, or a `Component` in Rust |
 | `location.reload()` style refreshes | `ui.close_and_refresh()`, `ui.navigate(...)`, `ui.refresh("topic")` with `.listens("topic")` |
 | A secret in `config/app.json` or code | `config.secret("key")` from the environment or a vault |
+| Polling an action on a timer for changes | A topic (`Live`, `socket.notify`) or an event with `.on_event` |
+| A group joined from a client supplied name without a check | An action with `conn: Conn` that checks membership, then `conn.join(..)` |
 | Forgetting to register | Screens in the feature's `mod.rs`, features and services in `src/app.rs` |
 
 ## 5. Verify before you finish

@@ -60,6 +60,9 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `tour.js` | 页面导览（`Tour`）：显示开始按钮，并让对话框依次停在页面的各个站点 |
 | `thread.js` 和 `thread.css`, `stream.js`, `composer.js` 和 `composer.css`, `typing.js` 和 `typing.css` | 消息线程；线程和助手共用的流式 Markdown 和 JSON 行；聊天 composer；正在输入指示器 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 帖子信息流；图片和视频的灯箱；故事环及其行，无需脚本 |
+| `drag.js`, `net.js` | 没有自身标记的共享辅助模块，随导入它们的模块一起链接（见下文） |
+
+两个辅助模块收纳了原本会被多个模块复制的代码。`net.js`（由 `kanban.js`、`files.js` 和 `vlist.js` 导入）导出 `BASE`、`csrf()`、`parse(text)` 和 `post(path, body)`；`post` 在页面同源上带 `x-zeyn-csrf` 请求头发送 JSON，并返回 `{ ok, body }`。`drag.js`（由 `grid.js` 用于移动列、由 `catalog.js` 用于拖动滚动轨道导入）是之后可排序列表、看板和画布的拖动核心：`press(e, { threshold, longPress, tolerance, axis, onStart })` 在鼠标或笔移动 6 px，或触摸在 5 px 范围内按住 250 ms 时，把 `pointerdown` 变为拖动（滑动仍然滚动，先滚动会取消按下）；`capture(el, e, move, end)` 用指针捕获跟随拖动，每个动画帧最多调用一次 `move`，在松开、取消或按 Escape 时调用 `end(event, cancelled)`；`swallowClick()` 取消松开后的点击；`announce(text)` 在每页一个 polite 实时区域中朗读本地化文本，最多每 500 ms 一次。`.z-drag-handle`（在 `zeyn.css` 中）只在拖动手柄上关闭触摸平移。每个可拖动的组件也提供用键盘和单指针移动的方式（移动菜单，WCAG 2.5.7）。两个模块都不写入 HTML。
 
 完整页面在 head 中链接所有页面都用的样式表（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、其 HTML 中出现标记的模块的样式表，以及这些模块的脚本（放在它们导入的模块之后）。`zeyn.js` 带着同一张表（`[name, script selector, style selector]`）提供，并在之后到来的内容中加载缺少的部分：`nav.js` 在替换屏幕前发出带 `{ root, waits }` 的 `zeyn:need` 并等待新的样式表，窗口在打开前同样等待，`zeyn:content`、grid 页和 grid 筛选会加载其内容所需的脚本。浏览器对每个 URL 只保留一个实例，因此模块只运行一次。模块运行时设置它在文档中找到的内容，之后监听 `zeyn:content`；它从不扫描或监听页面上不存在的组件。模块用自身 URL 的 `?v=` 导入共享部分。当页面链接了它不使用的模块，或某个模块的样式表为其标记之外的类设置样式时，`tests/ui_modules.rs` 会失败。
 
@@ -352,7 +355,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket；文本帧 `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket；文本帧 `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket；双向的二进制帧 `0x01` + Y update (v1) |
 
 握手在升级之前会检查 origin、与 cookie 比对的 CSRF 令牌、已登录用户以及权限。参见 `docs/realtime.md`。
@@ -422,7 +425,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 | `Mcp::read_only()` | on | on | no |
 | `Mcp::on()` | on | on | 表单保存和执行写入的 API action |
 
-`.server(false)` 和 `.webmcp(false)` 关闭其中一个入口。由 `zeyn new` 创建的新项目以 `Mcp::read_only()` 起步。
+`.no_server()` 和 `.no_webmcp()` 关闭其中一个入口。由 `zeyn new` 创建的新项目以 `Mcp::read_only()` 起步。
 
 为什么默认关闭：该端点允许任何持有有效 `Authorization` 请求头的人通过模型驱动应用，而模型可能被它所读取的数据所操纵。框架让每个应用都为代理做好准备（工具由代码生成，无需编写任何内容），但应用是否打开这个入口，以及代理是否可以写入，应由运行它的人决定。只读模式只需一行即可启用。
 

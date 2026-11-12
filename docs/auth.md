@@ -115,7 +115,7 @@ re authentication address. It adds three routes:
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | starts a sign in and redirects to the provider |
 | `GET /_zeyn/auth/callback` | the provider's redirect back |
-| `GET /_zeyn/auth/logout` | ends the session here and at the provider |
+| `POST`, then `GET /_zeyn/auth/logout` | `POST` with the CSRF token ends the session here, `GET` then signs out at the provider |
 
 At the provider, register `<public url>/_zeyn/auth/callback` as the redirect URI and
 `<public url>/` as the post logout redirect URI. The public URL is configured, never taken from
@@ -169,9 +169,16 @@ at the same moment can sign the user out. Keep rotation off or allow reuse for a
 
 ### Logout
 
-`/_zeyn/auth/logout` deletes the session cookie and sends the user to the provider's
-`end_session_endpoint` with `client_id` and `post_logout_redirect_uri`. Without that endpoint
-the user goes to the app's start page.
+Signing out takes two steps, so a link or an image on another site cannot sign a user out.
+`POST /_zeyn/auth/logout` with the CSRF token deletes the session cookie and clears the app's
+browser storage. Then `GET /_zeyn/auth/logout` sends the browser to the provider's
+`end_session_endpoint` with `client_id` and `post_logout_redirect_uri`; without that endpoint the
+user goes to the app's start page. A `GET` from a browser that still holds a session only goes
+back to the app.
+
+The sign out link of the site shell and the idle sign out do both steps. A sign out link of your
+own does the same with `data-zeyn-signout`: the runtime posts to that address, then follows the
+link.
 
 ### API and MCP clients of the same app
 

@@ -68,7 +68,14 @@ const fn script(name: &'static str, script: &'static [&'static str]) -> Module {
 /// use. The grid runtime is linked as a `modulepreload`, because `zeyn.js` imports it itself to
 /// hand it the shared functions.
 pub(crate) const MODULES: &[Module] = &[
-    script("grid", &["data-zeyn-grid"]),
+    Module {
+        name: "grid",
+        script: &["data-zeyn-grid"],
+        style: &[],
+        needs: &["drag"],
+    },
+    script("drag", &[]),
+    script("net", &[]),
     script(
         "components",
         &[
@@ -80,7 +87,12 @@ pub(crate) const MODULES: &[Module] = &[
     ),
     control(
         "tabs",
-        &["data-zeyn-toggle", "data-zeyn-tabs", "data-zeyn-split"],
+        &[
+            "data-zeyn-toggle",
+            "data-zeyn-tabs",
+            "data-zeyn-split",
+            "data-zeyn-defer",
+        ],
     ),
     control("dates", &["data-zeyn-date", "data-zeyn-filter-date"]),
     control(
@@ -106,7 +118,10 @@ pub(crate) const MODULES: &[Module] = &[
     control("overlays", &["data-zeyn-tip", "z-popover-button"]),
     control("menubutton", &["z-menu-trigger", "z-split-button"]),
     script("busy", &["data-zeyn-busy"]),
-    script("menu", &["data-zeyn-menu"]),
+    script(
+        "menu",
+        &["data-zeyn-menu", "data-zeyn-menu-filter", "data-zeyn-count"],
+    ),
     script(
         "palette",
         &[
@@ -134,7 +149,7 @@ pub(crate) const MODULES: &[Module] = &[
         name: "catalog",
         script: &["data-zeyn-cards", "data-zeyn-searchbox"],
         style: &["z-cards", "z-rail", "z-poster", "z-search"],
-        needs: &[],
+        needs: &["drag"],
     },
     Module {
         name: "media",
@@ -155,7 +170,7 @@ pub(crate) const MODULES: &[Module] = &[
         name: "files",
         script: &["z-upload"],
         style: &["z-upload"],
-        needs: &[],
+        needs: &["net"],
     },
     Module {
         name: "charts",
@@ -169,7 +184,12 @@ pub(crate) const MODULES: &[Module] = &[
     script("hero", &["data-zeyn-hero"]),
     script("state", &["data-zeyn-prefs-clear"]),
     script("topics", &["data-zeyn-listens", "data-zeyn-drives"]),
-    script("vlist", &["data-zeyn-vlist"]),
+    Module {
+        name: "vlist",
+        script: &["data-zeyn-vlist"],
+        style: &[],
+        needs: &["net"],
+    },
     style("diff", &["z-diff"]),
     style("code", &["z-codeview"]),
     Module {
@@ -189,7 +209,7 @@ pub(crate) const MODULES: &[Module] = &[
         name: "kanban",
         script: &["data-zeyn-kanban"],
         style: &["z-kanban"],
-        needs: &[],
+        needs: &["net"],
     },
     Module {
         name: "calendar",
@@ -454,7 +474,9 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 59] = [
+const FILES: [(&str, &str); 61] = [
+    ("/_zeyn/drag.js", include_str!("../../assets/drag.js")),
+    ("/_zeyn/net.js", include_str!("../../assets/net.js")),
     ("/_zeyn/colors.js", include_str!("../../assets/colors.js")),
     ("/_zeyn/length.js", include_str!("../../assets/length.js")),
     (

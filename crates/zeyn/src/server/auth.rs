@@ -78,6 +78,7 @@ pub(super) fn resolve(extras: &mut Extras, prefix: &str, login_url: &mut Option<
         extras.mfa_url = Some(format!("{prefix}/_zeyn/auth/login?mfa=1"));
         extras.reauth_url = Some(format!("{prefix}/_zeyn/auth/login?reauth=1"));
         extras.logout_url = Some(format!("{prefix}/_zeyn/auth/logout"));
+        extras.signout = Some("/_zeyn/auth/logout");
     }
     #[cfg(feature = "accounts")]
     if extras.accounts.is_some() {
@@ -125,7 +126,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
         router
             .route("/_zeyn/auth/login", get(oidc::login))
             .route("/_zeyn/auth/callback", get(oidc::callback))
-            .route("/_zeyn/auth/logout", get(oidc::logout))
+            .route("/_zeyn/auth/logout", get(oidc::logout).post(oidc::sign_out))
     } else {
         router
     };
@@ -402,15 +403,18 @@ mod oidc {
         }
     }
 
-    /// Ends the session here and at the provider, and clears the app's browser storage.
-    pub(super) async fn logout(State(st): State<Arc<AppState>>) -> Response {
+    /// Ends the session here and clears the app's browser storage: `POST /_zeyn/auth/logout` with
+    /// the CSRF token, so a link or an image on another site cannot sign a user out. The browser
+    /// then opens `GET /_zeyn/auth/logout`, which goes on to the provider.
+    pub(super) async fn sign_out(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
         let Some(oidc) = st.sign_in.oidc.clone() else {
             return StatusCode::NOT_FOUND.into_response();
         };
-        let back = format!("{}{}/", oidc.public_url, st.prefix);
-        let target = oidc.logout_url(&back).await;
+        if let Err(f) = st.check_csrf(&headers) {
+            return st.error_response(&st.ctx(&headers), f);
+        }
         let mut r = add_cookie(
-            Redirect::to(&target).into_response(),
+            StatusCode::NO_CONTENT.into_response(),
             set_cookie(&st, SESSION, None, 0, oidc.secure()),
         );
         #[cfg(feature = "totp")]
@@ -426,6 +430,27 @@ mod oidc {
             super::super::CLEAR_SITE_DATA,
             HeaderValue::from_static(r#""storage""#),
         );
+        r
+    }
+
+    /// Sends a signed out browser to the provider's end session endpoint. A browser that still
+    /// holds a session goes back to the app instead: only `POST` signs out.
+    pub(super) async fn logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+        let Some(oidc) = st.sign_in.oidc.clone() else {
+            return StatusCode::NOT_FOUND.into_response();
+        };
+        let back = format!("{}{}/", oidc.public_url, st.prefix);
+        let signed_in = cookie(&headers, SESSION)
+            .and_then(|v| oidc.open_session(v))
+            .is_some();
+        let target = if signed_in {
+            back
+        } else {
+            oidc.logout_url(&back).await
+        };
+        let mut r = Redirect::to(&target).into_response();
+        r.headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         r
     }
 

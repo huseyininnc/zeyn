@@ -10,7 +10,7 @@ use showcase_shared::{
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
 use zeyn::prelude::*;
-use zeyn::realtime::{DocStore, Hub, Realtime, RoomKey};
+use zeyn::realtime::{DocStore, RoomKey, Socket, ZeynSocket};
 use zeyn::render::escape;
 use zeyn::ui::{Canvas, Island, Live};
 use zeyn::{BoxFuture, Component, Render};
@@ -106,13 +106,13 @@ impl DiagramStore {
 pub async fn save_diagram(
     diagram: Diagram,
     store: DiagramStore,
-    hub: Hub,
+    socket: Socket,
     ctx: Ctx,
 ) -> Result<Saved> {
     let diagram = diagram.clamped();
     let shapes = diagram.shapes.len() as u32;
     store.set(diagram)?;
-    hub.notify(&ctx, "diagram");
+    socket.notify(&ctx, "diagram");
     Ok(Saved { shapes })
 }
 
@@ -120,7 +120,7 @@ pub async fn save_diagram(
 /// save also notifies the `diagram` topic, so the shape grid refreshes in place.
 struct DiagramDocs {
     store: DiagramStore,
-    hub: Hub,
+    socket: Socket,
     state: Arc<RwLock<Option<Vec<u8>>>>,
 }
 
@@ -142,7 +142,7 @@ impl DocStore for DiagramDocs {
         if let Ok(mut s) = self.state.write() {
             *s = Some(state);
         }
-        self.hub.notify_tenant(
+        self.socket.notify_tenant(
             Some(key.tenant.as_str()).filter(|t| !t.is_empty()),
             "diagram",
         );
@@ -152,15 +152,15 @@ impl DocStore for DiagramDocs {
     }
 }
 
-/// The realtime channel of the showcase: the live diagram and its change topic.
-pub fn realtime(store: DiagramStore) -> Realtime {
-    let realtime = Realtime::new().topic("diagram", "showcase.islands.read");
+/// The live socket of the showcase: the live diagram and its change topic.
+pub fn socket(store: DiagramStore) -> ZeynSocket {
+    let live = ZeynSocket::new().topic("diagram", "showcase.islands.read");
     let docs = DiagramDocs {
         store,
-        hub: realtime.hub(),
+        socket: live.socket(),
         state: Arc::default(),
     };
-    realtime.documents(
+    live.documents(
         "diagram",
         "showcase.islands.read",
         "showcase.islands.write",
@@ -288,9 +288,11 @@ pub fn feature() -> Feature {
         .route_prefix("/islands")
         .screen(island_counter)
         .screen(island_diagram)
+        .screen(crate::live::live_updates)
         .menu(|m| {
             m.group(t!("menu.islands"), Icon::ChartBar)
                 .item(t!("islands.counter"), island_counter)
                 .item(t!("islands.diagram"), island_diagram)
+                .item(t!("live.title"), crate::live::live_updates)
         })
 }

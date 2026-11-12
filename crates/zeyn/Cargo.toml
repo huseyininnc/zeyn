@@ -13,7 +13,7 @@ categories = ["web-programming::http-server", "gui"]
 
 [features]
 default = ["server"]
-server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:tracing-subscriber", "dep:flate2"]
+server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:futures-util", "futures-util/alloc", "dep:tracing-subscriber", "dep:flate2"]
 signed-licenses = ["dep:ed25519-dalek"]
 redis = ["server", "dep:redis"]
 otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
@@ -29,9 +29,11 @@ oidc = ["server", "dep:reqwest", "dep:rustls", "dep:ring"]
 totp = ["server", "dep:ring", "dep:totp-rs", "dep:qrcodegen"]
 # WASM islands (`ui::Island`, `App::islands`). Pages without an island pay nothing either way.
 islands = ["server", "dep:zeyn-island", "tokio/fs"]
-# WebSocket rooms with Y-CRDT documents and change topics (`realtime::Realtime`, `ui::Live`).
-# Off by default: requests stay stateless unless an app turns this on.
+# The live socket (`realtime::ZeynSocket`): topics, typed events, actions over one WebSocket per
+# page, and Y-CRDT documents. Off by default: requests stay stateless unless an app turns this on.
 realtime = ["server", "axum/ws", "dep:yrs", "dep:futures-util", "futures-util/sink"]
+# A Rust client of the page socket (`realtime::TestSocket`), for tests and services.
+socket-client = ["realtime", "dep:tokio-tungstenite"]
 # Grid export to XLSX and XLSX import.
 xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
 # PDF documents from Typst templates, and grid export to PDF.
@@ -72,6 +74,7 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 ed25519-dalek = { version = "3", default-features = false, optional = true }
 redis = { version = "1", default-features = false, features = ["tokio-comp", "connection-manager", "script"], optional = true }
+tokio-tungstenite = { version = "0.29", optional = true }
 ring = { version = "0.17", optional = true }
 totp-rs = { version = "6", default-features = false, features = ["std", "otpauth"], optional = true }
 qrcodegen = { version = "1.8", optional = true }
@@ -133,6 +136,14 @@ required-features = ["islands"]
 [[test]]
 name = "realtime"
 required-features = ["realtime"]
+
+[[test]]
+name = "realtime_load"
+required-features = ["realtime"]
+
+[[test]]
+name = "socket_client"
+required-features = ["socket-client"]
 
 [[test]]
 name = "xlsx"

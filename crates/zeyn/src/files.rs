@@ -348,6 +348,8 @@ pub struct FileRules {
     max_bytes: u64,
     max_files: u32,
     accept: &'static [FileType],
+    /// Bytes one user may upload to the store per window, in seconds.
+    quota: Option<(u64, u64)>,
 }
 
 impl FileRules {
@@ -359,7 +361,22 @@ impl FileRules {
             max_bytes: 10 * 1024 * 1024,
             max_files: 10,
             accept: &[FileType::Png, FileType::Jpeg, FileType::Webp, FileType::Pdf],
+            quota: None,
         }
+    }
+
+    /// At most `bytes` per user (by IP without a user) in the store per `window`, counted with
+    /// the app's rate store, so it holds across instances with a shared one. The upload that
+    /// crosses the quota still lands; the next one answers `429` until the window refills.
+    pub const fn quota(mut self, bytes: u64, window: std::time::Duration) -> Self {
+        self.quota = Some((bytes, window.as_secs()));
+        self
+    }
+
+    /// The upload quota per user: bytes and window.
+    pub fn quota_limit(&self) -> Option<(u64, std::time::Duration)> {
+        self.quota
+            .map(|(b, s)| (b, std::time::Duration::from_secs(s.max(1))))
     }
 
     /// Largest file, in bytes. Never more than [`MAX_UPLOAD_BYTES`].
@@ -656,7 +673,7 @@ pub use store::*;
 
 #[cfg(feature = "server")]
 mod store {
-    use super::{File, FileRules, valid_file_id};
+    use super::{File, FileRules, FileType, valid_file_id};
     use crate::action::{Error, Result};
     use crate::ctx::BoxFuture;
     use crate::i18n::Text;
@@ -770,6 +787,128 @@ mod store {
         ) -> BoxFuture<Result<ScanVerdict>>;
     }
 
+    /// Refuses ZIP based uploads (ZIP, Word, Excel, PowerPoint) that would unpack into far more
+    /// than they weigh, before anything opens them: more entries than `max_entries`, more than
+    /// `max_bytes` in all, or more than `max_ratio` times the file's own size, as the archive's
+    /// central directory declares them. ZIP64 archives are refused, since their sizes are not
+    /// checked. Code that unpacks an accepted archive must still stop at these limits, because a
+    /// directory can understate what an entry holds. Register it with
+    /// [`Feature::scan_files`](crate::Feature::scan_files); other files pass.
+    ///
+    /// ```ignore
+    /// Feature::new("imports").files(SHEETS, "imports.write", store).scan_files(ZipGuard::default())
+    /// ```
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct ZipGuard {
+        pub max_entries: u64,
+        pub max_bytes: u64,
+        pub max_ratio: u64,
+    }
+
+    impl Default for ZipGuard {
+        fn default() -> Self {
+            ZipGuard {
+                max_entries: 10_000,
+                max_bytes: 1024 * 1024 * 1024,
+                max_ratio: 200,
+            }
+        }
+    }
+
+    /// Largest central directory read, so the check itself stays small.
+    const ZIP_DIRECTORY_MAX: u64 = 64 * 1024 * 1024;
+
+    /// The number of entries and the sum of their unpacked sizes, from the central directory.
+    fn zip_totals(r: &mut dyn MediaReader) -> std::result::Result<(u64, u64), &'static str> {
+        use std::io::SeekFrom;
+        let len = r
+            .seek(SeekFrom::End(0))
+            .map_err(|_| "unreadable")?;
+        let tail = len.min(65_557);
+        r.seek(SeekFrom::Start(len - tail))
+            .map_err(|_| "unreadable")?;
+        let mut end = vec![0u8; tail as usize];
+        r.read_exact(&mut end)
+            .map_err(|_| "unreadable")?;
+        let at = (0..end.len().saturating_sub(21))
+            .rev()
+            .find(|&i| end[i..i + 4] == [0x50, 0x4b, 0x05, 0x06])
+            .ok_or("no central directory")?;
+        let u16_at = |b: &[u8], i: usize| u64::from(u16::from_le_bytes([b[i], b[i + 1]]));
+        let u32_at = |b: &[u8], i: usize| {
+            u64::from(u32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]))
+        };
+        let entries = u16_at(&end, at + 10);
+        let size = u32_at(&end, at + 12);
+        let offset = u32_at(&end, at + 16);
+        if entries == 0xFFFF || size == 0xFFFF_FFFF || offset == 0xFFFF_FFFF {
+            return Err("ZIP64 archive");
+        }
+        if size > ZIP_DIRECTORY_MAX || offset + size > len {
+            return Err("central directory out of range");
+        }
+        r.seek(SeekFrom::Start(offset))
+            .map_err(|_| "unreadable")?;
+        let mut dir = vec![0u8; size as usize];
+        r.read_exact(&mut dir)
+            .map_err(|_| "unreadable")?;
+        let (mut i, mut count, mut total) = (0usize, 0u64, 0u64);
+        while i + 46 <= dir.len() && dir[i..i + 4] == [0x50, 0x4b, 0x01, 0x02] {
+            let unpacked = u32_at(&dir, i + 24);
+            if unpacked == 0xFFFF_FFFF {
+                return Err("ZIP64 entry");
+            }
+            total = total.saturating_add(unpacked);
+            count += 1;
+            let skip = u16_at(&dir, i + 28) + u16_at(&dir, i + 30) + u16_at(&dir, i + 32);
+            i += 46 + skip as usize;
+        }
+        Ok((count.max(entries), total))
+    }
+
+    impl FileScanner for ZipGuard {
+        fn scan(
+            &self,
+            meta: FileMeta,
+            mut file: Box<dyn MediaReader>,
+        ) -> BoxFuture<Result<ScanVerdict>> {
+            let zipped = [
+                FileType::Zip,
+                FileType::Docx,
+                FileType::Xlsx,
+                FileType::Pptx,
+            ]
+            .iter()
+            .any(|t| t.mime() == meta.content_type);
+            let guard = *self;
+            Box::pin(async move {
+                if !zipped {
+                    return Ok(ScanVerdict::Clean);
+                }
+                let totals = tokio::task::spawn_blocking(move || zip_totals(&mut *file))
+                    .await
+                    .map_err(|e| Error::Internal(e.to_string()))?;
+                let verdict = match totals {
+                    Err(why) => ScanVerdict::Refused(format!("zip: {why}")),
+                    Ok((entries, _)) if entries > guard.max_entries => {
+                        ScanVerdict::Refused(format!("zip: {entries} entries"))
+                    }
+                    Ok((_, total)) if total > guard.max_bytes => {
+                        ScanVerdict::Refused(format!("zip: unpacks to {total} bytes"))
+                    }
+                    Ok((_, total)) if total / meta.size.max(1) > guard.max_ratio => {
+                        ScanVerdict::Refused(format!(
+                            "zip: unpacks to {total} bytes from {}",
+                            meta.size
+                        ))
+                    }
+                    Ok(_) => ScanVerdict::Clean,
+                };
+                Ok(verdict)
+            })
+        }
+    }
+
     /// A store registered on a feature.
     #[derive(Clone)]
     pub struct FileEntry {
@@ -832,6 +971,8 @@ mod store {
     #[derive(Clone)]
     pub struct DiskStore {
         root: Arc<PathBuf>,
+        /// When the last sweep of stale `.part` files ran, in seconds since the epoch.
+        swept: Arc<std::sync::atomic::AtomicU64>,
     }
 
     impl DiskStore {
@@ -839,6 +980,7 @@ mod store {
         pub fn new(root: impl Into<PathBuf>) -> Self {
             DiskStore {
                 root: Arc::new(root.into()),
+                swept: Arc::default(),
             }
         }
 
@@ -850,6 +992,32 @@ mod store {
         }
     }
 
+    /// How old a `.part` file of a stopped upload must be before a sweep removes it.
+    pub const STALE_PART: std::time::Duration = std::time::Duration::from_secs(3600);
+
+    /// Removes the `.part` files under `root` older than [`STALE_PART`]: uploads stopped by a
+    /// crash or a restart. Returns how many it removed.
+    pub(crate) fn sweep_parts(root: &std::path::Path) -> u64 {
+        let Ok(dir) = std::fs::read_dir(root) else {
+            return 0;
+        };
+        let mut removed = 0;
+        for entry in dir.flatten() {
+            let path = entry.path();
+            let stale = path.extension() == Some(std::ffi::OsStr::new("part"))
+                && entry
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|m| m.elapsed().ok())
+                    .is_some_and(|age| age > STALE_PART);
+            if stale && std::fs::remove_file(&path).is_ok() {
+                removed += 1;
+            }
+        }
+        removed
+    }
+
     impl FileStore for DiskStore {
         fn put(&self, mut meta: FileMeta, mut chunks: FileChunks) -> BoxFuture<Result<()>> {
             let paths = (
@@ -858,10 +1026,29 @@ mod store {
                 self.path(&meta.id, "json"),
             );
             let root = self.root.clone();
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
+            let last = self
+                .swept
+                .load(std::sync::atomic::Ordering::Relaxed);
+            let sweep = now.saturating_sub(last) >= STALE_PART.as_secs()
+                && self
+                    .swept
+                    .compare_exchange(
+                        last,
+                        now,
+                        std::sync::atomic::Ordering::Relaxed,
+                        std::sync::atomic::Ordering::Relaxed,
+                    )
+                    .is_ok();
             Box::pin(async move {
                 let (part, bin, json) = (paths.0?, paths.1?, paths.2?);
                 let work = tokio::task::spawn_blocking(move || {
                     std::fs::create_dir_all(&*root).map_err(io)?;
+                    if sweep {
+                        sweep_parts(&root);
+                    }
                     let mut file = std::fs::File::create_new(&part).map_err(io)?;
                     let written = (|| {
                         let mut size = 0u64;

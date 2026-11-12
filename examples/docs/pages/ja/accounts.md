@@ -24,7 +24,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - キーは設定から取得し、32 バイト以上で、決して変更しません。

@@ -80,7 +80,7 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 `.mark_read(action)`와 `.archive(action)`을 쓰면 각 행에 체크 상자가, 받은 편지함에 "모두 선택"이 있는 도구 모음이 생깁니다. 버튼은 선택한 키를 `InboxSelection`으로 `POST /_zeyn/data`에 보내며, 이 엔드포인트는 CSRF를 확인하고 쓰기 제한에 포함되며 화면 접근 권한과 액션 권한을 확인합니다. 키는 최대 200개, 각 200자까지 받습니다. 키는 브라우저에서 오므로 액션은 `ctx.identity()`의 알림만 바꿔야 합니다. 사용자가 실행할 수 없는 버튼은 체크 상자와 함께 빠집니다.
 
-일괄 작업 후 받은 편지함은 자신의 토픽(`"notifications"`, `.topic(..)`으로 변경)을 알립니다. 받은 편지함과 그 토픽을 `.listens`하는 모든 노드가 제자리에서 다시 그려지고 종도 개수를 다시 불러옵니다. 종은 `UnreadCount { limit }`을 받아 한도(100)에서 멈추는 액션, 즉 한 번의 제한된 쿼리로 셉니다. 99를 넘으면 `99+`로 보여 주며 링크 이름이 스크린 리더에 개수를 알려 줍니다. 페이지가 보인 뒤 한 번의 요청으로 개수를 불러오고, 받은 편지함이나 `ui.refresh("notifications")`, 또는 `.live()`와 `realtime` 기능을 쓸 때 어떤 액션의 `hub.notify(&ctx, "notifications")`가 토픽을 알리면 다시 불러옵니다(토픽은 `Realtime::topic`으로 선언). `inbox.js`(6.1 KB, gzip 2.3 KB)와 `inbox.css`(3.1 KB)는 이 컴포넌트와 함께일 때만 불러옵니다.
+일괄 작업 후 받은 편지함은 자신의 토픽(`"notifications"`, `.topic(..)`으로 변경)을 알립니다. 받은 편지함과 그 토픽을 `.listens`하는 모든 노드가 제자리에서 다시 그려지고 종도 개수를 다시 불러옵니다. 종은 `UnreadCount { limit }`을 받아 한도(100)에서 멈추는 액션, 즉 한 번의 제한된 쿼리로 셉니다. 99를 넘으면 `99+`로 보여 주며 링크 이름이 스크린 리더에 개수를 알려 줍니다. 페이지가 보인 뒤 한 번의 요청으로 개수를 불러오고, 받은 편지함이나 `ui.refresh("notifications")`, 또는 `.live()`와 `realtime` 기능을 쓸 때 어떤 액션의 `socket.notify(&ctx, "notifications")`가 토픽을 알리면 다시 불러옵니다(토픽은 `ZeynSocket::topic`으로 선언). `inbox.js`(6.1 KB, gzip 2.3 KB)와 `inbox.css`(3.1 KB)는 이 컴포넌트와 함께일 때만 불러옵니다.
 
 ## Kanban
 

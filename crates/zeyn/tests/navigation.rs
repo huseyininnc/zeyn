@@ -491,6 +491,62 @@ async fn framework_links_use_the_path_form() {
     );
 }
 
+#[screen(route = "/later", public)]
+pub fn later() -> Screen {
+    Screen::new("Later").body(
+        Stack::new()
+            .add(Alert::info("Right away"))
+            .add(zeyn::ui::Deferred::new(Alert::info("The slow part")).lines(2)),
+    )
+}
+
+#[tokio::test]
+async fn a_deferred_part_shows_a_placeholder_and_loads_by_its_path() {
+    let router = App::new("Nav")
+        .feature(Feature::new("n").screen(later))
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/later", false).await;
+    assert!(page.contains("Right away"));
+    assert!(
+        !page.contains("The slow part"),
+        "the slow part is not in the page"
+    );
+    assert!(
+        page.contains(r#"<div class="z-deferred" data-zeyn-defer="0.1.0" aria-busy="true""#),
+        "{page}"
+    );
+    assert!(
+        page.contains("/_zeyn/tabs.js"),
+        "the loader comes with the placeholder"
+    );
+    let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let body = serde_json::json!({ "screen": "later", "params": null, "node": "0.1.0" });
+    let res = router
+        .clone()
+        .oneshot(
+            Request::post("/_zeyn/node")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, format!("zeyn_csrf={token}"))
+                .header("x-zeyn-csrf", token)
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let html = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(html.contains("The slow part"), "{html}");
+}
+
 #[tokio::test]
 async fn lazy_parts_and_fragments_of_a_path_screen_get_its_params() {
     let router = path_app();
@@ -857,8 +913,8 @@ async fn the_side_menu_starts_with_the_logo_and_draws_item_icons() {
         "{page}"
     );
     assert!(
-        page.contains(r#"<h2><button type="button" class="z-nav-heading" aria-expanded="true" aria-controls="z-nav-g0"><span>Group</span>"#),
-        "the group label drops its icon"
+        page.contains(r#"<h2><button type="button" class="z-nav-heading" aria-expanded="true" aria-controls="z-nav-g0"><span class="z-nav-initial" aria-hidden="true">G</span><span>Group</span>"#),
+        "the group label drops its icon; the icon rail shows its first letter instead"
     );
     assert!(page.contains(r#"aria-current="page"><span class="z-icon z-icon-home" aria-hidden="true"></span><span>One</span></a>"#));
 
@@ -1036,7 +1092,7 @@ async fn an_accordion_menu_marks_the_side_menu() {
 }
 
 #[tokio::test]
-async fn an_open_group_has_no_toggle_and_loads_no_menu_script() {
+async fn an_open_group_has_no_toggle_button() {
     let router = App::new("Nav")
         .feature(Feature::new("n").screen(one).menu(|m| {
             m.group("Group", Icon::Box)
@@ -1047,9 +1103,141 @@ async fn an_open_group_has_no_toggle_and_loads_no_menu_script() {
         .unwrap();
     let (_, _, page) = get(&router, "/one", false).await;
     let nav = side_menu(&page);
-    assert!(nav.starts_with(r#"<nav class="z-nav" aria-label="Main">"#));
-    assert!(nav.contains(r#"<div class="z-nav-group"><h2><span class="z-icon z-icon-box" aria-hidden="true"></span>Group</h2><ul><li>"#), "{nav}");
-    assert!(!page.contains("/_zeyn/menu.js"));
+    assert!(nav.contains(r#"<div class="z-nav-group"><h2><span class="z-icon z-icon-box" aria-hidden="true"></span><span>Group</span></h2><ul><li>"#), "{nav}");
+    assert!(
+        !nav.contains("z-nav-heading"),
+        "an open group has no toggle button"
+    );
+    assert!(
+        nav.contains(r#"data-zeyn-rail-toggle aria-pressed="false""#),
+        "the menu can still fold to an icon rail, so menu.js loads"
+    );
+}
+
+#[tokio::test]
+async fn the_side_menu_folds_to_an_icon_rail_remembered_in_a_cookie() {
+    let router = App::new("Nav")
+        .feature(Feature::new("n").screen(one).menu(|m| {
+            m.group("Group", Icon::Box)
+                .item("One", one)
+        }))
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/one", false).await;
+    assert!(page.contains(r#"<div class="z-app" data-zeyn-shell="app"><nav"#));
+    assert!(page.contains(r#"aria-pressed="false" aria-label="Collapse the menu""#));
+    assert!(
+        page.contains(r#"aria-expanded="true" aria-controls="z-nav-g0""#),
+        "unfolded, the group of the current screen is open"
+    );
+    let rail = router
+        .clone()
+        .oneshot(
+            axum::http::Request::get("/one")
+                .header("cookie", "zeyn_rail=1")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let rail = String::from_utf8(
+        http_body_util::BodyExt::collect(rail.into_body())
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(rail.contains(r#"<div class="z-app" data-zeyn-shell="app" data-zeyn-rail><nav"#));
+    assert!(rail.contains(r#"aria-pressed="true" aria-label="Expand the menu""#));
+    assert!(
+        rail.contains(r#"aria-expanded="false" aria-controls="z-nav-g0""#),
+        "in the rail every group starts closed; it opens as a flyout"
+    );
+}
+
+#[action(permission = "mail.read")]
+pub async fn unread(_: ()) -> Result<u64> {
+    Ok(7)
+}
+
+#[action(permission = "mail.admin")]
+pub async fn flagged(_: ()) -> Result<u64> {
+    Ok(150)
+}
+
+#[tokio::test]
+async fn menu_items_show_badges_and_counts_loaded_after_the_page() {
+    let router = |perms: &'static [&'static str]| {
+        App::new("Nav")
+            .auth(move |_: &axum::http::HeaderMap| {
+                Some(Identity::user("ayse").with_permissions(perms.iter().copied()))
+            })
+            .feature(Feature::new("n").screen(one).menu(|m| {
+                m.group("Mail", Icon::Box)
+                    .item("One", one)
+                    .badge("New")
+                    .count(unread)
+                    .count_listens("mail")
+                    .item("One", one)
+                    .count(flagged)
+            }))
+            .router()
+            .unwrap()
+    };
+    let r = router(&["mail.read"]);
+    let (_, _, page) = get(&r, "/one", false).await;
+    assert!(
+        page.contains(r#"<span>One</span> <span class="z-nav-badge">New</span> <span class="z-nav-count" data-zeyn-count="unread" data-zeyn-count-topics="mail" hidden></span></a>"#),
+        "{page}"
+    );
+    assert!(
+        !page.contains(r#"data-zeyn-count="flagged""#),
+        "a count the user may not run is not shown"
+    );
+    let (status, _, body) = get(&r, "/_zeyn/menu/counts", false).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "unread": 7 })
+    );
+    let (_, _, body) = get(
+        &router(&["mail.read", "mail.admin"]),
+        "/_zeyn/menu/counts",
+        false,
+    )
+    .await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "unread": 7, "flagged": 150 })
+    );
+}
+
+#[tokio::test]
+async fn long_menus_get_a_filter_box_and_short_ones_do_not() {
+    let router = |n: usize| {
+        App::new("Nav")
+            .feature(
+                Feature::new("n")
+                    .screen(one)
+                    .menu(move |m| {
+                        let mut m = m.group("Many", Icon::Box);
+                        for _ in 0..n {
+                            m = m.item("One", one);
+                        }
+                        m
+                    }),
+            )
+            .router()
+            .unwrap()
+    };
+    let (_, _, long) = get(&router(zeyn::server::MENU_FILTER_FROM), "/one", false).await;
+    assert!(long.contains(r#"<div class="z-nav-filter" data-zeyn-menu-filter"#));
+    assert!(long.contains(r#"aria-label="Filter the menu""#));
+    assert!(long.contains(r#"data-text-pin="Pin {label}""#));
+    assert!(long.contains("/_zeyn/menu.js"));
+    let (_, _, short) = get(&router(zeyn::server::MENU_FILTER_FROM - 1), "/one", false).await;
+    assert!(!short.contains("data-zeyn-menu-filter"));
 }
 
 #[tokio::test]

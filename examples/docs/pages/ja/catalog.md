@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -92,13 +92,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 レールは、横にスクロールする 1 行に並べたカードグリッドで、スクロールスナップと、1 画面分の幅ずつスクロールする前へ・次へのボタンがあります（ユーザーがモーションの軽減を求めていない限り滑らかに動きます）。ユーザーが末尾の近くまでスクロールすると、次のバッチを 12 件ずつ読み込みます。カードはタブ順に含まれるリンクで、フォーカスされると表示範囲へスクロールされます。
 
-スクロールバーは非表示です。タッチ、トラックパッド、Shift+ホイールでは引き続きスクロールでき、`.scrollbar(true)` で細いバーを残せます。マウスで rail を押したまま横にドラッグできます。5 ピクセルを超えて動かすと、離したときのクリックは取り消されるため、ポインターの下のカードは開かず、rail は最も近いカードに揃います。それより小さい動きは通常のクリックです。ドラッグ中はテキストが選択されず、画像が外へドラッグされず、カードのプレビューも開きません。タッチではブラウザー自身のスクロールが使われます。前へ・次へのボタンは常に表示され、端では無効になります。非表示のスクロールバーではキーボードでスクロールできないためです。JavaScript がない場合、ボタンは非表示になり、rail はネイティブにスクロールします。
+スクロールバーは非表示です。タッチ、トラックパッド、Shift+ホイールでは引き続きスクロールでき、`.scrollbar()` で細いバーを残せます。マウスで rail を押したまま横にドラッグできます。5 ピクセルを超えて動かすと、離したときのクリックは取り消されるため、ポインターの下のカードは開かず、rail は最も近いカードに揃います。それより小さい動きは通常のクリックです。ドラッグ中はテキストが選択されず、画像が外へドラッグされず、カードのプレビューも開きません。タッチではブラウザー自身のスクロールが使われます。前へ・次へのボタンは常に表示され、端では無効になります。非表示のスクロールバーではキーボードでスクロールできないためです。JavaScript がない場合、ボタンは非表示になり、rail はネイティブにスクロールします。
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## 検索ボックス

@@ -197,7 +197,7 @@ impl ListItem {
 /// List::of(search_people)
 ///     .title(t!("people.title"))
 ///     .item(|p: &Person| ListItem::new(p.name.clone()).subtitle(p.city.clone()).link(person, PersonParams { id: p.id }))
-///     .sort_option(t!("people.by_name"), Person::name, false)
+///     .sort_option(t!("people.by_name"), Person::name)
 ///     .paging(Paging::pages(20))
 /// ```
 #[derive(Default)]

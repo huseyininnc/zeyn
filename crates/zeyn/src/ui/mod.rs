@@ -83,6 +83,8 @@ pub use markdown::{MAX_MARKDOWN, Markdown};
 mod live;
 #[cfg(feature = "realtime")]
 pub use live::Live;
+#[cfg(feature = "realtime")]
+pub use live::{EventNode, OnEvent, OnEvents};
 
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
@@ -90,7 +92,7 @@ pub use embed::{
     Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Fit, Given, Image, NoAlt,
     NoSize, NoTitle, PLACEHOLDER_BLUR_MAX, Placeholder,
 };
-pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
+pub use layout::{Card, Deferred, ListDetail, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use accordion::{Accordion, MAX_ACCORDION_SECTIONS};

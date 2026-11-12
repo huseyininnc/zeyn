@@ -129,7 +129,10 @@
       "rate_limited": "请求过多，请稍后再试。",
       "confirmation_required": "此操作需要先在应用中确认后才会执行。",
       "cursor": "列表在加载后已发生变化。请重新加载后再试。",
-      "duplicate": "此记录已存在。"
+      "duplicate": "此记录已存在。",
+      "too_large": "请求过大。",
+      "bad_request": "无法读取请求。",
+      "socket_only": "此操作只能通过实时连接运行。"
     },
     "grid": {
       "pagination": "分页",
@@ -212,6 +215,14 @@
     "shell": {
       "skip": "跳到正文",
       "menu": "主菜单",
+      "menu_filter": "筛选菜单",
+      "menu_results": "{n} 项",
+      "menu_none": "没有匹配的菜单项",
+      "menu_favorites": "收藏",
+      "menu_pin": "固定 {label}",
+      "menu_unpin": "取消固定 {label}",
+      "rail_collapse": "收起菜单",
+      "rail_expand": "展开菜单",
       "language": "语言",
       "time_zone": "时区",
       "time_zone_auto": "自动（此设备）",
@@ -934,6 +945,7 @@
     },
     "files": {
       "too_large": "文件过大。允许的最大文件为 {max}。",
+      "quota": "暂时已达到上传上限，请稍后再试。",
       "too_many": "{label}最多接受 {n} 个文件。",
       "type": "不接受此类型的文件，或其内容与文件名不符。",
       "refused": "文件未通过安全检查，已被拒绝。",

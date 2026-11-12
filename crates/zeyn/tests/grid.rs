@@ -825,7 +825,7 @@ pub fn act_nested() -> Screen {
 pub fn sorted() -> Screen {
     Screen::new("Sorted").body(
         DataGrid::of(search)
-            .sort_by(Item::qty, true)
+            .sort_by_desc(Item::qty)
             .column(Item::code)
             .column(Item::qty),
     )
@@ -916,6 +916,16 @@ async fn cells_render_badges_progress_and_icons() {
         r.body
             .contains(r#"style="--z-pct:2.5%""#),
         "1 of 40"
+    );
+    assert!(
+        r.body
+            .contains(r#"<span class="z-cell-progress"><span class="z-cell-progress-track""#),
+        "grid cells have classes of their own, so the Progress widget's layout cannot squeeze them"
+    );
+    let css = include_str!("../assets/zeyn.css");
+    assert!(
+        css.contains(".z-button[hidden] { display: none; }"),
+        "a hidden button, such as a card grid's load more without more rows, stays hidden"
     );
     assert!(
         r.body
@@ -1386,7 +1396,7 @@ async fn browser_menu_stays_unless_the_app_turns_it_off() {
     );
     let router = App::new("Test")
         .service(Store::seeded())
-        .browser_context_menu(false)
+        .no_browser_context_menu()
         .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
         .feature(Feature::new("items").screen(menus))
         .router()

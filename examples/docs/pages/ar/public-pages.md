@@ -98,3 +98,12 @@ App::new(t!("app.name"))
 ```
 
 كلاهما يُقدَّم كنص عادي للجميع.
+
+## مجلد public
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+تُضمَّن ملفات مجلد `public/` في الحزمة داخل الملف التنفيذي عبر `zeyn::public_files!()` وتُقدَّم من جذر الموقع: `public/favicon.svg` يجيب على `/favicon.svg`، وتربط الصفحة أول ما تجده من `/favicon.svg` و`/favicon.png` و`/favicon.ico` أيقونةً لها. تُقبل الصور والأيقونات والخطوط والنصوص وXML وJSON وملفات بيان الويب وPDF؛ أما HTML والسكربتات فتوقف البناء، لأنها ستعمل تحت أصل التطبيق. تحمل الملفات وسم كيان وتُخزَّن مؤقتًا لمدة ساعة. يمكن أن يبلغ الملف 256 KB والمجلد 2 MB ما لم تحدد `max_public_file_kb` و`max_public_total_kb` تحت `[package.metadata.zeyn]` غير ذلك. يبلّغ `App::check` عن ملف يستخدم مساره بالفعل شاشةٌ أو `/robots.txt` أو `/llms.txt` أو `/sitemap.xml` أو `/_zeyn/`. يضيف `zeyn new` الملف `public/favicon.svg`.

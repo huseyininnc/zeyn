@@ -186,9 +186,13 @@ struct CtxInner {
     trail: Arc<Mutex<crate::audit::Trail>>,
     theme: Option<Arc<str>>,
     compact: bool,
+    /// The side menu is folded to an icon rail (`zeyn_rail` cookie).
+    rail: bool,
     reauth_within: std::time::Duration,
     csp: Option<Arc<crate::csp::Csp>>,
     prefetch: bool,
+    /// The live connection an action was called over, when it was (feature `realtime`).
+    conn: Option<Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 /// How recent a sign in counts as recent unless the app sets another age.
@@ -220,9 +224,11 @@ impl Ctx {
             trail: Arc::default(),
             theme: None,
             compact: false,
+            rail: false,
             reauth_within: REAUTH_WITHIN,
             csp: None,
             prefetch: false,
+            conn: None,
         }))
     }
 
@@ -254,9 +260,11 @@ impl Ctx {
             trail: Arc::default(),
             theme: Some(theme),
             compact: false,
+            rail: false,
             reauth_within,
             csp: Some(csp),
             prefetch: false,
+            conn: None,
         }))
     }
 
@@ -310,6 +318,16 @@ impl Ctx {
         self.0.compact
     }
 
+    /// Same context with the side menu folded to an icon rail.
+    pub(crate) fn with_rail(&self) -> Self {
+        self.rebuild(|i| i.rail = true)
+    }
+
+    /// Whether the user folded the side menu to an icon rail.
+    pub fn rail(&self) -> bool {
+        self.0.rail
+    }
+
     /// The theme the page is shown in: `system`, `light`, `dark` or the name of an app theme.
     /// `None` outside a request, such as in tests that build a context by hand.
     pub fn theme(&self) -> Option<&str> {
@@ -347,12 +365,26 @@ impl Ctx {
             trail: i.trail.clone(),
             theme: i.theme.clone(),
             compact: i.compact,
+            rail: i.rail,
             reauth_within: i.reauth_within,
             csp: i.csp.clone(),
             prefetch: i.prefetch,
+            conn: i.conn.clone(),
         };
         change(&mut inner);
         Ctx(Arc::new(inner))
+    }
+
+    /// Same context for an action called over a live connection.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn with_conn(&self, conn: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.rebuild(|i| i.conn = Some(conn))
+    }
+
+    /// The live connection the call came over, if any.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn conn<T: 'static>(&self) -> Option<&T> {
+        self.0.conn.as_ref()?.downcast_ref()
     }
 
     pub fn with_tenant(&self, tenant: Option<Tenant>) -> Self {

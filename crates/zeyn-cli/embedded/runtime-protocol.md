@@ -61,6 +61,9 @@ A page loads and runs only the browser code its screen uses. Every page runs the
 | `tour.js` | guided tours (`Tour`): shows the start button and walks a dialog over the stops of the page |
 | `thread.js` and `thread.css`, `stream.js`, `composer.js` and `composer.css`, `typing.js` and `typing.css` | message threads; the streamed Markdown and JSON lines shared by threads and the assistant; chat composers; typing indicators |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | feeds of posts; the lightbox of images and videos; story rings and their rows, which need no script |
+| `drag.js`, `net.js` | shared helpers without markers of their own, linked with the modules that import them (below) |
+
+Two helper modules hold code that several modules would otherwise copy. `net.js` (imported by `kanban.js`, `files.js` and `vlist.js`) exports `BASE`, `csrf()`, `parse(text)` and `post(path, body)`, which posts JSON on the page's origin with the `x-zeyn-csrf` header and resolves to `{ ok, body }`. `drag.js` (imported by `grid.js` for column moves and `catalog.js` for rail drag scrolling) is the drag core later sortable lists, boards and surfaces build on: `press(e, { threshold, longPress, tolerance, axis, onStart })` turns a `pointerdown` into a drag once a mouse or pen moves 6 px, or a touch is held 250 ms within 5 px (a swipe still scrolls, and scrolling first cancels the press); `capture(el, e, move, end)` follows the drag with pointer capture, calls `move` at most once per animation frame and `end(event, cancelled)` on release, cancel or Escape; `swallowClick()` cancels the click after a release; `announce(text)` speaks a localized text in one polite live region per page, at most every 500 ms. `.z-drag-handle` (in `zeyn.css`) turns off touch panning on a drag handle only. Every component that drags also offers a keyboard and single pointer way to move (a move menu, WCAG 2.5.7). Neither module writes HTML.
 
 A full page links, in its head, the stylesheets every page uses (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), the stylesheets of the modules whose markers are in its HTML, and their scripts after the modules they import. `zeyn.js` is served with the same table (`[name, script selector, style selector]`) and loads what is missing when content arrives later: `nav.js` fires `zeyn:need` with `{ root, waits }` before it swaps a screen in and waits for the new stylesheets, windows wait the same way before they open, and `zeyn:content`, grid pages and grid filters load the scripts of what they hold. The browser keeps one instance per URL, so a module runs once. A module sets up what it finds in the document when it runs and listens to `zeyn:content` after that; it never scans for, or listens to, components that are not on the page. Modules import the shared part with the `?v=` of their own URL. `tests/ui_modules.rs` fails when a page links a module it does not use or a module stylesheet styles a class outside its markers.
 
@@ -362,7 +365,7 @@ inside it in place.
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b` | WebSocket; text frames `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket; text frames `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
 
 Handshakes check the origin, the CSRF token (offered as the subprotocol `csrf.TOKEN` next to `zeyn`, never in the URL) against the cookie, the signed in user and the
@@ -434,7 +437,7 @@ Outside AI agents reach the app through two doors, both off by default and turne
 | `Mcp::read_only()` | on | on | no |
 | `Mcp::on()` | on | on | form saves and API actions that write |
 
-`.server(false)` and `.webmcp(false)` turn one door off. New projects from `zeyn new` start with
+`.no_server()` and `.no_webmcp()` turn one door off. New projects from `zeyn new` start with
 `Mcp::read_only()`.
 
 Why off: the endpoint lets any holder of a valid `Authorization` header drive the app through a

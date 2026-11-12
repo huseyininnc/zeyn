@@ -191,7 +191,7 @@ impl<E: Model, T> DataGridColumn<E, T> {
             };
             let pct = if max > 0 { (amount / max as f64 * 100.0).clamp(0.0, 100.0) } else { 0.0 };
             format!(
-                r#"<span class="z-progress"><span class="z-progress-track" aria-hidden="true"><span class="z-progress-bar" style="--z-pct:{pct:.1}%"></span></span><span class="z-progress-text">{}</span></span>"#,
+                r#"<span class="z-cell-progress"><span class="z-cell-progress-track" aria-hidden="true"><span class="z-cell-progress-bar" style="--z-pct:{pct:.1}%"></span></span><span class="z-cell-progress-text">{}</span></span>"#,
                 r.value(&value, &kind)
             )
         })
@@ -291,6 +291,14 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.selectable()
     }
 
+    pub fn empty(self, state: crate::ui::EmptyState) -> DataGrid<E> {
+        self.grid.empty(state)
+    }
+
+    pub fn empty_filtered(self, state: crate::ui::EmptyState) -> DataGrid<E> {
+        self.grid.empty_filtered(state)
+    }
+
     pub fn row_menu(
         self,
         menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static,
@@ -336,8 +344,12 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.scope(field, value)
     }
 
-    pub fn sort_by<U: FieldType>(self, field: Field<E, U>, desc: bool) -> DataGrid<E> {
-        self.grid.sort_by(field, desc)
+    pub fn sort_by<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {
+        self.grid.sort_by(field)
+    }
+
+    pub fn sort_by_desc<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {
+        self.grid.sort_by_desc(field)
     }
 
     pub fn group_by<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {

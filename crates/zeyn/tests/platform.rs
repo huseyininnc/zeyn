@@ -141,6 +141,55 @@ async fn per_tenant_services_are_built_once_per_tenant() {
     assert!(matches!(pools.get(&none).await, Err(Error::Denied(_))));
 }
 
+#[tokio::test]
+async fn concurrent_first_requests_build_a_tenant_once_and_the_cache_is_capped() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    let pools: PerTenant<String> = PerTenant::new(move |tenant, _| {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            Ok(tenant.id().to_string())
+        })
+    })
+    .max_tenants(2);
+    let ctx = |t: &str| {
+        Ctx::for_tests(Identity::anonymous(), Services::default()).with_tenant(Tenant::new(t))
+    };
+    let firsts = (0..20).map(|_| {
+        let pools = pools.clone();
+        let ctx = ctx("acme");
+        tokio::spawn(async move { pools.get(&ctx).await.unwrap() })
+    });
+    for first in firsts.collect::<Vec<_>>() {
+        assert_eq!(first.await.unwrap(), "acme");
+    }
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "built once for 20 first requests"
+    );
+    pools.get(&ctx("globex")).await.unwrap();
+    pools.get(&ctx("acme")).await.unwrap();
+    pools
+        .get(&ctx("initech"))
+        .await
+        .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    pools.get(&ctx("acme")).await.unwrap();
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        3,
+        "the recently used tenant stays"
+    );
+    pools.get(&ctx("globex")).await.unwrap();
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        4,
+        "the least recently used one was dropped"
+    );
+}
+
 #[test]
 fn tenants_resolve_from_headers_and_subdomains() {
     let mut h = HeaderMap::new();
@@ -725,6 +774,28 @@ fn memory_rate_store_caps_its_size() {
             .unwrap();
     }
     assert!(store.len() <= 100);
+}
+
+#[test]
+fn a_full_rate_store_makes_room_in_batches_so_a_flood_stays_cheap() {
+    let store = zeyn::MemoryRateStore::with_max_keys(10_000);
+    let limit = RateLimit::per_ip(5, Duration::from_secs(60));
+    let started = std::time::Instant::now();
+    for i in 0..200_000 {
+        let _ = store.take(&format!("ip:{i}"), &limit);
+    }
+    assert!(store.len() <= 10_000);
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "200,000 new keys into a full store took {:?}; evicting one key per insert scans the map each time",
+        started.elapsed()
+    );
+    store.take("ip:199999", &limit).unwrap();
+    assert!(
+        (0..3).all(|_| store.take("ip:199999", &limit).is_ok())
+            && store.take("ip:199999", &limit).is_err(),
+        "a recent key keeps its bucket"
+    );
 }
 
 #[tokio::test]

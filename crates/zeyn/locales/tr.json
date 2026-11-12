@@ -130,7 +130,10 @@
       "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin.",
       "confirmation_required": "Bu işlem çalışmadan önce uygulamada onayınızı bekliyor.",
       "cursor": "Liste yüklendikten sonra değişti. Yenileyip tekrar deneyin.",
-      "duplicate": "Bu kayıt zaten var."
+      "duplicate": "Bu kayıt zaten var.",
+      "too_large": "İstek çok büyük.",
+      "bad_request": "İstek okunamadı.",
+      "socket_only": "Bu işlem yalnızca canlı bağlantı üzerinden çalışır."
     },
     "grid": {
       "pagination": "Sayfalama",
@@ -219,6 +222,14 @@
     "shell": {
       "skip": "İçeriğe geç",
       "menu": "Ana menü",
+      "menu_filter": "Menüde ara",
+      "menu_results": "{n} öğe",
+      "menu_none": "Eşleşen menü öğesi yok",
+      "menu_favorites": "Favoriler",
+      "menu_pin": "{label} sabitle",
+      "menu_unpin": "{label} sabitlemesini kaldır",
+      "rail_collapse": "Menüyü daralt",
+      "rail_expand": "Menüyü genişlet",
       "language": "Dil",
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)",
@@ -1146,6 +1157,7 @@
     },
     "files": {
       "too_large": "Dosya çok büyük. İzin verilen en büyük dosya {max}.",
+      "quota": "Şimdilik yükleme sınırına ulaştınız. Daha sonra tekrar deneyin.",
       "too_many": "{label} en fazla {n} dosya alır.",
       "type": "Bu dosya türü kabul edilmiyor ya da içeriği adıyla uyuşmuyor.",
       "refused": "Dosya güvenlik denetiminden geçmedi.",

@@ -732,13 +732,13 @@ async fn without_realtime_the_typing_indicator_renders_nothing_and_loads_nothing
 #[cfg(feature = "realtime")]
 #[tokio::test]
 async fn with_realtime_the_indicator_knows_people_by_key_and_never_by_id() {
-    let realtime = zeyn::realtime::Realtime::new().topic("chat", "chat.read");
-    let hub = realtime.hub();
+    let live = zeyn::realtime::ZeynSocket::new().topic("chat", "chat.read");
+    let hub = live.socket();
     let router = App::new("Chat")
         .i18n(I18n::new("en"))
         .auth(|_: &HeaderMap| Some(Identity::user("u").with_permissions(["chat.read"])))
         .feature(Feature::new("chat").screen(typing))
-        .realtime(realtime)
+        .socket(live)
         .router()
         .unwrap();
     let (status, page) = get_as(&router, "/typing", ALL).await;

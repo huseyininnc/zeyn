@@ -512,6 +512,9 @@ pub struct DataGrid<E: Model> {
     row_actions: Vec<RowAction<E>>,
     selectable: bool,
     zebra: bool,
+    /// What shows when there are no rows, and when there are none because of the filters.
+    empty: Option<crate::ui::EmptyState>,
+    empty_filtered: Option<crate::ui::EmptyState>,
     bulk: Vec<BulkDef>,
     /// Whether the last added action is a bulk action, the one `confirm` and `tone` set.
     last_bulk: bool,
@@ -622,37 +625,53 @@ pub struct ExportColumn {
 /// Most rows an export holds unless the grid sets another limit.
 pub const DEFAULT_EXPORT_LIMIT: usize = 100_000;
 
-/// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number:
-/// at the start and after every character a spreadsheet may split cells on (`,`, `;`, tab), since
-/// the list separator depends on the reader's locale.
-fn csv_cell(value: &str) -> String {
+/// Writes one CSV cell (RFC 4180) to `out`, quoted when it holds a separator, a quote or a line
+/// break, and defuses spreadsheet formulas in text that is not a number: at the start and after
+/// every character a spreadsheet may split cells on (`,`, `;`, tab), since the list separator
+/// depends on the reader's locale. Writes in place, without a string of its own.
+fn csv_cell(out: &mut String, value: &str) {
     let numeric = |s: &str| {
         !s.is_empty()
             && s.chars()
                 .all(|c| c.is_ascii_digit() || ".,- +".contains(c))
     };
     let formula = |s: &str| s.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(s);
-    let mut v = String::with_capacity(value.len() + 2);
+    let quote = value.contains([',', ';', '\t', '"', '\r', '\n']);
+    let push = |out: &mut String, part: &str| {
+        if quote {
+            let mut pieces = part.split('"');
+            if let Some(first) = pieces.next() {
+                out.push_str(first);
+            }
+            for piece in pieces {
+                out.push_str("\"\"");
+                out.push_str(piece);
+            }
+        } else {
+            out.push_str(part);
+        }
+    };
+    if quote {
+        out.push('"');
+    }
     let mut rest = value;
     loop {
         if formula(rest) {
-            v.push('\'');
+            out.push('\'');
         }
         match rest.find([',', ';', '\t']) {
             Some(i) => {
-                v.push_str(&rest[..=i]);
+                push(out, &rest[..=i]);
                 rest = &rest[i + 1..];
             }
             None => {
-                v.push_str(rest);
+                push(out, rest);
                 break;
             }
         }
     }
-    if v.contains([',', ';', '\t', '"', '\r', '\n']) {
-        format!("\"{}\"", v.replace('"', "\"\""))
-    } else {
-        v
+    if quote {
+        out.push('"');
     }
 }
 
@@ -742,6 +761,8 @@ impl<E: Model> DataGrid<E> {
             row_style: None,
             on_open: None,
             row_actions: Vec::new(),
+            empty: None,
+            empty_filtered: None,
             selectable: false,
             zebra: false,
             bulk: Vec::new(),
@@ -828,11 +849,20 @@ impl<E: Model> DataGrid<E> {
         self
     }
 
-    /// The order rows come in before the user sorts: `.sort_by(Order::id, true)` for newest
+    /// The order rows come in before the user sorts: `.sort_by_desc(Order::id)` for newest
     /// first. The header shows it, and clicking that column only switches between ascending and
     /// descending; other columns go back to this order on their third click. Call it again to add
     /// further keys. The action still receives it in `DataQuery::sort`.
-    pub fn sort_by<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
+    pub fn sort_by<T: FieldType>(self, field: Field<E, T>) -> Self {
+        self.sort_field(field, false)
+    }
+
+    /// Same as [`DataGrid::sort_by`], falling: newest, largest or last first.
+    pub fn sort_by_desc<T: FieldType>(self, field: Field<E, T>) -> Self {
+        self.sort_field(field, true)
+    }
+
+    fn sort_field<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
         self.default_sort
             .push(crate::action::Sort {
                 field: field.meta().name.to_string(),
@@ -1062,6 +1092,27 @@ impl<E: Model> DataGrid<E> {
 
     /// Shades every other row, for very wide grids where the eye loses the row. Rows are
     /// divided by lines only unless set.
+    /// What the grid shows when it has no rows, in place of "No records": a title, a text and
+    /// an action, such as "No orders yet" with "New order". With [`DataGrid::empty_filtered`]
+    /// it shows only while no filter is on.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_orders)
+    ///     .empty(EmptyState::new(t!("orders.none")).opens(t!("orders.new"), new_order, ()))
+    ///     .empty_filtered(EmptyState::new(t!("orders.no_match")).text(t!("orders.no_match_help")))
+    /// ```
+    pub fn empty(mut self, state: crate::ui::EmptyState) -> Self {
+        self.empty = Some(state);
+        self
+    }
+
+    /// What the grid shows when its filters leave no rows, such as "No orders match" with a hint
+    /// to change the filters.
+    pub fn empty_filtered(mut self, state: crate::ui::EmptyState) -> Self {
+        self.empty_filtered = Some(state);
+        self
+    }
+
     pub fn zebra(mut self) -> Self {
         self.zebra = true;
         self
@@ -1876,6 +1927,16 @@ impl<E: Model> DataGrid<E> {
             out.push_str("</tfoot>");
         }
         out.push_str("</table>");
+        for (state, kind) in [
+            (&self.empty, "empty"),
+            (&self.empty_filtered, "empty-filtered"),
+        ] {
+            if let Some(state) = state {
+                out.push_str(&format!(r#"<template data-zeyn-{kind}>"#));
+                state.render(out, r);
+                out.push_str("</template>");
+            }
+        }
         if !later.is_empty() {
             out.push_str("<template data-zeyn-rows-later>");
             out.push_str(&later);
@@ -2342,12 +2403,15 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn csv_head(&self, r: &Render, view: Option<&DataGridView>) -> String {
-        let cols = self.layout(view);
-        let line: Vec<String> = cols
-            .iter()
-            .map(|s| csv_cell(&self.columns[s.index].label_plain(r)))
-            .collect();
-        format!("{}\r\n", line.join(","))
+        let mut out = String::new();
+        for (i, slot) in self.layout(view).iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            csv_cell(&mut out, &self.columns[slot.index].label_plain(r));
+        }
+        out.push_str("\r\n");
+        out
     }
 
     fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
@@ -2355,21 +2419,21 @@ impl<E: Model> GridSource for DataGrid<E> {
         let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
             return String::new();
         };
-        let mut out = String::new();
+        let mut out = String::with_capacity(rows.len() * cols.len() * 12);
         for row in rows {
-            let line: Vec<String> = cols
-                .iter()
-                .map(|s| {
-                    let c = &self.columns[s.index];
-                    let v = (c.value)(row);
-                    csv_cell(&if c.meta.mask.is_some() {
-                        masked(c.meta, &v)
-                    } else {
-                        plain(&v, &c.meta.kind, r)
-                    })
-                })
-                .collect();
-            out.push_str(&line.join(","));
+            for (i, slot) in cols.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                let c = &self.columns[slot.index];
+                let v = (c.value)(row);
+                let text = if c.meta.mask.is_some() {
+                    masked(c.meta, &v)
+                } else {
+                    plain(&v, &c.meta.kind, r)
+                };
+                csv_cell(&mut out, &text);
+            }
             out.push_str("\r\n");
         }
         out

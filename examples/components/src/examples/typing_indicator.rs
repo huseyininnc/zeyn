@@ -1,6 +1,6 @@
 //! TypingIndicator examples: who else is typing, under a composer. The catalog runs without the
 //! realtime channel, so the indicator renders nothing here and the composer sends no signals;
-//! an app with `App::realtime` and the topic declared shows the names.
+//! an app with `App::socket` and the topic declared shows the names.
 
 use crate::examples::composer::{find_people, send_sample};
 use crate::examples::message_thread::thread;

@@ -74,7 +74,7 @@ docs/                  design documents and guides
 ```
 cargo build --workspace
 cargo test --workspace
-cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,accounts   tests behind features
+cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts   tests behind features
 cargo check -p zeyn --all-features --tests                                      everything compiles
 cargo run -p zeyn-example-showcase      http://127.0.0.1:3002, every component
 cargo run -p zeyn-example-docs          http://127.0.0.1:3008, the documentation

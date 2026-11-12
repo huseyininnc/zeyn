@@ -149,7 +149,7 @@ pub use feature::{
 #[cfg(feature = "server")]
 pub use files::{
     DiskStore, FileAccess, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore,
-    ScanVerdict, StoredFile,
+    STALE_PART, ScanVerdict, StoredFile, ZipGuard,
 };
 pub use files::{
     File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,
@@ -189,10 +189,12 @@ pub use model::{
 pub use pdf::{MAX_PDF_DATA, MAX_PDF_ROWS, Pdf, PdfLink, PdfSource, PdfTemplate};
 pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource,
-    Licensed, PerTenant, Secret, StaticSource, Tenant, TenantRequired,
+    Licensed, Secret, StaticSource, Tenant, TenantRequired,
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
+#[cfg(feature = "server")]
+pub use platform::{MAX_TENANTS, PerTenant};
 pub use prefs::{
     Choice, ClientPref, ClientPrefs, Consent, Draft, MAX_DRAFT_CHARS, MAX_DRAFTS,
     MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
@@ -221,8 +223,8 @@ pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
     CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MAX_MENU_CACHE, MAX_MENU_LABEL,
     MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL, Mcp, MemoryAudit, MenuNode, MenuSource,
-    Menus, Plugin, Prefetch, READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant,
-    TenantResolver, Theme, TimePolicy, probe,
+    Menus, Plugin, Prefetch, PublicFile, READY_CACHE, StaticCredentials, StderrAudit,
+    SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
 pub use site::{
     BottomNavItem, CenterOnPhone, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell,
@@ -243,7 +245,7 @@ pub use workflow::{
 };
 #[cfg(feature = "xlsx")]
 pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
-pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
+pub use zeyn_macros::{action, choice, entity, model, params, public_files, screen, t};
 
 #[doc(hidden)]
 pub use feature::read_params as __read_params;

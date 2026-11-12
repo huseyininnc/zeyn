@@ -130,7 +130,10 @@
       "rate_limited": "Too many requests. Try again in a moment.",
       "confirmation_required": "This needs your confirmation in the app before it runs.",
       "cursor": "The list changed since it was loaded. Reload it and try again.",
-      "duplicate": "This record already exists."
+      "duplicate": "This record already exists.",
+      "too_large": "The request is too large.",
+      "bad_request": "The request could not be read.",
+      "socket_only": "This action runs only over the live socket."
     },
     "grid": {
       "pagination": "Pagination",
@@ -219,6 +222,14 @@
     "shell": {
       "skip": "Skip to content",
       "menu": "Main",
+      "menu_filter": "Filter the menu",
+      "menu_results": "{n} items",
+      "menu_none": "No menu items match",
+      "menu_favorites": "Favorites",
+      "menu_pin": "Pin {label}",
+      "menu_unpin": "Unpin {label}",
+      "rail_collapse": "Collapse the menu",
+      "rail_expand": "Expand the menu",
       "language": "Language",
       "time_zone": "Time zone",
       "time_zone_auto": "Automatic (this device)",
@@ -1146,6 +1157,7 @@
     },
     "files": {
       "too_large": "The file is too large. The largest file allowed is {max}.",
+      "quota": "You reached the upload limit for now. Try again later.",
       "too_many": "{label} takes at most {n} files.",
       "type": "This type of file is not accepted, or its content does not match its name.",
       "refused": "The file was refused by the security check.",

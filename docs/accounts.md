@@ -30,7 +30,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - `App::accounts` registers `Accounts`, `UserManager`, `RoleManager` and `SignInManager` as
@@ -322,8 +322,9 @@ The equivalent of `MapIdentityApi`, under `/_zeyn/account`:
 
 Validation problems list errors by code in Pascal case (`PasswordTooShort`), as .NET does. Every
 `POST` must be `application/json` (a cross site form cannot send that, and a cross site script
-cannot without a CORS preflight the app does not grant). A `POST` that carries the session cookie
-also needs the `x-zeyn-csrf` token. The paths count as writes for the write rate limit.
+cannot without a CORS preflight the app does not grant). A `POST` that carries any cookie also
+needs the `x-zeyn-csrf` token, unless it signs in with a bearer token; clients that sign in for
+tokens send no cookies. The paths count as writes for the write rate limit.
 
 ## Security
 

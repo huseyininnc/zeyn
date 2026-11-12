@@ -80,6 +80,10 @@ const TEMPLATES: &[(&str, &str)] = &[
         "locales/tr.json",
         include_str!("../templates/locales/tr.json"),
     ),
+    (
+        "public/favicon.svg",
+        include_str!("../templates/public/favicon.svg"),
+    ),
     ("src/main.rs", include_str!("../templates/src/main.rs")),
     ("src/app.rs", include_str!("../templates/src/app.rs")),
     (
@@ -573,6 +577,9 @@ const RENAMES: &[(&str, &str)] = &[
     ("MAX_EMBED_CONSENT", "MAX_PREF_LIFETIME"),
     ("Icon::Delete", "Icon::Trash"),
     ("Icon::Chart", "Icon::ChartBar"),
+    ("Realtime", "ZeynSocket"),
+    ("HubStats", "SocketStats"),
+    ("Hub", "Socket"),
 ];
 
 /// Runs [`fix_renames`] when asked and describes what changed.

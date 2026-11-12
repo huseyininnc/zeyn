@@ -60,6 +60,9 @@ Bir sayfa yalnızca ekranının kullandığı tarayıcı kodunu yükler ve çal�
 | `tour.js` | sayfa turları (`Tour`): başlat düğmesini gösterir ve bir iletişim kutusunu sayfadaki duraklarda gezdirir |
 | `thread.js` ve `thread.css`, `stream.js`, `composer.js` ve `composer.css`, `typing.js` ve `typing.css` | mesaj thread'leri; thread'ler ile asistanın paylaştığı akan Markdown ve JSON satırları; sohbet composer'ları; yazıyor göstergeleri |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | gönderi akışları; resim ve videoların lightbox'ı; hikâye halkaları ve sıraları, betik gerektirmez |
+| `drag.js`, `net.js` | ortak yardımcılar, kendi işaretleri yok; onları içe aktaran modüllerle bağlanır (aşağıda) |
+
+İki yardımcı modül, birkaç modülün aksi halde kopyalayacağı kodu tutar. `net.js` (`kanban.js`, `files.js` ve `vlist.js` içe aktarır) `BASE`, `csrf()`, `parse(text)` ve `post(path, body)` dışa aktarır; `post` JSON'u sayfanın kökeninde `x-zeyn-csrf` başlığıyla gönderir ve `{ ok, body }` döner. `drag.js` (sütun taşıma için `grid.js`, ray sürükleyerek kaydırma için `catalog.js` içe aktarır) sonraki sıralanabilir listelerin, panoların ve yüzeylerin üzerine kurulacağı sürükleme çekirdeğidir: `press(e, { threshold, longPress, tolerance, axis, onStart })` bir `pointerdown` olayını fare veya kalem 6 px hareket edince, dokunmada ise 5 px içinde 250 ms basılı tutulunca sürüklemeye çevirir (kaydırma hareketi yine kaydırır, önce kaydırmak basışı iptal eder); `capture(el, e, move, end)` sürüklemeyi işaretçi yakalamayla izler, `move`'u her animasyon karesinde en çok bir kez, `end(event, cancelled)`'ı bırakmada, iptalde veya Escape ile çağırır; `swallowClick()` bırakmadan sonraki tıklamayı iptal eder; `announce(text)` yerelleştirilmiş bir metni sayfa başına tek bir polite canlı bölgede, en çok 500 ms'de bir okur. `.z-drag-handle` (`zeyn.css` içinde) dokunmatik kaydırmayı yalnızca sürükleme tutamacında kapatır. Sürükleyen her bileşen taşımak için bir klavye ve tek işaretçi yolu da sunar (taşıma menüsü, WCAG 2.5.7). İki modül de HTML yazmaz.
 
 Tam bir sayfa, head içinde her sayfanın kullandığı stil dosyalarını (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), işaretleri HTML'inde bulunan modüllerin stil dosyalarını ve onların scriptlerini, import ettikleri modüllerden sonra bağlar. `zeyn.js` aynı tabloyla (`[name, script selector, style selector]`) sunulur ve sonradan gelen içerik için eksik olanı yükler: `nav.js` bir ekranı yerine koymadan önce `{ root, waits }` ile `zeyn:need` olayını gönderir ve yeni stil dosyalarını bekler, pencereler açılmadan önce aynı şekilde bekler; `zeyn:content`, grid sayfaları ve grid filtreleri taşıdıklarının scriptlerini yükler. Tarayıcı her URL için tek bir örnek tutar, bu yüzden bir modül bir kez çalışır. Bir modül çalıştığında belgede bulduklarını kurar, ardından `zeyn:content` olayını dinler; sayfada olmayan bileşenleri asla taramaz ve onlar için dinlemez. Modüller ortak bölümü kendi URL'lerinin `?v=` değeriyle import eder. `tests/ui_modules.rs`, bir sayfa kullanmadığı bir modülü bağladığında ya da bir modül stil dosyası işaretlerinin dışındaki bir sınıfa stil verdiğinde başarısız olur.
 
@@ -352,7 +355,7 @@ Bkz. `docs/islands.md`.
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; metin çerçeveleri `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket; metin çerçeveleri `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; ikili çerçeveler `0x01` + Y güncellemesi (v1), iki yönde |
 
 El sıkışmalar, yükseltmeden önce origin'i, CSRF belirtecini çerezle karşılaştırarak, oturum açmış kullanıcıyı ve izinleri denetler. Bkz. `docs/realtime.md`.
@@ -422,7 +425,7 @@ Dışarıdaki AI ajanları uygulamaya, ikisi de varsayılan olarak kapalı olan 
 | `Mcp::read_only()` | on | on | no |
 | `Mcp::on()` | on | on | form saves and API actions that write |
 
-`.server(false)` ve `.webmcp(false)` bir kapıyı kapatır. `zeyn new` ile oluşturulan yeni projeler `Mcp::read_only()` ile başlar.
+`.no_server()` ve `.no_webmcp()` bir kapıyı kapatır. `zeyn new` ile oluşturulan yeni projeler `Mcp::read_only()` ile başlar.
 
 Neden kapalı: endpoint, geçerli bir `Authorization` başlığına sahip herkesin uygulamayı bir model üzerinden yönetmesine izin verir ve bir model okuduğu verilerle yönlendirilebilir. Framework her uygulamayı ajanlara hazır hale getirir (araçlar koddan üretilir, yazılacak bir şey yoktur), ancak bir uygulamanın bu kapıyı açıp açmayacağı ve ajanların yazıp yazamayacağı, uygulamayı işletenlerin kararıdır. Salt okunur mod tek satır uzaklıktadır.
 

@@ -95,7 +95,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | 发起登录并重定向到提供方 |
 | `GET /_zeyn/auth/callback` | 提供方的回跳 |
-| `GET /_zeyn/auth/logout` | 在本应用和提供方两处结束会话 |
+| 先 `POST` 后 `GET /_zeyn/auth/logout` | 带 CSRF 令牌的 `POST` 在本应用结束会话，随后的 `GET` 在提供方退出登录 |
 
 请在提供方处把 `<public url>/_zeyn/auth/callback` 注册为重定向 URI，把 `<public url>/` 注册为登出后重定向 URI。公开 URL 是配置得到的，绝不取自请求的 `Host` 头。设置了 base 路径或公开路径时，这些路由会移到该路径之下。
 
@@ -127,7 +127,9 @@ CSRF 保护不变：无论由哪个 cookie 让用户登录，运行时的每个 
 
 ### 登出
 
-`/_zeyn/auth/logout` 删除会话 cookie，并带着 `client_id` 和 `post_logout_redirect_uri` 把用户送到提供方的 `end_session_endpoint`。没有该端点时，用户会回到应用的起始页。
+退出登录分两步，这样其他网站上的链接或图片无法让用户退出登录。带 CSRF 令牌的 `POST /_zeyn/auth/logout` 删除会话 cookie 并清除应用的浏览器存储。随后 `GET /_zeyn/auth/logout` 带着 `client_id` 和 `post_logout_redirect_uri` 把浏览器送到提供方的 `end_session_endpoint`；没有该端点时，用户会回到应用的起始页。仍持有会话的浏览器发出的 `GET` 只会回到应用。
+
+站点外壳中的退出链接和空闲退出都会完成这两步。你自己的链接加上 `data-zeyn-signout` 也能做到：运行时先向该地址发送 `POST`，再跟随链接。
 
 ### 同一应用的 API 和 MCP 客户端
 
