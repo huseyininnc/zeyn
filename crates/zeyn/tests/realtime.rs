@@ -100,7 +100,16 @@ async fn start(limits: Limits) -> (SocketAddr, LiveSocket, MemoryDocStore) {
             } else {
                 &["notes.read"]
             };
-            Some(Identity::user(user).with_permissions(perms.iter().copied()))
+            let identity = Identity::user(user).with_permissions(perms.iter().copied());
+            Some(
+                match h
+                    .get("x-tenant")
+                    .and_then(|v| v.to_str().ok())
+                {
+                    Some(t) => identity.with_tenant(t),
+                    None => identity,
+                },
+            )
         })
         .feature(
             Feature::new("notes")
@@ -109,6 +118,7 @@ async fn start(limits: Limits) -> (SocketAddr, LiveSocket, MemoryDocStore) {
                 .api(save_note),
         )
         .interceptor(Suspended)
+        .tenancy(zeyn::HeaderTenant("x-tenant"))
         .socket(live);
     let router = app.router().unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -161,7 +171,13 @@ async fn open_with(
         "cookie",
         HeaderValue::from_str(&format!("zeyn_csrf={TOKEN}")).unwrap(),
     );
+    let (user, tenant) = user
+        .split_once('@')
+        .unwrap_or((user, ""));
     h.insert("x-user", HeaderValue::from_str(user).unwrap());
+    if !tenant.is_empty() {
+        h.insert("x-tenant", HeaderValue::from_str(tenant).unwrap());
+    }
     if write {
         h.insert("x-write", HeaderValue::from_static("1"));
     }
@@ -887,6 +903,117 @@ async fn detached_sockets_expire_and_clean_closes_are_forgotten_at_once() {
         0,
         "a page that closes on purpose is not kept for a minute"
     );
+}
+
+#[tokio::test]
+async fn topics_groups_events_and_resumes_stay_inside_their_tenant() {
+    let (addr, hub, _) = start(Limits::default()).await;
+    let here = format!("http://{addr}");
+    let (mut a, welcome_a) = hello(addr, "ayse@acme", None).await;
+    let (mut b, _) = hello(addr, "ayse@globex", None).await;
+    let mut writer_a = open(addr, PAGE, "bora@acme", true, &here)
+        .await
+        .unwrap();
+    let mut writer_b = open(addr, PAGE, "bora@globex", true, &here)
+        .await
+        .unwrap();
+    for s in [&mut a, &mut b, &mut writer_a, &mut writer_b] {
+        send_json(
+            s,
+            serde_json::json!({ "c": 1, "a": "join_room", "d": { "name": "r1" } }),
+        )
+        .await;
+        assert_eq!(next_json(s).await["r"], 1);
+    }
+    assert_eq!(
+        hub.stats().groups,
+        2,
+        "the same group name is one group per tenant"
+    );
+    until_subscribers(&hub, 2).await;
+
+    hub.notify_tenant(Some("acme"), "orders");
+    assert_eq!(next_json(&mut a).await["t"], "orders");
+    assert!(
+        next_text(&mut b, 300).await.is_none(),
+        "a topic of acme never reaches globex"
+    );
+
+    send_json(
+        &mut writer_a,
+        serde_json::json!({ "c": 2, "a": "save_note", "d": { "name": "r1" } }),
+    )
+    .await;
+    assert_eq!(next_json(&mut a).await["e"], "notes.saved");
+    let mut got = Vec::new();
+    for _ in 0..3 {
+        got.push(next_json(&mut writer_a).await);
+    }
+    assert!(
+        got.iter()
+            .any(|v| v["e"] == "notes.audit"),
+        "{got:?}"
+    );
+    assert!(
+        next_text(&mut b, 300).await.is_none(),
+        "a group event of acme never reaches globex"
+    );
+    assert!(
+        next_text(&mut writer_b, 300)
+            .await
+            .is_none(),
+        "a tenant event of acme never reaches globex"
+    );
+
+    let token = welcome_a["welcome"]["resume"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    drop(a);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let (_, welcome) = hello(addr, "ayse@globex", Some((&token, 0))).await;
+    assert_eq!(
+        welcome["welcome"]["resumed"], false,
+        "the same user id in another tenant cannot resume the connection"
+    );
+}
+
+#[tokio::test]
+async fn a_flood_of_frames_or_one_too_large_closes_the_socket() {
+    let limits = Limits {
+        frames: 5,
+        message_bytes: 1024,
+        ..Limits::default()
+    };
+    let (addr, _, _) = start(limits).await;
+    let here = format!("http://{addr}");
+    let close_code = |mut s: Socket| async move {
+        loop {
+            match tokio::time::timeout(Duration::from_secs(5), s.next())
+                .await
+                .unwrap()
+            {
+                Some(Ok(Message::Close(frame))) => break frame.map(|f| f.code),
+                Some(Ok(_)) => continue,
+                Some(Err(_)) | None => break None,
+            }
+        }
+    };
+    let mut s = open(addr, PAGE, "ayse", false, &here)
+        .await
+        .unwrap();
+    for _ in 0..10 {
+        let _ = s
+            .send(Message::Text(r#"{"ack":0}"#.into()))
+            .await;
+    }
+    assert_eq!(close_code(s).await, Some(CloseCode::Policy));
+    let mut s = open(addr, PAGE, "ayse", false, &here)
+        .await
+        .unwrap();
+    let big = format!(r#"{{"sub":["{}"]}}"#, "x".repeat(2000));
+    let _ = s.send(Message::Text(big.into())).await;
+    assert_eq!(close_code(s).await, Some(CloseCode::Size));
 }
 
 /// The next text frame within `ms`, or `None`.

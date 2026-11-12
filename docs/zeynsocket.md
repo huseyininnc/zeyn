@@ -1,8 +1,9 @@
 # ZeynSocket: design
 
 Status: ZEYN-272 (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events, groups,
-`Conn`, actions over the socket) and ZEYN-273 (resume, replay, heartbeat, backoff) are built.
-ZEYN-274 to ZEYN-278 follow in the order of section 8.
+`Conn`, actions over the socket), ZEYN-273 (resume, replay, heartbeat, backoff) and ZEYN-277
+(limits, tenant isolation, memory) are built. ZEYN-274 to ZEYN-278 follow in the order of
+section 8.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,
@@ -169,6 +170,7 @@ Existing `Limits` stay. New fields, defaults in brackets:
 | `detached` time a dropped connection is kept | 60 s | groups and buffer dropped |
 | `groups` per connection | 32 | `join` answers `429` |
 | `calls` per connection per second | 20 | the call answers `429`; the write limit applies to write actions as for HTTP |
+| `frames` per connection per second | 100 | the socket is closed with 1008 |
 | `event_bytes` | 16 KB | `emit` returns an error and sends nothing |
 
 Worst case per user: `per_user (8) * (queue + replay_bytes)`, about 1 MB. An event is serialized
