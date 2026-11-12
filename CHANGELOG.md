@@ -15,6 +15,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Paging SQL follows the database more closely. PostgreSQL keyset pages seek with one row comparison, `("code", "id") > ($1, $2)`, when the sort keys share a direction and hold no NULLs; with an index on `(status, id)` over one million rows and three status values this took 0.11 ms instead of 29.4 ms. Oracle 11g pages without an offset, keyset pages and capped counts use `ROWNUM <= :n` alone, without the numbering wrapper.
 - Grid exports continue from the previous batch's keyset cursor when the data layer returns one, instead of an offset that rereads every earlier row.
 - Breaking: the `accounts` feature no longer serves `GET /_zeyn/account/signout`, so a link or image on another site cannot sign a user out. Signing out is `POST /_zeyn/account/logout` with the CSRF token, which the idle timeout now calls before it opens the sign in page.
+- The build id is computed on a background thread when the router is built, reading the executable in 64 KiB pieces, instead of on the first request with the whole executable in memory.
 
 ### Fixed
 

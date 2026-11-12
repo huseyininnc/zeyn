@@ -1715,6 +1715,7 @@ impl App {
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
+        ops::warm_build_id();
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self
