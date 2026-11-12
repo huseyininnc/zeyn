@@ -478,6 +478,23 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 
 .z-nav a[aria-current="page"] > .z-icon { color: var(--z-accent); }
 
+/** A menu item's fixed badge (`Menu::badge`) and its count (`Menu::count`), at the end of the row. */
+.z-nav a > span:has(+ :is(.z-nav-badge, .z-nav-count)) { flex: 1; min-width: 0; }
+.z-nav-badge,
+.z-nav-count {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0 var(--z-s-1_5);
+  border-radius: var(--z-radius-full);
+  font-size: var(--z-text-xs);
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.z-nav-badge { background: var(--z-hover); color: var(--z-text-muted); }
+.z-nav-count { min-width: 18px; background: var(--z-accent); color: var(--z-on-brand); text-align: center; }
+.z-nav-count[hidden] { display: none; }
+
 .z-main {
   min-width: 0;
   padding: var(--z-s-6) var(--z-s-8) var(--z-s-8);
