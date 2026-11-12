@@ -353,6 +353,8 @@ What to remember:
 2. `zeyn check` (or the `zeyn_check` MCP tool): compiles, then reports structural problems and
    missing translations. It must say `ok`. Its warnings name a `#[screen]` or `#[action]` that no
    feature registers and a flat `screens.rs` or `actions.rs` that has grown too large to stay flat.
+   Run `zeyn check --json` to read the result: each error has a stable `code` (`Z01xx` to
+   `Z06xx`, warnings `W01xx`), a `why`, a `fix` to apply and a `docs` link to read first.
 3. `zeyn dev` and open the screen in a browser: the page follows each rebuild without reloading.
    Check that the screen works by keyboard, in both themes, and that the console has no errors.
 4. For a container: `docker build -t <app> .` and `docker run -p 3000:3000 <app>`.

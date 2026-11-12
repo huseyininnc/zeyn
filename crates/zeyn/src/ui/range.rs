@@ -254,12 +254,18 @@ impl RangeSlider {
         let [a, b] = self.names;
         if a.is_empty() || b.is_empty() || a == b {
             check.problem(
-                "a RangeSlider needs two different names, such as `[\"min_price\", \"max_price\"]`",
+                crate::Problem::new("Z0619", "a RangeSlider needs two different names")
+                    .why("the two ends are two screen params, and one name for both would let one end overwrite the other")
+                    .fix("give it two names, such as `[\"min_price\", \"max_price\"]`")
+                    .docs("components/commerce#range-slider"),
             );
         }
         if self.bounds.0 == self.bounds.1 {
             check.problem(
-                "a RangeSlider's minimum and maximum are the same; give it a range to pick from",
+                crate::Problem::new("Z0620", "a RangeSlider's minimum and maximum are the same")
+                    .why("there is nothing to pick between equal ends, so the slider cannot be moved")
+                    .fix("give it a range to pick from")
+                    .docs("components/commerce#range-slider"),
             );
         }
     }

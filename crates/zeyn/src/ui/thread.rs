@@ -810,10 +810,23 @@ impl<E: Model> Component for MessageThread<E> {
             check.listens(t);
         }
         if self.author.is_none() || self.text.is_none() || self.when.is_none() {
-            check.problem("a MessageThread needs `.author(field)`, `.text(field)` and `.when(field)`: who sent a message, its text and when");
+            check.problem(
+                crate::Problem::new(
+                    "Z0621",
+                    "a MessageThread needs `.author(field)`, `.text(field)` and `.when(field)`",
+                )
+                .why("these fields say who sent a message, its text and when, and the thread cannot draw a message without them")
+                .fix("add the missing calls with the model's fields")
+                .docs("components/chat#messagethread"),
+            );
         }
         if !E::fields().iter().any(|f| f.key) {
-            check.problem("a MessageThread needs a model with a `#[key]` field, so messages that load twice show once");
+            check.problem(
+                crate::Problem::new("Z0622", "a MessageThread needs a model with a `#[key]` field")
+                    .why("messages that arrive live and with the next page are matched by key, so without one they show twice")
+                    .fix("mark the message id field `#[key]`")
+                    .docs("components/chat#messagethread"),
+            );
         }
     }
 }

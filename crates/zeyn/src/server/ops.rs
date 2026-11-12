@@ -86,10 +86,14 @@ pub(super) struct Extras {
 /// The startup problem of a development authenticator in a release build, unless allowed.
 pub(super) fn dev_auth_problem(release: bool, development: bool, allowed: bool) -> Option<String> {
     (release && development && !allowed).then(|| {
-        "DevAuth signs every request in with full access, so it does not run in release builds
-  = help: use a real authenticator in release builds (OidcAuth, JwtAuth, ForwardAuth or App::accounts), for example only under `#[cfg(debug_assertions)]`
-  = help: a demo that must run in a release build can call `App::allow_dev_auth()`"
-            .into()
+crate::Problem::new(
+    "Z0201",
+    "DevAuth signs every request in with full access, so it does not run in release builds",
+)
+.why("a release build is what goes to users, and with DevAuth anyone who reaches it can read and change everything")
+.fix("use a real authenticator in release builds (OidcAuth, JwtAuth, ForwardAuth or App::accounts), for example DevAuth only under `#[cfg(debug_assertions)]`; a demo that must run in a release build can call `App::allow_dev_auth()`")
+.docs("guides/security#signing-in")
+.to_string()
     })
 }
 
@@ -230,8 +234,13 @@ impl App {
             .get_or_insert_with(crate::jobs::Jobs::default)
             .clone();
         if let Err(e) = jobs.set_store(store) {
-            self.setup_problems
-                .push(format!("job_store: {e:?}"));
+            self.setup_problems.push(
+                crate::Problem::new("Z0504", format!("job_store: {e:?}"))
+                    .why("the job store could not be set, so jobs would run without the store the app asked for")
+                    .fix("call `App::job_store` once, before the first `App::job`")
+                    .docs("guides/enterprise#background-jobs")
+                    .to_string(),
+            );
         }
         self.services.insert(jobs);
         self
@@ -241,8 +250,16 @@ impl App {
     pub fn job_concurrency(mut self, limit: usize) -> Self {
         match &self.extras.jobs {
             Some(jobs) if !jobs.is_empty() => {
-                self.setup_problems
-                    .push("job_concurrency must be set before the first job is added".into());
+                self.setup_problems.push(
+                    crate::Problem::new(
+                        "Z0505",
+                        "job_concurrency must be set before the first job is added",
+                    )
+                    .why("the job runner is created with the first job, and its limit cannot change afterwards")
+                    .fix("move `.job_concurrency(n)` above the first `.job(...)`")
+                    .docs("guides/enterprise#background-jobs")
+                    .to_string(),
+                );
             }
             _ => {
                 let jobs = crate::jobs::Jobs::with_limit(limit);

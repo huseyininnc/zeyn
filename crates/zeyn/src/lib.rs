@@ -94,6 +94,7 @@ mod pdf;
 mod platform;
 mod prefs;
 mod privacy;
+mod problem;
 /// Fractional index keys for user ordered rows.
 pub mod rank;
 #[cfg(feature = "redis")]
@@ -202,6 +203,7 @@ pub use prefs::{
 #[doc(hidden)]
 pub use privacy::output as __privacy;
 pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
+pub use problem::{DOCS_URL, Problem, problem_json};
 pub use rank::Rank;
 #[cfg(feature = "redis")]
 pub use redis_store::RedisStore;

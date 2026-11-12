@@ -650,10 +650,16 @@ impl Feature {
                 .iter()
                 .any(|o| o.path == r.path)
             {
-                problems.push(format!(
-                    "route `{}` is used by more than one screen",
-                    r.path
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0109",
+                        format!("route `{}` is used by more than one screen", r.path),
+                    )
+                    .why("a request to the route can open only one screen, so the others would never be reached")
+                    .fix("give each screen of the feature its own route in `#[screen(route = \"...\")]`")
+                    .docs("language/screens#params-in-the-path")
+                    .to_string(),
+                );
             }
         }
         for (i, s) in self.screens.iter().enumerate() {
@@ -661,21 +667,45 @@ impl Feature {
                 .iter()
                 .any(|o| o.meta.name == s.meta.name)
             {
-                problems.push(format!("screen `{}` is registered twice", s.meta.name));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0110",
+                        format!("screen `{}` is registered twice", s.meta.name),
+                    )
+                    .why("each `.screen(...)` call adds a route and a permission, so the second one only repeats the first")
+                    .fix("remove one of the `.screen(...)` calls")
+                    .docs("start/structure#a-feature")
+                    .to_string(),
+                );
             }
         }
         for (i, m) in self.media.iter().enumerate() {
             if !crate::media::valid_media_id(m.name) {
-                problems.push(format!(
-                    "media source `{}` must use only letters, digits, `-`, `_` and `.`",
-                    m.name
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0502",
+                        format!("media source `{}` must use only letters, digits, `-`, `_` and `.`", m.name),
+                    )
+                    .why("the name is a segment of every media URL, so other characters would break the address or let it point elsewhere")
+                    .fix("rename the source with letters, digits, `-`, `_` and `.`, such as `films`")
+                    .docs("components/media#serving-files")
+                    .to_string(),
+                );
             }
             if self.media[..i]
                 .iter()
                 .any(|o| o.name == m.name)
             {
-                problems.push(format!("media source `{}` is registered twice", m.name));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0503",
+                        format!("media source `{}` is registered twice", m.name),
+                    )
+                    .why("media URLs carry the source name, so only one of the two sources would ever serve files")
+                    .fix("remove one of the `.media(...)` calls, or give it another name")
+                    .docs("components/media#serving-files")
+                    .to_string(),
+                );
             }
         }
         for item in self.menu.iter().flat_map(|g| &g.items) {
@@ -684,18 +714,27 @@ impl Feature {
                 .iter()
                 .find(|s| s.meta.name == item.screen)
             {
-                Some(s) if s.meta.route.is_none() => problems.push(format!(
-                    "menu item `{}` points to screen `{}`, which has no route",
-                    item.label.english(),
-                    item.screen
-                )),
+                Some(s) if s.meta.route.is_none() => problems.push(
+                    crate::Problem::new(
+                        "Z0401",
+                        format!("menu item `{}` points to screen `{}`, which has no route", item.label.english(), item.screen),
+                    )
+                    .why("a menu item is a link, and a screen without a route has no address to link to")
+                    .fix("give the screen `#[screen(route = \"...\")]`, or remove the menu item")
+                    .docs("components/shell#the-menu")
+                    .to_string(),
+                ),
                 Some(_) => {}
-                None => problems.push(format!(
-                    "menu item `{}` points to screen `{}`, which is not registered in feature `{}`",
-                    item.label.english(),
-                    item.screen,
-                    self.name
-                )),
+                None => problems.push(
+                    crate::Problem::new(
+                        "Z0402",
+                        format!("menu item `{}` points to screen `{}`, which is not registered in feature `{}`", item.label.english(), item.screen, self.name),
+                    )
+                    .why("the menu would show a link to a screen the feature does not serve")
+                    .fix("add `.screen(...)` for it to the same feature, or remove the menu item")
+                    .docs("components/shell#the-menu")
+                    .to_string(),
+                ),
             }
         }
         let commands: Vec<(&str, &crate::command::Command)> = self

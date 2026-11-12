@@ -682,7 +682,7 @@ fn call_literals<'a>(text: &'a str, call: &str) -> Vec<(&'a str, usize)> {
 /// `ui.refresh`) or driven (`.drives`) but that no node listens to (`.listens`, `Live::new`), and
 /// a topic nodes listen to that nothing refreshes, drives or notifies (`hub.notify`,
 /// `notify_tenant`). Read from the source text, so only topics written as string literals count.
-pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<String> {
+pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<(&'static str, String)> {
     let mut listened: Vec<(&str, String)> = Vec::new();
     let mut sent: Vec<(&str, String, &str)> = Vec::new();
     for (path, text) in files {
@@ -713,16 +713,22 @@ pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<String> {
         if *how != "notified" && !listened.iter().any(|(t, _)| t == topic) && !seen.contains(topic)
         {
             seen.push(topic);
-            out.push(format!(
-                "topic `{topic}` is {how} at {place}, but no node listens to it; add `.listens(\"{topic}\")` to the nodes that show it, or remove the call"
+            out.push((
+                "W0103",
+                format!(
+                    "topic `{topic}` is {how} at {place}, but no node listens to it; add `.listens(\"{topic}\")` to the nodes that show it, or remove the call"
+                ),
             ));
         }
     }
     for (topic, place) in &listened {
         if !sent.iter().any(|(t, _, _)| t == topic) && !seen.contains(topic) {
             seen.push(topic);
-            out.push(format!(
-                "nodes listen to topic `{topic}` at {place}, but nothing refreshes, drives or notifies it; call `ui.refresh(\"{topic}\")` after saving, `.drives(\"{topic}\")` on a filter, or `hub.notify(&ctx, \"{topic}\")`"
+            out.push((
+                "W0104",
+                format!(
+                    "nodes listen to topic `{topic}` at {place}, but nothing refreshes, drives or notifies it; call `ui.refresh(\"{topic}\")` after saving, `.drives(\"{topic}\")` on a filter, or `hub.notify(&ctx, \"{topic}\")`"
+                ),
             ));
         }
     }
@@ -731,7 +737,10 @@ pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<String> {
 
 /// Warnings about the default layout for `zeyn check`, from the source files of an app and the
 /// screens and APIs its features register. Never errors: the layout is a default, not a rule.
-pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Vec<String> {
+pub fn layout_warnings(
+    files: &[(PathBuf, String)],
+    registered: &[String],
+) -> Vec<(&'static str, String)> {
     let mut out = Vec::new();
     let words = |t: &str| -> Vec<String> {
         t.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
@@ -771,8 +780,11 @@ pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Ve
                 } else {
                     format!("use it from a screen or add `.api(actions::{name})` to its feature()")
                 };
-                out.push(format!(
-                    "#[{kind}] `{name}` in {shown} is not registered in any feature; {how}"
+                out.push((
+                    "W0101",
+                    format!(
+                        "#[{kind}] `{name}` in {shown} is not registered in any feature; {how}"
+                    ),
                 ));
             }
         }
@@ -796,11 +808,14 @@ pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Ve
                 && n > 1
                 && lines > 150
             {
-                out.push(format!(
-                    "{shown} has {n} #[{kind}] functions in {lines} lines; {first}move each \
-                     {kind} into {}/<name>.rs and shared parts of screens into \
-                     components/<name>.rs",
-                    file.trim_end_matches(".rs")
+                out.push((
+                    "W0102",
+                    format!(
+                        "{shown} has {n} #[{kind}] functions in {lines} lines; {first}move each \
+                         {kind} into {}/<name>.rs and shared parts of screens into \
+                         components/<name>.rs",
+                        file.trim_end_matches(".rs")
+                    ),
                 ));
             }
         }

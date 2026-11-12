@@ -13,6 +13,7 @@
 | `zeyn routes` | Выводит список функций, экранов, маршрутов, API и прав доступа |
 | `zeyn check` | Компилирует и сообщает о структурных проблемах и отсутствующих переводах |
 | `zeyn check --fix` | Переписывает переименованные API Zeyn в `src`, `tests` и `examples`, затем проверяет |
+| `zeyn check --json` | Выводит отчёт в JSON со стабильными кодами, причинами и исправлениями |
 | `zeyn mcp` | Запускает MCP-сервер через stdio для ИИ-агентов |
 
 Установите её из crates.io:
@@ -87,6 +88,30 @@ zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 
 ```sh
 zeyn check --fix
+```
+
+У каждой проблемы есть стабильный код: `Z01xx` для приложения, фич, маршрутов и сервисов, `Z02xx` для безопасности, `Z03xx` для публичных страниц, `Z04xx` для меню, команд и сочетаний клавиш, `Z05xx` для данных, `Z06xx` для проверок страниц и `W01xx` для предупреждений. Текстовый вывод показывает каждую проблему с причиной (`why`), исправлением (`help`), ссылкой на эту документацию и кодом. `zeyn check --json` выводит тот же отчёт одним документом JSON для агентов и CI и завершается с ошибкой, когда `ok` равно false.
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
 ```
 
 ## Docker
