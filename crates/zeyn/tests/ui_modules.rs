@@ -208,6 +208,10 @@ async fn a_page_links_the_modules_of_its_components_with_what_they_import() {
     let (_, grid) = get("/trips").await;
     assert!(grid.contains(r#"<link rel="modulepreload" href="/_zeyn/grid.js?v="#));
     assert!(!links(&grid).contains(&"dates.js".to_string()));
+    assert!(
+        !links(&grid).contains(&"menu.js".to_string()),
+        "the grid's data-zeyn-count is not a menu count"
+    );
     let (_, form) = get("/trip").await;
     let linked = links(&form);
     for name in ["dates.js", "components.js"] {

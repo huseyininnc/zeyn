@@ -120,7 +120,11 @@ pub(crate) const MODULES: &[Module] = &[
     script("busy", &["data-zeyn-busy"]),
     script(
         "menu",
-        &["data-zeyn-menu", "data-zeyn-menu-filter", "data-zeyn-count"],
+        &[
+            "data-zeyn-menu",
+            "data-zeyn-menu-filter",
+            "data-zeyn-menu-count",
+        ],
     ),
     script(
         "palette",
