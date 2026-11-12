@@ -19,6 +19,7 @@ A failed page answers with its status (404, 403, 500, ...) and the app's error s
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
+  <meta name="zeyn-storage" content="USER-KEY">
   <title>Products · Inventory</title>
   <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
   <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
@@ -45,7 +46,7 @@ A page loads and runs only the browser code its screen uses. Every page runs the
 | Module | Components |
 |---|---|
 | `components.js` | the shared part every control module imports: helpers, the popup and listbox cores, selects (the pickers of the app shell), confirm dialogs, alerts, breadcrumbs |
-| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | panels, tabs and split panes; date and time pickers (also grid date filters); listboxes, lookups and multiple selects; numbers, growing text areas, masks and passwords; the lines editor; forms in steps; trees; tooltips and popovers; menu and split buttons; busy overlays |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`, `menu.js` | panels, tabs and split panes; date and time pickers (also grid date filters); listboxes, lookups and multiple selects; numbers, growing text areas, masks and passwords; the lines editor; forms in steps; trees; tooltips and popovers; menu and split buttons; busy overlays; collapsible groups of the side menu |
 | `grid.js` | grids, linked as `<link rel="modulepreload">` because `zeyn.js` imports it itself |
 | `palette.js`, `pro.js` | the command palette and command buttons; menu bars, toolboxes, status bars, docks and property inspectors |
 | `colors.js`, `length.js`, `inspector.js` | color pickers; lengths with a unit switch; property inspectors of islands |
@@ -58,6 +59,9 @@ A page loads and runs only the browser code its screen uses. Every page runs the
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js` and `commerce.css` | range sliders, quantity steppers, product galleries and countdowns; the stylesheet of every shop component (prices, variant pickers, facet panels, review summaries) |
 | `thread.js` and `thread.css`, `stream.js`, `composer.js` and `composer.css`, `typing.js` and `typing.css` | message threads; the streamed Markdown and JSON lines shared by threads and the assistant; chat composers; typing indicators |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | feeds of posts; the lightbox of images and videos; story rings and their rows, which need no script |
+| `drag.js`, `net.js` | shared helpers without markers of their own, linked with the modules that import them (below) |
+
+Two helper modules hold code that several modules would otherwise copy. `net.js` (imported by `kanban.js`, `files.js` and `vlist.js`) exports `BASE`, `csrf()`, `parse(text)` and `post(path, body)`, which posts JSON on the page's origin with the `x-zeyn-csrf` header and resolves to `{ ok, body }`. `drag.js` (imported by `grid.js` for column moves and `catalog.js` for rail drag scrolling) is the drag core later sortable lists, boards and surfaces build on: `press(e, { threshold, longPress, tolerance, axis, onStart })` turns a `pointerdown` into a drag once a mouse or pen moves 6 px, or a touch is held 250 ms within 5 px (a swipe still scrolls, and scrolling first cancels the press); `capture(el, e, move, end)` follows the drag with pointer capture, calls `move` at most once per animation frame and `end(event, cancelled)` on release, cancel or Escape; `swallowClick()` cancels the click after a release; `announce(text)` speaks a localized text in one polite live region per page, at most every 500 ms. `.z-drag-handle` (in `zeyn.css`) turns off touch panning on a drag handle only. Every component that drags also offers a keyboard and single pointer way to move (a move menu, WCAG 2.5.7). Neither module writes HTML.
 
 A full page links, in its head, the stylesheets every page uses (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), the stylesheets of the modules whose markers are in its HTML, and their scripts after the modules they import. `zeyn.js` is served with the same table (`[name, script selector, style selector]`) and loads what is missing when content arrives later: `nav.js` fires `zeyn:need` with `{ root, waits }` before it swaps a screen in and waits for the new stylesheets, windows wait the same way before they open, and `zeyn:content`, grid pages and grid filters load the scripts of what they hold. The browser keeps one instance per URL, so a module runs once. A module sets up what it finds in the document when it runs and listens to `zeyn:content` after that; it never scans for, or listens to, components that are not on the page. Modules import the shared part with the `?v=` of their own URL. `tests/ui_modules.rs` fails when a page links a module it does not use or a module stylesheet styles a class outside its markers.
 
@@ -132,7 +136,7 @@ All `POST` requests send JSON, must carry the header `x-zeyn-csrf` with the toke
 
 A public screen opened without a session comes with an empty `zeyn-csrf` meta tag and no `Set-Cookie`, so that it can be cached. Before its first `POST` the runtime calls `GET /_zeyn/csrf`, which answers `{ "token": "..." }` with `Cache-Control: no-store`, sets the `zeyn_csrf` cookie when the browser has none, and refuses requests whose `Sec-Fetch-Site` is not `same-origin`. The token goes into the meta tag; when the call fails the `POST` goes out without a token and is refused like any other. Nothing is retried silently.
 
-In-app navigation (`nav.js`) asks for a screen with `x-zeyn-partial: 1` and gets only its HTML, with the page title in `x-zeyn-title`. When the screen sets head tags (description, canonical URL, preview image, robots, JSON-LD), the body starts with `<template data-zeyn-head>` holding them; `nav.js` removes every `[data-zeyn-head]` element of the document head, moves the template's tags there and drops the template. A screen without head tags sends no template, so the old tags are only removed.
+In-app navigation (`nav.js`) asks for a screen with `x-zeyn-partial: 1` and gets only its HTML, with the page title in `x-zeyn-title`. When the screen sets head tags (description, canonical URL, preview image, robots, JSON-LD), the body starts with `<template data-zeyn-head>` holding them; `nav.js` removes every `[data-zeyn-head]` element of the document head, moves the template's tags there and drops the template. A screen without head tags sends no template, so the old tags are only removed. `nav.js` uses an answer only when its final URL, after redirects, is on the page's origin; otherwise it loads the requested address in full. A `zeyn:navigate` to another origin (also `javascript:` and `data:` addresses) is canceled and ignored with one console warning.
 
 ### 4.1 Screen fragment
 
@@ -266,6 +270,7 @@ the request).
 - Every response sets `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. `App::csp` adds named `https` hosts to `img-src`, `media-src` (and `blob:`), `frame-src`, `connect-src` and `font-src`; the other directives never change. The header text is built once at startup.
 - No inline scripts or inline event handlers. Inline `style` attributes are used only for CSS custom properties (`--z-width`, `--z-flex`) and fixed column widths, so the policy adds `style-src-attr 'unsafe-inline'`. Scripts stay strict.
 - The CSRF token is stored in an `HttpOnly`, `SameSite=Strict` cookie and compared in constant time with the `x-zeyn-csrf` header.
+- Values the runtime keeps in the browser for one user (form drafts, grid views, palette recents) are filed under the page's `zeyn-storage` key: `anon` when signed out, otherwise a short keyed hash of the user id (HMAC with the accounts or OpenID Connect secret), never the id itself. A page of a new user removes what the previous user left. Signing out (`POST /_zeyn/account/logout`, the sign out screen, `/_zeyn/auth/logout`) answers with `Clear-Site-Data: "storage"`, which browsers apply on HTTPS.
 - Pages, the `totp` form and `GET /_zeyn/csrf` never carry the token as it is in the cookie: each response gets a fresh random pad followed by the token XOR the pad (128 hex digits), so gzip cannot leak it (BREACH). The server unmasks before it compares and still accepts the plain 64 digit token.
 - Dynamic responses of 1 KB or more (pages, partial screens, grid blocks, exports) are gzipped at level 2 when the browser accepts it, with `Vary: Accept-Encoding`. Never compressed: responses that already have a `Content-Encoding` (the framework assets, compressed once and cached), ranges (`Content-Range`, and any request with `Range`), video, audio, images other than SVG, `application/octet-stream`, archives and PDFs, `text/event-stream`, `application/x-ndjson` (the assistant's stream) and WebSocket upgrades.
 - Each call checks, in order: authentication, the screen's access, the feature's guards, the node action's access, then runs the interceptors and the action.
@@ -290,7 +295,7 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 | Endpoint | Body | Answer |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | HTML of one node with the first page of its grids. Used by lazy tabs. |
-| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: several nodes rendered from one run of the screen, for the listeners of a refreshed or driven topic. At most 32 distinct paths; a path not in the screen answers `404`. The screen's access, guards and interceptors run once, and params are read as the screen's typed params. |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: several nodes rendered from one run of the screen, for the listeners of a refreshed or driven topic. At most 32 distinct paths; a path not in the screen answers `404`. A path inside another requested path is dropped, and only the ancestor is answered, since it renders the whole subtree. Counts against the write limit, like `/_zeyn/node`. The screen's access, guards and interceptors run once, and params are read as the screen's typed params. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | JSON from the data source `key` of the node: lookup options (`key` is the field name), tree children (`key` is empty), step checks (`key` is `_step`). The source's action permission is checked and the interceptors run, as for grids. Input that does not fit the action is refused with `404`. |
 | `/_zeyn/data` with `screen` = `_site.{feature}` | as above | The same for a component in a site header slot: `node` is the slot (0 start, 1 center, 2 end, 3 bottom), the node's index in it, then child indexes. The feature's guards and the action's permission are checked. |
 | `/_zeyn/parse` | `{ kind, text, label }` | How the server reads a typed date or time in the user's language, zone and clock: `{ ok, text, iso, utc, zone }` or `{ ok: false, message }`. `kind` is `date`, `time`, `datetime`, `local` or `presets` (today and quick ranges). |
@@ -358,10 +363,10 @@ inside it in place.
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; text frames `{ "topic": "a" }` |
-| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
+| `GET /_zeyn/live/topics?t=a,b` | WebSocket; text frames `{ "topic": "a" }` |
+| `GET /_zeyn/live/doc/{kind}/{doc}` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
 
-Handshakes check the origin, the CSRF token against the cookie, the signed in user and the
+Handshakes check the origin, the CSRF token (offered as the subprotocol `csrf.TOKEN` next to `zeyn`, never in the URL) against the cookie, the signed in user and the
 permissions before upgrading. See `docs/realtime.md`.
 
 The player dispatches the cancelable `zeyn:media-adaptive` event (`{ media, kind, url, hls, dash }`) on its root before falling back to progressive files; a streaming library calls `preventDefault()` to take over.
@@ -385,7 +390,7 @@ Commands are declared in Rust (`Command::open`, `Command::navigate`, `Command::e
 
 `App::check` refuses shortcuts that cannot be read, single character shortcuts (WCAG 2.1.4), the palette's own shortcut, shortcuts or ids used by two commands, shortcuts the browser never passes to the page (`BROWSER_RESERVED`: `Ctrl+N`, `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Alt+F4` and their macOS forms) and, unless the command calls `.override_browser()`, shortcuts the browser uses (`BROWSER_DEFAULTS`: print, save, find, address bar, reload, zoom, developer tools, copy and paste, `F1` to `F12`). Toolbar buttons follow the same rules at run time: such a shortcut is not bound and the reason is logged. Free combinations are `Alt+Shift+<letter>` and `Ctrl+Alt+<letter>`.
 
-`Alt+Shift+P` (Option+Shift+P on macOS) opens the palette by default; `App::palette_shortcut("Ctrl+Shift+P")` changes it, also to a key the browser uses, on purpose. The shortcut is in `data-palette-keys`, and letters match by physical key so Option and AltGr do not break it. The palette also opens also from `button[data-zeyn-palette-open]` in the menu. It is a modal `<dialog>` with an ARIA combobox and listbox. It lists the app's commands, the toolbar buttons, menu bar commands and context menu items of the current screen (the top window when one is open) and the screens in the menu. Matching is fuzzy and ignores case and accents; the eight most recently run commands come first (`localStorage` key `zeyn.palette.recent`). Escape closes it and focus returns to where it was.
+`Alt+Shift+P` (Option+Shift+P on macOS) opens the palette by default; `App::palette_shortcut("Ctrl+Shift+P")` changes it, also to a key the browser uses, on purpose. The shortcut is in `data-palette-keys`, and letters match by physical key so Option and AltGr do not break it. The palette also opens also from `button[data-zeyn-palette-open]` in the menu. It is a modal `<dialog>` with an ARIA combobox and listbox. It lists the app's commands, the toolbar buttons, menu bar commands and context menu items of the current screen (the top window when one is open) and the screens in the menu. Matching is fuzzy and ignores case and accents; the eight most recently run commands come first (`localStorage` key `zeyn.palette.recent:` and the page's `zeyn-storage` key). Escape closes it and focus returns to where it was.
 
 | Endpoint | Body | Answer |
 |---|---|---|

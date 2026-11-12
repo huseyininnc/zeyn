@@ -31,7 +31,31 @@ function isScreenUrl(url) {
   return !local.startsWith('/_zeyn/') && !local.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(local);
 }
 
-/** Marks the menu link of the current page and writes the top bar's breadcrumb from it. */
+/**
+ * Whether `res` came from this app's origin, also after redirects. A response from another
+ * origin is never swapped in or written to the history.
+ */
+function sameOrigin(res) {
+  return !res.url || new URL(res.url).origin === location.origin;
+}
+
+/**
+ * Opens the side menu groups around `link` (their heading buttons, see `menu.js`); in an
+ * accordion menu it closes their open siblings.
+ */
+function openBranch(link) {
+  const accordion = link.closest('[data-zeyn-accordion]');
+  const heading = (el) => el.querySelector(':scope > :is(h2, h3, h4, h5) > .z-nav-heading');
+  for (let g = link.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {
+    if (accordion) for (const s of g.parentElement.children) if (s !== g) heading(s)?.setAttribute('aria-expanded', 'false');
+    heading(g)?.setAttribute('aria-expanded', 'true');
+  }
+}
+
+/**
+ * Marks the menu link of the current page, opens its menu groups and writes the top bar's
+ * breadcrumb from them.
+ */
 function markCurrent(url) {
   let current = null;
   document.querySelectorAll('.z-nav a[href], .z-site-nav a[href], .z-site-bottom a[href]').forEach((a) => {
@@ -41,9 +65,13 @@ function markCurrent(url) {
       if (a.closest('.z-nav')) current = a;
     } else a.removeAttribute('aria-current');
   });
+  if (current) openBranch(current);
   const crumbs = document.querySelector('[data-zeyn-crumbs] ol');
   if (!crumbs) return;
-  const group = current?.closest('.z-nav-group')?.querySelector('h2')?.textContent ?? '';
+  const groups = [];
+  for (let g = current?.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {
+    groups.unshift(g.querySelector(':scope > :is(h2, h3, h4, h5)')?.textContent ?? '');
+  }
   const page = current?.textContent ?? document.querySelector('#z-main h1')?.textContent ?? '';
   const li = (text, here) => {
     const item = document.createElement('li');
@@ -53,7 +81,7 @@ function markCurrent(url) {
     item.append(here ? span : text);
     return item;
   };
-  crumbs.replaceChildren(...(group && group !== page ? [li(group, false)] : []), ...(page ? [li(page, true)] : []));
+  crumbs.replaceChildren(...groups.filter((g) => g && g !== page).map((g) => li(g, false)), ...(page ? [li(page, true)] : []));
 }
 
 /** Moves focus to the new screen's heading and tells screen readers that the page changed. */
@@ -115,6 +143,10 @@ async function swapScreen(url, push) {
     });
   } catch (err) {
     if (err?.name === 'AbortError') return;
+    location.assign(url.href);
+    return;
+  }
+  if (!sameOrigin(res)) {
     location.assign(url.href);
     return;
   }
@@ -220,6 +252,10 @@ async function swapFrame(url, push, hash) {
     location.assign(url.href);
     return;
   }
+  if (!sameOrigin(res)) {
+    location.assign(url.href);
+    return;
+  }
   const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
   const next = doc.querySelector('.z-app');
   const current = document.querySelector('.z-app');
@@ -264,12 +300,20 @@ function refreshPage() {
  * Other scripts ask for navigation with events instead of loading pages themselves:
  * `zeyn:navigate` (`detail.url`, `detail.replace`) loads a screen, `zeyn:refresh` reloads the
  * current one in place and `zeyn:refresh-page` the whole app frame. Each event is canceled when
- * handled, so a sender without this script can fall back to a page load.
+ * handled, so a sender without this script can fall back to a page load. A `zeyn:navigate` to
+ * another origin (also `javascript:` and `data:` addresses) is canceled too and goes nowhere,
+ * with one console warning.
  */
+let warnedOrigin = false;
+
 document.addEventListener('zeyn:navigate', (e) => {
-  const url = new URL(e.detail?.url ?? location.href, location.href);
-  if (url.origin !== location.origin) return;
   e.preventDefault();
+  const url = new URL(e.detail?.url ?? location.href, location.href);
+  if (url.origin !== location.origin) {
+    if (!warnedOrigin) console.warn('zeyn:navigate ignored an address outside this app');
+    warnedOrigin = true;
+    return;
+  }
   visit(url, !e.detail?.replace);
 });
 

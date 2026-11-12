@@ -16,6 +16,95 @@ Feature::new("sales")
     .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
 ```
 
+### नेस्टेड और समेटे जा सकने वाले समूह
+
+`.sub(label, |m| ...)` आख़िरी समूह में एक नेस्टेड समूह जोड़ता है; उसके अंदर `item`, `icon`, `open` और `sub` वैसे ही काम करते हैं जैसे किसी समूह में। नेस्टेड समूह अपने समूह की आइटम के बाद आते हैं और शीर्ष स्तर के समूह से अधिकतम तीन स्तर नीचे तक जाते हैं (`MENU_DEPTH`); इससे गहरा मेनू ऐप को शुरू होते समय समूह का नाम बताने वाले संदेश के साथ रोक देता है।
+
+```rust
+.menu(|m| {
+    m.group(t!("sales.menu"), Icon::Cart)
+        .item(t!("sales.orders"), orders)
+        .sub(t!("sales.reports"), |m| m.item(t!("sales.by_city"), by_city).item(t!("sales.archive"), archive))
+        .accordion()
+})
+```
+
+- **समेटे जा सकने वाले।** हर समूह का शीर्षक `aria-expanded` और `aria-controls` वाला एक बटन है (W3C APG डिस्क्लोज़र नेविगेशन पैटर्न)। सर्वर मौजूदा स्क्रीन वाले समूहों को खुला और बाक़ी को बंद बनाता है, और `nav.js` हर नेविगेशन के बाद नई स्क्रीन की शाखा खोलता है। स्क्रिप्ट के बिना सभी समूह खुले रहते हैं, इसलिए कुछ भी पहुँच से बाहर नहीं होता।
+- **हमेशा खुला।** किसी समूह के बाद `.open()` उसे खुला रखता है: उसका शीर्षक बिना बटन का सादा टेक्स्ट होता है।
+- **अकॉर्डियन।** app shell की किसी भी feature के मेनू पर `.accordion()` पूरे साइड मेनू को अकॉर्डियन बना देता है: एक समूह खोलने पर उसके खुले सहोदर समूह बंद हो जाते हैं।
+- **कीबोर्ड।** ऊपर और नीचे दिखने वाले शीर्षकों और लिंक के बीच चलते हैं, Home और End पहले और आख़िरी पर जाते हैं। दायाँ बंद समूह खोलता है या खुले समूह के अंदर जाता है; बायाँ खुला समूह बंद करता है या बाहरी समूह के शीर्षक पर जाता है। Enter और Space समूह खोलते और बंद करते हैं। दाएँ से बाएँ लिखी जाने वाली भाषाओं में बायाँ और दायाँ आपस में बदल जाते हैं।
+- **अनुमतियाँ और विलय।** एक ही लेबल वाले समूह हर स्तर पर features के बीच मिल जाते हैं, और जिस समूह की कोई आइटम उपयोगकर्ता नहीं खोल सकता वह नेस्टेड समूहों समेत हटा दिया जाता है। `App::header(|h| h.breadcrumb())` का ब्रेडक्रंब समूह का पूरा पथ दिखाता है। site shell नेस्टेड समूहों के लिंक उनके शीर्ष स्तर के समूह में दिखाता है।
+
+### हर अनुरोध पर बनने वाले मेनू
+
+`App::menu_source(source)` ऐसी मेनू प्रविष्टियाँ जोड़ता है जो हर अनुरोध के लिए बनती हैं, जैसे उपयोगकर्ता की भूमिकाओं से छाँटी गई किसी मेनू तालिका से। स्रोत एक async फ़ंक्शन है जो `Ctx` (पहचान, टेनेंट, भाषा) लेता है और `MenuNode` लौटाता है: सबसे ऊपर `MenuNode::group(label, children)`, और उसके भीतर `MenuNode::screen(label, "screen_name")` लिंक (`.params(json)` पथ के हिस्से और क्वेरी उसी तरह भरता है जैसे `screen_url`), `MenuNode::path(label, "/reports/sales")` लिंक और नेस्टेड समूह। `.icon(...)`, `.open()` और `.permission("menu.reports")` किसी भी नोड पर काम करते हैं। लेबल सादा पाठ होता है, जो किसी भी दूसरे पाठ की तरह एस्केप होता है, या `Text::key` के साथ कैटलॉग कुंजी।
+
+ये समूह features के स्थिर मेनू के बाद आते हैं, और किसी स्थिर समूह के लेबल वाला समूह उसी में मिल जाता है। ब्रेडक्रम्ब, कमांड पैलेट और `nav.js` इनके लिंक को किसी भी दूसरे मेनू लिंक की तरह मानते हैं।
+
+नीचे की तालिका PostgreSQL और Oracle दोनों पर चलती है। एक सपाट `SELECT` उसे पढ़ता है, और पेड़ Rust में `parent_id` से बनता है:
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **कभी भरोसा नहीं।** सर्वर हर अनुरोध पर हर लिंक जाँचता है: अज्ञात screens के लिंक लॉग में चेतावनी के साथ हटा दिए जाते हैं, उन screens के लिंक जिन्हें उपयोगकर्ता नहीं खोल सकता (पहुँच, feature guards, नोड की अपनी `permission`) स्रोत के लौटाने पर भी हटा दिए जाते हैं, और वे screen लिंक भी जिनके पथ के हिस्से params से नहीं भरते। पथ एक ही `/` से शुरू होना चाहिए: कोई स्कीम नहीं, `//` नहीं, बैकस्लैश नहीं और कोई नियंत्रण वर्ण नहीं। समूह अधिकतम `MENU_DEPTH` स्तर तक नेस्ट होते हैं, स्रोत के उत्तर में अधिकतम `MAX_MENU_NODES` (500) नोड रहते हैं, और लेबल `MAX_MENU_LABEL` (100) वर्णों पर काट दिए जाते हैं।
+- **कैश किया हुआ।** उत्तर हर टेनेंट, भाषा और अनुमतियों के समूह के लिए `MENU_TTL` (60 सेकंड) तक कैश रहते हैं, इसलिए एक जैसी भूमिकाओं वाले उपयोगकर्ता एक ही उत्तर साझा करते हैं और उनके लिए स्रोत मिनट में एक बार चलता है। कैश अधिकतम `MAX_MENU_CACHE` (256) उत्तर रखता है और सबसे पुराना हटा देता है। जिस स्रोत का उत्तर केवल अनुमतियों पर नहीं बल्कि उपयोगकर्ता पर भी निर्भर हो, उसे `App::menu_per_user()` चाहिए। कोई action तालिका बदलने के बाद इंजेक्ट की गई `Menus` सेवा पर `invalidate()` बुलाता है।
+- **पेज कभी नहीं गिरता।** जब स्रोत त्रुटि लौटाता है, पैनिक करता है या `MENU_TIMEOUT` (2 सेकंड) से ज़्यादा समय लेता है, तो पेज स्थिर मेनू दिखाता है और सर्वर विफलता लॉग करता है। विफलताएँ कैश नहीं होतीं।
+- **कहाँ दिखता है।** मेनू app shell का हिस्सा है: screens के पूरे पेज लोड और त्रुटि पेज इसे रखते हैं, जबकि साइट शेल और साइन इन पेज केवल स्थिर मेनू दिखाते हैं।
+
 ## साइट शेल
 
 कार्य Screen अपने साइड मेनू वाले ऐप शेल में खुलती हैं। सार्वजनिक पृष्ठ, जैसे शॉप या उत्पाद कैटलॉग, इसके बजाय साइट शेल में खुल सकते हैं: ब्रांड लिंक के रूप में ऐप का नाम, क्षैतिज मेनू, संकरी स्क्रीन पर मेनू बटन, वैकल्पिक action और फ़ुटर। feature इसे चुनती है; अन्य feature की Screen ऐप शेल रखती हैं, इसलिए दोनों एक ऐप में रहते हैं।

@@ -259,13 +259,20 @@ async fn grid_export(
         }
         let limit = grid.export_limit();
         let mut sent = 0usize;
+        let mut seek: Option<crate::action::Cursor> = None;
         let mut outcome: Result<(), Failure> = Ok(());
         while sent < limit {
             let size = (limit - sent).min(crate::action::MAX_PAGE_SIZE as usize) as u32;
             let mut q = query.clone();
-            q.page = crate::action::PageRequest::Offset {
-                offset: sent as u64,
-                limit: size,
+            q.page = match seek.take() {
+                Some(cursor) => crate::action::PageRequest::After {
+                    cursor: Some(cursor),
+                    limit: size,
+                },
+                None => crate::action::PageRequest::Offset {
+                    offset: sent as u64,
+                    limit: size,
+                },
             };
             let mut page = match state
                 .timed(grid.fetch(ctx.clone(), q))
@@ -281,6 +288,7 @@ async fn grid_export(
                 }
             };
             page.view = view.clone();
+            seek = keyset(page.next.take());
             let n = page.count;
             let open = match &sheet {
                 _ if n == 0 => true,
@@ -333,6 +341,13 @@ async fn grid_export(
 
 /// Records an export of a sensitive grid in the call's audit trail: once, with the row count and
 /// the query, so exports cost nothing per row.
+/// The cursor an export continues from when the data layer pages by keyset. A position cursor
+/// (a plain number, as [`crate::action::Page::window`] writes it) or none keeps offset paging,
+/// so actions that page only by offset still export every row once.
+fn keyset(next: Option<crate::action::Cursor>) -> Option<crate::action::Cursor> {
+    next.filter(|c| c.0.parse::<u64>().is_err())
+}
+
 pub(super) fn note_export(
     ctx: &Ctx,
     grid: &dyn GridSource,

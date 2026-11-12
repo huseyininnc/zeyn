@@ -118,7 +118,7 @@ adresi yapar. Üç route ekler:
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | bir oturum açma başlatır ve sağlayıcıya yönlendirir |
 | `GET /_zeyn/auth/callback` | sağlayıcının geri yönlendirmesi |
-| `GET /_zeyn/auth/logout` | oturumu burada ve sağlayıcıda sonlandırır |
+| `POST`, sonra `GET /_zeyn/auth/logout` | CSRF token'lı `POST` oturumu burada sonlandırır, ardından `GET` sağlayıcıda oturumu kapatır |
 
 Sağlayıcıda, `<public url>/_zeyn/auth/callback` adresini yönlendirme URI'si (redirect URI) olarak ve
 `<public url>/` adresini oturum kapatma sonrası yönlendirme URI'si olarak kaydedin. Genel URL
@@ -175,9 +175,16 @@ yeniden kullanıma izin verin.
 
 ### Oturum kapatma
 
-`/_zeyn/auth/logout` oturum cookie'sini siler ve kullanıcıyı `client_id` ve
-`post_logout_redirect_uri` ile sağlayıcının `end_session_endpoint` adresine gönderir. Bu uç nokta
-yoksa kullanıcı uygulamanın başlangıç sayfasına gider.
+Oturum kapatma iki adımdır; böylece başka bir sitedeki link veya resim kullanıcının oturumunu
+kapatamaz. CSRF token'lı `POST /_zeyn/auth/logout` oturum cookie'sini siler ve uygulamanın
+tarayıcı depolamasını temizler. Ardından `GET /_zeyn/auth/logout` tarayıcıyı `client_id` ve
+`post_logout_redirect_uri` ile sağlayıcının `end_session_endpoint` adresine gönderir; bu uç nokta
+yoksa kullanıcı uygulamanın başlangıç sayfasına gider. Hâlâ oturumu olan bir tarayıcının `GET`
+isteği yalnızca uygulamaya geri döner.
+
+Site kabuğundaki oturum kapatma linki ve boşta kalma ile oturum kapatma iki adımı da yapar. Kendi
+linkiniz de `data-zeyn-signout` ile aynısını yapar: runtime önce o adrese `POST` gönderir, sonra
+linki izler.
 
 ### Aynı uygulamanın API ve MCP client'ları
 

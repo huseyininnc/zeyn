@@ -271,6 +271,13 @@ What to remember:
   ChevronRight, TrendUp, TrendDown, Info, CheckCircle, AlertTriangle, AlertCircle, Clock,
   History, Calendar, Star, Menu, Sidebar, Command, Sun, Moon, Monitor, File, FileText, Folder,
   Image, Paperclip. Menu items take one with `.icon(Icon::...)` after `.item(..)`.
+- Menus nest: `.sub(t!("..."), |m| m.item(..).item(..))` after `.group(..)` adds a collapsible
+  subgroup (at most three levels deep); `.open()` keeps a group open, `.accordion()` closes
+  siblings when a group opens.
+- Menus from a table or an API: `App::menu_source(|ctx: Ctx| async move { Ok(vec![MenuNode::group(..,
+  vec![MenuNode::screen(label, "screen_name"), MenuNode::path(label, "/path")])]) })`. The server
+  drops links the user may not open and caches answers per permission set; call
+  `Menus::invalidate()` from the action that edits the menu.
 - Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
   and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
 - Audit history: `DiffView::of(&before, &after)` or `DiffView::changes(entry.changes).model::<M>()`;

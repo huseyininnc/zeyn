@@ -1516,6 +1516,45 @@ async fn posts_need_json_and_cookie_sessions_need_the_csrf_token() {
 }
 
 #[tokio::test]
+async fn any_cookie_needs_the_csrf_token_and_a_bearer_token_needs_none() {
+    let a = accounts();
+    user(&a, "bearer@example.com").await;
+    let router = app(a.clone());
+    let other_cookie = Request::post("/_zeyn/account/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, "zeyn_theme=dark")
+        .body(Body::from(
+            json!({ "email": "bearer@example.com", "password": PASSWORD }).to_string(),
+        ))
+        .unwrap();
+    assert_eq!(
+        send(&router, other_cookie).await.status,
+        StatusCode::FORBIDDEN,
+        "a cookie other than the session still needs the CSRF token"
+    );
+    let no_cookie = Request::post("/_zeyn/account/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({ "email": "bearer@example.com", "password": PASSWORD }).to_string(),
+        ))
+        .unwrap();
+    let tokens = send(&router, no_cookie).await;
+    assert_eq!(tokens.status, StatusCode::OK, "{}", tokens.body);
+    let access: Json = serde_json::from_str(&tokens.body).unwrap();
+    let access = access["accessToken"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let with_bearer = Request::post("/_zeyn/account/manage/2fa")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::AUTHORIZATION, format!("Bearer {access}"))
+        .header(header::COOKIE, "zeyn_theme=dark")
+        .body(Body::from("{}"))
+        .unwrap();
+    assert_eq!(send(&router, with_bearer).await.status, StatusCode::OK);
+}
+
+#[tokio::test]
 async fn sign_in_attempts_are_rate_limited_per_account() {
     let a = accounts().options(|o| {
         o.hasher = light();
@@ -1672,4 +1711,115 @@ async fn the_register_screen_goes_to_a_screen_that_opens() {
     )
     .await;
     assert!(mismatch.body.contains("do not match"), "{}", mismatch.body);
+}
+
+#[tokio::test]
+async fn signing_out_needs_a_post_with_the_csrf_token() {
+    let a = accounts();
+    user(&a, "out@example.com").await;
+    let router = app(a.clone());
+    let login = send(
+        &router,
+        post(
+            "/_zeyn/account/login?useCookies=true",
+            json!({ "email": "out@example.com", "password": PASSWORD }),
+            "",
+        ),
+    )
+    .await;
+    let session = login.cookie("zeyn_account").unwrap();
+    let cookies = format!("zeyn_account={session}");
+    let image = send(&router, get("/_zeyn/account/signout", &cookies)).await;
+    assert!(
+        matches!(
+            image.status,
+            StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED
+        ),
+        "a cross site image tag cannot sign the user out: {}",
+        image.status
+    );
+    assert_eq!(image.cookie("zeyn_account"), None);
+    let no_token = Request::post("/_zeyn/account/logout")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, &cookies)
+        .body(Body::from("{}"))
+        .unwrap();
+    let refused = send(&router, no_token).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.cookie("zeyn_account"), None);
+    let out = send(&router, post("/_zeyn/account/logout", json!({}), &cookies)).await;
+    assert_eq!(out.status, StatusCode::OK);
+    assert_eq!(out.cookie("zeyn_account").as_deref(), Some(""));
+}
+
+/// The per user browser storage key a page carries (`<meta name="zeyn-storage">`).
+fn storage_key(page: &str) -> String {
+    let start = page
+        .find(r#"<meta name="zeyn-storage" content=""#)
+        .expect("the page carries a storage key")
+        + r#"<meta name="zeyn-storage" content=""#.len();
+    page[start..]
+        .split('"')
+        .next()
+        .unwrap()
+        .to_string()
+}
+
+#[tokio::test]
+async fn sign_out_clears_browser_storage_and_pages_key_storage_per_user() {
+    let a = accounts();
+    let ada = user(&a, "ada@example.com").await;
+    let bob = user(&a, "bob@example.com").await;
+    let router = app(a.clone());
+    let mut keys = Vec::new();
+    for u in [&ada, &bob] {
+        let email = u.email.clone().unwrap();
+        let login = send(
+            &router,
+            post(
+                "/_zeyn/account/login?useCookies=true",
+                json!({ "email": email, "password": PASSWORD }),
+                "",
+            ),
+        )
+        .await;
+        let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
+        let page = send(&router, get("/account/manage", &session)).await;
+        assert_eq!(page.status, StatusCode::OK, "{}", page.body);
+        let key = storage_key(&page.body);
+        assert!(
+            !key.is_empty() && !key.contains(&u.id) && !key.contains(&email),
+            "the key is opaque: {key}"
+        );
+        keys.push((key, session));
+    }
+    assert_ne!(keys[0].0, keys[1].0, "two users get two storage keys");
+    let anonymous = send(&router, get("/account/login", "")).await;
+    let anonymous = storage_key(&anonymous.body);
+    assert!(
+        !keys
+            .iter()
+            .any(|(k, _)| *k == anonymous)
+    );
+    let again = send(&router, get("/account/manage", &keys[0].1)).await;
+    assert_eq!(storage_key(&again.body), keys[0].0, "the key is stable");
+    let logout = send(
+        &router,
+        post("/_zeyn/account/logout", json!({}), &keys[0].1),
+    )
+    .await;
+    assert_eq!(logout.status, StatusCode::OK, "{}", logout.body);
+    assert_eq!(
+        logout
+            .headers
+            .get("clear-site-data")
+            .map(|v| v.to_str().unwrap()),
+        Some(r#""storage""#)
+    );
+    let page = send(&router, get("/account/login", "")).await;
+    assert!(
+        page.headers
+            .get("clear-site-data")
+            .is_none()
+    );
 }

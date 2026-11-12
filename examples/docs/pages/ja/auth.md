@@ -96,7 +96,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | サインインを開始し、プロバイダーへリダイレクトする |
 | `GET /_zeyn/auth/callback` | プロバイダーからのリダイレクト先 |
-| `GET /_zeyn/auth/logout` | こことプロバイダーの両方でセッションを終了する |
+| `POST`、続いて `GET /_zeyn/auth/logout` | CSRF トークン付きの `POST` がここでセッションを終了し、続く `GET` がプロバイダーでサインアウトする |
 
 プロバイダー側では、リダイレクト URI として `<public url>/_zeyn/auth/callback` を、ログアウト後のリダイレクト URI として `<public url>/` を登録します。公開 URL は設定で指定するもので、リクエストの `Host` ヘッダーから取得することはありません。ベースパスまたは公開パスがある場合、ルートはその下に移動します。
 
@@ -128,7 +128,9 @@ CSRF 保護は変わりません。どの cookie でユーザーがサインイ�
 
 ### ログアウト
 
-`/_zeyn/auth/logout` はセッション cookie を削除し、`client_id` と `post_logout_redirect_uri` を付けて、ユーザーをプロバイダーの `end_session_endpoint` に移動させます。このエンドポイントがない場合、ユーザーはアプリのスタートページに移動します。
+サインアウトは 2 段階です。これにより、他のサイトのリンクや画像がユーザーをサインアウトさせることはできません。CSRF トークン付きの `POST /_zeyn/auth/logout` がセッション cookie を削除し、アプリのブラウザーストレージを消去します。続いて `GET /_zeyn/auth/logout` が `client_id` と `post_logout_redirect_uri` を付けてブラウザーをプロバイダーの `end_session_endpoint` に送ります。このエンドポイントがない場合、ユーザーはアプリのスタートページに移動します。まだセッションを持つブラウザーからの `GET` は、アプリに戻るだけです。
+
+サイトシェルのサインアウトリンクとアイドル時のサインアウトは両方の段階を行います。独自のリンクも `data-zeyn-signout` で同じことができます。ランタイムはまずそのアドレスに `POST` を送り、それからリンクをたどります。
 
 ### 同じアプリの API と MCP クライアント
 

@@ -6,6 +6,7 @@ use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
 use serde_json::{Value as Json, json};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use tower::ServiceExt;
 use zeyn::prelude::*;
@@ -20,13 +21,15 @@ pub struct Sale {
     pub amount: i64,
 }
 
+/// The sales rows and the number of times the grid's action ran.
 #[derive(Clone, Default)]
-pub struct Store(Arc<RwLock<Vec<Sale>>>);
+pub struct Store(Arc<RwLock<Vec<Sale>>>, Arc<AtomicUsize>);
 
 impl Service for Store {}
 
 #[action(permission = "sales.read")]
 pub async fn search_sales(q: DataQuery, store: Store) -> Result<Page<Sale>> {
+    store.1.fetch_add(1, Ordering::SeqCst);
     Ok(q.apply(store.0.read().unwrap().clone()))
 }
 
@@ -152,6 +155,11 @@ pub fn address() -> Screen {
 }
 
 fn app() -> Router {
+    app_counting(Arc::default())
+}
+
+/// The test app, counting the runs of the grid's action in `calls`.
+fn app_counting(calls: Arc<AtomicUsize>) -> Router {
     let rows = [("north", 10), ("north", 5), ("south", 7)]
         .into_iter()
         .zip(1..)
@@ -163,7 +171,7 @@ fn app() -> Router {
         .collect();
     App::new("Test")
         .i18n(I18n::new("en"))
-        .service(Store(Arc::new(RwLock::new(rows))))
+        .service(Store(Arc::new(RwLock::new(rows)), calls))
         .auth(|h: &HeaderMap| {
             let perms: Vec<String> = h
                 .get("x-perms")?
@@ -259,6 +267,33 @@ async fn nested_listeners_render_again_in_one_request_with_the_driven_params() {
             r#"data-value="north" data-zeyn-base-href data-zeyn-params="{&quot;region&quot;:null}""#
         ),
         "{chips}"
+    );
+}
+
+#[tokio::test]
+async fn overlapping_refresh_paths_load_a_grid_once() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let router = app_counting(calls.clone());
+    let body = json!({
+        "screen": "sales",
+        "params": null,
+        "nodes": ["1.1", "1", "1.1", "1", "1.0"]
+    });
+    let (status, text) = send(&router, post("/_zeyn/nodes", "sales.read", body)).await;
+    assert_eq!(status, StatusCode::OK, "{text}");
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "a node inside another requested node is rendered with its ancestor"
+    );
+    let nodes: Json = serde_json::from_str(&text).unwrap();
+    let nodes = nodes["nodes"].as_object().unwrap();
+    assert_eq!(nodes.len(), 1, "{text}");
+    assert!(
+        nodes["1"]
+            .as_str()
+            .unwrap()
+            .contains(r#"data-zeyn-node="1.1"#)
     );
 }
 

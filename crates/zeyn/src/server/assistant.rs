@@ -18,8 +18,8 @@ use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::render::{Render, escape};
 use axum::Router;
-use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, Query, State};
+use axum::body::{Body, Bytes};
+use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -56,10 +56,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/assistant/chat", post(chat_call))
         .route("/_zeyn/assistant/confirm", post(confirm_call))
         .route("/_zeyn/assistant/clear", post(clear_call))
-        .route(
-            "/_zeyn/assistant/stt",
-            post(stt_call).layer(DefaultBodyLimit::max(crate::assistant::MAX_AUDIO_BYTES + 1)),
-        )
+        .route("/_zeyn/assistant/stt", post(stt_call))
         .route("/_zeyn/assistant/tts", post(tts_call))
 }
 
@@ -147,6 +144,40 @@ async fn checked<'a>(
         .await
         .map_err(|_| rate_limited())?;
     Ok((a, key))
+}
+
+/// Reads at most `limit` bytes of the request body. Handlers call it only after [`checked`], so a
+/// refused caller never makes the server buffer or parse its body.
+async fn read(body: Body, limit: usize) -> Result<Bytes, Failure> {
+    axum::body::to_bytes(body, limit)
+        .await
+        .map_err(|_| {
+            Failure::Status(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "too_large",
+                Text::key("zeyn.error.too_large"),
+            )
+        })
+}
+
+/// Reads a JSON request body of at most `limit` bytes, after [`checked`].
+async fn read_json<T: serde::de::DeserializeOwned>(body: Body, limit: usize) -> Result<T, Failure> {
+    let raw = read(body, limit).await?;
+    serde_json::from_slice(&raw).map_err(|_| {
+        Failure::Status(
+            StatusCode::BAD_REQUEST,
+            "bad_request",
+            Text::key("zeyn.error.bad_request"),
+        )
+    })
+}
+
+/// Largest JSON body for a text of at most `chars` characters: four bytes each, escapes and the
+/// other fields.
+fn json_limit(chars: usize) -> usize {
+    chars
+        .saturating_mul(6)
+        .saturating_add(1024)
 }
 
 /// The message of a failure in the user's language.
@@ -238,14 +269,14 @@ enum Start {
     Confirm { id: String, approve: bool },
 }
 
-async fn chat_call(
-    State(st): State<Arc<AppState>>,
-    headers: HeaderMap,
-    axum::Json(call): axum::Json<ChatCall>,
-) -> Response {
+async fn chat_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Body) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let (a, key) = match checked(&st, &ctx, &headers).await {
         Ok(v) => v,
+        Err(f) => return st.error_response(&ctx, f),
+    };
+    let call: ChatCall = match read_json(body, json_limit(a.limits.message_chars)).await {
+        Ok(c) => c,
         Err(f) => return st.error_response(&ctx, f),
     };
     let text = call.message.trim();
@@ -268,14 +299,14 @@ async fn chat_call(
     )
 }
 
-async fn confirm_call(
-    State(st): State<Arc<AppState>>,
-    headers: HeaderMap,
-    axum::Json(call): axum::Json<ConfirmCall>,
-) -> Response {
+async fn confirm_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Body) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let key = match checked(&st, &ctx, &headers).await {
         Ok((_, key)) => key,
+        Err(f) => return st.error_response(&ctx, f),
+    };
+    let call: ConfirmCall = match read_json(body, json_limit(200)).await {
+        Ok(c) => c,
         Err(f) => return st.error_response(&ctx, f),
     };
     if call.id.len() > 200 {
@@ -306,7 +337,7 @@ async fn clear_call(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Resp
 }
 
 /// Speech to text on the server: the request body is the recording.
-async fn stt_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Bytes) -> Response {
+async fn stt_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Body) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let (a, _) = checked(&st, &ctx, &headers).await?;
@@ -314,12 +345,18 @@ async fn stt_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Byt
             .stt
             .clone()
             .ok_or(Failure::App(Error::NotFound))?;
-        if body.is_empty() || body.len() > a.limits.audio_bytes {
-            return Err(Failure::Status(
+        let too_large = || {
+            Failure::Status(
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "too_large",
                 Text::key("zeyn.assistant.audio_too_large"),
-            ));
+            )
+        };
+        let body = read(body, a.limits.audio_bytes)
+            .await
+            .map_err(|_| too_large())?;
+        if body.is_empty() {
+            return Err(too_large());
         }
         let mime = headers
             .get(header::CONTENT_TYPE)
@@ -347,14 +384,11 @@ struct SpeakCall {
 }
 
 /// Text to speech on the server: the audio streams through as the provider sends it.
-async fn tts_call(
-    State(st): State<Arc<AppState>>,
-    headers: HeaderMap,
-    axum::Json(call): axum::Json<SpeakCall>,
-) -> Response {
+async fn tts_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Body) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let (a, _) = checked(&st, &ctx, &headers).await?;
+        let call: SpeakCall = read_json(body, json_limit(a.limits.speech_chars)).await?;
         let tts = a
             .tts
             .clone()
@@ -626,9 +660,8 @@ fn screens_for(st: &AppState, ctx: &Ctx) -> Vec<(&'static str, String, String)> 
             let label = f
                 .menu_groups()
                 .iter()
-                .flat_map(|g| g.items.iter())
-                .find(|i| i.screen == s.meta.name)
-                .map(|i| ctx.t(&i.label))
+                .find_map(|g| g.find(s.meta.name))
+                .map(|(_, i)| ctx.t(&i.label))
                 .unwrap_or_else(|| s.meta.doc.to_string());
             list.push((s.meta.name, path, label));
         }

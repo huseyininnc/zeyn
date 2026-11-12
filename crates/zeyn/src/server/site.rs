@@ -177,8 +177,9 @@ pub(super) fn header_actions(st: &AppState, header: &SiteHeader, ctx: &Ctx, r: &
                 "zeyn.shell.site.sign_in"
             };
             actions.push_str(&format!(
-                r#"<a class="z-button z-site-sign-in" href="{}" data-zeyn-reload>{}</a>"#,
+                r#"<a class="z-button z-site-sign-in" href="{}"{} data-zeyn-reload>{}</a>"#,
                 escape(href),
+                signout_attr(st, signed_in),
                 r.text(&Text::key(key))
             ));
         }
@@ -254,8 +255,9 @@ fn account_menu(st: &AppState, ctx: &Ctx, r: &Render) -> String {
             ("zeyn.shell.site.sign_in", crate::screen::Icon::SignIn)
         };
         out.push_str(&format!(
-            r#"<a class="z-button z-ghost z-account-sign" href="{}" data-zeyn-reload>{}{}</a>"#,
+            r#"<a class="z-button z-ghost z-account-sign" href="{}"{} data-zeyn-reload>{}{}</a>"#,
             escape(href),
+            signout_attr(st, signed_in),
             icon.html(),
             r.text(&Text::key(key))
         ));
@@ -305,11 +307,13 @@ pub(super) fn frame(
 ) -> String {
     let menu_label = r.text(&Text::key("zeyn.shell.menu"));
     let mut menu = String::new();
-    for (i, (_, label, items)) in st
+    for (i, group) in st
         .menu_links(ctx, r, current, true)
         .into_iter()
         .enumerate()
     {
+        let label = group.label().to_owned();
+        let items = group.all_links();
         if items.len() == 1 {
             menu.push_str(&items[0]);
             continue;
@@ -400,4 +404,15 @@ pub(super) fn frame(
         home = escape(&home_url(st, fi)),
         app = r.text(&st.name),
     )
+}
+
+/// The `data-zeyn-signout` attribute of a sign out link: the address the runtime posts to, with
+/// the CSRF token, before it follows the link. Empty for sign in links and apps without one.
+fn signout_attr(st: &AppState, signed_in: bool) -> String {
+    match st.sign_in.signout {
+        Some(path) if signed_in => {
+            format!(r#" data-zeyn-signout="{}{}""#, escape(&st.prefix), path)
+        }
+        _ => String::new(),
+    }
 }

@@ -79,11 +79,30 @@ async fn open(
     write: bool,
     origin: &str,
 ) -> Result<Socket, WsError> {
+    open_with(addr, path, user, write, origin, Some(TOKEN)).await
+}
+
+/// Opens a socket as the browser runtime does: the CSRF token travels in
+/// `Sec-WebSocket-Protocol` next to `zeyn`, never in the address.
+async fn open_with(
+    addr: SocketAddr,
+    path: &str,
+    user: &str,
+    write: bool,
+    origin: &str,
+    csrf: Option<&str>,
+) -> Result<Socket, WsError> {
     let mut req = format!("ws://{addr}{path}")
         .into_client_request()
         .unwrap();
     let h = req.headers_mut();
     h.insert("origin", HeaderValue::from_str(origin).unwrap());
+    if let Some(token) = csrf {
+        h.insert(
+            "sec-websocket-protocol",
+            HeaderValue::from_str(&format!("zeyn, csrf.{token}")).unwrap(),
+        );
+    }
     h.insert(
         "cookie",
         HeaderValue::from_str(&format!("zeyn_csrf={TOKEN}")).unwrap(),
@@ -98,7 +117,7 @@ async fn open(
 }
 
 fn doc_path(doc: &str) -> String {
-    format!("/_zeyn/live/doc/notes/{doc}?csrf={TOKEN}")
+    format!("/_zeyn/live/doc/notes/{doc}")
 }
 
 async fn next_binary(s: &mut Socket) -> Vec<u8> {
@@ -159,12 +178,13 @@ async fn handshakes_need_origin_token_user_and_a_declared_document() {
     );
     assert_eq!(
         status(
-            open(
+            open_with(
                 addr,
-                "/_zeyn/live/doc/notes/a?csrf=wrong",
+                "/_zeyn/live/doc/notes/a",
                 "ayse",
                 true,
-                &here
+                &here,
+                Some("wrong")
             )
             .await
             .unwrap_err()
@@ -173,15 +193,9 @@ async fn handshakes_need_origin_token_user_and_a_declared_document() {
     );
     assert_eq!(
         status(
-            open(
-                addr,
-                &format!("/_zeyn/live/doc/other/a?csrf={TOKEN}"),
-                "ayse",
-                true,
-                &here
-            )
-            .await
-            .unwrap_err()
+            open(addr, "/_zeyn/live/doc/other/a", "ayse", true, &here)
+                .await
+                .unwrap_err()
         ),
         404
     );
@@ -195,22 +209,54 @@ async fn handshakes_need_origin_token_user_and_a_declared_document() {
     );
     assert_eq!(
         status(
-            open(
+            open(addr, "/_zeyn/live/topics?t=secret", "ayse", true, &here)
+                .await
+                .unwrap_err()
+        ),
+        403
+    );
+    assert_eq!(
+        status(
+            open_with(
                 addr,
-                &format!("/_zeyn/live/topics?t=secret&csrf={TOKEN}"),
+                &format!("/_zeyn/live/doc/notes/a?csrf={TOKEN}"),
                 "ayse",
                 true,
-                &here
+                &here,
+                None
             )
             .await
             .unwrap_err()
         ),
-        403
+        403,
+        "a token in the address, where logs and history keep it, is not accepted"
     );
-    assert!(
-        open(addr, &doc_path("a"), "ayse", true, &here)
-            .await
-            .is_ok()
+    let (_, answer) = tokio_tungstenite::connect_async({
+        let mut req = format!("ws://{addr}{}", doc_path("a"))
+            .into_client_request()
+            .unwrap();
+        let h = req.headers_mut();
+        h.insert("origin", HeaderValue::from_str(&here).unwrap());
+        h.insert(
+            "cookie",
+            HeaderValue::from_str(&format!("zeyn_csrf={TOKEN}")).unwrap(),
+        );
+        h.insert("x-user", HeaderValue::from_static("ayse"));
+        h.insert(
+            "sec-websocket-protocol",
+            HeaderValue::from_str(&format!("zeyn, csrf.{TOKEN}")).unwrap(),
+        );
+        req
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        answer
+            .headers()
+            .get("sec-websocket-protocol")
+            .unwrap(),
+        "zeyn",
+        "the server picks `zeyn` and never echoes the token"
     );
 }
 
@@ -226,17 +272,17 @@ async fn live_channels_run_the_interceptors() {
         ),
         403
     );
-    let topics = format!("/_zeyn/live/topics?t=orders&csrf={TOKEN}");
+    let topics = "/_zeyn/live/topics?t=orders";
     assert_eq!(
         status(
-            open(addr, &topics, "blocked", false, &here)
+            open(addr, topics, "blocked", false, &here)
                 .await
                 .unwrap_err()
         ),
         403
     );
     assert!(
-        open(addr, &topics, "ayse", false, &here)
+        open(addr, topics, "ayse", false, &here)
             .await
             .is_ok()
     );
@@ -392,15 +438,9 @@ async fn limits_refuse_extra_connections_and_large_documents() {
 async fn topics_reach_subscribers_of_the_same_tenant() {
     let (addr, hub, _) = start(Limits::default()).await;
     let here = format!("http://{addr}");
-    let mut s = open(
-        addr,
-        &format!("/_zeyn/live/topics?t=orders&csrf={TOKEN}"),
-        "ayse",
-        false,
-        &here,
-    )
-    .await
-    .unwrap();
+    let mut s = open(addr, "/_zeyn/live/topics?t=orders", "ayse", false, &here)
+        .await
+        .unwrap();
     let mut waited = 0;
     while hub.stats().subscribers == 0 && waited < 50 {
         tokio::time::sleep(Duration::from_millis(20)).await;
@@ -436,14 +476,14 @@ async fn next_text(s: &mut Socket, ms: u64) -> Option<String> {
 async fn typing_signals_reach_other_users_only_throttled_and_without_user_ids() {
     let (addr, hub, _) = start(Limits::default()).await;
     let here = format!("http://{addr}");
-    let path = format!("/_zeyn/live/topics?t=orders&csrf={TOKEN}");
-    let mut ada = open(addr, &path, "ada", false, &here)
+    let path = "/_zeyn/live/topics?t=orders";
+    let mut ada = open(addr, path, "ada", false, &here)
         .await
         .unwrap();
-    let mut ada2 = open(addr, &path, "ada", false, &here)
+    let mut ada2 = open(addr, path, "ada", false, &here)
         .await
         .unwrap();
-    let mut grace = open(addr, &path, "grace", false, &here)
+    let mut grace = open(addr, path, "grace", false, &here)
         .await
         .unwrap();
     let mut waited = 0;

@@ -11,10 +11,12 @@ pub(super) const DEFAULT_CSP: &str = "default-src 'self'; script-src 'self'; sty
 /// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
 /// action or costs money goes here. Published API actions and the assistant are matched by prefix,
 /// and file uploads (`POST /_zeyn/files/{store}`) by `files::is_upload`.
-const WRITE_PATHS: [&str; 16] = [
+const WRITE_PATHS: [&str; 18] = [
     "/_zeyn/form",
     "/_zeyn/reveal",
     "/_zeyn/data",
+    "/_zeyn/node",
+    "/_zeyn/nodes",
     "/_zeyn/stream",
     "/_zeyn/import",
     "/_zeyn/mcp",
@@ -107,7 +109,9 @@ pub(super) fn forwarded_for(headers: &HeaderMap) -> Option<std::borrow::Cow<'_, 
     }
 }
 
-/// IP rules and rate limits, before any handler runs.
+/// IP rules and rate limits, before any handler runs. Files of public media sources cost nothing
+/// while the client is within its limit, so a page of images never spends it; a request for an
+/// id the source does not have (`404`) is counted, so ids cannot be probed without limit.
 pub(super) async fn guard_request(
     State(st): State<Arc<AppState>>,
     req: axum::extract::Request,
@@ -134,11 +138,11 @@ pub(super) async fn guard_request(
     let forwarded = forwarded_for(headers);
     let ip = client_ip(peer, forwarded.as_deref(), &st.trusted);
     let probe = ops::is_probe(path);
-    let unlimited = ops::probe_unlimited(&st.extras, path, ip)
-        || (matches!(
-            parts.method,
-            axum::http::Method::GET | axum::http::Method::HEAD
-        ) && media::is_public(&st, path));
+    let unlimited = ops::probe_unlimited(&st.extras, path, ip);
+    let public_media = matches!(
+        parts.method,
+        axum::http::Method::GET | axum::http::Method::HEAD
+    ) && media::is_public(&st, path);
     let blocked = match ip {
         Some(ip) => {
             st.deny.iter().any(|r| r.contains(ip))
@@ -152,8 +156,10 @@ pub(super) async fn guard_request(
         let ctx = st.ctx(headers);
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
-    let is_write = (parts.method == axum::http::Method::GET
-        && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
+    let is_write = (matches!(
+        parts.method,
+        axum::http::Method::GET | axum::http::Method::HEAD
+    ) && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
         || parts.method == axum::http::Method::POST
             && (WRITE_PATHS.contains(&path)
                 || files::is_upload(path)
@@ -170,6 +176,7 @@ pub(super) async fn guard_request(
             (if is_write { st.write_rate } else { None }, "write"),
         ]
     };
+    let mut miss = None;
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
         let ip_key = ip
@@ -187,7 +194,14 @@ pub(super) async fn guard_request(
                 None => format!("{scope}:ip:{ip_key}"),
             },
         };
-        if let Err(wait) = st.rate_store.take(&key, &limit).await {
+        let taken = if public_media {
+            st.rate_store
+                .charge(&key, &limit, 0)
+                .await
+        } else {
+            st.rate_store.take(&key, &limit).await
+        };
+        if let Err(wait) = taken {
             let ctx = st.ctx(headers);
             let mut response = problem(
                 &ctx,
@@ -208,9 +222,19 @@ pub(super) async fn guard_request(
             }
             return response;
         }
+        if public_media {
+            miss = Some((key, limit));
+        }
     }
-    next.run(axum::extract::Request::from_parts(parts, body))
-        .await
+    let response = next
+        .run(axum::extract::Request::from_parts(parts, body))
+        .await;
+    if let Some((key, limit)) = miss
+        && response.status() == StatusCode::NOT_FOUND
+    {
+        let _ = st.rate_store.take(&key, &limit).await;
+    }
+    response
 }
 
 /// One `request` span per request: method, path without the query string, status and duration,

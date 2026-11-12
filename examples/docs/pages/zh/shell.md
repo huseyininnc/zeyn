@@ -16,6 +16,95 @@ Feature::new("sales")
     .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
 ```
 
+### 嵌套和可折叠的分组
+
+`.sub(label, |m| ...)` 在最后一个分组中添加嵌套分组；在其中，`item`、`icon`、`open` 和 `sub` 的用法与分组相同。嵌套分组排在其所在分组的条目之后，最多比顶层分组深三层（`MENU_DEPTH`）；更深的菜单会在启动时停止应用，并给出指明该分组的消息。
+
+```rust
+.menu(|m| {
+    m.group(t!("sales.menu"), Icon::Cart)
+        .item(t!("sales.orders"), orders)
+        .sub(t!("sales.reports"), |m| m.item(t!("sales.by_city"), by_city).item(t!("sales.archive"), archive))
+        .accordion()
+})
+```
+
+- **可折叠。** 每个分组标题都是带 `aria-expanded` 和 `aria-controls` 的按钮（W3C APG 展开式导航模式）。服务器把包含当前屏幕的分组渲染为展开，其余为折叠；每次导航后 `nav.js` 会展开新屏幕所在的分支。没有脚本时所有分组保持展开，因此不会有内容无法访问。
+- **始终展开。** 在分组后调用 `.open()` 使其保持展开：标题是不带按钮的普通文本。
+- **手风琴。** 在 app shell 中任一 feature 的菜单上调用 `.accordion()`，整个侧边菜单变为手风琴：展开一个分组会折叠其已展开的同级分组。
+- **键盘。** 上和下在可见的标题和链接之间移动，Home 和 End 跳到第一个和最后一个。右键展开折叠的分组或进入已展开的分组；左键折叠已展开的分组或移到外层分组的标题。Enter 和空格切换分组。在从右到左的语言中左右互换。
+- **权限与合并。** 同名分组在每一层跨 feature 合并；用户无法打开其中任何条目的分组（包括嵌套分组）不会显示。`App::header(|h| h.breadcrumb())` 的面包屑显示完整的分组路径。site shell 把嵌套分组的链接列在其顶层分组中。
+
+### 每次请求构建的菜单
+
+`App::menu_source(source)` 添加在每次请求时构建的菜单项，例如来自按用户角色筛选的菜单表。菜单源是一个 async 函数，接收 `Ctx`（身份、租户、语言）并返回 `MenuNode`：顶层是 `MenuNode::group(label, children)`，其中包含 `MenuNode::screen(label, "screen_name")` 链接（`.params(json)` 像 `screen_url` 一样填充路径片段和查询）、`MenuNode::path(label, "/reports/sales")` 链接以及嵌套分组。`.icon(...)`、`.open()` 和 `.permission("menu.reports")` 可用于任何节点。标签可以是纯文本（与其他文本一样会被转义），也可以是通过 `Text::key` 指定的目录键。
+
+这些分组排在各 feature 的静态菜单之后，与静态分组标签相同的分组会合并进去。面包屑、命令面板和 `nav.js` 像对待其他菜单链接一样对待这些链接。
+
+下面的表可用于 PostgreSQL 和 Oracle。一条扁平的 `SELECT` 读取它，树在 Rust 中按 `parent_id` 构建：
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **从不信任。** 服务器在每次请求时检查每个链接：指向未知 screen 的链接会被丢弃，并在日志中记一条警告；指向用户无权打开的 screen 的链接（访问权限、feature 的 guard、节点自己的 `permission`）即使菜单源返回了也会被丢弃；params 无法填满路径片段的 screen 链接同样会被丢弃。路径必须以单个 `/` 开头：不能有协议、`//`、反斜杠或控制字符。分组最多嵌套 `MENU_DEPTH` 层，菜单源的一次返回最多保留 `MAX_MENU_NODES`（500）个节点，标签在 `MAX_MENU_LABEL`（100）个字符处截断。
+- **缓存。** 返回结果按租户、语言和权限集合缓存 `MENU_TTL`（60 秒），因此角色相同的用户共享一份结果，菜单源为他们每分钟只运行一次。缓存最多保存 `MAX_MENU_CACHE`（256）份结果，并先丢弃最旧的。如果菜单源的结果不仅取决于权限，还取决于用户本身，需要使用 `App::menu_per_user()`。action 修改菜单表后，调用注入的 `Menus` 服务的 `invalidate()`。
+- **从不让页面失败。** 当菜单源返回错误、发生 panic 或耗时超过 `MENU_TIMEOUT`（2 秒）时，页面显示静态菜单，服务器记录这次失败。失败不会被缓存。
+- **显示位置。** 该菜单属于 app shell：screen 的整页加载和错误页面都包含它，而站点 shell 和登录页面只显示静态菜单。
+
 ## 站点 shell
 
 工作 screen 在带侧边菜单的应用 shell 中打开。公共页面（例如商店或产品目录）可以改为在站点 shell 中打开：应用名称作为品牌链接、横向菜单、窄屏幕上的菜单按钮、可选的操作和页脚。由 feature 选择使用哪一个；其他 feature 的 screen 保持应用 shell，因此两者可以共存于同一个应用。

@@ -246,6 +246,9 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   border: 0;
 }
 
+/** A drag handle (`drag.js`): touch drags it after a long press instead of panning the page. */
+.z-drag-handle { touch-action: none; }
+
 .z-skip {
   position: absolute;
   inset-inline-start: 8px;
@@ -353,7 +356,8 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 
 .z-nav h2,
 .z-nav h3,
-.z-nav summary {
+.z-nav h4,
+.z-nav h5 {
   display: flex;
   align-items: center;
   gap: var(--z-s-2);
@@ -366,10 +370,81 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   color: var(--z-text-muted);
 }
 
-.z-nav h2 .z-icon,
-.z-nav h3 .z-icon { width: 14px; height: 14px; }
+.z-nav h2 .z-icon { width: 14px; height: 14px; }
 
-.z-nav summary { cursor: pointer; }
+/**
+ * Collapsible menu groups (`menu.js`, W3C APG disclosure): the heading is a button whose caret
+ * points down when the group is open. Closed lists are hidden only while scripting is on, so
+ * without the script every group stays open. Nested groups are rows like links, their lists
+ * indented behind a guide line.
+ */
+.z-nav-heading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--z-s-2);
+  min-width: 0;
+  min-height: 24px;
+  margin: 0 calc(var(--z-s-3) * -1);
+  padding: 0 var(--z-s-3);
+  border: 0;
+  border-radius: var(--z-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--z-dur-1) var(--z-ease-linear);
+}
+
+.z-nav-heading > span:not([class]) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.z-nav-heading:hover { background: var(--z-hover); color: var(--z-text); }
+
+.z-nav-heading:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: -2px;
+}
+
+.z-nav-caret {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  -webkit-mask: var(--z-i) center / contain no-repeat;
+  mask: var(--z-i) center / contain no-repeat;
+  --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5l3-3'/%3E%3C/svg%3E");
+  transition: transform var(--z-dur-1) var(--z-ease-linear);
+}
+
+.z-nav-heading[aria-expanded="false"] .z-nav-caret { transform: rotate(-90deg); }
+.z-nav-heading[aria-expanded="false"]:dir(rtl) .z-nav-caret { transform: rotate(90deg); }
+
+.z-nav-sub > :is(h3, h4, h5) {
+  min-height: max(28px, calc(var(--z-space) * 8));
+  margin: 0;
+  padding: 0 var(--z-s-2);
+  color: var(--z-text);
+  font-size: var(--z-text-sm);
+  line-height: var(--z-leading-sm);
+}
+
+.z-nav-sub > :is(h3, h4, h5) > .z-nav-heading {
+  align-self: stretch;
+  margin: 0 calc(var(--z-s-2) * -1);
+  padding: 0 var(--z-s-2);
+}
+
+.z-nav-sub > ul {
+  margin-block-start: 1px;
+  margin-inline-start: var(--z-s-3);
+  padding-inline-start: var(--z-s-2);
+  border-inline-start: 1px solid var(--z-border);
+}
+
+@media (scripting: enabled) {
+  .z-nav-group:has(> :is(h2, h3, h4, h5) > .z-nav-heading[aria-expanded="false"]) > ul { display: none; }
+}
 
 .z-nav li + li { margin-top: 1px; }
 
@@ -388,7 +463,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   transition: background-color var(--z-dur-1) var(--z-ease-linear);
 }
 
-.z-nav-group:has(> h2 > .z-icon) a { padding-inline-start: calc(var(--z-s-3) + 14px + var(--z-s-2)); }
+.z-nav-group:has(> h2 .z-icon) :is(a, .z-nav-sub > :is(h3, h4, h5)) { padding-inline-start: calc(var(--z-s-3) + 14px + var(--z-s-2)); }
 
 .z-nav a > .z-icon { color: var(--z-text-muted); }
 

@@ -7,7 +7,7 @@
 //! preflight the app does not grant), and a `POST` that carries the session cookie must also
 //! send the `x-zeyn-csrf` token. API and mobile clients use bearer tokens and no cookies.
 
-use super::{App, AppState, cookie, encode};
+use super::{App, AppState, CLEAR_SITE_DATA, cookie, encode};
 use crate::accounts::passkey::{self, CEREMONY, Party, PasskeyState};
 use crate::accounts::scope::{self, Scope};
 use crate::accounts::signin::{AccountsAuth, BEARER, SESSION, Session, bearer};
@@ -19,10 +19,11 @@ use crate::{Error, Result};
 use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 /// Base path of the account endpoints.
@@ -165,8 +166,14 @@ pub(super) async fn layer(
         path: st.cookie_path().to_string(),
         prefix: st.prefix.clone(),
         rate: st.rate_store.clone(),
+        clear_storage: AtomicBool::new(false),
     });
     let mut response = scope::run(scope.clone(), next.run(req)).await;
+    if scope::clears_storage(&scope) {
+        response
+            .headers_mut()
+            .insert(CLEAR_SITE_DATA, HeaderValue::from_static(r#""storage""#));
+    }
     for c in scope::taken(&scope) {
         if let Ok(v) = HeaderValue::from_str(&c) {
             response
@@ -185,7 +192,6 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
         .route(&format!("{BASE}/register"), post(register))
         .route(&format!("{BASE}/login"), post(login))
         .route(&format!("{BASE}/logout"), post(logout))
-        .route(&format!("{BASE}/signout"), get(signout))
         .route(&format!("{BASE}/refresh"), post(refresh))
         .route(&format!("{BASE}/confirmEmail"), get(confirm_email))
         .route(&format!("{BASE}/resendConfirmationEmail"), post(resend))
@@ -247,6 +253,14 @@ fn accounts(st: &AppState) -> Accounts {
         .expect("routes exist only with accounts")
 }
 
+/// Whether a `POST` must carry the CSRF token: every request that sends cookies, unless it signs
+/// in with a bearer token. Only the browser sends cookies by itself, so any cookie based sign in
+/// (today the session cookie, later any other) is covered; clients that sign in for tokens send
+/// no cookies and need none.
+fn needs_csrf(headers: &HeaderMap) -> bool {
+    bearer(headers).is_none() && headers.contains_key(header::COOKIE)
+}
+
 /// A JSON body, after the content type and, for cookie sessions, CSRF checks.
 #[allow(
     clippy::result_large_err,
@@ -264,7 +278,7 @@ fn body<T: serde::de::DeserializeOwned>(
     if !json {
         return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE.into_response());
     }
-    if cookie(headers, SESSION).is_some() && st.check_csrf(headers).is_err() {
+    if needs_csrf(headers) && st.check_csrf(headers).is_err() {
         return Err(problem(
             StatusCode::FORBIDDEN,
             "csrf",
@@ -664,7 +678,7 @@ async fn login(
 }
 
 async fn logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    if cookie(&headers, SESSION).is_some() && st.check_csrf(&headers).is_err() {
+    if needs_csrf(&headers) && st.check_csrf(&headers).is_err() {
         return problem(
             StatusCode::FORBIDDEN,
             "csrf",
@@ -680,27 +694,6 @@ async fn logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response
         .sign_in()
         .sign_out(user.as_ref().map(|u| u.id.as_str()));
     StatusCode::OK.into_response()
-}
-
-/// Ends the browser session and goes to the sign in page; the idle timeout sends users here.
-async fn signout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let accounts = accounts(&st);
-    let user = current(&accounts, &headers)
-        .await
-        .ok()
-        .flatten();
-    accounts
-        .sign_in()
-        .sign_out(user.as_ref().map(|u| u.id.as_str()));
-    let mut r = Redirect::to(
-        &st.login_url
-            .clone()
-            .unwrap_or_else(|| st.url("/")),
-    )
-    .into_response();
-    r.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    r
 }
 
 #[derive(Deserialize)]
@@ -1203,7 +1196,7 @@ async fn passkey_creation_options(accounts: &Accounts, st: &AppState, user: &Use
 }
 
 async fn passkey_creation(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    if cookie(&headers, SESSION).is_some() && st.check_csrf(&headers).is_err() {
+    if needs_csrf(&headers) && st.check_csrf(&headers).is_err() {
         return problem(
             StatusCode::FORBIDDEN,
             "csrf",
@@ -1430,7 +1423,7 @@ mod external {
                     Some(&sealer.seal(&flow_cookie(&provider), &flow)),
                     Some(600),
                 );
-                Redirect::to(&url).into_response()
+                axum::response::Redirect::to(&url).into_response()
             }
             Err(e) => {
                 tracing::error!("external sign in is not available: {e}");
@@ -1487,7 +1480,7 @@ mod external {
             .unwrap_or_else(|| st.url("/"));
         let fail = |why: String| {
             tracing::warn!("external sign in refused: {why}");
-            Redirect::to(&format!(
+            axum::response::Redirect::to(&format!(
                 "{login}?params={}",
                 encode(&json!({ "error": "external" }).to_string())
             ))
@@ -1548,7 +1541,7 @@ mod external {
                         .sign_in()
                         .refresh_sign_in(&user)
                         .await;
-                    Redirect::to(&back).into_response()
+                    axum::response::Redirect::to(&back).into_response()
                 }
                 Err(e) => fail(e.to_string()),
             };
@@ -1558,15 +1551,15 @@ mod external {
             .external_login_sign_in(&provider, &key, remember)
             .await
         {
-            Ok(SignInResult::Succeeded) => Redirect::to(&back).into_response(),
-            Ok(SignInResult::RequiresTwoFactor) => Redirect::to(&format!(
+            Ok(SignInResult::Succeeded) => axum::response::Redirect::to(&back).into_response(),
+            Ok(SignInResult::RequiresTwoFactor) => axum::response::Redirect::to(&format!(
                 "{}?params={}",
                 st.url("/account/login-2fa"),
                 encode(&json!({ "return_to": back, "remember": remember }).to_string())
             ))
             .into_response(),
             Ok(SignInResult::LockedOut) => {
-                Redirect::to(&st.url("/account/lockout")).into_response()
+                axum::response::Redirect::to(&st.url("/account/lockout")).into_response()
             }
             Ok(SignInResult::NotAllowed) => fail("not allowed".into()),
             Ok(_) => {
@@ -1592,7 +1585,7 @@ mod external {
                     return fail("no key".into());
                 };
                 scope::set_cookie(PENDING, Some(&sealer.seal(PENDING, &pending)), Some(600));
-                Redirect::to(&st.url("/account/external-login")).into_response()
+                axum::response::Redirect::to(&st.url("/account/external-login")).into_response()
             }
             Err(e) => fail(e.to_string()),
         }

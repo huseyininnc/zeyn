@@ -89,7 +89,6 @@ function shortcutText(keys) {
 
 /* Command palette ---------------------------------------------------------------------------- */
 
-const RECENT_KEY = 'zeyn.palette.recent';
 const RECENT_MAX = 8;
 const SHOWN_MAX = 60;
 
@@ -186,7 +185,7 @@ function collect() {
     walk(menu, '');
   }
   for (const a of document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]')) {
-    const group = a.closest('.z-nav-group')?.querySelector('h2')?.textContent.trim();
+    const group = a.closest('.z-nav-group')?.querySelector(':scope > :is(h2, h3, h4, h5)')?.textContent.trim();
     const path = new URL(a.href, location.href).pathname;
     const icon = [...(a.querySelector('.z-icon')?.classList ?? [])].find((c) => c.startsWith('z-icon-'));
     add({ key: `nav:${path}`, label: a.textContent.trim(), group: group ? `${t.textGo} · ${group}` : t.textGo, icon, run: () => a.click() });
@@ -238,15 +237,20 @@ function labelOf(text, query) {
   return span;
 }
 
+/** `localStorage` key of the recent commands of the user (`meta[name=zeyn-storage]`). */
+function recentKey() {
+  return `zeyn.palette.recent:${document.querySelector('meta[name="zeyn-storage"]')?.content ?? 'anon'}`;
+}
+
 /** Keys of recently run commands, newest first. */
 function recent() {
-  const list = load(RECENT_KEY, []);
+  const list = load(recentKey(), []);
   return Array.isArray(list) ? list.filter((k) => typeof k === 'string') : [];
 }
 
 /** Remembers a command as the most recent one. */
 function remember(key) {
-  store(RECENT_KEY, [key, ...recent().filter((k) => k !== key)].slice(0, RECENT_MAX));
+  store(recentKey(), [key, ...recent().filter((k) => k !== key)].slice(0, RECENT_MAX));
 }
 
 /** Items matching the query: recent ones first, then by score, then in their own order. */

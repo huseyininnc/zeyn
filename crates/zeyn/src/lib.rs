@@ -143,7 +143,8 @@ pub use csp::{Csp, MAX_EMBED_URL, TRACKING_PARAMS, embed_url};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
 pub use feature::{
-    Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn,
+    Feature, Guard, GuardResult, MENU_DEPTH, Menu, MenuGroup, MenuItem, Route, ScreenEntry,
+    SignedIn,
 };
 #[cfg(feature = "server")]
 pub use files::{
@@ -188,10 +189,12 @@ pub use model::{
 pub use pdf::{MAX_PDF_DATA, MAX_PDF_ROWS, Pdf, PdfLink, PdfSource, PdfTemplate};
 pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource,
-    Licensed, PerTenant, Secret, StaticSource, Tenant, TenantRequired,
+    Licensed, Secret, StaticSource, Tenant, TenantRequired,
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
+#[cfg(feature = "server")]
+pub use platform::{MAX_TENANTS, PerTenant};
 pub use prefs::{
     Choice, ClientPref, ClientPrefs, Consent, Draft, MAX_DRAFT_CHARS, MAX_DRAFTS,
     MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
@@ -218,9 +221,10 @@ pub use server::realtime;
 #[cfg(feature = "server")]
 pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
-    CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin,
-    Prefetch, READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
-    TimePolicy, probe,
+    CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MAX_MENU_CACHE, MAX_MENU_LABEL,
+    MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL, Mcp, MemoryAudit, MenuNode, MenuSource,
+    Menus, Plugin, Prefetch, READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant,
+    TenantResolver, Theme, TimePolicy, probe,
 };
 pub use site::{
     BottomNavItem, CenterOnPhone, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell,
@@ -292,7 +296,7 @@ pub mod prelude {
     };
     #[cfg(feature = "server")]
     pub use crate::{
-        ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, Plugin,
-        RateLimit, StaticCredentials, StderrAudit, Theme, TimePolicy,
+        ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, MenuNode, Menus,
+        Plugin, RateLimit, StaticCredentials, StderrAudit, Theme, TimePolicy,
     };
 }

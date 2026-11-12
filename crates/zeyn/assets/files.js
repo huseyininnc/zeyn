@@ -13,27 +13,13 @@
  * @module files
  */
 
-const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
+/** The shared request helpers (`net.js`). */
+const { BASE, csrf, parse } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
 const PREVIEW = /^image\/(png|jpeg|gif|webp)$/;
 const ANNOUNCE_STEP = 25;
 
 /** Upload state by item element: the chosen file, the running request and the object URL. */
 const items = new WeakMap();
-
-/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
-async function csrf() {
-  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
-  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
-}
-
-/** Parses JSON, or returns `null`. */
-function parse(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
 
 /** Fills `{name}` placeholders. */
 function fill(template, values) {

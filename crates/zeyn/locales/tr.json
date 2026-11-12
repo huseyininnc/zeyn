@@ -130,7 +130,9 @@
       "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin.",
       "confirmation_required": "Bu işlem çalışmadan önce uygulamada onayınızı bekliyor.",
       "cursor": "Liste yüklendikten sonra değişti. Yenileyip tekrar deneyin.",
-      "duplicate": "Bu kayıt zaten var."
+      "duplicate": "Bu kayıt zaten var.",
+      "too_large": "İstek çok büyük.",
+      "bad_request": "İstek okunamadı."
     },
     "grid": {
       "pagination": "Sayfalama",

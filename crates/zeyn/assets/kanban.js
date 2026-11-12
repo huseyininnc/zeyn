@@ -17,37 +17,8 @@
  * @module kanban
  */
 
-const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
-
-/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
-async function csrf() {
-  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
-  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
-}
-
-/** Parses JSON, or returns `null`. */
-function parse(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-/** Posts JSON with the CSRF header: `{ ok, body }`. */
-async function post(path, body) {
-  try {
-    const res = await fetch(BASE + path, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
-      body: JSON.stringify(body),
-    });
-    return { ok: res.ok, body: parse(await res.text()) };
-  } catch {
-    return { ok: false, body: null };
-  }
-}
+/** The shared request helpers (`net.js`). */
+const { parse, post } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
 
 /** Screen name and params of an element. */
 function screenOf(el) {

@@ -11,6 +11,7 @@
     "overview": "Genel bakış",
     "stock": "Stok",
     "sales": "Satış",
+    "sales_reports": "Raporlar",
     "people": "İnsan kaynakları",
     "gallery": "Bileşenler",
     "ui": "Bileşen kütüphanesi",
@@ -22,6 +23,10 @@
     "charts": "Grafikler"
 ,
     "inputs": "Girişler"
+,
+    "shortcuts": "Kısayollar",
+    "shortcut_product": "NW-0001 ürünü",
+    "shortcut_cities": "Şehre göre siparişler"
   },
   "errors": {
     "not_found": "Sayfa bulunamadı",

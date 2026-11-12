@@ -194,7 +194,9 @@ RFC 3339; `DevAuth` reports every request as freshly signed in).
 - `App::idle_timeout(Duration)` makes the runtime warn the user `idle_warning` before the end
   (one minute by default) in an alert dialog with a countdown and a "stay signed in" button, which
   calls `POST /_zeyn/keepalive` so a proxy in front sees activity. Input in any tab of the app
-  counts. At the end the user goes to `logout_url`, else to `login_url` with `return_to`, else
+  counts. At the end the runtime first posts to the session's own sign out endpoint when there is
+  one (`POST /_zeyn/account/logout` with the `accounts` feature), then the user goes to
+  `logout_url`, else to `login_url` with `return_to`, else
   sees a signed out screen. Form drafts are kept. The idle timeout only closes forgotten screens;
   ending the real session is the identity provider's job.
 - `#[action(permission = "...", reauth)]` needs a sign in within `App::reauth_within` (five

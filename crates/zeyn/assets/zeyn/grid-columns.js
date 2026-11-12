@@ -56,10 +56,11 @@ function savedView(grid) {
   }
 }
 
-/** `localStorage` key of a grid's view: screen and node. */
+/** `localStorage` key of a grid's view: user (`meta[name=zeyn-storage]`), screen and node. */
 function viewKey(grid) {
   const a = address(grid);
-  return `zeyn.view:${a.screen}#${a.node}`;
+  const user = document.querySelector('meta[name="zeyn-storage"]')?.content ?? 'anon';
+  return `zeyn.view:${user}:${a.screen}#${a.node}`;
 }
 
 /** Every column of the grid, shown or not: `[{field, label, hidden, pin, width}]`. */
@@ -324,6 +325,55 @@ function widthChanged(grid) {
   if (!s) return;
   s.columns = shownColumns(grid);
   saveView(grid);
+}
+
+/**
+ * Moves a column by dragging its header onto another header of the same pinned group, through
+ * the drag core (`drag.js`): a press that moves less than its threshold is still a click and
+ * sorts, Escape cancels. The drop goes before or after the header under the pointer by its
+ * midpoint, mirrored in right to left grids. The column menu (Move left, Move right) does the
+ * same from the keyboard.
+ */
+function startColumnDrag(e, th) {
+  const grid = th.closest('[data-zeyn-grid]');
+  if (!grids.get(grid)) return;
+  D.press(e, {
+    onStart: (ev) => {
+      const rtl = getComputedStyle(grid).direction === 'rtl';
+      const group = [...th.parentElement.cells].filter((h) => h.dataset.field && (h.dataset.pin || '') === (th.dataset.pin || ''));
+      let target = null;
+      let after = false;
+      const mark = (on) => target?.classList.toggle(after ? 'z-col-drop-end' : 'z-col-drop-start', on);
+      th.classList.add('z-col-dragging');
+      document.documentElement.classList.add('z-col-moving');
+      const move = (m) => {
+        mark(false);
+        target = group.find((h) => {
+          const r = h.getBoundingClientRect();
+          return m.clientX >= r.left && m.clientX <= r.right;
+        }) ?? null;
+        if (target === th) target = null;
+        if (target) {
+          const r = target.getBoundingClientRect();
+          after = m.clientX > r.left + r.width / 2 !== rtl;
+          mark(true);
+        }
+      };
+      move(ev);
+      D.capture(th, ev, move, (_, cancelled) => {
+        mark(false);
+        th.classList.remove('z-col-dragging');
+        document.documentElement.classList.remove('z-col-moving');
+        if (!cancelled) D.swallowClick();
+        if (!target || cancelled) return;
+        const shown = shownColumns(grid);
+        const [col] = shown.splice(shown.findIndex((c) => c.field === th.dataset.field), 1);
+        const at = shown.findIndex((c) => c.field === target.dataset.field) + (after ? 1 : 0);
+        shown.splice(at, 0, col);
+        setColumns(grid, shown);
+      });
+    },
+  });
 }
 
 /** Drags a resize handle; in right to left pages, dragging left makes the column wider. */

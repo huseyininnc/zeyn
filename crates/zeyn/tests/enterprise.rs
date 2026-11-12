@@ -636,6 +636,41 @@ async fn reveals_and_exports_count_against_the_write_limit() {
 }
 
 #[tokio::test]
+async fn head_requests_to_exports_count_against_the_write_limit() {
+    let identity = officer();
+    let router = App::new("Test")
+        .service(People::seeded())
+        .write_limit(zeyn::RateLimit::per_user(
+            1,
+            std::time::Duration::from_secs(60),
+        ))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(Feature::new("hr").screen(people))
+        .router()
+        .unwrap();
+    let head = || {
+        Request::head("/_zeyn/grid/export?screen=people&node=0")
+            .header("x-user", "1")
+            .body(Body::empty())
+            .unwrap()
+    };
+    assert_eq!(send(&router, head()).await.status, StatusCode::OK);
+    assert_eq!(
+        send(&router, head()).await.status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        send(&router, get("/_zeyn/grid/export?screen=people&node=0"))
+            .await
+            .status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+}
+
+#[tokio::test]
 async fn masked_fields_never_group_a_grid() {
     let router = hr_app(clerk(), MemoryAudit::default());
     let page = send(&router, get("/people-grouped")).await;
@@ -1389,6 +1424,24 @@ async fn empty_masked_fields_can_be_filled_in_but_not_overwritten_later() {
         "{}",
         form.body
     );
+}
+
+#[test]
+fn the_build_id_is_the_hash_of_the_whole_executable_read_in_pieces() {
+    if std::env::var("ZEYN_BUILD_ID").is_ok() {
+        return;
+    }
+    let bytes = std::fs::read(std::env::current_exe().unwrap()).unwrap();
+    assert!(
+        bytes.len() > 64 * 1024,
+        "the test needs a file larger than one piece"
+    );
+    let hash = bytes
+        .iter()
+        .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+            (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3)
+        });
+    assert_eq!(zeyn::server::build_id(), format!("{hash:016x}"));
 }
 
 #[tokio::test]

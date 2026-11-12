@@ -16,6 +16,95 @@ Feature::new("sales")
     .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
 ```
 
+### Nested and collapsible groups
+
+`.sub(label, |m| ...)` adds a nested group to the last group; inside it, `item`, `icon`, `open` and `sub` work as they do on a group. Nested groups come after the items of their group and nest at most three levels below a top level group (`MENU_DEPTH`); a deeper menu stops the app at startup with a message that names the group.
+
+```rust
+.menu(|m| {
+    m.group(t!("sales.menu"), Icon::Cart)
+        .item(t!("sales.orders"), orders)
+        .sub(t!("sales.reports"), |m| m.item(t!("sales.by_city"), by_city).item(t!("sales.archive"), archive))
+        .accordion()
+})
+```
+
+- **Collapsible.** Every group heading is a button with `aria-expanded` and `aria-controls` (the W3C APG disclosure navigation pattern). The server renders the groups that hold the current screen open and the others closed, and `nav.js` opens the branch of the new screen after each navigation. Without the script every group stays open, so nothing becomes unreachable.
+- **Always open.** `.open()` after a group keeps it open: its heading is plain text without a button.
+- **Accordion.** `.accordion()` on the menu of any feature in the app shell makes the whole side menu an accordion: opening a group closes its open siblings.
+- **Keyboard.** Up and Down move between the visible headings and links, Home and End go to the first and the last. Right opens a closed group or moves into an open one; Left closes an open group or moves to the heading of the group around it. Enter and Space toggle a group. Left and Right swap in right to left languages.
+- **Permissions and merging.** Groups with the same label merge across features at every level, and a group whose items the user may not open is left out, nested groups included. The breadcrumb of `App::header(|h| h.breadcrumb())` shows the whole group path. The site shell lists the links of nested groups in their top level group.
+
+### Menus built per request
+
+`App::menu_source(source)` adds menu entries that are built for each request, for example from a menu table filtered by the user's roles. A source is an async function that takes the `Ctx` (identity, tenant, language) and returns `MenuNode`s: `MenuNode::group(label, children)` at the top level, with `MenuNode::screen(label, "screen_name")` links (`.params(json)` fills path segments and the query, as `screen_url` does), `MenuNode::path(label, "/reports/sales")` links and nested groups inside. `.icon(...)`, `.open()` and `.permission("menu.reports")` work on any node. A label is plain text, escaped like any other text, or a catalog key with `Text::key`.
+
+The groups come after the static menus of the features, and a group with the label of a static group is merged into it. The breadcrumb, the command palette and `nav.js` treat their links like any other menu link.
+
+The table below works on PostgreSQL and Oracle. One flat `SELECT` reads it, and the tree is built in Rust by `parent_id`:
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **Never trusted.** The server checks every link on every request: links to unknown screens are dropped with a warning in the log, links to screens the user may not open (access, feature guards, the node's own `permission`) are dropped although the source returned them, and so are screen links whose path segments the params do not fill. A path must start with one `/`: no scheme, no `//`, no backslash and no control characters. Groups nest at most `MENU_DEPTH` levels, a source's answer keeps at most `MAX_MENU_NODES` (500) nodes, and labels are cut at `MAX_MENU_LABEL` (100) characters.
+- **Cached.** Answers are cached for `MENU_TTL` (60 seconds) per tenant, language and set of permissions, so users with the same roles share one answer and the source runs once per minute for them. The cache holds at most `MAX_MENU_CACHE` (256) answers and drops the oldest. A source whose answer depends on the user, not only on the permissions, needs `App::menu_per_user()`. After an action edits the table, it calls `invalidate()` on the injected `Menus` service.
+- **Never fails the page.** When the source returns an error, panics or takes longer than `MENU_TIMEOUT` (2 seconds), the page shows the static menu and the server logs the failure. Failures are not cached.
+- **Where it shows.** The menu belongs to the app shell: full page loads of screens and error pages hold it, while the site shell and the sign in pages show the static menus only.
+
 ## The site shell
 
 Work screens open in the app shell with its side menu. Public pages, such as a shop or a product catalog, can open in the site shell instead: the app's name as a brand link, a horizontal menu, a menu button on narrow screens, optional actions and a footer. A feature chooses it; screens of other features keep the app shell, so both live in one app.

@@ -314,8 +314,9 @@ function touch(force = false) {
 }
 
 /**
- * Idle timeout: warns `warn` seconds before the end with a countdown, then sends the user to the
- * sign out or sign in page, or shows a signed out screen. The server's own session rules still
+ * Idle timeout: warns `warn` seconds before the end with a countdown, ends the session with a
+ * `POST` to `signout` when the app has one, then sends the user to the sign out or sign in page,
+ * or shows a signed out screen. The server's own session rules still
  * apply; this only stops a forgotten screen from staying open.
  */
 function startIdle(idle, warn) {
@@ -334,12 +335,13 @@ function startIdle(idle, warn) {
     warning = null;
     await post('/_zeyn/keepalive', {});
   };
-  const end = () => {
+  const end = async () => {
     ended = true;
     saveAllDrafts();
     warning?.dialog.close();
     warning?.dialog.remove();
     warning = null;
+    if (SESSION.signout) await post(SESSION.signout, {});
     const target = SESSION.logout ?? (SESSION.login ? withReturn(SESSION.login) : null);
     if (target) {
       location.assign(target);
