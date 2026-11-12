@@ -42,11 +42,23 @@ impl OrgNode {
         self
     }
 
-    fn schema(&self) -> Json {
+    /// The box and the boxes under it as the chart draws them: at most [`MAX_ORG_DEPTH`] levels
+    /// and [`MAX_ORG_NODES`] boxes, counted down in `left`.
+    fn schema(&self, depth: usize, left: &mut usize) -> Json {
+        *left = left.saturating_sub(1);
+        let mut children = Vec::new();
+        if depth + 1 < MAX_ORG_DEPTH {
+            for child in &self.children {
+                if *left == 0 {
+                    break;
+                }
+                children.push(child.schema(depth + 1, left));
+            }
+        }
         json!({
             "name": self.name,
             "role": self.role,
-            "children": self.children.iter().map(OrgNode::schema).collect::<Vec<_>>(),
+            "children": children,
         })
     }
 }
@@ -116,6 +128,7 @@ impl Component for OrgChart {
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "org_chart", "label": self.label, "root": self.root.schema() })
+        let mut left = MAX_ORG_NODES;
+        json!({ "type": "org_chart", "label": self.label, "root": self.root.schema(0, &mut left) })
     }
 }

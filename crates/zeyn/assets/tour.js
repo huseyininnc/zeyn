@@ -61,6 +61,7 @@ function show(index) {
 /** Starts the tour of `tour` when the page has a visible stop. */
 function open(tour) {
   const dialog = tour.querySelector('.z-tour-card');
+  if (run && !run.dialog.isConnected) finish();
   const stops = [...document.querySelectorAll('.z-tourstop')].filter((s) => s.getClientRects().length > 0).slice(0, MAX_STOPS);
   if (!dialog || stops.length === 0 || run) return;
   run = { tour, dialog, stops, index: 0 };

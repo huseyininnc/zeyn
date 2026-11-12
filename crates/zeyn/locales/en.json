@@ -597,7 +597,8 @@
       "gantt": {
         "task": "Task",
         "from": "Starts",
-        "to": "Ends"
+        "to": "Ends",
+        "done": "{n}% done"
       },
       "meter": {
         "low": "low",

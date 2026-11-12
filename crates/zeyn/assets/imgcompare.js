@@ -5,6 +5,12 @@
  * @module imgcompare
  */
 
+/** Uncovers the share of the first picture the slider says, and names it for screen readers. */
+function slide(range) {
+  range.closest('[data-zeyn-imgcompare]')?.style.setProperty('--z-imgcompare', `${range.value}%`);
+  range.setAttribute('aria-valuetext', `${range.value}%`);
+}
+
 /** Shows the sliders under `root` and sets their starting share. */
 function setup(root) {
   const found = root.matches?.('[data-zeyn-imgcompare]') ? [root] : [...(root.querySelectorAll?.('[data-zeyn-imgcompare]') ?? [])];
@@ -12,13 +18,13 @@ function setup(root) {
     const range = box.querySelector('.z-imgcompare-range');
     if (!range || !range.hidden) continue;
     range.hidden = false;
-    box.style.setProperty('--z-imgcompare', `${range.value}%`);
+    slide(range);
   }
 }
 
 document.addEventListener('input', (e) => {
   const range = e.target instanceof Element ? e.target.closest('.z-imgcompare-range') : null;
-  range?.closest('[data-zeyn-imgcompare]')?.style.setProperty('--z-imgcompare', `${range.value}%`);
+  if (range) slide(range);
 });
 
 document.addEventListener('zeyn:content', (e) => setup(e.detail ?? document));

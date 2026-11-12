@@ -184,8 +184,16 @@ impl Component for Gantt {
             } else {
                 String::new()
             };
+            let done = if task.done > 0 {
+                format!(
+                    r#"<span class="z-sr-only">, {}</span>"#,
+                    r.text(&Text::key("zeyn.ui.gantt.done").arg("n", task.done.to_string()))
+                )
+            } else {
+                String::new()
+            };
             out.push_str(&format!(
-                r#"<tr><th scope="row">{}</th><td class="z-gantt-date">{}</td><td class="z-gantt-date">{}</td><td class="z-gantt-track" aria-hidden="true">{bar}{today}</td></tr>"#,
+                r#"<tr><th scope="row">{}{done}</th><td class="z-gantt-date">{}</td><td class="z-gantt-date">{}</td><td class="z-gantt-track" aria-hidden="true">{bar}{today}</td></tr>"#,
                 r.text(&task.title),
                 task.from.format(r.locale),
                 task.to.format(r.locale)
