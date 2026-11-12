@@ -79,6 +79,23 @@ impl zeyn::Interceptor for Suspended {
 }
 
 async fn start(limits: Limits) -> (SocketAddr, LiveSocket, MemoryDocStore) {
+    let (router, hub, store) = app(limits);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
+    (addr, hub, store)
+}
+
+fn app(limits: Limits) -> (axum::Router, LiveSocket, MemoryDocStore) {
     let store = MemoryDocStore::default();
     let live = ZeynSocket::new()
         .documents("notes", "notes.read", "notes.write", store.clone())
@@ -120,20 +137,7 @@ async fn start(limits: Limits) -> (SocketAddr, LiveSocket, MemoryDocStore) {
         .interceptor(Suspended)
         .tenancy(zeyn::HeaderTenant("x-tenant"))
         .socket(live);
-    let router = app.router().unwrap();
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
-    let addr = listener.local_addr().unwrap();
-    tokio::spawn(async move {
-        axum::serve(
-            listener,
-            router.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .await
-        .unwrap()
-    });
-    (addr, hub, store)
+    (app.router().unwrap(), hub, store)
 }
 
 async fn open(
@@ -1014,6 +1018,253 @@ async fn a_flood_of_frames_or_one_too_large_closes_the_socket() {
     let big = format!(r#"{{"sub":["{}"]}}"#, "x".repeat(2000));
     let _ = s.send(Message::Text(big.into())).await;
     assert_eq!(close_code(s).await, Some(CloseCode::Size));
+}
+
+/// A request of the fallback transport: the user's header, and the CSRF cookie and header
+/// unless `csrf` is false.
+fn sse_request(
+    method: &str,
+    path: &str,
+    user: &str,
+    csrf: bool,
+    body: &str,
+) -> axum::http::Request<axum::body::Body> {
+    let mut b = axum::http::Request::builder()
+        .method(method)
+        .uri(path)
+        .header("x-user", user)
+        .header("content-type", "application/json")
+        .header("cookie", format!("zeyn_csrf={TOKEN}"));
+    if csrf {
+        b = b.header("x-zeyn-csrf", TOKEN);
+    }
+    b.body(axum::body::Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// Reads the next `data:` line of an event stream body within five seconds.
+async fn next_data(body: &mut axum::body::Body, held: &mut String) -> serde_json::Value {
+    use http_body_util::BodyExt;
+    loop {
+        if let Some(end) = held.find("\n\n") {
+            let event: String = held.drain(..end + 2).collect();
+            if let Some(data) = event
+                .lines()
+                .find_map(|l| l.strip_prefix("data: "))
+            {
+                return serde_json::from_str(data).unwrap();
+            }
+            continue;
+        }
+        let frame = tokio::time::timeout(Duration::from_secs(5), body.frame())
+            .await
+            .expect("an event in time")
+            .expect("the stream is open")
+            .unwrap();
+        if let Ok(bytes) = frame.into_data() {
+            held.push_str(&String::from_utf8_lossy(&bytes));
+        }
+    }
+}
+
+/// Opens the fallback transport for `user` and returns the event stream, the resume token and
+/// what is left of the stream's first read.
+async fn sse_open(
+    router: &axum::Router,
+    user: &str,
+    open: &str,
+) -> (axum::body::Body, String, String, serde_json::Value) {
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+    let res = router
+        .clone()
+        .oneshot(sse_request("POST", "/_zeyn/socket/open", user, true, open))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 200);
+    let opened: serde_json::Value = serde_json::from_slice(
+        &res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes(),
+    )
+    .unwrap();
+    let ticket = opened["ticket"].as_str().unwrap();
+    let res = router
+        .clone()
+        .oneshot(sse_request(
+            "GET",
+            &format!("/_zeyn/socket/events?ticket={ticket}"),
+            user,
+            false,
+            "",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 200);
+    assert!(
+        res.headers()["content-type"]
+            .to_str()
+            .unwrap()
+            .starts_with("text/event-stream")
+    );
+    let mut body = res.into_body();
+    let mut held = String::new();
+    let welcome = next_data(&mut body, &mut held).await;
+    let token = welcome["welcome"]["resume"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    (body, token, held, welcome)
+}
+
+/// Sends one frame up the fallback transport and returns the status.
+async fn sse_send(router: &axum::Router, user: &str, token: &str, frame: serde_json::Value) -> u16 {
+    use tower::ServiceExt;
+    let mut req = sse_request("POST", "/_zeyn/socket/send", user, true, &frame.to_string());
+    req.headers_mut()
+        .insert("x-zeyn-socket", HeaderValue::from_str(token).unwrap());
+    router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap()
+        .status()
+        .as_u16()
+}
+
+#[tokio::test]
+async fn the_fallback_transport_carries_topics_calls_and_resume_over_events_and_posts() {
+    let (router, hub, _) = app(Limits::default());
+    let (mut body, token, mut held, welcome) = sse_open(&router, "ayse", "").await;
+    assert_eq!(welcome["welcome"]["resumed"], false);
+    assert_eq!(
+        sse_send(
+            &router,
+            "ayse",
+            &token,
+            serde_json::json!({ "sub": ["orders"] })
+        )
+        .await,
+        204
+    );
+    until_subscribers(&hub, 1).await;
+    hub.notify_tenant(None, "orders");
+    assert_eq!(
+        next_data(&mut body, &mut held).await,
+        serde_json::json!({ "s": 1, "t": "orders" })
+    );
+    assert_eq!(
+        sse_send(
+            &router,
+            "ayse",
+            &token,
+            serde_json::json!({ "c": 4, "a": "join_room", "d": { "name": "r1" } })
+        )
+        .await,
+        204
+    );
+    assert_eq!(
+        next_data(&mut body, &mut held).await,
+        serde_json::json!({ "r": 4, "ok": null })
+    );
+
+    drop(body);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    hub.notify_tenant(None, "orders");
+    let open = serde_json::json!({ "resume": token, "seq": 1 }).to_string();
+    let (mut body, _, mut held, welcome) = sse_open(&router, "ayse", &open).await;
+    assert_eq!(welcome["welcome"]["resumed"], true, "{welcome}");
+    assert_eq!(
+        next_data(&mut body, &mut held).await,
+        serde_json::json!({ "s": 2, "t": "orders" })
+    );
+}
+
+#[tokio::test]
+async fn the_fallback_transport_checks_csrf_tickets_and_tokens() {
+    use tower::ServiceExt;
+    let (router, _, _) = app(Limits::default());
+    let status = |req: axum::http::Request<axum::body::Body>| {
+        let router = router.clone();
+        async move {
+            router
+                .oneshot(req)
+                .await
+                .unwrap()
+                .status()
+                .as_u16()
+        }
+    };
+    assert_eq!(
+        status(sse_request("POST", "/_zeyn/socket/open", "ayse", false, "")).await,
+        403,
+        "opening needs the CSRF token"
+    );
+    let (_body, token, _, _) = sse_open(&router, "ayse", "").await;
+    assert_eq!(
+        sse_send(
+            &router,
+            "bora",
+            &token,
+            serde_json::json!({ "sub": ["orders"] })
+        )
+        .await,
+        404,
+        "another user cannot send on the connection"
+    );
+    assert_eq!(
+        sse_send(
+            &router,
+            "ayse",
+            "0.00",
+            serde_json::json!({ "sub": ["orders"] })
+        )
+        .await,
+        404,
+        "a made up token names nothing"
+    );
+    let mut no_csrf = sse_request(
+        "POST",
+        "/_zeyn/socket/send",
+        "ayse",
+        false,
+        r#"{"sub":["orders"]}"#,
+    );
+    no_csrf
+        .headers_mut()
+        .insert("x-zeyn-socket", HeaderValue::from_str(&token).unwrap());
+    assert_eq!(status(no_csrf).await, 403, "sending needs the CSRF token");
+
+    use http_body_util::BodyExt;
+    let res = router
+        .clone()
+        .oneshot(sse_request("POST", "/_zeyn/socket/open", "ayse", true, ""))
+        .await
+        .unwrap();
+    let opened: serde_json::Value = serde_json::from_slice(
+        &res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes(),
+    )
+    .unwrap();
+    let path = format!(
+        "/_zeyn/socket/events?ticket={}",
+        opened["ticket"].as_str().unwrap()
+    );
+    assert_eq!(
+        status(sse_request("GET", &path, "bora", false, "")).await,
+        403,
+        "a ticket works only for the user who opened it"
+    );
+    assert_eq!(
+        status(sse_request("GET", &path, "ayse", false, "")).await,
+        404,
+        "and only once"
+    );
 }
 
 /// The next text frame within `ms`, or `None`.

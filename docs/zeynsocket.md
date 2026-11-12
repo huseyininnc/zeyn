@@ -2,8 +2,8 @@
 
 Status: ZEYN-272 (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events, groups,
 `Conn`, actions over the socket), ZEYN-273 (resume, replay, heartbeat, backoff) and ZEYN-277
-(limits, tenant isolation, memory) and ZEYN-276 (`on_event`, `zeyn.socket`, `TestSocket`) are
-built. ZEYN-274, ZEYN-275 and ZEYN-278 follow in the order of section 8.
+(limits, tenant isolation, memory), ZEYN-276 (`on_event`, `zeyn.socket`, `TestSocket`) and
+ZEYN-274 (Server-Sent Events fallback) are built. ZEYN-275 and ZEYN-278 follow.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,
@@ -27,7 +27,7 @@ notification bell or a job progress bar without learning a second model.
 | Sockets per page | One, shared by every component on the page | Fewer connections per user; the `per_user` limit stays meaningful. |
 | Server state | Only open connections, groups and short replay buffers, all capped | Screens stay stateless; a lost server loses no data, clients resync. |
 | CSRF | Sent as the subprotocol `csrf.TOKEN` next to `zeyn`, never in the URL | URLs land in proxy and server logs (ZEYN-258). The subprotocol keeps it out of them and is checked before the upgrade, so no unauthenticated socket is ever opened. The handshake also checks `Origin`. |
-| Fallback | Server-Sent Events down, `POST` up | Works through proxies that strip `Upgrade`; same envelope, same resume. Long polling is not built. |
+| Fallback | Server-Sent Events down, `POST` up | Works through proxies that strip `Upgrade`; same envelope, same resume. Long polling is not built. `POST /_zeyn/socket/open` with the CSRF token returns a single use ticket (30 s, same user) for `GET /_zeyn/socket/events?ticket=`; the ticket is the only thing in a URL. `POST /_zeyn/socket/send` takes one frame with the CSRF token and `x-zeyn-socket: <resume token>`. |
 | Scale out | Redis pub/sub behind the `redis` feature | Already a dependency of the `redis` feature; no sticky sessions needed. |
 
 Not built: server to client calls that wait for an answer (SignalR client results), binary
