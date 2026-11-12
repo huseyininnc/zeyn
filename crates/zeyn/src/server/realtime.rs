@@ -21,6 +21,8 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use std::collections::HashMap;
 
+#[cfg(feature = "redis")]
+mod bus;
 #[cfg(feature = "socket-client")]
 mod client;
 mod socket;
@@ -299,6 +301,9 @@ struct Inner {
     groups: Mutex<HashMap<TenantKey, Vec<u64>>>,
     /// Fallback transports opened with `POST` and waiting for their event stream.
     tickets: Mutex<HashMap<String, socket::sse::Ticket>>,
+    /// Other instances of the app, through Redis.
+    #[cfg(feature = "redis")]
+    bus: OnceLock<bus::Bus>,
     next: AtomicU64,
     sweeping: AtomicBool,
     /// When each user (by tenant and user id) last sent a typing signal.
@@ -339,6 +344,18 @@ impl Socket {
     /// Same as [`Socket::notify`] for a tenant given by id (`None` without tenancy). A
     /// subscriber whose queue is full is told to resync instead.
     pub fn notify_tenant(&self, tenant: Option<&str>, topic: &str) {
+        self.notify_local(tenant, topic);
+        #[cfg(feature = "redis")]
+        self.publish(
+            tenant.unwrap_or(""),
+            bus::What::Topic {
+                topic: topic.to_string(),
+            },
+        );
+    }
+
+    /// Notifies the subscribers of this instance only.
+    fn notify_local(&self, tenant: Option<&str>, topic: &str) {
         let key = (tenant.unwrap_or("").to_string(), topic.to_string());
         if let Ok(mut topics) = self.0.topics.lock()
             && let Some(subs) = topics.get_mut(&key)
@@ -401,6 +418,20 @@ impl Socket {
         if !self.typing_allowed(tenant, user) {
             return;
         }
+        self.typing_local(tenant, topic, user, room);
+        #[cfg(feature = "redis")]
+        self.publish(
+            tenant,
+            bus::What::Typing {
+                topic: topic.to_string(),
+                user: user.to_string(),
+                room: room.to_string(),
+            },
+        );
+    }
+
+    /// Passes a typing signal to the subscribers of this instance only.
+    fn typing_local(&self, tenant: &str, topic: &str, user: &str, room: &str) {
         let text = serde_json::json!({
             "t": topic,
             "typing": { "room": room, "who": self.person_key(tenant, user) },
