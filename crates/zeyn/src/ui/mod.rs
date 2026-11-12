@@ -69,6 +69,8 @@ pub use markdown::{MAX_MARKDOWN, Markdown};
 mod live;
 #[cfg(feature = "realtime")]
 pub use live::Live;
+#[cfg(feature = "realtime")]
+pub use live::{EventNode, OnEvent, OnEvents};
 
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
