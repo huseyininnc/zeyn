@@ -768,6 +768,7 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
   gap: 4px;
   font: inherit;
   white-space: nowrap;
+  direction: ltr;
 }
 
 .z-keys > kbd {
@@ -1187,10 +1188,9 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
   font-size: var(--z-font-size-sm);
 }
 
-.z-meter-value { color: var(--z-text-muted); font-variant-numeric: tabular-nums; }
+.z-meter-value { display: inline-flex; gap: 8px; color: var(--z-text-muted); font-variant-numeric: tabular-nums; }
 
 .z-meter-state {
-  margin-inline-start: 8px;
   color: var(--z-tone);
   font-weight: 600;
 }
@@ -1307,7 +1307,7 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
 
 .z-imgcompare {
   position: relative;
-  max-width: 100%;
+  width: min(100%, var(--z-imgcompare-width, 100%));
   aspect-ratio: var(--z-imgcompare-ratio, 4 / 3);
   margin: 0 0 16px;
   border-radius: var(--z-radius-lg);

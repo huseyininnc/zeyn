@@ -1202,7 +1202,7 @@ fn image_compares_hold_two_allowed_pictures_and_a_hidden_slider() {
         .size(1200, 800);
     let out = html(&c, "en");
     assert!(
-        out.starts_with(r#"<div class="z-imgcompare" data-zeyn-imgcompare style="--z-imgcompare-ratio:1200 / 800">"#),
+        out.starts_with(r#"<div class="z-imgcompare" data-zeyn-imgcompare style="--z-imgcompare-ratio:1200 / 800;--z-imgcompare-width:1200px">"#),
         "{out}"
     );
     assert!(out.contains(

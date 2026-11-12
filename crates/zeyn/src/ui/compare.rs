@@ -221,7 +221,8 @@ impl ImageCompare {
         self
     }
 
-    /// The size of the pictures in pixels; it gives the box its shape before they load.
+    /// The size of the pictures in pixels; it gives the box its shape before they load and is its
+    /// largest width.
     pub fn size(mut self, width: u32, height: u32) -> Self {
         self.size = (width.max(1), height.max(1));
         self
@@ -245,7 +246,7 @@ impl Component for ImageCompare {
                 .unwrap_or_default()
         };
         out.push_str(&format!(
-            r#"<div class="z-imgcompare" data-zeyn-imgcompare style="--z-imgcompare-ratio:{w} / {h}">{}{}<span class="z-imgcompare-line" aria-hidden="true"></span><input class="z-imgcompare-range" type="range" min="0" max="100" value="50" aria-label="{}" data-testid="{}.imgcompare" hidden></div>"#,
+            r#"<div class="z-imgcompare" data-zeyn-imgcompare style="--z-imgcompare-ratio:{w} / {h};--z-imgcompare-width:{w}px">{}{}<span class="z-imgcompare-line" aria-hidden="true"></span><input class="z-imgcompare-range" type="range" min="0" max="100" value="50" aria-label="{}" data-testid="{}.imgcompare" hidden></div>"#,
             image(&self.after, "z-imgcompare-after"),
             image(&self.before, "z-imgcompare-before"),
             r.text(&self.label),
