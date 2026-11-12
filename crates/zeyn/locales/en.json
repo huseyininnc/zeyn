@@ -1114,6 +1114,7 @@
     },
     "files": {
       "too_large": "The file is too large. The largest file allowed is {max}.",
+      "quota": "You reached the upload limit for now. Try again later.",
       "too_many": "{label} takes at most {n} files.",
       "type": "This type of file is not accepted, or its content does not match its name.",
       "refused": "The file was refused by the security check.",

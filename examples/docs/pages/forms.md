@@ -130,4 +130,6 @@ Downloads (`GET /_zeyn/files/{store}/{id}`) check the id's shape, the permission
 
 `DiskStore` keeps `{id}.bin` and `{id}.json` in one folder and writes uploads to `{id}.part` first. `MemoryStore` holds files in memory with a byte cap, for tests and demos. The form value only names files: a save action that must be sure a file exists calls `store.meta(id)`, as the showcase does.
 
+`FileRules::quota(bytes, window)` caps what one user uploads to a store per window, counted with the app's rate store; the upload that crosses it still lands and the next one answers `429`. `DiskStore` removes `.part` files older than an hour (uploads stopped by a crash) at most once an hour. `ZipGuard` is a scanner for ZIP based uploads (ZIP, Word, Excel, PowerPoint): it refuses archives whose central directory declares more than 10,000 entries, more than 1 GiB in all or more than 200 times the file's size, and ZIP64 archives; code that unpacks an accepted archive must still stop at those limits.
+
 Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 12 KB raw and 4 KB gzip, `files.css` 3 KB raw and 1 KB gzip.

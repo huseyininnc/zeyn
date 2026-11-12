@@ -215,6 +215,10 @@ pub(super) async fn guard_request(
         parts.method,
         axum::http::Method::GET | axum::http::Method::HEAD
     ) && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
+        || matches!(
+            parts.method,
+            axum::http::Method::PUT | axum::http::Method::PATCH | axum::http::Method::DELETE
+        )
         || parts.method == axum::http::Method::POST
             && (WRITE_PATHS.contains(&path)
                 || files::is_upload(path)
