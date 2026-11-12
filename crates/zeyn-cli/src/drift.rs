@@ -339,6 +339,92 @@ fn the_component_index_names_only_what_the_zeyn_crate_has() {
     );
 }
 
+/// Components the index leaves out on purpose: nodes the framework builds itself (text, markup,
+/// live and event nodes, dynamic grids, submit forms), parts of another component, and ones an
+/// app reaches through its guide page, since the template stays under its size budget.
+const NOT_IN_INDEX: &[&str] = &[
+    "AlphaIndex",
+    "AssistantChat",
+    "Busy",
+    "ClearPrefs",
+    "CommandNode",
+    "DynamicGrid",
+    "Embed",
+    "EventNode",
+    "ExternalLink",
+    "Import",
+    "Island",
+    "KanbanCard",
+    "Listen",
+    "Live",
+    "Markup",
+    "MenuButton",
+    "MetaLine",
+    "PdfLink",
+    "Popover",
+    "PrevNext",
+    "Skeleton",
+    "Spoiler",
+    "SubmitForm",
+    "TextNode",
+    "ThemePicker",
+    "Toolbox",
+    "WeekSchedule",
+];
+
+/// Every type that renders as a component (`impl Component for X` in `crates/zeyn/src`).
+fn component_types(dir: &Path, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            component_types(&path, out);
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        for line in text.lines() {
+            if let Some(at) = line.find(" Component for ")
+                && line.trim_start().starts_with("impl")
+            {
+                out.push(ident(&line[at + " Component for ".len()..]).to_string());
+            }
+        }
+    }
+}
+
+#[test]
+fn every_component_is_in_the_index_or_left_out_on_purpose() {
+    let src = repo("crates/zeyn/src");
+    if !src.is_dir() {
+        return;
+    }
+    let mut found = Vec::new();
+    component_types(&src, &mut found);
+    found.sort();
+    found.dedup();
+    let (types, _, _) = index_names();
+    let missing: Vec<&String> = found
+        .iter()
+        .filter(|t| !types.contains(*t) && !NOT_IN_INDEX.contains(&t.as_str()))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "{missing:?} render as components but the index in crates/zeyn-cli/templates/AGENTS.md.tmpl does not name them; add each to the index (\"### Components by area\") or, when apps should not reach for it directly, to NOT_IN_INDEX in crates/zeyn-cli/src/drift.rs"
+    );
+    let stale: Vec<&&str> = NOT_IN_INDEX
+        .iter()
+        .filter(|t| !found.iter().any(|f| f == *t))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "NOT_IN_INDEX names {stale:?}, which no longer exist"
+    );
+}
+
 #[test]
 fn the_agents_template_stays_within_its_size_budget() {
     assert!(

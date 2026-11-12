@@ -719,6 +719,9 @@ impl Component for Meter {
         let state = match self.state() {
             MeterState::Low => Some(r.text(&Text::key("zeyn.ui.meter.low"))),
             MeterState::High => Some(r.text(&Text::key("zeyn.ui.meter.high"))),
+            MeterState::Normal if self.tone() == Tone::Warning => {
+                Some(r.text(&Text::key("zeyn.ui.meter.fair")))
+            }
             MeterState::Normal => None,
         };
         let spoken = match &state {
