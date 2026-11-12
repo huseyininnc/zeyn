@@ -30,7 +30,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - `App::accounts` registers `Accounts`, `UserManager`, `RoleManager` and `SignInManager` as

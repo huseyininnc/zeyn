@@ -201,7 +201,7 @@ async fn a_signed_in_users_choice_is_saved_in_the_view_store_and_follows_them_to
 async fn a_hidden_picker_or_a_single_theme_locks_the_app() {
     let hidden = build(
         App::new("T")
-            .theme_picker(false)
+            .no_theme_picker()
             .default_theme("dark"),
     );
     let (_, _, page) = get(&hidden, "/home", "zeyn_theme=light").await;
@@ -316,7 +316,7 @@ async fn a_theme_picker_in_a_screen_offers_the_shells_themes_and_shows_the_curre
         ),
         "{screen_picker}"
     );
-    let locked = with_appearance(App::new("T").theme_picker(false));
+    let locked = with_appearance(App::new("T").no_theme_picker());
     let (_, _, page) = get(&locked, "/appearance", "").await;
     assert!(
         !page.contains("data-zeyn-theme-picker"),

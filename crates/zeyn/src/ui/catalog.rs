@@ -377,7 +377,7 @@ pub(crate) fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
 ///     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()).text(p.price.to_string())
 ///         .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
 ///         .link(product_page, ProductParams { id: p.id }))
-///     .sort_option(t!("shop.by_name"), Product::name, false)
+///     .sort_option(t!("shop.by_name"), Product::name)
 ///     .paging(Paging::infinite(24))
 /// ```
 pub struct CardGrid<E: Model> {
@@ -558,8 +558,8 @@ impl<E: Model> CardGrid<E> {
 
     /// Keeps the scrollbar of a [`Rail`] visible (thin). Rails hide it by default; card grids and
     /// lists do not scroll sideways, so it changes nothing for them.
-    pub fn scrollbar(mut self, show: bool) -> Self {
-        self.scrollbar = show;
+    pub fn scrollbar(mut self) -> Self {
+        self.scrollbar = true;
         self
     }
 
@@ -597,17 +597,26 @@ impl<E: Model> CardGrid<E> {
         self
     }
 
-    /// A sort order users can pick. The first one is the order the cards start in.
-    pub fn sort_option<T>(
-        mut self,
+    /// A sort order users can pick, rising by `field`. The first one is the order the cards
+    /// start in.
+    pub fn sort_option<T>(self, label: impl Into<Text>, field: crate::model::Field<E, T>) -> Self {
+        self.sort_choice(label.into(), field.meta().name, false)
+    }
+
+    /// A sort order users can pick, falling by `field` (newest, dearest first).
+    pub fn sort_option_desc<T>(
+        self,
         label: impl Into<Text>,
         field: crate::model::Field<E, T>,
-        desc: bool,
     ) -> Self {
+        self.sort_choice(label.into(), field.meta().name, true)
+    }
+
+    fn sort_choice(mut self, label: Text, field: &str, desc: bool) -> Self {
         self.sorts.push((
-            label.into(),
+            label,
             Sort {
-                field: field.meta().name.to_string(),
+                field: field.to_string(),
                 desc,
             },
         ));

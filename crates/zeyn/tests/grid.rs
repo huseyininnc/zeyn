@@ -825,7 +825,7 @@ pub fn act_nested() -> Screen {
 pub fn sorted() -> Screen {
     Screen::new("Sorted").body(
         DataGrid::of(search)
-            .sort_by(Item::qty, true)
+            .sort_by_desc(Item::qty)
             .column(Item::code)
             .column(Item::qty),
     )
@@ -1396,7 +1396,7 @@ async fn browser_menu_stays_unless_the_app_turns_it_off() {
     );
     let router = App::new("Test")
         .service(Store::seeded())
-        .browser_context_menu(false)
+        .no_browser_context_menu()
         .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
         .feature(Feature::new("items").screen(menus))
         .router()

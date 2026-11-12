@@ -893,7 +893,7 @@ async fn refresh_tokens_renew_the_session_and_a_refused_refresh_signs_out() {
     let idp = Idp::start().await;
     idp.expires_in
         .store(0, Ordering::SeqCst);
-    let router = app(oidc(&idp, "http://app.test").refresh_tokens(true));
+    let router = app(oidc(&idp, "http://app.test").refresh_tokens());
     let value = sign_in(&router, &idp, "/_zeyn/auth/login", "f1", json!({})).await;
     let r = send(&router, get_with("/home", &format!("zeyn_session={value}"))).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
@@ -1413,7 +1413,7 @@ mod keycloak {
         )
         .client_secret(Secret::new(CLIENT_SECRET.into()))
         .claims(claims.clone())
-        .refresh_tokens(true));
+        .refresh_tokens());
 
         let (flow, q, r) = start(&router, "/_zeyn/auth/login?return_to=%2Fhome").await;
         let back = browser_login(&http, &r.location()).await;
