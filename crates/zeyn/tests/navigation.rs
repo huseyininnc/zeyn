@@ -491,6 +491,62 @@ async fn framework_links_use_the_path_form() {
     );
 }
 
+#[screen(route = "/later", public)]
+pub fn later() -> Screen {
+    Screen::new("Later").body(
+        Stack::new()
+            .add(Alert::info("Right away"))
+            .add(zeyn::ui::Deferred::new(Alert::info("The slow part")).lines(2)),
+    )
+}
+
+#[tokio::test]
+async fn a_deferred_part_shows_a_placeholder_and_loads_by_its_path() {
+    let router = App::new("Nav")
+        .feature(Feature::new("n").screen(later))
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/later", false).await;
+    assert!(page.contains("Right away"));
+    assert!(
+        !page.contains("The slow part"),
+        "the slow part is not in the page"
+    );
+    assert!(
+        page.contains(r#"<div class="z-deferred" data-zeyn-defer="0.1.0" aria-busy="true""#),
+        "{page}"
+    );
+    assert!(
+        page.contains("/_zeyn/tabs.js"),
+        "the loader comes with the placeholder"
+    );
+    let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let body = serde_json::json!({ "screen": "later", "params": null, "node": "0.1.0" });
+    let res = router
+        .clone()
+        .oneshot(
+            Request::post("/_zeyn/node")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, format!("zeyn_csrf={token}"))
+                .header("x-zeyn-csrf", token)
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let html = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(html.contains("The slow part"), "{html}");
+}
+
 #[tokio::test]
 async fn lazy_parts_and_fragments_of_a_path_screen_get_its_params() {
     let router = path_app();
