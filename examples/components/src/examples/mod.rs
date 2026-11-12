@@ -94,6 +94,7 @@ pub mod screen_header;
 pub mod search_box;
 pub mod share;
 pub mod shop;
+pub mod side_menu;
 pub mod skeleton;
 pub mod split;
 pub mod spoiler;
