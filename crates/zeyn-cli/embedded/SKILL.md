@@ -16,7 +16,7 @@ Do not guess an API. Find it in the docs, in this order:
 
 1. **The project's `AGENTS.md`**: commands, structure and a framework index for this app.
 2. **The zeyn MCP server** (set up in `.mcp.json` by `zeyn new`): `zeyn_docs` with topic `rules`,
-   `language` or `protocol`; `zeyn_describe` lists the app's features, screens,
+   `language` or `protocol`, or `search: "words"` and `page: "/path"` for every docs page; `zeyn_describe` lists the app's features, screens,
    routes, access and problems; `zeyn_check` compiles and reports; `zeyn_test` runs the tests;
    `zeyn_new_feature` and `zeyn_new_screen` run the generators.
 3. **The documentation site**: run `cargo run -p zeyn-example-docs` in the Zeyn repository and
