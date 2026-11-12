@@ -3376,9 +3376,10 @@ impl AppState {
     }
 
     /// The app shell: a side menu with the app's name, the palette button, the menus of the
-    /// features without a site shell and the pickers, beside the screen. Below 800 px the menu
-    /// folds behind a menu button under the app's name (W3C APG disclosure); `nav.js` shows the
-    /// button, so without the script the menu stays open and nothing becomes unreachable.
+    /// features without a site shell and the pickers, beside the screen. Below 1024 px the menu
+    /// folds behind a menu button under the app's name and opens as a drawer over the screen;
+    /// `nav.js` shows the button, so without the script the menu stays open and nothing becomes
+    /// unreachable.
     #[allow(clippy::too_many_arguments)]
     fn app_frame(
         &self,
