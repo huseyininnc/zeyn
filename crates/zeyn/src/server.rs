@@ -3137,12 +3137,12 @@ impl AppState {
                         String::new()
                     } else {
                         format!(
-                            r#" data-zeyn-count-topics="{}""#,
+                            r#" data-zeyn-menu-count-topics="{}""#,
                             escape(&item.topics.join(","))
                         )
                     };
                     extra.push_str(&format!(
-                        r#" <span class="z-nav-count" data-zeyn-count="{}"{topics} hidden></span>"#,
+                        r#" <span class="z-nav-count" data-zeyn-menu-count="{}"{topics} hidden></span>"#,
                         escape(count.action.name)
                     ));
                 }

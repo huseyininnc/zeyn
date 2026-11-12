@@ -73,11 +73,12 @@ function markCurrent(url) {
   if (current) openBranch(current);
   const crumbs = document.querySelector('[data-zeyn-crumbs] ol');
   if (!crumbs) return;
+  const label = (el) => el?.querySelector('span:not([aria-hidden="true"])')?.textContent ?? el?.textContent;
   const groups = [];
   for (let g = current?.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {
-    groups.unshift(g.querySelector(':scope > :is(h2, h3, h4, h5)')?.textContent ?? '');
+    groups.unshift(label(g.querySelector(':scope > :is(h2, h3, h4, h5)')) ?? '');
   }
-  const page = current?.textContent ?? document.querySelector('#z-main h1')?.textContent ?? '';
+  const page = label(current) ?? document.querySelector('#z-main h1')?.textContent ?? '';
   const li = (text, here) => {
     const item = document.createElement('li');
     const span = document.createElement('span');
