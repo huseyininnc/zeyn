@@ -814,19 +814,20 @@ async fn logout_clears_the_session_and_goes_through_the_end_session_endpoint() {
     let idp = Idp::start().await;
     let router = app(oidc(&idp, "http://app.test"));
     let value = sign_in(&router, &idp, "/_zeyn/auth/login", "l1", json!({})).await;
+    let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     let r = send(
         &router,
-        get_with("/_zeyn/auth/logout", &format!("zeyn_session={value}")),
+        Request::post("/_zeyn/auth/logout")
+            .header(
+                header::COOKIE,
+                format!("zeyn_session={value}; zeyn_csrf={token}"),
+            )
+            .header("x-zeyn-csrf", token)
+            .body(Body::empty())
+            .unwrap(),
     )
     .await;
-    assert_eq!(r.status, StatusCode::SEE_OTHER);
-    assert_eq!(
-        r.location(),
-        format!(
-            "{}/logout?client_id=web&post_logout_redirect_uri=http%3A%2F%2Fapp.test%2F",
-            idp.base
-        )
-    );
+    assert_eq!(r.status, StatusCode::NO_CONTENT);
     assert!(
         r.cookie("zeyn_session")
             .unwrap()
@@ -838,6 +839,52 @@ async fn logout_clears_the_session_and_goes_through_the_end_session_endpoint() {
             .map(|v| v.to_str().unwrap()),
         Some(r#""storage""#),
         "signing out clears the browser storage of the app"
+    );
+    let r = send(&router, get_with("/_zeyn/auth/logout", "")).await;
+    assert_eq!(r.status, StatusCode::SEE_OTHER);
+    assert_eq!(
+        r.location(),
+        format!(
+            "{}/logout?client_id=web&post_logout_redirect_uri=http%3A%2F%2Fapp.test%2F",
+            idp.base
+        )
+    );
+}
+
+#[tokio::test]
+async fn a_cross_site_get_or_a_post_without_csrf_does_not_sign_out() {
+    let idp = Idp::start().await;
+    let router = app(oidc(&idp, "http://app.test"));
+    let value = sign_in(&router, &idp, "/_zeyn/auth/login", "l2", json!({})).await;
+    let r = send(
+        &router,
+        get_with("/_zeyn/auth/logout", &format!("zeyn_session={value}")),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::SEE_OTHER);
+    assert_eq!(
+        r.location(),
+        "http://app.test/",
+        "a signed in GET goes back to the app"
+    );
+    assert!(r.cookie("zeyn_session").is_none(), "GET keeps the session");
+    assert!(
+        r.headers
+            .get("clear-site-data")
+            .is_none()
+    );
+    let r = send(
+        &router,
+        Request::post("/_zeyn/auth/logout")
+            .header(header::COOKIE, format!("zeyn_session={value}"))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    assert!(
+        r.cookie("zeyn_session").is_none(),
+        "a refused POST keeps the session"
     );
 }
 

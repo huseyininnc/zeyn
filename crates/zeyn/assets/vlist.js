@@ -11,17 +11,12 @@
  * @module vlist
  */
 
-const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
+/** The shared request helpers (`net.js`). */
+const { post } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
 const OVERSCAN = 6;
 const MAX_BLOCKS = 10;
 /** @type {WeakMap<Element, object>} State per list. */
 const lists = new WeakMap();
-
-/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
-async function csrf() {
-  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
-  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
-}
 
 /** Screen name, params and node path of an element, as the endpoints expect them. */
 function address(el) {
@@ -51,16 +46,8 @@ async function load(section, b) {
   const s = lists.get(section);
   if (s.loading.has(b)) return;
   s.loading.add(b);
-  let body = null;
-  try {
-    const res = await fetch(BASE + '/_zeyn/grid', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
-      body: JSON.stringify({ ...address(section), query: { page: { type: 'offset', offset: b * s.block, limit: s.block }, with_total: true } }),
-    });
-    body = res.ok ? await res.json() : null;
-  } catch {}
+  const r = await post('/_zeyn/grid', { ...address(section), query: { page: { type: 'offset', offset: b * s.block, limit: s.block }, with_total: true } });
+  const body = r.ok ? r.body : null;
   s.loading.delete(b);
   if (!body) {
     const status = section.querySelector('[data-zeyn-cards-status]');

@@ -94,7 +94,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | 로그인을 시작하고 제공자로 리다이렉트합니다 |
 | `GET /_zeyn/auth/callback` | 제공자가 되돌려 보내는 리다이렉트 |
-| `GET /_zeyn/auth/logout` | 여기와 제공자에서 세션을 종료합니다 |
+| `POST` 다음 `GET /_zeyn/auth/logout` | CSRF 토큰이 있는 `POST`가 여기서 세션을 종료하고, 이어서 `GET`이 제공자에서 로그아웃합니다 |
 
 제공자에서 `<public url>/_zeyn/auth/callback`을 리다이렉트 URI로, `<public url>/`을 로그아웃 후 리다이렉트 URI로 등록하십시오. 공개 URL은 설정으로 지정하며 요청의 `Host` 헤더에서 가져오지 않습니다. 기본 경로나 공개 경로가 있으면 경로는 그 아래로 이동합니다.
 
@@ -126,7 +126,9 @@ CSRF 보호는 바뀌지 않습니다. 어떤 쿠키가 사용자를 로그인�
 
 ### 로그아웃
 
-`/_zeyn/auth/logout`은 세션 쿠키를 삭제하고 `client_id`와 `post_logout_redirect_uri`와 함께 사용자를 제공자의 `end_session_endpoint`로 보냅니다. 그 엔드포인트가 없으면 사용자는 앱의 시작 페이지로 갑니다.
+로그아웃은 두 단계로 이루어지므로 다른 사이트의 링크나 이미지가 사용자를 로그아웃시킬 수 없습니다. CSRF 토큰이 있는 `POST /_zeyn/auth/logout`은 세션 쿠키를 삭제하고 앱의 브라우저 저장소를 비웁니다. 그다음 `GET /_zeyn/auth/logout`이 `client_id`와 `post_logout_redirect_uri`와 함께 브라우저를 제공자의 `end_session_endpoint`로 보냅니다. 이 엔드포인트가 없으면 사용자는 앱의 시작 페이지로 갑니다. 아직 세션이 있는 브라우저의 `GET`은 앱으로 돌아가기만 합니다.
+
+사이트 셸의 로그아웃 링크와 유휴 로그아웃은 두 단계를 모두 수행합니다. 직접 만든 링크도 `data-zeyn-signout`으로 같은 일을 합니다. 런타임이 먼저 그 주소로 `POST`를 보낸 뒤 링크를 따라갑니다.
 
 ### 같은 앱의 API 및 MCP 클라이언트
 

@@ -598,6 +598,42 @@ async fn limits_and_security_checks() {
     );
 }
 
+/// A body that records whether anything read it, and fails when it is read.
+fn watched_body(read: Arc<std::sync::atomic::AtomicBool>) -> Body {
+    Body::from_stream(futures_util::stream::once(async move {
+        read.store(true, std::sync::atomic::Ordering::SeqCst);
+        Err::<axum::body::Bytes, _>(std::io::Error::other("the body was read"))
+    }))
+}
+
+#[tokio::test]
+async fn refused_requests_are_answered_before_their_body_is_read() {
+    let s = setup(ALL, |a| a);
+    for path in [
+        "/_zeyn/assistant/stt",
+        "/_zeyn/assistant/chat",
+        "/_zeyn/assistant/confirm",
+        "/_zeyn/assistant/tts",
+    ] {
+        let read = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let req = Request::post(path)
+            .header("x-user", "1")
+            .header(header::CONTENT_TYPE, "audio/webm")
+            .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+            .body(watched_body(read.clone()))
+            .unwrap();
+        assert_eq!(
+            send(&s.router, req).await.status,
+            StatusCode::FORBIDDEN,
+            "{path}"
+        );
+        assert!(
+            !read.load(std::sync::atomic::Ordering::SeqCst),
+            "{path} read the body of a request without CSRF"
+        );
+    }
+}
+
 #[tokio::test]
 async fn the_page_shell_carries_the_launcher_and_assets_only_for_allowed_users() {
     let s = setup(ALL, |a| a);
