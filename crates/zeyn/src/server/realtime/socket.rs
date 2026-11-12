@@ -207,7 +207,9 @@ pub struct Target<'a> {
     to: To,
 }
 
-enum To {
+#[derive(Clone, serde::Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(super) enum To {
     User(String),
     Group(String),
     Tenant,
@@ -237,6 +239,16 @@ impl Socket {
             socket: self,
             tenant: tenant.unwrap_or("").to_string(),
             to: To::Tenant,
+        }
+    }
+
+    /// Every open page of a user of a tenant given by id (`None` without tenancy), for jobs that
+    /// run without a request.
+    pub fn to_user_id(&self, tenant: Option<&str>, user: impl Into<String>) -> Target<'_> {
+        Target {
+            socket: self,
+            tenant: tenant.unwrap_or("").to_string(),
+            to: To::User(user.into()),
         }
     }
 
@@ -286,20 +298,21 @@ impl Socket {
 
 impl Target<'_> {
     /// Sends an event to every connection of the target whose user holds the permission the
-    /// event was declared with, and returns how many got it. The event is serialized once. An
-    /// event not declared with `ZeynSocket::event`, or larger than [`Limits::event_bytes`], is
-    /// an error.
+    /// event was declared with, on this instance and, with [`ZeynSocket::redis`](super::ZeynSocket::redis),
+    /// on the others, and returns how many connections of this instance got it. The event is
+    /// serialized once. An event not declared with `ZeynSocket::event`, or larger than
+    /// [`Limits::event_bytes`], is an error.
     pub fn emit<E: Event>(&self, event: &E) -> crate::Result<usize> {
         let Some(config) = self.socket.config() else {
             return Ok(0);
         };
-        let Some(permission) = config.events.get(E::NAME) else {
+        if !config.events.contains_key(E::NAME) {
             return Err(Error::Internal(format!(
                 "the socket event `{}` is not declared: add `.event::<{}>(\"permission\")` to `ZeynSocket::new()`",
                 E::NAME,
                 std::any::type_name::<E>()
             )));
-        };
+        }
         let data = serde_json::to_string(event)
             .map_err(|e| Error::Internal(format!("socket event `{}`: {e}", E::NAME)))?;
         if data.len() > config.limits.event_bytes {
@@ -310,20 +323,43 @@ impl Target<'_> {
                 config.limits.event_bytes
             )));
         }
-        let name = serde_json::to_string(E::NAME).unwrap_or_default();
+        let sent = self
+            .socket
+            .emit_local(&self.tenant, &self.to, E::NAME, &data);
+        #[cfg(feature = "redis")]
+        self.socket.publish(
+            &self.tenant,
+            super::bus::What::Event {
+                to: self.to.clone(),
+                name: E::NAME.to_string(),
+                data,
+            },
+        );
+        Ok(sent)
+    }
+}
+
+impl Socket {
+    /// Delivers a serialized event to the connections of this instance that the target names and
+    /// whose user holds the event's permission.
+    pub(super) fn emit_local(&self, tenant: &str, to: &To, name: &str, data: &str) -> usize {
+        let Some(permission) = self
+            .config()
+            .and_then(|c| c.events.get(name).copied())
+        else {
+            return 0;
+        };
+        let name = serde_json::to_string(name).unwrap_or_default();
         let access = crate::action::Access::Permission(permission);
         let mut sent = 0;
-        for peer in self
-            .socket
-            .peers(&self.tenant, &self.to)
-        {
+        for peer in self.peers(tenant, to) {
             if peer.identity.can(&access)
                 && peer.send_numbered(|s| format!(r#"{{"s":{s},"e":{name},"d":{data}}}"#))
             {
                 sent += 1;
             }
         }
-        Ok(sent)
+        sent
     }
 }
 
@@ -506,6 +542,8 @@ pub(super) async fn page_socket(
         socket.release_user(&user);
         return st.error_response(&ctx, f);
     }
+    #[cfg(feature = "redis")]
+    socket.listen();
     let ws = match ws {
         Ok(ws) => ws,
         Err(e) => {

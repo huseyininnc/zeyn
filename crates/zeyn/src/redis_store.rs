@@ -82,7 +82,19 @@ impl RedisStore {
         })))
     }
 
-    async fn connection(&self) -> redis::RedisResult<ConnectionManager> {
+    /// The key prefix, `zeyn:<prefix>:`.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn prefix(&self) -> &str {
+        &self.0.prefix
+    }
+
+    /// The client, for connections of their own such as a subscription.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn client(&self) -> &redis::Client {
+        &self.0.client
+    }
+
+    pub(crate) async fn connection(&self) -> redis::RedisResult<ConnectionManager> {
         let config = ConnectionManagerConfig::new()
             .set_connection_timeout(Some(Duration::from_secs(1)))
             .set_response_timeout(Some(Duration::from_millis(500)))

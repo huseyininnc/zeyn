@@ -79,6 +79,8 @@ pub(in crate::server) async fn open(
     if let Err(f) = st.admit_call(&ctx, &call) {
         return refuse(st.error_response(&ctx, f));
     }
+    #[cfg(feature = "redis")]
+    socket.listen();
     let Ok(raw) = axum::body::to_bytes(body, OPEN_BYTES).await else {
         return refuse(bad_request(&st, &ctx));
     };

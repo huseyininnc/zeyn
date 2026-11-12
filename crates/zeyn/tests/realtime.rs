@@ -1267,6 +1267,115 @@ async fn the_fallback_transport_checks_csrf_tickets_and_tokens() {
     );
 }
 
+/// Two instances of one app behind one Redis: a topic notified and an event sent on one reach a
+/// page socket on the other. Runs when `ZEYN_TEST_REDIS` is set, for example
+/// `docker run -d --rm -p 6379:6379 redis:7-alpine` and
+/// `ZEYN_TEST_REDIS=redis://127.0.0.1:6379 cargo test -p zeyn --features realtime,redis --test realtime`.
+#[cfg(feature = "redis")]
+#[tokio::test]
+async fn instances_share_topics_and_events_through_redis() {
+    let Some(url) = std::env::var("ZEYN_TEST_REDIS")
+        .ok()
+        .filter(|u| !u.is_empty())
+    else {
+        return;
+    };
+    let prefix = format!("t{}", std::process::id());
+    let instance = |store: &zeyn::RedisStore| {
+        let live = ZeynSocket::new()
+            .topic("orders", "notes.read")
+            .event::<Saved>("notes.read")
+            .redis(store);
+        let socket = live.socket();
+        let router = App::new("Test")
+            .auth(|h: &HeaderMap| {
+                Some(
+                    Identity::user(h.get("x-user")?.to_str().ok()?)
+                        .with_permissions(["notes.read"]),
+                )
+            })
+            .feature(Feature::new("notes").screen(home))
+            .socket(live)
+            .router()
+            .unwrap();
+        (router, socket)
+    };
+    let (router_a, socket_a) = instance(&zeyn::RedisStore::new(&url, &prefix).unwrap());
+    let (_router_b, socket_b) = instance(&zeyn::RedisStore::new(&url, &prefix).unwrap());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            router_a.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
+    let (mut s, _) = hello(addr, "ayse", None).await;
+    until_subscribers(&socket_a, 1).await;
+    let mut got = None;
+    for _ in 0..50 {
+        socket_b.notify_tenant(None, "orders");
+        if let Some(text) = next_text(&mut s, 100).await {
+            got = Some(text);
+            break;
+        }
+    }
+    let first: serde_json::Value =
+        serde_json::from_str(&got.expect("a topic from the other instance")).unwrap();
+    assert_eq!(first["t"], "orders");
+    while next_text(&mut s, 300).await.is_some() {}
+    assert_eq!(
+        socket_b
+            .to_user_id(None, "ayse")
+            .emit(&Saved { room: "r1".into() })
+            .unwrap(),
+        0,
+        "instance b holds no connection itself"
+    );
+    let v = next_json(&mut s).await;
+    assert_eq!(v["e"], "notes.saved", "{v}");
+    assert_eq!(v["d"]["room"], "r1");
+}
+
+/// With Redis unreachable, sends still reach the connections of this instance.
+#[cfg(feature = "redis")]
+#[tokio::test]
+async fn sends_stay_local_while_redis_is_down() {
+    let store = zeyn::RedisStore::new("redis://127.0.0.1:1", "down").unwrap();
+    let live = ZeynSocket::new()
+        .topic("orders", "notes.read")
+        .redis(&store);
+    let socket = live.socket();
+    let router = App::new("Test")
+        .auth(|h: &HeaderMap| {
+            Some(Identity::user(h.get("x-user")?.to_str().ok()?).with_permissions(["notes.read"]))
+        })
+        .feature(Feature::new("notes").screen(home))
+        .socket(live)
+        .router()
+        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
+    let (mut s, _) = hello(addr, "ayse", None).await;
+    until_subscribers(&socket, 1).await;
+    socket.notify_tenant(None, "orders");
+    assert_eq!(next_json(&mut s).await["t"], "orders");
+}
+
 /// The next text frame within `ms`, or `None`.
 async fn next_text(s: &mut Socket, ms: u64) -> Option<String> {
     loop {
