@@ -288,9 +288,11 @@ pub fn feature() -> Feature {
         .route_prefix("/islands")
         .screen(island_counter)
         .screen(island_diagram)
+        .screen(crate::live::live_updates)
         .menu(|m| {
             m.group(t!("menu.islands"), Icon::ChartBar)
                 .item(t!("islands.counter"), island_counter)
                 .item(t!("islands.diagram"), island_diagram)
+                .item(t!("live.title"), crate::live::live_updates)
         })
 }

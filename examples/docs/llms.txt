@@ -76,6 +76,7 @@ These docs are written in English, and the English pages below are the source. E
 - [Operations](https://docs.zeynsoft.com/guides/operations): Docker, tracing, Redis, licenses
 - [AI assistant](https://docs.zeynsoft.com/guides/assistant)
 - [WASM islands](https://docs.zeynsoft.com/guides/islands)
+- [ZeynSocket](https://docs.zeynsoft.com/guides/socket)
 - [Realtime and CRDT](https://docs.zeynsoft.com/guides/realtime)
 - [Desktop apps](https://docs.zeynsoft.com/guides/desktop)
 

@@ -78,6 +78,7 @@
       "operations": "العمليات",
       "assistant": "مساعد الذكاء الاصطناعي",
       "islands": "جزر WASM",
+      "socket": "ZeynSocket",
       "realtime": "الوقت الفعلي وCRDT",
       "desktop": "تطبيقات سطح المكتب (Desktop apps)",
       "protocol": "بروتوكول وقت التشغيل",
