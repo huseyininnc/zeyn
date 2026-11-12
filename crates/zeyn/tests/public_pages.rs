@@ -736,3 +736,41 @@ fn a_sitemap_action_must_be_public_and_the_site_url_an_https_origin() {
         );
     }
 }
+
+#[test]
+fn a_public_file_on_a_path_the_app_serves_is_a_check_problem() {
+    static FILES: [zeyn::PublicFile; 3] = [
+        zeyn::PublicFile {
+            path: "/robots.txt",
+            bytes: b"x",
+            content_type: "text/plain",
+        },
+        zeyn::PublicFile {
+            path: "/pricing",
+            bytes: b"x",
+            content_type: "text/plain",
+        },
+        zeyn::PublicFile {
+            path: "/logo.svg",
+            bytes: b"<svg/>",
+            content_type: "image/svg+xml",
+        },
+    ];
+    let problems = seo_app()
+        .public(&FILES)
+        .check()
+        .unwrap_err();
+    assert_eq!(
+        problems
+            .iter()
+            .filter(|p| p.contains("public file"))
+            .count(),
+        2,
+        "{problems:?}"
+    );
+    assert!(
+        problems
+            .iter()
+            .all(|p| !p.contains("/logo.svg"))
+    );
+}

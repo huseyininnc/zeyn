@@ -610,3 +610,35 @@ async fn the_project_page_exists_in_every_language_and_the_header_links_the_sour
     let (_, intro) = get("/").await;
     assert!(article(&intro).contains(r#"href="/project#license""#));
 }
+
+#[tokio::test]
+async fn public_folder_serves_the_favicon_with_an_entity_tag() {
+    let res = ROUTER
+        .clone()
+        .oneshot(
+            Request::get("/favicon.svg")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()[header::CONTENT_TYPE], "image/svg+xml");
+    let tag = res.headers()[header::ETAG]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let again = ROUTER
+        .clone()
+        .oneshot(
+            Request::get("/favicon.svg")
+                .header(header::IF_NONE_MATCH, &tag)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(again.status(), StatusCode::NOT_MODIFIED);
+    let (_, page) = get("/").await;
+    assert!(page.contains(r#"<link rel="icon" href="/favicon.svg" type="image/svg+xml">"#));
+}

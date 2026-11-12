@@ -121,3 +121,12 @@ App::new(t!("app.name"))
 ```
 
 どちらも、プレーンテキストとして全員に提供されます。
+
+## public フォルダー
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+crate の `public/` フォルダーにあるファイルは `zeyn::public_files!()` でバイナリに埋め込まれ、サイトのルートから配信されます。`public/favicon.svg` は `/favicon.svg` で応答し、ページは `/favicon.svg`、`/favicon.png`、`/favicon.ico` のうち最初に見つかったものをアイコンとしてリンクします。画像、アイコン、フォント、テキスト、XML、JSON、Web マニフェスト、PDF を受け付けます。HTML とスクリプトはアプリのオリジンで実行されてしまうため、ビルドを止めます。ファイルにはエンティティタグが付き、1 時間キャッシュされます。`[package.metadata.zeyn]` の `max_public_file_kb` と `max_public_total_kb` で変えない限り、ファイルは 256 KB、フォルダーは 2 MB までです。画面、`/robots.txt`、`/llms.txt`、`/sitemap.xml`、`/_zeyn/` がすでに使っているパスのファイルは `App::check` が報告します。`zeyn new` は `public/favicon.svg` を追加します。

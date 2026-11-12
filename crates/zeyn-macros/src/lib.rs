@@ -1226,6 +1226,162 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
     })
 }
 
+/// The files of the crate's `public/` folder, embedded in the binary and served from the site's
+/// root by `App::public`: `public/favicon.svg` is `/favicon.svg`. Only static types are taken
+/// (images, icons, fonts, text, XML, JSON and web manifests); HTML and scripts are a compile
+/// error, since they would run under the app's origin. A file over `max_public_file_kb` (256
+/// unless set) or a folder over `max_public_total_kb` (2048) stops the build; set them under
+/// `[package.metadata.zeyn]` in Cargo.toml.
+#[proc_macro]
+pub fn public_files(input: TokenStream) -> TokenStream {
+    if !input.is_empty() {
+        return syn::Error::new(
+            Ts::from(input).span(),
+            "`public_files!()` takes no arguments",
+        )
+        .to_compile_error()
+        .into();
+    }
+    match public_tokens() {
+        Ok(ts) => ts.into(),
+        Err(e) => syn::Error::new(proc_macro2::Span::call_site(), e)
+            .to_compile_error()
+            .into(),
+    }
+}
+
+/// The content type of a public file by its extension, `None` for types that are not served.
+fn public_type(name: &str) -> Option<&'static str> {
+    let ext = name
+        .rsplit_once('.')?
+        .1
+        .to_ascii_lowercase();
+    Some(match ext.as_str() {
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "avif" => "image/avif",
+        "gif" => "image/gif",
+        "ico" => "image/x-icon",
+        "woff2" => "font/woff2",
+        "woff" => "font/woff",
+        "txt" => "text/plain; charset=utf-8",
+        "xml" => "application/xml",
+        "json" => "application/json",
+        "webmanifest" => "application/manifest+json",
+        "pdf" => "application/pdf",
+        _ => return None,
+    })
+}
+
+/// A `[package.metadata.zeyn]` number of the crate's Cargo.toml, or `default`.
+fn zeyn_metadata(manifest: &str, key: &str, default: u64) -> u64 {
+    let mut inside = false;
+    for line in manifest.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            inside = line == "[package.metadata.zeyn]";
+            continue;
+        }
+        if inside
+            && let Some((k, v)) = line.split_once('=')
+            && k.trim() == key
+        {
+            return v.trim().parse().unwrap_or(default);
+        }
+    }
+    default
+}
+
+fn public_tokens() -> Result<Ts, String> {
+    let root = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default());
+    let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default();
+    let max_file = zeyn_metadata(&manifest, "max_public_file_kb", 256) * 1024;
+    let max_total = zeyn_metadata(&manifest, "max_public_total_kb", 2048) * 1024;
+    let dir = root.join("public");
+    let mut files = Vec::new();
+    let mut stack = vec![dir.clone()];
+    while let Some(d) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&d) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry
+                .file_name()
+                .to_string_lossy()
+                .into_owned();
+            if name.starts_with('.') {
+                continue;
+            }
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    let mut total = 0u64;
+    let mut items = Vec::new();
+    let mut tracked = Vec::new();
+    for path in files {
+        let rel = path
+            .strip_prefix(&dir)
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        let safe = rel
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'-' | b'_' | b'.'));
+        if !safe || rel.contains("..") {
+            return Err(format!(
+                "public/{rel}: use only letters, digits, `-`, `_` and `.` in public file names"
+            ));
+        }
+        let Some(content_type) = public_type(&rel) else {
+            return Err(format!(
+                "public/{rel}: this type is not served from public/
+  = help: public/ takes images, icons, fonts, text, XML, JSON, web manifests and PDF; HTML and scripts would run under the app's origin, so build them as screens"
+            ));
+        };
+        let size = std::fs::metadata(&path)
+            .map_err(|e| e.to_string())?
+            .len();
+        if size > max_file {
+            return Err(format!(
+                "public/{rel} has {} KB, more than max_public_file_kb ({} KB)
+  = help: make the file smaller, or raise `max_public_file_kb` under [package.metadata.zeyn] in Cargo.toml",
+                size / 1024,
+                max_file / 1024
+            ));
+        }
+        total += size;
+        let abs = path.to_string_lossy().into_owned();
+        let url = format!("/{rel}");
+        items.push(quote!(::zeyn::PublicFile {
+            path: #url,
+            bytes: ::core::include_bytes!(#abs),
+            content_type: #content_type,
+        }));
+        tracked.push(abs);
+    }
+    if total > max_total {
+        return Err(format!(
+            "public/ holds {} KB, more than max_public_total_kb ({} KB)
+  = help: remove or shrink files, or raise `max_public_total_kb` under [package.metadata.zeyn] in Cargo.toml",
+            total / 1024,
+            max_total / 1024
+        ));
+    }
+    let _ = tracked;
+    Ok(quote!({
+        const FILES: &[::zeyn::PublicFile] = &[#(#items),*];
+        FILES
+    }))
+}
+
 /// Catalog text checked at compile time: `t!("products.title")` or `t!("orders.count", n = count)`.
 ///
 /// Every JSON file in the crate's `locales/` folder must have the key, and the message's `{name}`
@@ -1369,4 +1525,28 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
         #(#tracked)*
         ::zeyn::Text::key(#key) #(#args)*
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{public_type, zeyn_metadata};
+
+    #[test]
+    fn public_files_take_static_types_only() {
+        assert_eq!(public_type("logo.SVG"), Some("image/svg+xml"));
+        assert_eq!(
+            public_type("site.webmanifest"),
+            Some("application/manifest+json")
+        );
+        assert_eq!(public_type("index.html"), None);
+        assert_eq!(public_type("app.js"), None);
+        assert_eq!(public_type("noext"), None);
+    }
+
+    #[test]
+    fn public_limits_come_from_the_zeyn_metadata_table() {
+        let manifest = "[package]\nmax_public_file_kb = 1\n[package.metadata.zeyn]\nmax_public_file_kb = 512\n";
+        assert_eq!(zeyn_metadata(manifest, "max_public_file_kb", 256), 512);
+        assert_eq!(zeyn_metadata(manifest, "max_public_total_kb", 2048), 2048);
+    }
 }
