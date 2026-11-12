@@ -97,6 +97,12 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 
 分页、虚拟滚动、键盘操作以及按用户语言格式化数字和日期,都与类型化的 grid 相同。名称、标签和单元格都会被转义,服务器会限制列数、行数和文本长度。该 grid 不排序也不筛选,行是只读的。详见 [DataGrid 参考](grid.md)。
 
+## 搜索与分组表头
+
+`.search()` 在表格上方放一个搜索框。动作以 `DataQuery::q` 接收文本,`DataQuery::apply` 用它匹配
+文本字段,但从不匹配掩码字段。`.band(label, |b| b.column(..).column(..))` 把列归到同一个表头单元格下。
+参见 [DataGrid 参考](grid.md)。
+
 ## 就地刷新
 
 最后调用的 `.listens(topic)` 让网格在主题被点名时就地重新加载（见 [主题](effects.md#topics)）：`ui.refresh(topic)` 之后，它保留排序和筛选重新加载当前页；带 `.drives(topic)` 的筛选控件变化之后，它以新的界面 params 从第一页开始。网格经由带有全部权限检查的 `POST /_zeyn/grid` 重新加载，筛选改变的界面 param 通过界面函数传给网格，例如作为 scope：

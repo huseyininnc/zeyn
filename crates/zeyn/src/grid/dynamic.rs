@@ -609,6 +609,7 @@ impl GridSource for DynamicGrid {
     fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
         query.sort.clear();
         query.filters.clear();
+        query.q.clear();
         query.aggregates.clear();
         query.group = None;
         query.time_zone = ctx.time_zone();

@@ -109,6 +109,7 @@
     "saved": "Product {code} saved.",
     "code_taken": "Code {code} is already used by another product.",
     "no_match": "No products match",
+    "price_and_stock": "Price and stock",
     "no_match_help": "Change or clear the filters to see more products."
   },
   "sales": {

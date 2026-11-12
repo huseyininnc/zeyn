@@ -194,6 +194,7 @@ document.addEventListener('input', (e) => {
   const t = e.target;
   if (!(t instanceof Element)) return;
   if (t.closest('.z-filter-cell')) return G?.onFilter(t);
+  if (t.matches('[data-zeyn-grid-search]')) return G?.onSearch(t);
   if (t.getAttribute('aria-invalid') === 'true') {
     t.removeAttribute('aria-invalid');
     const box = t.id && document.getElementById(`${t.id}-error`);

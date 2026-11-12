@@ -103,6 +103,13 @@ as in a typed grid. Names, labels and cells are escaped, and the server caps col
 length. The grid does not sort or filter, and its rows are read only. See the
 [DataGrid reference](grid.md).
 
+## Search and bands
+
+`.search()` puts a search box above the grid. The action gets the text as `DataQuery::q`, which
+`DataQuery::apply` matches against the text fields, never the masked ones.
+`.band(label, |b| b.column(..).column(..))` groups columns under one header cell. See the
+[DataGrid reference](grid.md).
+
 ## Refreshing in place
 
 `.listens(topic)`, called last, makes the grid reload in place when the topic is named (see [Topics](effects.md#topics)): after `ui.refresh(topic)` it reloads its current page with its sort and filters, after a filter control that `.drives(topic)` changed it starts on the first page with the new screen params. The grid reloads through `POST /_zeyn/grid` with every permission check, and a screen param the filter changed reaches the grid through the screen function, for example as a scope:

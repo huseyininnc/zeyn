@@ -241,6 +241,7 @@ pub fn product_list() -> Screen {
             DataGrid::of(search_products)
                 .mode(DataMode::Server)
                 .paging(Paging::pages(25))
+                .search()
                 .empty_filtered(
                     EmptyState::new(t!("stock.no_match")).text(t!("stock.no_match_help")),
                 )
@@ -272,17 +273,19 @@ pub fn product_list() -> Screen {
                     Unit::Kg => Tone::Info,
                     Unit::Liter => Tone::Brand,
                 })
-                .column(Product::price)
-                .width(220)
-                .filter()
-                .editable()
-                .avg()
-                .max()
-                .column(Product::stock)
-                .width(170)
-                .filter()
-                .sum()
-                .progress(120)
+                .band(t!("stock.price_and_stock"), |b| {
+                    b.column(Product::price)
+                        .width(220)
+                        .filter()
+                        .editable()
+                        .avg()
+                        .max()
+                        .column(Product::stock)
+                        .width(170)
+                        .filter()
+                        .sum()
+                        .progress(120)
+                })
                 .column(Product::active)
                 .width(110)
                 .filter()

@@ -101,6 +101,39 @@ boyutlandırır, sürükleyerek veya ok tuşlarıyla (daha büyük adımlar içi
 sabitlenmiş gruptaki başka bir başlığın üzerine sürüklemek sütunu taşır; kısa bir basış ise yine
 sıralar. Hepsi sağdan sola yönde de çalışır.
 
+## Arama
+
+`search()` tablonun üstüne bir arama kutusu koyar. Kullanıcının yazdığı metin kısa bir aradan
+sonra tablonun eylemine `DataQuery::q` olarak gider; her sayfa, blok, dal, eşleşen tüm satırlar
+üzerindeki toplu işlem ve dışa aktarma ile birlikte. Yeni bir arama öncekinin isteğini iptal eder.
+`DataQuery::apply` ve SQL veri katmanları metni büyük küçük harf ve aksan farkı gözetmeden metin
+alanlarında arar; maskeli alanlarda asla aramaz. `search()` olmayan tablo, istemcinin gönderdiği
+`q` değerini atar. Sonuç tablonun canlı bölgesinde duyurulur ve arama bir şey bulamazsa
+`empty_filtered` gösterilir. Arama metni kayıtlı görünüme girmez. Yapay zekâ ajanları `q`
+alanını tablonun araç şemasında bulur.
+
+## Bant başlıkları
+
+`band(label, |b| ...)` kapanışın eklediği sütunları, sütun başlıklarının üstündeki bir satırda tek
+bir başlık hücresi altında toplar:
+
+```rust
+DataGrid::of(search_products)
+    .search()
+    .column(Product::code).pin_start()
+    .band(t!("stock.price_and_stock"), |b| b
+        .column(Product::price).avg()
+        .column(Product::stock).sum())
+    .column(Product::active)
+```
+
+Bant, gösterilen sütunları üzerinde `colspan` taşıyan, `scope="colgroup"` bir `th` hücresidir;
+bant dışındaki sütunların üstündeki hücreler boş kalır. Bant satırı kullanıcının düzenine uyar:
+gizlenen sütun bandından çıkar, bant yan yana ve aynı sabitleme tarafında kalan her sütun dizisi
+için bir hücre gösterir (bir sütunu uzağa taşımak bandı böler), sabitlenmiş diziler sütunlarıyla
+birlikte yerinde kalır ve sütun sanallaştırması bant satırını bütün tutar. Dışa aktarma ve
+kopyalama bantları içermez.
+
 ## Kayıtlı görünümler
 
 Kullanıcının yerleşimi (gösterilen sütunlar sırasıyla, genişlikler, sabitlemeler), sıralaması ve

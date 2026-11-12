@@ -140,6 +140,7 @@
       "previous": "Önceki sayfa",
       "next": "Sonraki sayfa",
       "load_more": "Daha fazla yükle",
+      "search": "Satırlarda ara",
       "range": "{from}-{to}",
       "range_total": "{from}-{to} / {total}",
       "loaded": "{count} satır yüklendi",

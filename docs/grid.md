@@ -125,6 +125,37 @@ left and right, hide, filter, a column chooser and reset. The edge of a header r
 by dragging or with the arrow keys (Shift for bigger steps). Dragging a header onto another header
 of the same pinned group moves the column; a short press still sorts. All of it works right to left.
 
+## Search
+
+`search()` shows a search box above the grid. What the user types reaches the grid's action as
+`DataQuery::q` after a short pause, with every page, block, branch, bulk run over all matching
+rows and export; a new search cancels the request before it. `DataQuery::apply` and the SQL data
+layers match it against the text fields, ignoring case and accents, and never search masked
+fields. A grid without `search()` drops any `q` the client sends. The result is announced in the
+grid's live region, and `empty_filtered` shows when a search finds nothing. The search text is
+not part of a saved view. AI agents find `q` in the grid's tool schema.
+
+## Band headers
+
+`band(label, |b| ...)` groups the columns the closure adds under one header cell, in a row above
+the column headers:
+
+```rust
+DataGrid::of(search_products)
+    .search()
+    .column(Product::code).pin_start()
+    .band(t!("stock.price_and_stock"), |b| b
+        .column(Product::price).avg()
+        .column(Product::stock).sum())
+    .column(Product::active)
+```
+
+A band is a `th` with `scope="colgroup"` and a `colspan` over its shown columns; the cells above
+columns outside a band stay empty. The band row follows the user's layout: hidden columns leave
+their band, a band shows one cell for each run of its columns that stay next to each other on the
+same pinned side (moving a column away splits it), pinned runs stick with their columns, and
+column virtualization keeps the band row whole. Exports and copies leave bands out.
+
 ## Saved views
 
 The user's layout (shown columns in order, widths, pins), sort and filters form a `DataGridView`.

@@ -38,6 +38,7 @@ function initGrid(grid) {
     count: rows(grid).length,
     sort: sorted.length ? sorted.map((th) => ({ field: th.dataset.field, desc: th.getAttribute('aria-sort') === 'descending' })) : defaultSort(grid),
     filters: {},
+    q: '',
     texts: textsOf(grid),
     columns: null,
     needHead: false,
@@ -121,7 +122,7 @@ async function loadGrid(grid, kind) {
     BASE + '/_zeyn/grid',
     {
       ...address(grid),
-      query: { page, sort: s.sort, filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
+      query: { page, sort: s.sort, filters, q: s.q, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
       view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
       head: layout,
       shape: grid.dataset.zeynShape,
@@ -155,7 +156,8 @@ async function loadGrid(grid, kind) {
   applyFoot(grid, r.data.foot);
   gridState(grid, s.count ? null : 'empty');
   roving(grid, hadFocus);
-  updateChrome(grid, append);
+  updateChrome(grid, append || s.searched);
+  s.searched = false;
 }
 
 /**
@@ -208,7 +210,7 @@ function gridState(grid, kind) {
   box.hidden = false;
   box.dataset.kind = kind;
   const s = grids.get(grid);
-  const filtered = !!s && filterList(s).length > 0;
+  const filtered = !!s && (filterList(s).length > 0 || !!s.q);
   const custom = kind === 'empty' && (filtered && grid.querySelector(':scope > template[data-zeyn-empty-filtered]') || grid.querySelector(':scope > template[data-zeyn-empty]'));
   if (custom) {
     box.replaceChildren(custom.content.cloneNode(true));
@@ -291,7 +293,7 @@ function updateChrome(grid, announce = false) {
 function initVirtual(grid, s) {
   const body = grid.querySelector('[data-zeyn-rows]');
   const head = grid.querySelector('thead');
-  const columns = head.rows[0]?.cells.length ?? 1;
+  const columns = head.querySelector('tr:not(.z-band-row)')?.cells.length ?? 1;
   const spacer = document.createElement('tbody');
   spacer.className = 'z-spacer';
   spacer.setAttribute('aria-hidden', 'true');
@@ -499,7 +501,7 @@ function renderVirtual(grid, focusIndex = null, geometry = null) {
  * reload go first, then the least recently used fresh ones.
  */
 function trimCache(s) {
-  const columns = s.colv?.n ?? s.head.rows[0]?.cells.length ?? 1;
+  const columns = s.colv?.n ?? s.head.querySelector('tr:not(.z-band-row)')?.cells.length ?? 1;
   const cap = Math.max(3, Math.min(V_CACHE, Math.floor(V_CACHE_CELLS / (s.size * columns))));
   while (s.stale.size && s.stale.size + s.cache.size > cap) s.stale.delete(s.stale.keys().next().value);
   while (s.cache.size > cap) s.cache.delete(s.cache.keys().next().value);
@@ -520,7 +522,7 @@ async function fetchBlock(grid, s, b) {
     BASE + '/_zeyn/grid',
     {
       ...address(grid),
-      query: { page, sort: s.sort, filters, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
+      query: { page, sort: s.sort, filters, q: s.q, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
       view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
       head,
       shape: grid.dataset.zeynShape,

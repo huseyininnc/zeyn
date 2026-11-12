@@ -310,6 +310,18 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.exportable()
     }
 
+    pub fn search(self) -> DataGrid<E> {
+        self.grid.search()
+    }
+
+    pub fn band<G: Into<DataGrid<E>>>(
+        self,
+        label: impl Into<Text>,
+        columns: impl FnOnce(DataGrid<E>) -> G,
+    ) -> DataGrid<E> {
+        self.grid.band(label, columns)
+    }
+
     pub fn edit_with<A>(self, save: A) -> DataGrid<E>
     where
         A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
