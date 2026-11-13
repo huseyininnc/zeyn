@@ -573,3 +573,33 @@ fn docs_pages_match_the_docs_app() {
         "the embedded docs pages are out of date ({stale:?}); run `ZEYN_RECORD_DOCS=1 cargo test -p zeyn-cli docs_pages` and commit crates/zeyn-cli/embedded/docs and src/doc_pages.rs"
     );
 }
+
+/// The MCP registry entry (`server.json`) names this release, and the crate README carries the
+/// `mcp-name` line the registry reads to check that the crate belongs to the server.
+#[test]
+fn the_mcp_registry_entry_names_this_release() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let entry: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("server.json")).unwrap()).unwrap();
+    let version = env!("CARGO_PKG_VERSION");
+    assert_eq!(
+        entry["version"], version,
+        "crates/zeyn-cli/server.json names another version; set it to {version}"
+    );
+    assert_eq!(entry["packages"][0]["version"], version);
+    assert_eq!(entry["packages"][0]["identifier"], "zeyn-cli");
+    let name = entry["name"].as_str().unwrap();
+    let readme = std::fs::read_to_string(dir.join("README.md")).unwrap();
+    assert!(
+        readme.contains(&format!("mcp-name: {name}")),
+        "crates/zeyn-cli/README.md needs the line `mcp-name: {name}`"
+    );
+    assert!(
+        entry["description"]
+            .as_str()
+            .unwrap()
+            .len()
+            <= 100,
+        "the registry allows at most 100 characters of description"
+    );
+}

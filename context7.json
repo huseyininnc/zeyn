@@ -1,0 +1,37 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Zeyn Framework",
+  "description": "Open source Rust web framework for data heavy business apps: grids, forms and workflows rendered on the server, written by AI agents and reviewed by people.",
+  "folders": [
+    "examples/docs/pages",
+    "docs",
+    "skills/zeyn"
+  ],
+  "excludeFolders": [
+    "examples/docs/pages/ar",
+    "examples/docs/pages/es",
+    "examples/docs/pages/hi",
+    "examples/docs/pages/ja",
+    "examples/docs/pages/ko",
+    "examples/docs/pages/ru",
+    "examples/docs/pages/tr",
+    "examples/docs/pages/zh",
+    "docs/screenshots"
+  ],
+  "excludeFiles": [
+    "translations.json",
+    "component-quality.md",
+    "component-matrix.md"
+  ],
+  "rules": [
+    "Create projects with `cargo install zeyn-cli` and `zeyn new my-app`; do not write the project layout by hand.",
+    "Every action and screen declares `permission = \"...\"` or `public`.",
+    "Every user facing text comes from the locale files through `t!(\"key\")`, in English and Turkish.",
+    "Use `DataGrid`, `DataQuery`, `Form` and `Screen` from `zeyn::prelude`; app code has no HTML, CSS or JavaScript.",
+    "Run `zeyn check` and `cargo test` after every change."
+  ],
+  "previousVersions": [
+    { "tag": "v0.0.10", "title": "0.0.10" },
+    { "tag": "v0.0.9", "title": "0.0.9" }
+  ]
+}
