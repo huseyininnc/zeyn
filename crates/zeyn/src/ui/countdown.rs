@@ -54,8 +54,9 @@ impl Countdown {
     }
 
     /// What shows once `end` has passed, rendered by the server, such as "The sale has ended".
+    #[track_caller]
     pub fn ended(mut self, node: impl Into<Node>) -> Self {
-        self.ended = vec![node.into()];
+        self.ended = vec![Node::placed(node)];
         self
     }
 }

@@ -13,6 +13,7 @@ Zeyn 从两个方面为智能体而设计：编写 Zeyn 应用的智能体，以
 |---|---|
 | `zeyn_docs` | 按主题提供框架参考：`rules`、`language`、`protocol`；`search: "关键词"` 对此版本的文档页面排序，`page: "/language/forms"` 以 Markdown 返回一页 |
 | `zeyn_describe` | 应用的 feature、界面、路由、访问控制、API、问题和缺失的翻译 |
+| `zeyn_inspect` | 一个 screen 的节点树：路径、组件类型，以及放置每个节点的 Rust `file:line:column` |
 | `zeyn_check` | 编译并报告问题；`fix: true` 会先重写已更名的 API |
 | `zeyn_test` | 运行 `cargo test` 并返回输出的末尾部分 |
 | `zeyn_new_feature` | 创建 feature 文件夹并注册它 |
@@ -26,6 +27,12 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ```
 
 `ZEYN_DESCRIBE=1 cargo run` 会打印与 `zeyn_describe` 返回内容相同的描述，然后退出。
+
+### Source inspector
+
+调试构建会记住把每个节点放到 screen 上的那一行 Rust 代码（`Screen::body`、`Stack::add`、`Tabs::tab` 以及其他容器方法）。`ZEYN_INSPECT=<screen> cargo run` 会打印 `zeyn_inspect` 返回的节点树，然后退出。
+
+用 `cargo run` 提供服务的调试构建会把这一行写进页面，作为每个节点第一个元素上的 `data-zeyn-src`。Alt+Shift+I 打开一个浮层，框出指针下的节点或获得焦点的元素并显示它的代码行，随后是包含它的各个节点的代码行；按 Alt+Shift+I 或 Escape 关闭。发布构建不保存任何代码行：节点仍是一个装箱指针，页面上没有该属性，检查器脚本也不在二进制文件中。
 
 ## 使用应用的智能体
 

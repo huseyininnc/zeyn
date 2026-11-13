@@ -13,6 +13,7 @@ Zeyn は 2 つの側面のエージェントを想定して作られています
 |---|---|
 | `zeyn_docs` | トピック別のフレームワークリファレンス: `rules`、`language`、`protocol`。`search: "語句"` はこのバージョンのドキュメントページを順位付けし、`page: "/language/forms"` は 1 ページを Markdown で返します |
 | `zeyn_describe` | アプリの Feature、画面、ルート、アクセス権、API、問題点、欠けている翻訳 |
+| `zeyn_inspect` | 1 つの画面のノードツリー：パス、コンポーネントの種類、各ノードを置いた Rust の `file:line:column` |
 | `zeyn_check` | コンパイルして問題を報告します。`fix: true` を付けると、先に名前が変わった API を書き換えます |
 | `zeyn_test` | `cargo test` を実行し、出力の末尾を返します |
 | `zeyn_new_feature` | Feature のフォルダを作成して登録します |
@@ -26,6 +27,12 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ```
 
 `ZEYN_DESCRIBE=1 cargo run` は、`zeyn_describe` が返すのと同じ記述を出力して終了します。
+
+### Source inspector
+
+デバッグビルドは、各ノードを画面に置いた Rust の行（`Screen::body`、`Stack::add`、`Tabs::tab` などのコンテナのメソッド）を覚えています。`ZEYN_INSPECT=<screen> cargo run` は `zeyn_inspect` が返すノードツリーを出力して終了します。
+
+`cargo run` で動かすデバッグビルドは、その行を各ノードの最初の要素に `data-zeyn-src` としてページに書き込みます。Alt+Shift+I を押すとオーバーレイが開き、ポインターの下のノードまたはフォーカスのある要素を囲んでその行を示し、続けてそれを含むノードの行を示します。Alt+Shift+I または Escape で閉じます。リリースビルドは行を持ちません。ノードはボックス化されたポインター 1 つのままで、ページに属性はなく、インスペクターのスクリプトもバイナリに含まれません。
 
 ## アプリを使うエージェント
 

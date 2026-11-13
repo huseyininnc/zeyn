@@ -526,8 +526,9 @@ impl<E: Model> CardGrid<E> {
     /// A node shown between two rows, such as a divider or a dot. It is hidden from screen
     /// readers, which count the rows themselves. Not used with virtual scrolling, where every
     /// row has the same height.
+    #[track_caller]
     pub fn separator(mut self, node: impl Into<Node>) -> Self {
-        self.separator = Some(node.into());
+        self.separator = Some(Node::placed(node));
         self
     }
 

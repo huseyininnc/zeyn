@@ -72,9 +72,10 @@ pub struct TourStop {
 
 impl TourStop {
     /// A stop at `node`.
+    #[track_caller]
     pub fn on(node: impl Into<Node>) -> Self {
         TourStop {
-            nodes: vec![node.into()],
+            nodes: vec![Node::placed(node)],
             title: Text::from(""),
             body: Text::from(""),
         }

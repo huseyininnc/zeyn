@@ -95,6 +95,11 @@
       "reason_cancel": "Cancelar",
       "reason_invalid": "Escribe un motivo de entre 3 y 300 caracteres."
     },
+    "inspect": {
+      "title": "Origen del elemento",
+      "none": "Este elemento no tiene línea de código fuente.",
+      "hint": "Alt+Shift+I o Escape cierra el inspector."
+    },
     "validation": {
       "required": "{label} es obligatorio.",
       "min_len": "{label} debe tener al menos {n} caracteres.",
