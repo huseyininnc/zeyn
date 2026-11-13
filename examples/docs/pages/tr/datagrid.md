@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 İstemci ne isterse istesin, sunucu sayfa boyutunu sınırlar.
 
+`.page_sizes(&[10, 25, 50, 100])` numaralı sayfaların sayfalayıcısına "Sayfa başına satır" listesi ekler. Tablonun kendi boyutu her zaman sunulur, seçim kullanıcının görünümüyle kaydedilir ve sunucu yalnızca tablonun sunduğu boyutları kabul eder.
+
 ## Sütunlar
 
 | Çağrı | Sonuç |

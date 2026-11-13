@@ -2251,6 +2251,24 @@ th[aria-sort="descending"] .z-sort::after {
   line-height: 1;
 }
 
+.z-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--z-space) * 1.5);
+  margin-inline-start: auto;
+  color: var(--z-text-muted);
+}
+
+.z-page-size select {
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius-sm);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
+}
+
 .z-page-info {
   min-width: 10ch;
   text-align: center;

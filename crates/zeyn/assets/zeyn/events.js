@@ -214,6 +214,7 @@ document.addEventListener('change', (e) => {
   else if (e.target.matches('[data-zeyn-timezone]')) changeTimeZone(e.target);
   else if (e.target.matches('[data-zeyn-theme-picker]')) changeTheme(e.target);
   else if (e.target.matches('[data-zeyn-density]')) changeDensity(e.target);
+  else if (e.target.matches('[data-zeyn-page-size-pick]')) G?.pickPageSize(e.target);
 });
 
 syncTimeZone();

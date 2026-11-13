@@ -158,6 +158,7 @@
       "next": "Sonraki sayfa",
       "load_more": "Daha fazla yükle",
       "search": "Satırlarda ara",
+      "page_size": "Sayfa başına satır",
       "filter_builder": "Süz",
       "builder_title": "Satırları süz",
       "add_condition": "Koşul ekle",

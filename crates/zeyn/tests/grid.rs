@@ -119,6 +119,7 @@ fn app(identity: Identity) -> App {
                 .screen(banded)
                 .screen(rows_edit)
                 .screen(built)
+                .screen(sized)
                 .api(search),
         )
 }
@@ -3958,4 +3959,56 @@ async fn filter_builder_shows_a_button_only_for_grids_with_filters() {
         "conditions on columns without filter() are dropped: {}",
         r.body
     );
+}
+
+#[screen(route = "/sized", permission = "items.read")]
+pub fn sized() -> Screen {
+    Screen::new("Sized").body(
+        DataGrid::of(search)
+            .paging(Paging::pages(5))
+            .page_sizes(&[50, 10, 900])
+            .column(Item::code),
+    )
+}
+
+#[tokio::test]
+async fn page_size_picker_offers_the_grid_sizes_and_starts_on_its_own() {
+    let page = send(&router(reader()), get("/sized")).await;
+    assert!(
+        page.body.contains(r#"<select data-zeyn-page-size-pick data-testid="sized.pager.size"><option value="5" selected>5</option><option value="10">10</option><option value="50">50</option><option value="500">500</option></select>"#),
+        "{}",
+        page.body
+    );
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-page-size="5""#)
+    );
+    let plain = send(&router(reader()), get("/items")).await;
+    assert!(
+        !plain
+            .body
+            .contains("data-zeyn-page-size-pick")
+    );
+}
+
+#[test]
+fn views_keep_only_page_sizes_the_grid_offers() {
+    let grid = DataGrid::of(search)
+        .paging(Paging::pages(5))
+        .page_sizes(&[10, 50])
+        .column(Item::code)
+        .done();
+    let view = |size: u32| -> zeyn::DataGridView {
+        serde_json::from_value(serde_json::json!({ "page_size": size })).unwrap()
+    };
+    let kept = zeyn::GridSource::clean_view(&grid, view(10));
+    assert_eq!(kept.page_size, Some(10));
+    assert_eq!(
+        zeyn::GridSource::clean_view(&grid, view(37)).page_size,
+        None
+    );
+    let q = zeyn::GridSource::first_query(&grid, Some(&kept));
+    assert_eq!(q.limit(), 10);
+    let q = zeyn::GridSource::first_query(&grid, Some(&view(37)));
+    assert_eq!(q.limit(), 5);
 }
