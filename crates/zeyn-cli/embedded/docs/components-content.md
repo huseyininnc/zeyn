@@ -108,6 +108,17 @@ List::of(search_tasks)
     .sortable(Task::rank, reorder_tasks)
 ```
 
+`.connect(group, id)` joins the sortable lists of a screen that share a group: rows are dragged from one onto another, or moved with "Move to" in the move menu. The action gets the id of the list the rows land in (`r.list`) and of the list they left (`r.from`); both ids come from the screen, never from the browser, and the server checks the permission of both lists' actions. `.multi_select()` lets people select rows with Control or Command and a click on the handle, or with "Select for moving" in the menu, and move up to 100 of them at once: the other keys are in `r.rest`, and `r.ranks(lookup)` gives one rank for each of `r.keys()`. Look the moved keys up in the list they left. Virtual lists take part in neither.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
+
 ## Avatar
 
 A round picture of a person or a team, 32, 40 or 64 pixels (`AvatarSize::Small`, `Medium`, `Large`). The name is required: it is the alternative text and the source of the initials shown when there is no picture, or when the picture is not on a host the app's `img-src` allows (the same rule as `Image`). Initials follow the language's capitals, so Turkish `i` becomes `İ`. When the name is written right next to the avatar, `.decorative()` hides it from screen readers so they do not read the name twice.

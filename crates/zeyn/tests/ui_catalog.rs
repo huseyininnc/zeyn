@@ -1251,7 +1251,8 @@ fn steps_app(steps: Steps) -> axum::Router {
         .feature(
             Feature::new("steps")
                 .screen(steps_screen)
-                .screen(steps_virtual),
+                .screen(steps_virtual)
+                .screen(steps_board),
         )
         .router()
         .unwrap()
@@ -1462,4 +1463,299 @@ async fn reordering_refuses_foreign_and_bad_neighbors_and_stale_orders() {
         assert_eq!(status, want, "{why}: {body}");
     }
     assert_eq!(steps.order(), [1, 2, 3], "nothing moved");
+}
+
+impl Steps {
+    /// The ids of list `list` in rank order.
+    fn order_of(&self, list: i64) -> Vec<i64> {
+        let mut rows: Vec<(Rank, i64)> = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|s| s.list == list)
+            .map(|s| (s.rank.clone(), s.id.0))
+            .collect();
+        rows.sort();
+        rows.into_iter()
+            .map(|(_, id)| id)
+            .collect()
+    }
+}
+
+/// The rows of list `list`.
+fn steps_in(q: DataQuery, steps: &Steps, list: i64) -> Page<Step> {
+    let rows: Vec<Step> = steps
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|s| s.list == list)
+        .cloned()
+        .collect();
+    q.apply(rows)
+}
+
+#[action(permission = "steps.read")]
+pub async fn search_done(q: DataQuery, steps: Steps) -> Result<Page<Step>> {
+    Ok(steps_in(q, &steps, 2))
+}
+
+#[action(permission = "steps.read")]
+pub async fn search_archive(q: DataQuery, steps: Steps) -> Result<Page<Step>> {
+    Ok(steps_in(q, &steps, 3))
+}
+
+/// Moves the rows of a request into its list, checking every row in the list it left.
+fn move_rows(r: &ReorderRequest<StepId>, steps: &Steps) -> Result<()> {
+    let id = |s: &Option<String>| -> Result<i64> {
+        s.as_deref()
+            .ok_or(Error::NotFound)?
+            .parse()
+            .map_err(|_| Error::NotFound)
+    };
+    let list = id(&r.list)?;
+    let from = if r.from.is_some() { id(&r.from)? } else { list };
+    let mut all = steps.0.lock().unwrap();
+    let ranks = r.ranks(|k| {
+        all.iter()
+            .find(|s| s.id == *k && s.list == list)
+            .map(|s| s.rank.clone())
+    })?;
+    if !r.keys().all(|k| {
+        all.iter()
+            .any(|s| s.id == *k && s.list == from)
+    }) {
+        return Err(Error::NotFound);
+    }
+    for (k, rank) in r.keys().zip(ranks) {
+        let row = all
+            .iter_mut()
+            .find(|s| s.id == *k)
+            .ok_or(Error::NotFound)?;
+        row.list = list;
+        row.rank = rank;
+    }
+    Ok(())
+}
+
+#[action(permission = "steps.write")]
+pub async fn move_steps(r: ReorderRequest<StepId>, steps: Steps) -> Result<()> {
+    move_rows(&r, &steps)
+}
+
+#[action(permission = "steps.archive")]
+pub async fn move_archived(r: ReorderRequest<StepId>, steps: Steps) -> Result<()> {
+    move_rows(&r, &steps)
+}
+
+#[screen(route = "/steps/board", permission = "steps.read")]
+pub fn steps_board() -> Screen {
+    let item = |s: &Step| zeyn::ui::ListItem::new(s.title.clone());
+    Screen::new("Board")
+        .body(
+            Card::new()
+                .add(
+                    List::of(search_steps)
+                        .title("To do")
+                        .item(item)
+                        .sortable(Step::rank, move_steps)
+                        .connect("steps", "1")
+                        .multi_select(),
+                )
+                .add(
+                    List::of(search_done)
+                        .title("Done")
+                        .item(item)
+                        .sortable(Step::rank, move_steps)
+                        .connect("steps", "2"),
+                ),
+        )
+        .body(
+            Card::new().add(
+                Card::new().add(
+                    List::of(search_archive)
+                        .title("Archive")
+                        .item(item)
+                        .sortable(Step::rank, move_archived)
+                        .connect("steps", "3"),
+                ),
+            ),
+        )
+        .body(
+            List::of(search_archive)
+                .title("Elsewhere")
+                .item(item)
+                .sortable(Step::rank, move_steps)
+                .connect("other", "3"),
+        )
+}
+
+fn board_move(
+    perms: &str,
+    node: &str,
+    from: Option<&str>,
+    input: serde_json::Value,
+) -> Request<Body> {
+    post(
+        "/_zeyn/data",
+        perms,
+        serde_json::json!({ "screen": "steps_board", "params": null, "node": node, "from": from, "key": "reorder", "input": input }),
+    )
+}
+
+#[tokio::test]
+async fn connected_lists_mark_their_group_and_selection() {
+    let router = steps_app(Steps::seeded());
+    let req = Request::get("/steps/board")
+        .header("x-perms", STEPS_RW)
+        .body(Body::empty())
+        .unwrap();
+    let (status, html) = send(&router, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        html.matches(r#"data-zeyn-sort-group="steps""#)
+            .count(),
+        3
+    );
+    assert_eq!(
+        html.matches(r#"data-zeyn-sort-group="other""#)
+            .count(),
+        1
+    );
+    assert_eq!(
+        html.matches("data-zeyn-sort-multi")
+            .count(),
+        1,
+        "only the list with multi_select() selects rows"
+    );
+    assert!(html.contains(r#"data-zeyn-sort-list="2""#));
+}
+
+#[tokio::test]
+async fn rows_move_between_connected_lists_after_both_permissions() {
+    let steps = Steps::seeded();
+    let router = steps_app(steps.clone());
+    let to_done = serde_json::json!({ "key": "2", "after": "4", "before": null });
+    let (status, body) = send(&router, board_move(STEPS_RW, "0.1", Some("0.0"), to_done)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(steps.order_of(1), [1, 3]);
+    assert_eq!(steps.order_of(2), [4, 2]);
+
+    let back = serde_json::json!({ "key": "2", "after": null, "before": "1" });
+    let refused = [
+        ("2", "a list of another group"),
+        ("0.0", "the list itself as the source"),
+        ("0.9", "a node that does not exist"),
+        ("1.0.0", "the archive needs steps.archive"),
+    ];
+    for (from, why) in refused {
+        let (status, _) = send(
+            &router,
+            board_move(STEPS_RW, "0.0", Some(from), back.clone()),
+        )
+        .await;
+        let want = if from == "1.0.0" {
+            StatusCode::FORBIDDEN
+        } else {
+            StatusCode::NOT_FOUND
+        };
+        assert_eq!(status, want, "{why}");
+    }
+
+    let to_archive = serde_json::json!({ "key": "2", "after": null, "before": null });
+    let (status, _) = send(
+        &router,
+        board_move(STEPS_RW, "1.0.0", Some("0.1"), to_archive.clone()),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the target list's permission"
+    );
+    let archive = "steps.read,steps.archive";
+    let (status, _) = send(
+        &router,
+        board_move(archive, "1.0.0", Some("0.1"), to_archive.clone()),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the source list's permission"
+    );
+    let all = "steps.read,steps.write,steps.archive";
+    let (status, body) = send(&router, board_move(all, "1.0.0", Some("0.1"), to_archive)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(steps.order_of(3), [2]);
+
+    let mut missing = board_move(STEPS_RW, "0.0", Some("0.1"), back);
+    missing
+        .headers_mut()
+        .remove("x-zeyn-csrf");
+    assert_eq!(send(&router, missing).await.0, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn list_ids_come_from_the_screen_not_the_browser() {
+    let steps = Steps::seeded();
+    let router = steps_app(steps.clone());
+    let forged =
+        serde_json::json!({ "key": "1", "after": "4", "before": null, "from": "1", "list": "2" });
+    let (status, _) = send(&router, board_move(STEPS_RW, "0.1", None, forged)).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "row 1 is looked up in list 2"
+    );
+    assert_eq!(steps.order_of(1), [1, 2, 3]);
+}
+
+#[tokio::test]
+async fn selected_rows_move_together_up_to_the_cap() {
+    let steps = Steps::seeded();
+    let router = steps_app(steps.clone());
+    let call = |node: &str, input: serde_json::Value| board_move(STEPS_RW, node, None, input);
+    let many: Vec<String> = (10..110)
+        .map(|i| i.to_string())
+        .collect();
+    let refused = [
+        (
+            "0.1",
+            serde_json::json!({ "key": "4", "rest": ["9"], "after": null, "before": null }),
+            "a list without multi_select()",
+        ),
+        (
+            "0.0",
+            serde_json::json!({ "key": "3", "rest": ["3"], "after": null, "before": "1" }),
+            "a row twice",
+        ),
+        (
+            "0.0",
+            serde_json::json!({ "key": "3", "rest": ["1"], "after": null, "before": "1" }),
+            "a moved row as a neighbor",
+        ),
+        (
+            "0.0",
+            serde_json::json!({ "key": "3", "rest": many, "after": null, "before": "1" }),
+            "more than 100 rows",
+        ),
+    ];
+    for (node, input, why) in refused {
+        let (status, body) = send(&router, call(node, input)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{why}: {body}");
+    }
+    assert_eq!(steps.order_of(1), [1, 2, 3], "nothing moved");
+    let two = serde_json::json!({ "key": "3", "rest": ["1"], "after": null, "before": "2" });
+    let (status, body) = send(&router, call("0.0", two)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(steps.order_of(1), [3, 1, 2]);
+    let across = serde_json::json!({ "key": "3", "rest": ["2"], "after": "4", "before": null });
+    let (status, body) = send(&router, board_move(STEPS_RW, "0.1", Some("0.0"), across)).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "the target list has no multi_select(): {body}"
+    );
 }

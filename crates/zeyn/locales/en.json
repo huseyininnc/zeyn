@@ -776,7 +776,15 @@
         "down": "Move down",
         "top": "Move to the top",
         "bottom": "Move to the end",
-        "menu": "Move {item}"
+        "menu": "Move {item}",
+        "to_list": "Move to {list}",
+        "select": "Select for moving",
+        "deselect": "Remove from selection",
+        "selected": "{item} selected, {count} selected",
+        "deselected": "{item} not selected, {count} selected",
+        "too_many": "At most {count} rows move at once",
+        "is_selected": "selected",
+        "moved_to": "{item} moved to {list}, position {pos} of {count}"
       },
       "calendar": {
         "navigation": "Period",

@@ -376,6 +376,7 @@
         "numbered_pages": "Numbered pages without a total",
         "sortable": "Rows people put in their own order",
         "sortable_virtual": "A long sortable list that stays virtual",
+        "connected": "Two lists that rows move between, several at once",
         "fixed": "Fixed items",
         "builder": "Rows built with any node, with a separator",
         "virtual_rows": "Virtual scrolling with a fixed row height",
