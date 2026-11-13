@@ -552,8 +552,9 @@ pub trait GridSource: Send + Sync {
         ctx: Ctx,
         query: DataQuery,
         path: Vec<Option<String>>,
+        view: Option<&crate::grid::DataGridView>,
     ) -> BoxFuture<Result<LoadedPage>> {
-        let _ = path;
+        let _ = (path, view);
         self.fetch(ctx, query)
     }
 
@@ -629,6 +630,19 @@ pub trait GridSource: Send + Sync {
         tz: crate::time::TimeZone,
     ) -> Result<RowCall> {
         let _ = (page, key, values, locale, tz);
+        Err(crate::action::Error::NotFound)
+    }
+
+    /// Builds the create of a new row from the values of its editable columns, for the user of
+    /// `ctx`: `Forbidden` without the create action's permission or for any other field; the row
+    /// starts from the model's default and is read and validated as a form would. `NotFound` for
+    /// grids that do not add rows.
+    fn add_call(
+        &self,
+        values: &serde_json::Map<String, serde_json::Value>,
+        ctx: &crate::ctx::Ctx,
+    ) -> Result<RowCall> {
+        let _ = (values, ctx);
         Err(crate::action::Error::NotFound)
     }
 

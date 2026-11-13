@@ -117,6 +117,7 @@ fn app(identity: Identity) -> App {
             Feature::new("items")
                 .screen(list)
                 .screen(banded)
+                .screen(rows_edit)
                 .api(search),
         )
 }
@@ -2075,6 +2076,7 @@ fn nested_router(identity: Identity) -> Router {
         .feature(
             Feature::new("items")
                 .screen(grouped)
+                .screen(user_grouped)
                 .screen(tree),
         )
         .router()
@@ -3571,4 +3573,339 @@ fn search_shows_in_the_grid_schema_and_the_agent_tool() {
         zeyn::GridSource::tool_schema(&grid)["properties"]["q"]["maxLength"],
         zeyn::MAX_SEARCH_QUERY
     );
+}
+
+/// Creates an item.
+#[action(permission = "items.write")]
+pub async fn create_item(item: Valid<Item>, store: Store) -> Result<()> {
+    let mut item = item.into_inner();
+    let mut rows = store.0.write().unwrap();
+    item.id = ItemId(rows.len() as i64 + 1);
+    rows.push(item);
+    Ok(())
+}
+
+/// Deletes items by key.
+#[action(permission = "items.write")]
+pub async fn delete_items(ids: Vec<ItemId>, store: Store) -> Result<usize> {
+    let mut rows = store.0.write().unwrap();
+    let before = rows.len();
+    rows.retain(|i| !ids.contains(&i.id));
+    Ok(before - rows.len())
+}
+
+/// Saves an item in place.
+#[action(permission = "items.write")]
+pub async fn update_item(item: Valid<Item>, store: Store) -> Result<()> {
+    let item = item.into_inner();
+    let mut rows = store.0.write().unwrap();
+    if let Some(row) = rows
+        .iter_mut()
+        .find(|r| r.id == item.id)
+    {
+        *row = item;
+    }
+    Ok(())
+}
+
+#[screen(route = "/rows-edit", permission = "items.read")]
+pub fn rows_edit() -> Screen {
+    Screen::new("Rows").body(
+        DataGrid::of(search)
+            .column(Item::code)
+            .editable()
+            .column(Item::qty)
+            .editable()
+            .column(Item::added)
+            .editable()
+            .column(Item::note)
+            .add_with(create_item)
+            .edit_with(update_item)
+            .delete_with(delete_items, Item::id)
+            .batch_edit(),
+    )
+}
+
+fn writer() -> Identity {
+    Identity::user("ayse").with_permissions(["items.read", "items.write"])
+}
+
+fn add_call(values: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({ "screen": "rows_edit", "node": 0, "values": values })
+}
+
+#[tokio::test]
+async fn add_row_creates_a_row_from_the_editable_columns() {
+    let router = router(writer());
+    let page = send(&router, get("/rows-edit")).await;
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-grid-add data-testid="rows_edit.grid.add""#),
+        "{}",
+        page.body
+    );
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-delete>Delete</button>"#),
+        "{}",
+        page.body
+    );
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-batch-bar"#)
+    );
+    assert!(
+        page.body
+            .contains(r#" data-zeyn-batch"#)
+    );
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid/add",
+            add_call(serde_json::json!({ "code": "NEW-1", "qty": "7", "added": "2026-02-01" })),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let q = serde_json::json!({ "with_total": true, "filters": [] });
+    let all = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "rows_edit", "node": 0, "query": q }),
+        ),
+    )
+    .await;
+    assert_eq!(all.json()["total"], 21, "{}", all.body);
+}
+
+#[tokio::test]
+async fn add_row_refuses_fields_that_are_not_editable_and_validates() {
+    let router = router(writer());
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid/add",
+            add_call(serde_json::json!({ "code": "X", "note": "hidden" })),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "{}", r.body);
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid/add",
+            add_call(serde_json::json!({ "code": "", "added": "2026-02-01" })),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", r.body);
+}
+
+#[tokio::test]
+async fn add_row_needs_the_create_permission_and_a_grid_that_adds() {
+    let r = send(
+        &router(reader()),
+        post(
+            "/_zeyn/grid/add",
+            add_call(serde_json::json!({ "code": "X" })),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "{}", r.body);
+    let page = send(&router(reader()), get("/rows-edit")).await;
+    assert!(!page.body.contains("data-zeyn-grid-add"));
+    assert!(
+        !page
+            .body
+            .contains("data-zeyn-batch-bar")
+    );
+    let other = serde_json::json!({ "screen": "list", "node": 0, "values": { "code": "X" } });
+    let r = send(&router(writer()), post("/_zeyn/grid/add", other)).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.body);
+}
+
+#[tokio::test]
+async fn add_row_needs_the_csrf_token() {
+    let req = Request::post("/_zeyn/grid/add")
+        .header("x-user", "1")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            add_call(serde_json::json!({ "code": "X" })).to_string(),
+        ))
+        .unwrap();
+    let r = send(&router(writer()), req).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "{}", r.body);
+}
+
+#[tokio::test]
+async fn delete_with_runs_the_action_with_the_picked_keys() {
+    let router = router(writer());
+    let call =
+        serde_json::json!({ "screen": "rows_edit", "node": 0, "action": 0, "keys": ["3", "4"] });
+    let r = send(&router, post("/_zeyn/grid/bulk", call)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let q = serde_json::json!({ "with_total": true });
+    let all = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "rows_edit", "node": 0, "query": q }),
+        ),
+    )
+    .await;
+    assert_eq!(all.json()["total"], 18, "{}", all.body);
+}
+
+#[screen(route = "/user-grouped", permission = "items.read")]
+pub fn user_grouped() -> Screen {
+    Screen::new("User grouped").body(
+        DataGrid::of(search)
+            .paging(Paging::pages(2))
+            .column(Item::code)
+            .column(Item::kind)
+            .groupable()
+            .column(Item::active)
+            .groupable()
+            .column(Item::qty)
+            .sum()
+            .summary("Twice", |t| match t.get(Item::qty, Aggregate::Sum) {
+                Some(Value::Int(n)) => Some(Value::Int(n * 2)),
+                _ => None,
+            }),
+    )
+}
+
+fn user_branch(path: serde_json::Value, groups: serde_json::Value) -> Request<Body> {
+    post(
+        "/_zeyn/grid",
+        serde_json::json!({ "screen": "user_grouped", "node": 0, "path": path, "view": { "group_by": groups }, "query": { "page": { "type": "offset", "offset": 0, "limit": 5 }, "with_total": true, "aggregates": [{ "field": "qty", "op": "sum" }] } }),
+    )
+}
+
+#[tokio::test]
+async fn users_group_by_groupable_columns_from_their_view() {
+    let router = nested_router(reader());
+    let page = send(&router, get("/user-grouped")).await;
+    assert!(
+        page.body
+            .contains(r#"<table role="grid""#)
+    );
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-group-panel"#),
+        "{}",
+        page.body
+    );
+    assert!(
+        page.body
+            .contains(r#"data-field="kind" aria-sort="none" aria-colindex="2" data-group="true""#),
+        "{}",
+        page.body
+    );
+    assert!(
+        !page
+            .body
+            .contains(r#"data-field="code" aria-sort="none" aria-colindex="1" data-group"#)
+    );
+    let r = send(
+        &router,
+        user_branch(
+            serde_json::json!([]),
+            serde_json::json!(["kind", "code", "kind"]),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.contains(r#"data-zeyn-path="[&quot;Food&quot;]""#),
+        "{rows}"
+    );
+    assert_eq!(r.json()["total"], 3, "{}", r.body);
+    let r = send(
+        &router,
+        user_branch(
+            serde_json::json!(["Tool"]),
+            serde_json::json!(["kind", "active"]),
+        ),
+    )
+    .await;
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.contains(r#"data-zeyn-path="[&quot;Tool&quot;,&quot;false&quot;]""#),
+        "{rows}"
+    );
+    let r = send(
+        &router,
+        user_branch(serde_json::json!(["Tool"]), serde_json::json!(["kind"])),
+    )
+    .await;
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.contains(r#"<tr aria-level="2" data-zeyn-level="1" data-zeyn-key="3">"#),
+        "{rows}"
+    );
+    let r = send(
+        &router,
+        user_branch(serde_json::json!([]), serde_json::json!(["code"])),
+    )
+    .await;
+    assert_eq!(
+        r.json()["total"],
+        20,
+        "a column that is not groupable does not group"
+    );
+}
+
+#[tokio::test]
+async fn custom_summaries_show_in_the_footer_and_in_group_rows() {
+    let router = nested_router(reader());
+    let page = send(&router, get("/user-grouped")).await;
+    assert!(
+        page.body.contains(r#"<span class="z-agg z-agg-custom"><span class="z-agg-label">Twice</span> <span class="z-agg-value">420</span></span>"#),
+        "{}",
+        page.body
+    );
+    let r = send(
+        &router,
+        user_branch(serde_json::json!([]), serde_json::json!(["active"])),
+    )
+    .await;
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.contains(
+            r#"<span class="z-agg-label">Twice</span> <span class="z-agg-value">220</span>"#
+        ),
+        "{rows}"
+    );
+}
+
+#[test]
+fn saved_views_keep_only_groupable_groups() {
+    let view: zeyn::DataGridView = serde_json::from_value(
+        serde_json::json!({ "group_by": ["code", "kind", "active", "kind"] }),
+    )
+    .unwrap();
+    let source = DataGrid::of(search)
+        .column(Item::kind)
+        .groupable()
+        .column(Item::active)
+        .groupable()
+        .column(Item::code)
+        .done();
+    let cleaned = zeyn::GridSource::clean_view(&source, view);
+    assert_eq!(cleaned.group_by, ["kind", "active"]);
 }

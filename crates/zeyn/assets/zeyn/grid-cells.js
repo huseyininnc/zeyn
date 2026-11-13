@@ -417,7 +417,7 @@ async function pasteCells(grid, text) {
     if (vf && tr.dataset.zeynVersion != null) values[vf] = tr.dataset.zeynVersion;
     const r = await post(
       BASE + '/_zeyn/grid/edit',
-      { ...address(grid), key: tr.dataset.zeynKey, values, view: s.columns ? { columns: s.columns } : null },
+      { ...address(grid), key: tr.dataset.zeynKey, values, view: viewOf(grid, s) },
       { quiet: true },
     );
     if (r.ok && typeof r.data?.row === 'string') {
@@ -650,7 +650,7 @@ async function loadBranch(grid, anchor, level, path, offset) {
     ...address(grid),
     path,
     query: { page: { type: 'offset', offset, limit: s.size }, sort: s.sort, filters: filterList(s), q: s.q, with_total: true, aggregates: [] },
-    view: s.columns ? { columns: s.columns } : null,
+    view: viewOf(grid, s),
   });
   anchor.removeAttribute('aria-busy');
   if (!r.ok || !r.data || !anchor.isConnected) return;

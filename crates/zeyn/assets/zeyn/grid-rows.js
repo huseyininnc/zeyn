@@ -156,7 +156,7 @@ function editableHeads(grid) {
 function startEdit(tr, start) {
   const grid = tr.closest('[data-zeyn-grid]');
   const s = grids.get(grid);
-  if (!s || tr.classList.contains('z-editing') || tr.dataset.zeynKey == null) return false;
+  if (!s || tr.classList.contains('z-editing') || (tr.dataset.zeynKey == null && !tr.classList.contains('z-new-row'))) return false;
   unwindow(tr);
   const heads = editableHeads(grid);
   let first = null;
@@ -202,8 +202,16 @@ function startEdit(tr, start) {
   return true;
 }
 
-/** Leaves edit mode without saving and puts the cells back. */
+/** Leaves edit mode without saving and puts the cells back; a new row goes away. */
 function cancelEdit(tr) {
+  const grid = tr.closest('[data-zeyn-grid]');
+  if (tr.classList.contains('z-new-row')) {
+    tr.remove();
+    if (!rows(grid).length) gridState(grid, 'empty');
+    toolsOf(grid)?.querySelector('[data-zeyn-grid-add]')?.focus();
+    return;
+  }
+  delete tr.dataset.zeynDirty;
   for (const td of tr.cells) {
     if (td._orig != null) {
       td.innerHTML = td._orig;
@@ -211,7 +219,7 @@ function cancelEdit(tr) {
     }
   }
   tr.classList.remove('z-editing');
-  const s = grids.get(tr.closest('[data-zeyn-grid]'));
+  const s = grids.get(grid);
   if (s?.colv) {
     tr._zw = '';
     windowRow(tr, s.colv);
@@ -244,26 +252,11 @@ async function sendEdit(grid, tr, values) {
     ...address(grid),
     key: tr.dataset.zeynKey,
     values,
-    view: s?.columns ? { columns: s.columns } : null,
+    view: s ? viewOf(grid, s) : null,
   });
   tr.removeAttribute('aria-busy');
   if (r.status === 422) {
-    let first = null;
-    for (const err of r.data?.errors ?? []) {
-      const input = tr.querySelector(`.z-cell-input[data-field="${CSS.escape(err.field)}"]`);
-      if (!input) {
-        toast(err.message, 'error');
-        continue;
-      }
-      input.setAttribute('aria-invalid', 'true');
-      const box = make('span', 'z-cell-error', { role: 'alert' });
-      box.id = `z-cell-error-${++uid}`;
-      box.textContent = err.message;
-      input.setAttribute('aria-describedby', box.id);
-      input.after(box);
-      first ??= input;
-    }
-    first?.focus();
+    cellErrors(tr, r.data?.errors);
     return null;
   }
   if (!r.ok || typeof r.data?.row !== 'string') {
@@ -275,6 +268,28 @@ async function sendEdit(grid, tr, values) {
   activate(fresh, true);
   syncSelection(grid);
   return fresh;
+}
+
+/**
+ * Shows validation errors of a row in edit mode under their inputs (`aria-invalid`,
+ * `role="alert"`) and focuses the first in the row; errors without an input become toasts.
+ */
+function cellErrors(tr, errors) {
+  for (const input of tr.querySelectorAll('.z-cell-input[aria-invalid]')) input.removeAttribute('aria-invalid');
+  for (const err of errors ?? []) {
+    const input = tr.querySelector(`.z-cell-input[data-field="${CSS.escape(err.field)}"]`);
+    if (!input) {
+      toast(err.message, 'error');
+      continue;
+    }
+    input.setAttribute('aria-invalid', 'true');
+    const box = make('span', 'z-cell-error', { role: 'alert' });
+    box.id = `z-cell-error-${++uid}`;
+    box.textContent = err.message;
+    input.setAttribute('aria-describedby', box.id);
+    input.after(box);
+  }
+  tr.querySelector('.z-cell-input[aria-invalid="true"]')?.focus();
 }
 
 /**
@@ -295,24 +310,154 @@ function keepBranch(tr, fresh) {
   if (tree.firstElementChild) cell.firstElementChild?.replaceWith(tree.firstElementChild);
 }
 
-/** Saves a row in edit mode and offers to undo the change. */
-async function saveEdit(tr) {
-  const grid = tr.closest('[data-zeyn-grid]');
-  const s = grids.get(grid);
-  if (!s || tr.getAttribute('aria-busy') === 'true') return;
+/** Values of a row in edit mode from before the edit, by field. */
+function editBefore(tr) {
   const before = {};
   for (const td of tr.cells) {
     const input = td.querySelector('.z-cell-input');
     if (input) before[input.dataset.field] = input.type === 'checkbox' ? td.dataset.v === 'true' : td.dataset.v;
   }
+  return before;
+}
+
+/**
+ * Saves a row in edit mode and offers to undo the change. A new row is created instead, and in
+ * a batch grid a changed row stays in edit mode, marked, until the user saves every change.
+ */
+async function saveEdit(tr) {
+  const grid = tr.closest('[data-zeyn-grid]');
+  const s = grids.get(grid);
+  if (!s || tr.getAttribute('aria-busy') === 'true') return;
+  if (tr.classList.contains('z-new-row')) return saveNew(grid, tr);
+  const before = editBefore(tr);
   const values = editValues(tr);
   const changed = Object.keys(before).some((k) => String(before[k]) !== String(values[k]));
-  if (!changed) return cancelEdit(tr);
+  if (!changed) {
+    cancelEdit(tr);
+    return batchBar(grid);
+  }
+  if (grid.hasAttribute('data-zeyn-batch')) {
+    tr.dataset.zeynDirty = '';
+    tr.focus();
+    return batchBar(grid);
+  }
   const fresh = await sendEdit(grid, tr, values);
   if (!fresh) return;
   const key = fresh.dataset.zeynKey;
   s.undo = { key, values: before };
   toast(s.texts.saved || 'Saved.', 'info', { label: s.texts.undo || 'Undo', run: () => undoEdit(grid) });
+}
+
+/** The tools above a grid (`.z-grid-tools`), or `null`. */
+function toolsOf(grid) {
+  let el = grid.previousElementSibling;
+  if (el?.matches('[data-zeyn-bulk]')) el = el.previousElementSibling;
+  return el?.matches('.z-grid-tools') ? el : null;
+}
+
+/**
+ * Opens an empty row at the top of the grid with an input for every editable column, or focuses
+ * the one already open.
+ */
+function addRow(button) {
+  const grid = gridOfTools(button);
+  const s = grid && grids.get(grid);
+  const body = grid?.querySelector(':scope > table > [data-zeyn-rows]');
+  if (!s || !body) return;
+  const open = body.querySelector(':scope > tr.z-new-row');
+  if (open) return open.querySelector('.z-cell-input')?.focus();
+  const tr = make('tr', 'z-new-row');
+  for (const th of cellsOf(own(grid, 'thead tr:not(.z-band-row)'))) {
+    const td = make('td');
+    if (th.dataset.edit) td.dataset.v = '';
+    tr.append(td);
+  }
+  body.prepend(tr);
+  gridState(grid, null);
+  startEdit(tr, null);
+}
+
+/** Creates the new row through `POST /_zeyn/grid/add` and reloads the grid. */
+async function saveNew(grid, tr) {
+  for (const e of tr.querySelectorAll('.z-cell-error')) e.remove();
+  tr.setAttribute('aria-busy', 'true');
+  const r = await post(BASE + '/_zeyn/grid/add', { ...address(grid), values: editValues(tr) });
+  tr.removeAttribute('aria-busy');
+  if (r.status === 422) return cellErrors(tr, r.data?.errors);
+  if (!r.ok) return;
+  tr.remove();
+  toast(grids.get(grid)?.texts.added || 'Row added.');
+  await loadGrid(grid, 'reload');
+  rows(grid)[0]?.focus();
+}
+
+/** Changed rows of a batch grid that wait to be saved. */
+function dirtyRows(grid) {
+  return rows(grid).filter((tr) => tr.dataset.zeynDirty != null && tr.classList.contains('z-editing'));
+}
+
+/** Shows the count of changed rows in the batch bar, or hides the bar when there are none. */
+function batchBar(grid) {
+  const bar = toolsOf(grid)?.querySelector('[data-zeyn-batch-bar]');
+  if (!bar) return;
+  const n = dirtyRows(grid).length;
+  bar.hidden = !n;
+  bar.firstElementChild.textContent = n ? fill(bar.dataset.textCount || 'Changed rows: {n}', { n: fmt(n) }) : '';
+}
+
+/** Saves every changed row of a batch grid, one after another; failed rows keep their changes. */
+async function saveBatch(button) {
+  const grid = gridOfTools(button);
+  const s = grid && grids.get(grid);
+  if (!s) return;
+  button.disabled = true;
+  let saved = 0;
+  for (const tr of dirtyRows(grid)) if (await sendEdit(grid, tr, editValues(tr))) saved++;
+  button.disabled = false;
+  batchBar(grid);
+  if (saved) toast(fill(s.texts.batch_saved || '{n} rows saved.', { n: fmt(saved) }));
+  const left = dirtyRows(grid).length;
+  if (left) toast(fill(s.texts.paste_failed || '{n} rows could not be saved.', { n: fmt(left) }), 'error');
+}
+
+/** Drops every unsaved change of a batch grid. */
+function discardBatch(button) {
+  const grid = gridOfTools(button);
+  if (!grid) return;
+  for (const tr of dirtyRows(grid)) cancelEdit(tr);
+  batchBar(grid);
+}
+
+/**
+ * Whether the grid may load other rows: a batch grid with unsaved changes asks first and drops
+ * them when the user agrees.
+ */
+function mayLeave(grid) {
+  const dirty = grid.hasAttribute('data-zeyn-batch') ? dirtyRows(grid) : [];
+  if (!dirty.length) return true;
+  if (!confirm(fill(grids.get(grid)?.texts.discard_confirm || 'Discard the changes in {n} rows?', { n: fmt(dirty.length) }))) return false;
+  for (const tr of dirty) cancelEdit(tr);
+  batchBar(grid);
+  return true;
+}
+
+/**
+ * The Delete key on a row of a grid with `delete_with`: deletes the selected rows, or the row
+ * itself when none is selected, after the action's confirmation. Returns true when handled.
+ */
+function deleteKey(tr) {
+  const grid = tr.closest('[data-zeyn-grid]');
+  const s = grids.get(grid);
+  const button = bulkBar(grid)?.querySelector('[data-zeyn-delete]');
+  if (!s || !button || tr.dataset.zeynKey == null) return false;
+  if (!s.selected.size && !s.allMatching) {
+    const box = tr.querySelector('input[data-zeyn-select]');
+    if (!box) return false;
+    box.checked = true;
+    pickRow(box, false);
+  }
+  runBulk(button);
+  return true;
 }
 
 /**

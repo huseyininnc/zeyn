@@ -141,6 +141,32 @@ DataGrid::of(search_products)
 
 服务器按主键重新加载该行，并只通过 `Form::read` 应用可编辑的列和行版本，因此值的读取和验证与表单一致。对任何其他列提交的值会以 `403` 被拒绝。过期的版本返回 `409`，验证错误返回 `422` 并显示在对应的单元格中。
 
+## 添加、删除和批量编辑行
+
+```rust
+DataGrid::of(search_products)
+    .column(Product::name).editable()
+    .column(Product::price).editable()
+    .edit_with(save_product)
+    .add_with(create_product)
+    .delete_with(delete_products, Product::id)
+    .batch_edit()
+```
+
+`add_with(create)` 在表格上方显示"添加行"按钮。它在顶部打开一个空行,每个 `editable()` 列都有一个
+输入框;Enter 保存,Escape 放弃。服务器从模型的默认值开始,像表单一样只读取可编辑的列(其他字段
+以 `403` 拒绝,无效的值以 `422` 返回并显示在对应单元格中),检查 `create` 的权限后运行它,然后
+重新加载表格。虚拟表格不添加行。
+模型不能保留默认值的字段(例如非可选的日期)需要一个可编辑的列。
+
+`delete_with(action, Model::key)` 在选择栏中加入一个运行前会先询问的红色"删除"按钮,在某一行上按
+Delete 键会删除选中的行,没有选中时删除该行。动作像批量动作一样接收键,因此必须检查每条记录。
+
+`batch_edit()` 会保留行内编辑,直到用户全部保存。按 Enter 后,改动过的行保持编辑状态并在开头带有
+标记,表格上方的栏显示改动行的数量以及"保存更改"和"放弃更改"。保存时各行逐一通过行内编辑的路径
+发送,因此每行都单独读取、验证并检查版本;失败的行保留其改动并显示原因。加载其他行(翻页、排序、
+筛选、搜索)前,会先询问是否放弃未保存的更改。
+
 ## 主从明细
 
 `detail(|row| (screen, params))` 让每一行都能展开成一个基于该行构建的屏幕，只在用户打开时才加载：
@@ -185,6 +211,31 @@ DataGrid::of(search_today)
 网格为每个组显示一个表头行，包含列标签、值、行数，以及该组内每一列的合计（显示在对应的列下）。展开一个组（通过其按钮，或右方向键和左方向键）会加载其子组或行，每次一页，还有更多时显示“加载更多”行；收起会将它们移除。最上层按组分页，因此分页器统计的是组数。页脚保留所有匹配行的合计。组内的行保留其他所有功能：编辑、行 action、菜单、选择和明细。
 
 数据层负责响应 `DataQuery::group`：设置它之后，数据层返回 `Page::groups`（每个组的值、计数以及查询所要求的合计），按该字段上排序键的方向以值排序，像行一样分页，`total` 统计的是组数。`DataQuery::apply` 为内存中的数据完成这项工作；SQL 使用 `GROUP BY`。`group` 由网格设置，绝不从客户端读取。客户端只发送它所展开的组值路径；服务器检查其长度，并把每个值转换成针对该组所在列的过滤条件，放在用户的过滤条件之前（空组使用 `blank`）。
+
+## 用户分组与自定义汇总
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` 让用户按某一列对行分组:使用列菜单中的"按此列分组",或把列标题拖到表格上方的分组
+面板。面板为每一层显示一个可移除该层的按钮;最多三层(`MAX_USER_GROUPS`)。分组保存在用户的视图
+(`DataGridView::group_by`)中并随之保存,设置期间会取代表格自身的 `group_by`。服务器只接受可分组的
+列,从不接受掩码列,分组方式与 `group_by` 完全相同,因此动作以同样的方式响应 `DataQuery::group`。
+树形表格和虚拟表格不分组。
+
+`summary(label, |t| ...)` 在列下方的页脚和每个分组行中加入你自己的值。它在服务器上根据 `Totals`,
+即表格声明的合计(`t.get(field, Aggregate::Sum)`)计算,因此从不需要行数据:用两个总和算出利润率,
+用一个总和和一个计数算出平均值。返回 `None` 时留空。整数按位分组,金额和小数按用户的语言格式化。
 
 ## 树形数据
 

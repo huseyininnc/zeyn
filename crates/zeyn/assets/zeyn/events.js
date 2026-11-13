@@ -18,6 +18,10 @@ document.addEventListener('click', (e) => {
   }
   if ((el = t.closest('[data-zeyn-branch-more]'))) return G?.moreBranch(el);
   if ((el = t.closest('[data-zeyn-bulk-run]'))) return G?.runBulk(el);
+  if ((el = t.closest('[data-zeyn-grid-add]'))) return G?.addRow(el);
+  if ((el = t.closest('[data-zeyn-ungroup]'))) return G?.ungroup(el);
+  if ((el = t.closest('[data-zeyn-batch-save]'))) return G?.saveBatch(el);
+  if ((el = t.closest('[data-zeyn-batch-discard]'))) return G?.discardBatch(el);
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);
   if ((el = t.closest('button[data-zeyn-run]'))) return G?.runRowItem(el);
   if ((el = t.closest('button.z-sort'))) return G?.toggleSort(el, e.shiftKey);
@@ -102,6 +106,7 @@ document.addEventListener('keydown', (e) => {
   }
   const vg = t instanceof Element ? t.closest('[data-zeyn-grid][data-zeyn-paging="virtual"]') : null;
   if (vg && (t === vg || t.parentElement?.matches('[data-zeyn-rows]')) && G?.virtualKey(e, vg)) return;
+  if (e.key === 'Delete' && t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]') && G?.deleteKey(t)) return e.preventDefault();
   if (t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]') && G?.rowKey(e, t)) return;
   shortcut(e);
 });

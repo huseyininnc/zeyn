@@ -1837,13 +1837,54 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-bulk[hidden] { display: none; }
 
+/** Tools above a grid: the search box, "Add row" and the bar of unsaved batch edits. */
+.z-grid-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  margin-block-end: calc(var(--z-space) * 2);
+}
+
+.z-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  margin-inline-start: auto;
+}
+
+.z-batch[hidden] { display: none; }
+
+.z-grid tr[data-zeyn-dirty] > td:first-child { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-warning); }
+
+/** Group panel above a grid: a drop target for headers and a button per group level. */
+.z-group-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 1.5);
+  min-height: 36px;
+  padding: 2px calc(var(--z-space) * 2);
+  border: 1px dashed var(--z-border-strong);
+  border-radius: var(--z-radius);
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-sm);
+}
+
+.z-group-panel.z-drop { border-style: solid; border-color: var(--z-focus); background: var(--z-brand-subtle); }
+
+.z-group-chip::after { content: "\00d7"; margin-inline-start: 6px; }
+
+.z-agg-custom .z-agg-label { font-style: italic; }
+
 /** Search box above a grid (`DataGrid::search`): a search input with a leading icon. */
 .z-grid-search {
   position: relative;
   display: flex;
+  flex: 1 1 16rem;
   align-items: center;
   max-width: 24rem;
-  margin-block-end: calc(var(--z-space) * 2);
 }
 
 .z-grid-search > .z-icon {

@@ -2,7 +2,8 @@ use super::actions::{find_menu, save_menu_item};
 use super::models::{Category, MenuItem};
 use zeyn::prelude::*;
 
-/// The menu with prices and stock, edited in place. Rows close to running out are highlighted.
+/// The menu with prices and stock, edited in place and saved together. Rows close to running out
+/// are highlighted.
 #[screen(route = "/menu", permission = "pos.menu")]
 pub fn menu_list() -> Screen {
     Screen::new(t!("menu.list"))
@@ -30,6 +31,7 @@ pub fn menu_list() -> Screen {
                 .column(MenuItem::active)
                 .editable()
                 .check_icon()
-                .edit_with(save_menu_item),
+                .edit_with(save_menu_item)
+                .batch_edit(),
         )
 }
