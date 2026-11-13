@@ -281,7 +281,7 @@ DataGrid::of(search_employees)
 
 ## 导出
 
-`exportable()`（以及可选的 `export_permission(...)`、`export_limit(n)`）让工具栏的 `Export::Csv` 按钮下载每一个匹配的行。服务器会逐页遍历网格的 action，并立即流式输出每一页，按用户的布局和语言。公式会被中和。默认最多 100,000 行。
+`exportable()`（以及可选的 `export_permission(...)`、`export_limit(n)`）让工具栏的 `Export::Csv` 按钮下载每一个匹配的行。服务器会逐页遍历网格的 action，并立即流式输出每一页，按用户的布局和语言。公式会被中和。默认最多 100,000 行。 选中行时(逐行选择,而不是"所有匹配行"),CSV 和 Excel 导出只包含这些行,最多 1,000 行,并且仍受用户筛选的限制;服务器按键查找这些行。
 
 启用 `xlsx` Cargo feature 后，工具栏的 `Export::Xlsx` 按钮会把同样的行下载为 Excel 工作簿（`GET /_zeyn/grid/export?format=xlsx`）。单元格保留其类型：数字、带货币格式的数字形式的金额、按用户时区写成真正 Excel 日期的日期和日期时间，以及布尔值。Choice 写成其标签，被掩码的字段写成其掩码文本，文本始终是文本，因此不会有任何内容变成公式。表头行包含用户语言的标签，加粗并冻结，列保持用户的顺序和宽度。
 

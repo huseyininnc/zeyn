@@ -417,7 +417,7 @@ parsing blocks of 200 rows with every column, which column virtualization does n
 `exportable()` (and optionally `export_permission(...)`, `export_limit(n)`) lets the toolbar's
 `Export::Csv` button download every matching row. The server pages through the grid's action and
 streams each page at once, in the user's layout and language. Formulas are defused. Up to 100,000
-rows by default.
+rows by default. While rows are selected (one by one, not "all matching"), CSV and Excel exports take only those rows, at most 1,000, still within the user's filters; the server looks them up by key.
 
 With the `xlsx` Cargo feature the toolbar's `Export::Xlsx` button downloads the same rows as an
 Excel workbook (`GET /_zeyn/grid/export?format=xlsx`). Cells keep their types: numbers, money as a

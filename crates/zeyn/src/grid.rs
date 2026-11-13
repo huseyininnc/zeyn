@@ -1091,6 +1091,44 @@ impl<E: Model> DataGrid<E> {
         pins
     }
 
+    /// Loads a page after cleaning the query, behind the scope filters and, when given, one more
+    /// filter the server built (the keys of the selected rows), which the client cannot remove.
+    fn fetch_only(
+        &self,
+        ctx: Ctx,
+        mut query: DataQuery,
+        only: Option<Filter>,
+    ) -> BoxFuture<Result<LoadedPage>> {
+        self.allow(&mut query, Some(&ctx));
+        self.scoped(&mut query);
+        if let Some(f) = only {
+            query.filters.insert(0, f);
+        }
+        query.time_zone = ctx.time_zone();
+        let fetch = self.fetch;
+        let offset = match &query.page {
+            PageRequest::Offset { offset, .. } => *offset,
+            PageRequest::After { .. } => 0,
+        };
+        Box::pin(async move {
+            let page = fetch(ctx, query).await?;
+            Ok(LoadedPage {
+                count: page.items.len(),
+                total: page.total,
+                next: page.next,
+                offset,
+                totals: page.totals,
+                items: Box::new(page.items),
+                view: None,
+                saved_views: false,
+                depth: 0,
+                path: Vec::new(),
+                groups: None,
+                parents: Vec::new(),
+            })
+        })
+    }
+
     /// Puts the grid's scope filters in front of the client's.
     fn scoped(&self, query: &mut DataQuery) {
         if !self.scope.is_empty() {
@@ -3051,32 +3089,24 @@ impl<E: Model> GridSource for DataGrid<E> {
         })
     }
 
-    fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
-        self.allow(&mut query, Some(&ctx));
-        self.scoped(&mut query);
-        query.time_zone = ctx.time_zone();
-        let fetch = self.fetch;
-        let offset = match &query.page {
-            PageRequest::Offset { offset, .. } => *offset,
-            PageRequest::After { .. } => 0,
-        };
-        Box::pin(async move {
-            let page = fetch(ctx, query).await?;
-            Ok(LoadedPage {
-                count: page.items.len(),
-                total: page.total,
-                next: page.next,
-                offset,
-                totals: page.totals,
-                items: Box::new(page.items),
-                view: None,
-                saved_views: false,
-                depth: 0,
-                path: Vec::new(),
-                groups: None,
-                parents: Vec::new(),
-            })
-        })
+    fn fetch(&self, ctx: Ctx, query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
+        self.fetch_only(ctx, query, None)
+    }
+
+    fn fetch_keys(
+        &self,
+        ctx: Ctx,
+        query: DataQuery,
+        keys: &[String],
+    ) -> BoxFuture<Result<LoadedPage>> {
+        match Self::key_index() {
+            Some(i) => self.fetch_only(
+                ctx,
+                query,
+                Some(Filter::any_of(E::fields()[i].name, keys.to_vec())),
+            ),
+            None => Box::pin(async { Err(crate::action::Error::NotFound) }),
+        }
     }
 
     fn fetch_at(
@@ -3397,6 +3427,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "paste_failed",
         "paste_readonly",
         "paste_too_many",
+        "too_many",
         "added",
         "batch_saved",
         "discard_confirm",

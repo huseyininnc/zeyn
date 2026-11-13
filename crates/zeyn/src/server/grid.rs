@@ -59,12 +59,16 @@ pub(super) struct GridCall {
     pub(super) shape: Option<String>,
 }
 
+/// Most selected rows one export takes by key; the keys travel in the export URL.
+pub const MAX_EXPORT_KEYS: usize = 1_000;
+
 #[derive(Deserialize)]
 struct ExportQuery {
     screen: String,
     params: Option<String>,
     node: crate::ui::NodePath,
-    /// JSON of `{ "sort": [...], "filters": [...], "q": "...", "columns": [...] }`, all optional.
+    /// JSON of `{ "sort": [...], "filters": [...], "q": "...", "columns": [...], "keys": [...] }`,
+    /// all optional. `keys` limits a CSV or XLSX export to the selected rows.
     q: Option<String>,
     /// `csv` (the default) or `xlsx`.
     format: Option<String>,
@@ -225,6 +229,13 @@ async fn grid_export(
     }))
     .unwrap_or_default();
     query.with_total = false;
+    let keys: Option<Vec<String>> = match spec.get("keys") {
+        None | Some(Json::Null) => None,
+        Some(k) => match serde_json::from_value::<Vec<String>>(k.clone()) {
+            Ok(k) if k.len() <= MAX_EXPORT_KEYS && k.iter().all(|k| k.len() <= 200) => Some(k),
+            _ => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+        },
+    };
     #[cfg(feature = "pdf")]
     if q.format.as_deref() == Some("pdf") {
         return pdf::grid_report(
@@ -286,10 +297,11 @@ async fn grid_export(
                     limit: size,
                 },
             };
-            let mut page = match state
-                .timed(grid.fetch(ctx.clone(), q))
-                .await
-            {
+            let rows = match &keys {
+                Some(keys) => grid.fetch_keys(ctx.clone(), q, keys),
+                None => grid.fetch(ctx.clone(), q),
+            };
+            let mut page = match state.timed(rows).await {
                 Ok(p) => p,
                 Err(f) => {
                     outcome = Err(f);
