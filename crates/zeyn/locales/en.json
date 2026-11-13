@@ -158,6 +158,7 @@
       "next": "Next page",
       "load_more": "Load more",
       "search": "Search rows",
+      "page_size": "Rows per page",
       "filter_builder": "Filter",
       "builder_title": "Filter rows",
       "add_condition": "Add condition",

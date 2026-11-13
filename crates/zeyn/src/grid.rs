@@ -237,6 +237,9 @@ pub struct DataGridView {
     /// `groupable()` count, at most [`MAX_USER_GROUPS`]; empty keeps the grid's own grouping.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub group_by: Vec<String>,
+    /// Rows per page the user picked, one of the grid's `page_sizes`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
 }
 
 /// Most levels a user groups a grid by.
@@ -574,6 +577,8 @@ pub struct DataGrid<E: Model> {
     batch: bool,
     /// Whether a "Filter" button opens the filter builder.
     builder: bool,
+    /// Page sizes users may pick in the pager.
+    page_sizes: Vec<u32>,
 }
 
 /// Most levels a tree grid opens.
@@ -830,6 +835,7 @@ impl<E: Model> DataGrid<E> {
             delete: None,
             batch: false,
             builder: false,
+            page_sizes: Vec::new(),
         }
     }
 
@@ -1201,6 +1207,45 @@ impl<E: Model> DataGrid<E> {
     pub fn filter_builder(mut self) -> Self {
         self.builder = true;
         self
+    }
+
+    /// Lets users pick how many rows a page shows, from `sizes`, in a "Rows per page" list next
+    /// to the pager. Each size is kept between 1 and [`MAX_PAGE_SIZE`]; the grid's own page size
+    /// is always offered. The pick is part of the user's view and is saved with it. Only grids
+    /// with numbered pages show it.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_orders).paging(Paging::pages(25)).page_sizes(&[10, 25, 50, 100])
+    /// ```
+    pub fn page_sizes(mut self, sizes: &[u32]) -> Self {
+        self.page_sizes = sizes
+            .iter()
+            .map(|s| (*s).clamp(1, MAX_PAGE_SIZE))
+            .collect();
+        self
+    }
+
+    /// The page sizes offered, in order with the grid's own; empty when the grid has none to
+    /// pick from.
+    fn size_choices(&self) -> Vec<u32> {
+        let Paging::Pages { size } = self.paging else {
+            return Vec::new();
+        };
+        if self.page_sizes.is_empty() {
+            return Vec::new();
+        }
+        let mut sizes = self.page_sizes.clone();
+        sizes.push(size);
+        sizes.sort_unstable();
+        sizes.dedup();
+        sizes
+    }
+
+    /// The page size of a view: its pick when the grid offers it, the grid's own otherwise.
+    fn page_size_for(&self, view: Option<&DataGridView>) -> u32 {
+        view.and_then(|v| v.page_size)
+            .filter(|s| self.size_choices().contains(s))
+            .unwrap_or(self.paging.size())
     }
 
     /// Whether this user may add rows here.
@@ -1636,6 +1681,9 @@ impl<E: Model> DataGrid<E> {
                 .iter()
                 .map(|m| m.name.to_string())
                 .collect(),
+            page_size: view
+                .page_size
+                .filter(|s| self.size_choices().contains(s)),
         }
     }
 
@@ -2168,7 +2216,7 @@ impl<E: Model> DataGrid<E> {
             self.action.name,
             self.mode.code(),
             self.paging.code(),
-            self.paging.size(),
+            self.page_size_for(view),
             self.on_open.is_some(),
             grid_text("range"),
             grid_text("range_total"),
@@ -2300,12 +2348,28 @@ impl<E: Model> DataGrid<E> {
             out.push_str("</template>");
         }
         match self.paging {
-            Paging::Pages { .. } => out.push_str(&format!(
-                r#"<nav class="z-pager" aria-label="{}" data-testid="{scope}.pager"><button type="button" class="z-button" data-zeyn-page="prev" data-testid="{scope}.pager.prev" aria-label="{}" disabled>&lsaquo;</button><span class="z-page-info" aria-live="polite" data-zeyn-page-info></span><button type="button" class="z-button" data-zeyn-page="next" data-testid="{scope}.pager.next" aria-label="{}">&rsaquo;</button></nav>"#,
-                grid_text("pagination"),
-                grid_text("previous"),
-                grid_text("next"),
-            )),
+            Paging::Pages { .. } => {
+                out.push_str(&format!(
+                    r#"<nav class="z-pager" aria-label="{}" data-testid="{scope}.pager"><button type="button" class="z-button" data-zeyn-page="prev" data-testid="{scope}.pager.prev" aria-label="{}" disabled>&lsaquo;</button><span class="z-page-info" aria-live="polite" data-zeyn-page-info></span><button type="button" class="z-button" data-zeyn-page="next" data-testid="{scope}.pager.next" aria-label="{}">&rsaquo;</button>"#,
+                    grid_text("pagination"),
+                    grid_text("previous"),
+                    grid_text("next"),
+                ));
+                let sizes = self.size_choices();
+                if !sizes.is_empty() {
+                    let now = self.page_size_for(view);
+                    out.push_str(&format!(
+                        r#"<label class="z-page-size"><span>{}</span><select data-zeyn-page-size-pick data-testid="{scope}.pager.size">"#,
+                        grid_text("page_size"),
+                    ));
+                    for s in sizes {
+                        let on = if s == now { " selected" } else { "" };
+                        out.push_str(&format!(r#"<option value="{s}"{on}>{s}</option>"#));
+                    }
+                    out.push_str("</select></label>");
+                }
+                out.push_str("</nav>");
+            }
             Paging::Infinite { .. } => out.push_str(&format!(
                 r#"<div class="z-more" data-zeyn-more><button type="button" class="z-button" data-testid="{scope}.grid.load-more">{}</button><span class="z-sr-only" aria-live="polite" data-zeyn-page-info></span></div>"#,
                 grid_text("load_more"),
@@ -2657,9 +2721,9 @@ impl<E: Model> GridSource for DataGrid<E> {
                 cursor: None,
                 limit: batch,
             },
-            other => PageRequest::Offset {
+            _ => PageRequest::Offset {
                 offset: 0,
-                limit: other.size(),
+                limit: self.page_size_for(view),
             },
         };
         DataQuery {
@@ -3194,6 +3258,7 @@ impl<E: Model> Component for DataGrid<E> {
             "tree": self.tree.map(|m| m.name),
             "search": self.search,
             "filter_builder": self.builder,
+            "page_sizes": self.size_choices(),
             "groupable": self.columns.iter().filter(|c| c.group).map(|c| c.meta.name).collect::<Vec<_>>(),
             "add": self.add.as_ref().map(|a| a.meta),
             "delete": self.delete.map(|i| self.bulk[i].meta),

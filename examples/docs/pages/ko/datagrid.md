@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 클라이언트가 무엇을 요청하든 서버가 페이지 크기에 상한을 둡니다.
 
+`.page_sizes(&[10, 25, 50, 100])`는 번호 페이지의 페이저에 "페이지당 행 수" 목록을 더합니다. 그리드 자체의 크기는 항상 제공되고, 선택은 사용자의 뷰와 함께 저장되며, 서버는 그리드가 제공하는 크기만 받습니다.
+
 ## 열
 
 | 호출 | 결과 |

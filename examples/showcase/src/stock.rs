@@ -255,6 +255,7 @@ pub fn product_list() -> Screen {
             DataGrid::of(search_products)
                 .mode(DataMode::Server)
                 .paging(Paging::pages(25))
+                .page_sizes(&[10, 50, 100])
                 .search()
                 .filter_builder()
                 .empty_filtered(

@@ -95,7 +95,7 @@ function saveView(grid, reset = false) {
   s.viewTimer = setTimeout(() => {
     const view = reset
       ? null
-      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), shape: grid.dataset.zeynShape, group_by: s.groups };
+      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), shape: grid.dataset.zeynShape, group_by: s.groups, page_size: own(grid, '[data-zeyn-page-size-pick]') ? s.size : undefined };
     if (grid.dataset.zeynViews === 'server') {
       post(BASE + '/_zeyn/grid/view', { ...address(grid), view }, { quiet: true });
       return;
@@ -163,6 +163,17 @@ function ungroup(chip) {
   const near = (chip.nextElementSibling ?? chip.previousElementSibling)?.dataset.zeynUngroup;
   setGroups(grid, s.groups.filter((f) => f !== chip.dataset.zeynUngroup));
   ((near && panel.querySelector(`[data-zeyn-ungroup="${CSS.escape(near)}"]`)) || grid).focus();
+}
+
+/** Shows the page size the user picked from the first page and saves it with the view. */
+function pickPageSize(select) {
+  const grid = select.closest('[data-zeyn-grid]');
+  const s = grid && grids.get(grid);
+  const size = Number(select.value);
+  if (!s || !(size > 0)) return;
+  s.size = size;
+  saveView(grid);
+  loadGrid(grid, 'reset');
 }
 
 /** Puts back the grid's own layout, sort and filters and forgets the saved view. */
