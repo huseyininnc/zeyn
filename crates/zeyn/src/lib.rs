@@ -274,8 +274,8 @@ pub mod prelude {
         LookupQuery, MenuBar, MenuButton, MetaLine, Pagination, Panel, Paragraph, Placeholder,
         Popover, PrevNext, Progress, ProgressRing, PropertyInspector, Quote, Rail, Reactions,
         RelativeTime, Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack,
-        StatusBar, Stepper, Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
-        WeekSchedule,
+        StatusBar, Stepper, Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeMove,
+        TreePlace, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::ui::{
         ActivityRings, ComparisonTable, FlowDiagram, Funnel, Gantt, Highlight, ImageCompare,

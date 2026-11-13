@@ -512,7 +512,17 @@
         "insert": "Ekle",
         "insert_hint": "Control+Enter ekler.",
         "insert_label": "{label} ekle",
-        "inserted": "{label} eklendi."
+        "inserted": "{label} eklendi.",
+        "move": "Taşı",
+        "move_down": "Aşağı",
+        "move_hint": "Alt ile ok tuşları öğeyi taşır: Yukarı, Aşağı, Sol dalın dışına, Sağ üstteki dalın içine.",
+        "move_into": "Üstteki dalın içine",
+        "move_label": "{label} öğesini taşı",
+        "move_none": "Taşınacak yer yok",
+        "move_out": "Bu dalın dışına",
+        "move_refused": "{label} taşınamadı.",
+        "move_up": "Yukarı",
+        "moved": "{label} taşındı."
       },
       "select": {
         "none": "Seçilmedi",

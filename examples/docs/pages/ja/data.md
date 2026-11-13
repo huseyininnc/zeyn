@@ -26,6 +26,18 @@ Tree::of(sample_tree).label("Products by unit")
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` で項目を移動できます。マウスやペンで項目を別の行の上部か下部（その前か後ろ）、またはブランチの中央（その中）にドラッグし、落ちる位置は印で示されます。フォーカスのある項目の「移動」ボタンはメニューを開きます（上へ、下へ、ブランチの外へ、上のブランチの中へ）。これは単一ポインターで移動する手段で、タッチもこれを使います。Alt と矢印キーではすぐに移動します。アクションは `POST /_zeyn/data` を通じて CSRF、書き込み制限、その権限の検査を経て `TreeMove`（`id`、`target`、`place`）を受け取ります。どちらの id もブラウザーから来るのでアクションはそれを検索し、`TreeMove::parent` は新しい親を返し、項目を自分自身やその下へ移すことを拒否します（`Error::Conflict`。親の連鎖が `MAX_TREE_DEPTH` より長い場合も同じ）。移動の後、ツリーは変わった階層を読み込み直し、移動した項目にフォーカスを保ちます。移動のコードは `treedrag.js` の一部で、ドラッグ可能か移動可能なツリーと一緒にだけ読み込まれます。
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## チャート
 
 `Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge`、`funnel` は、サーバー上で SVG を描画します。ブラウザにチャートライブラリはなく、チャートはページの HTML の一部です。

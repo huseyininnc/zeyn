@@ -190,7 +190,7 @@ pub use toc::{MAX_TOC_ITEMS, Toc};
 pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
 pub(crate) use topics::{topic_list, topics_attr};
 pub use tour::{MAX_TOUR_STOPS, Tour, TourStop};
-pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use tree::{MAX_TREE_CHILDREN, MAX_TREE_DEPTH, Tree, TreeItem, TreeMove, TreePlace, TreeQuery};
 pub use typing::{MAX_TYPING_PEOPLE, TYPING_EVERY_SECONDS, TYPING_SHOWN_SECONDS, TypingIndicator};
 pub use variants::{MAX_VARIANT_GROUPS, MAX_VARIANT_OPTIONS, VariantGroup, VariantPicker};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};

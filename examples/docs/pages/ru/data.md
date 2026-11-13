@@ -26,6 +26,18 @@ Tree::of(sample_tree).label("Products by unit")
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` позволяет перемещать элементы. Мышь или перо перетаскивают элемент на верх или низ другой строки (перед ней или после неё) или на середину ветви (внутрь), и метка показывает, куда он попадёт. Кнопка «Переместить» на элементе в фокусе открывает меню (вверх, вниз, из ветви, в ветвь выше): это способ переноса одним указателем, его же использует сенсорный экран; Alt со стрелкой перемещает сразу. Действие получает `TreeMove` (`id`, `target`, `place`) через `POST /_zeyn/data` с CSRF, лимитом записи и своим разрешением. Оба id приходят из браузера, поэтому действие ищет их, а `TreeMove::parent` возвращает нового родителя и отклоняет перенос элемента в самого себя или ниже себя (`Error::Conflict`, а также для цепочки родителей длиннее `MAX_TREE_DEPTH`). После переноса дерево заново загружает изменённые уровни и оставляет фокус на перенесённом элементе. Код переноса входит в `treedrag.js` и загружается только с перетаскиваемым или перемещаемым деревом.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## Диаграммы
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` и `funnel` рисуют SVG на сервере. В браузере нет библиотеки диаграмм; диаграмма это часть HTML страницы.

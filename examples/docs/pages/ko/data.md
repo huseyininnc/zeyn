@@ -26,6 +26,18 @@ Tree::of(sample_tree).label("Products by unit")
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)`는 항목을 옮길 수 있게 합니다. 마우스나 펜으로 항목을 다른 행의 위쪽이나 아래쪽(그 앞이나 뒤) 또는 가지의 가운데(그 안)로 끌면 표시가 놓일 위치를 보여 줍니다. 포커스된 항목의 이동 버튼은 메뉴를 엽니다(위로, 아래로, 가지 밖으로, 위쪽 가지 안으로). 단일 포인터로 옮기는 방법이며 터치도 이것을 씁니다. Alt와 화살표 키는 바로 옮깁니다. 액션은 `POST /_zeyn/data`를 통해 CSRF, 쓰기 한도, 자신의 권한 검사를 거쳐 `TreeMove`(`id`, `target`, `place`)를 받습니다. 두 id 모두 브라우저에서 오므로 액션이 이를 찾아보고, `TreeMove::parent`는 새 부모를 돌려주며 항목을 자기 자신이나 그 아래로 옮기는 것을 거부합니다(`Error::Conflict`, 부모 사슬이 `MAX_TREE_DEPTH`보다 길 때도). 옮긴 뒤 트리는 바뀐 단계를 다시 불러오고 옮긴 항목에 포커스를 둡니다. 이동 코드는 `treedrag.js`에 들어 있으며 끌 수 있거나 옮길 수 있는 트리와 함께만 불러옵니다.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## 차트
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge`, `funnel`은 서버에서 SVG를 그립니다. 브라우저에는 차트 라이브러리가 없으며, 차트는 페이지 HTML의 일부입니다.

@@ -502,7 +502,8 @@
       },
       "tree": {
         "overview": "Örnek",
-        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar"
+        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar",
+        "movable": "Sürükleyerek, menüyle ya da Alt ve ok tuşlarıyla taşınan klasörler"
       },
       "week_schedule": {
         "overview": "Örnek"

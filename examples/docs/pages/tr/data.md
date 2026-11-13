@@ -26,6 +26,18 @@ Ağaç ARIA tree desenini izler: ok tuşları öğeler arasında gezinir, dallar
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` öğelerin taşınmasını sağlar. Fare ya da kalem bir öğeyi başka bir satırın üst ya da alt kısmına (önüne ya da arkasına) veya bir dalın ortasına (içine) sürükler; nereye düşeceğini bir işaret gösterir. Odaktaki öğenin Taşı düğmesi bir menü açar (yukarı, aşağı, dalın dışına, üstteki dalın içine); bu, tek işaretçiyle taşımanın yoludur ve dokunmatik ekran da bunu kullanır. Alt ile bir ok tuşu öğeyi hemen taşır. Aksiyon `POST /_zeyn/data` üzerinden CSRF, yazma sınırı ve kendi izniyle bir `TreeMove` (`id`, `target`, `place`) alır. İki kimlik de tarayıcıdan gelir, bu yüzden aksiyon onları arar; `TreeMove::parent` yeni üst öğeyi verir ve öğenin kendi içine ya da altına taşınmasını reddeder (`Error::Conflict`; `MAX_TREE_DEPTH` değerinden uzun bir üst öğe zinciri için de). Taşımadan sonra ağaç değişen seviyeleri yeniden yükler ve odağı taşınan öğede tutar. Taşıma kodu `treedrag.js` içindedir ve yalnızca sürüklenebilir ya da taşınabilir bir ağaçla yüklenir.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## Grafikler
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` ve `funnel` SVG'yi sunucuda çizer. Tarayıcıda grafik kütüphanesi yoktur; grafik, sayfa HTML'inin bir parçasıdır.

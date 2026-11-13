@@ -26,6 +26,18 @@ Tree::of(sample_tree).label("Products by unit")
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` से आइटम ले जाए जा सकते हैं। माउस या पेन किसी आइटम को दूसरी पंक्ति के ऊपरी या निचले हिस्से पर (उसके पहले या बाद) या किसी शाखा के बीच में (उसके अंदर) खींचता है, और एक निशान दिखाता है कि वह कहाँ जाएगा। फ़ोकस वाले आइटम का Move बटन एक मेनू खोलता है (ऊपर, नीचे, अपनी शाखा से बाहर, ऊपर वाली शाखा के अंदर); यह एक पॉइंटर से ले जाने का तरीका है और टच भी इसी को इस्तेमाल करता है। Alt के साथ तीर कुंजी तुरंत ले जाती है। एक्शन को `POST /_zeyn/data` से CSRF, लिखने की सीमा और अपनी अनुमति के साथ एक `TreeMove` (`id`, `target`, `place`) मिलता है। दोनों id ब्राउज़र से आती हैं, इसलिए एक्शन उन्हें खोजता है, और `TreeMove::parent` नया पैरेंट देता है तथा आइटम को खुद में या अपने नीचे ले जाने से मना करता है (`Error::Conflict`, `MAX_TREE_DEPTH` से लंबी पैरेंट शृंखला के लिए भी)। ले जाने के बाद ट्री बदले हुए स्तर फिर से लोड करता है और फ़ोकस ले जाए गए आइटम पर रखता है। ले जाने का कोड `treedrag.js` का हिस्सा है और केवल खींचे जा सकने वाले या ले जाए जा सकने वाले ट्री के साथ लोड होता है।
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## चार्ट
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` और `funnel` सर्वर पर SVG बनाते हैं। ब्राउज़र में कोई चार्ट लाइब्रेरी नहीं है; चार्ट पृष्ठ के HTML का हिस्सा है।

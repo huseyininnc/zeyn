@@ -502,7 +502,8 @@
       },
       "tree": {
         "overview": "Example",
-        "draggable": "Leaves that drag onto a drop target, or insert with a button or Control+Enter"
+        "draggable": "Leaves that drag onto a drop target, or insert with a button or Control+Enter",
+        "movable": "Folders people move by drag, a menu or Alt with the arrow keys"
       },
       "week_schedule": {
         "overview": "Example"

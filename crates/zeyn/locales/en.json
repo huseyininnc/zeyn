@@ -512,7 +512,17 @@
         "insert": "Insert",
         "insert_hint": "Control+Enter inserts.",
         "insert_label": "Insert {label}",
-        "inserted": "Inserted {label}."
+        "inserted": "Inserted {label}.",
+        "move": "Move",
+        "move_down": "Down",
+        "move_hint": "Alt with the arrow keys moves the item: Up, Down, Left out of its branch, Right into the branch above.",
+        "move_into": "Into the branch above",
+        "move_label": "Move {label}",
+        "move_none": "Nowhere to move",
+        "move_out": "Out of this branch",
+        "move_refused": "{label} could not be moved.",
+        "move_up": "Up",
+        "moved": "Moved {label}."
       },
       "select": {
         "none": "None",
