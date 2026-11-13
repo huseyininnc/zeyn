@@ -67,7 +67,7 @@ struct ExportQuery {
     screen: String,
     params: Option<String>,
     node: crate::ui::NodePath,
-    /// JSON of `{ "sort": [...], "filters": [...], "q": "...", "columns": [...], "keys": [...] }`,
+    /// JSON of `{ "sort": [...], "filters": [...], "filter_groups": [...], "q": "...", "columns": [...], "keys": [...] }`,
     /// all optional. `keys` limits a CSV or XLSX export to the selected rows.
     q: Option<String>,
     /// `csv` (the default) or `xlsx`.
@@ -225,6 +225,7 @@ async fn grid_export(
     let mut query: DataQuery = serde_json::from_value(json!({
         "sort": spec.get("sort").cloned().unwrap_or(json!([])),
         "filters": spec.get("filters").cloned().unwrap_or(json!([])),
+        "filter_groups": spec.get("filter_groups").cloned().unwrap_or(json!([])),
         "q": spec.get("q").cloned().unwrap_or(json!("")),
     }))
     .unwrap_or_default();
@@ -380,7 +381,11 @@ pub(super) fn note_export(
     query: &DataQuery,
 ) {
     if let Some(model) = grid.sensitive_model() {
-        let query = json!({ "sort": query.sort, "filters": query.filters });
+        let query = json!({
+            "sort": query.sort,
+            "filters": query.filters,
+            "filter_groups": query.filter_groups,
+        });
         ctx.update_trail(|t| {
             t.export = Some(crate::audit::ExportRecord {
                 model,

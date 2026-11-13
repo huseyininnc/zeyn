@@ -137,7 +137,7 @@ async function submitForm(form, submitter) {
 function exportServer(grid, format) {
   const s = grids.get(grid);
   const a = address(grid);
-  const spec = { sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], q: s?.q ?? '', columns: s?.columns ?? [] };
+  const spec = { sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], filter_groups: s?.filterGroups ?? [], q: s?.q ?? '', columns: s?.columns ?? [] };
   if (s?.selected.size && !s.allMatching && format !== 'pdf') {
     if (s.selected.size > 1000) return toast(fill(s.texts.too_many || 'Select at most {n} rows for this action.', { n: fmt(1000) }), 'error');
     spec.keys = [...s.selected];

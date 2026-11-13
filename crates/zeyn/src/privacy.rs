@@ -201,9 +201,7 @@ pub(crate) fn strip_masked(query: &mut DataQuery, fields: &[FieldMeta], ctx: &Ct
             .iter()
             .any(|m| m.name == name && !can_unmask(Some(ctx), m))
     };
-    query
-        .filters
-        .retain(|f| !hidden(&f.field));
+    query.retain_filters(|f| !hidden(&f.field));
     query.sort.retain(|s| !hidden(&s.field));
 }
 

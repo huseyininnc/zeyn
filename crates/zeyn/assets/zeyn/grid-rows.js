@@ -133,7 +133,7 @@ async function runBulk(button) {
     action: Number(button.dataset.zeynBulkRun),
     keys: s.allMatching ? [] : [...s.selected],
     all: s.allMatching,
-    query: { sort: s.sort, filters: filterList(s), q: s.q },
+    query: { sort: s.sort, filters: filterList(s), filter_groups: s.filterGroups, q: s.q },
   });
   button.disabled = false;
   if (!r.ok) return;
