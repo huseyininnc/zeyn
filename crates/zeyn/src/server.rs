@@ -2921,7 +2921,12 @@ impl AppState {
                     .saved_view(ctx, grid, name, &i)
                     .await;
                 let mut page = self
-                    .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
+                    .timed(grid.fetch_at(
+                        ctx.clone(),
+                        grid.first_query(view.as_ref()),
+                        Vec::new(),
+                        view.as_ref(),
+                    ))
                     .await
                     .ok()?;
                 page.view = view;

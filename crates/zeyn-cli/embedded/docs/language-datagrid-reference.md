@@ -211,6 +211,37 @@ through `Form::read`, so values are read and validated as a form would. A value 
 column is refused with `403`. A stale version comes back as `409`, and validation errors come back
 as `422` and show in their cells.
 
+## Adding, deleting and batch editing rows
+
+```rust
+DataGrid::of(search_products)
+    .column(Product::name).editable()
+    .column(Product::price).editable()
+    .edit_with(save_product)
+    .add_with(create_product)
+    .delete_with(delete_products, Product::id)
+    .batch_edit()
+```
+
+`add_with(create)` shows an "Add row" button above the grid. It opens an empty row at the top
+with an input for every `editable()` column; Enter saves it, Escape drops it. The server starts
+from the model's default, reads only the editable columns as a form would (any other field is
+refused with `403`, invalid values come back as `422` and show in their cells), checks
+`create`'s permission and runs it; the grid then reloads. Virtual grids do not add rows.
+Fields the model cannot leave at their default, such as a date that is not optional, need an
+editable column.
+
+`delete_with(action, Model::key)` adds a red "Delete" button to the selection bar that asks
+before it runs, and the Delete key on a row deletes the selected rows, or that row when none is
+selected. The action takes the keys as a bulk action does, so it must check every record.
+
+`batch_edit()` keeps inline edits until the user saves them all. Enter leaves a changed row in
+edit mode with a mark at its start, and a bar above the grid counts the changed rows with "Save
+changes" and "Discard changes". Saving sends the rows one after another through the inline edit
+path, so each row is read, validated, versioned and checked on its own; rows that fail keep their
+changes and show why. Loading other rows (paging, sorting, filters, search) asks before it drops
+unsaved changes.
+
 ## Master detail
 
 `detail(|row| (screen, params))` lets every row expand into a screen built from the row, loaded only
@@ -277,6 +308,35 @@ memory data; SQL uses `GROUP BY`. `group` is set by the grid and never read from
 client sends only the path of group values it opens; the server checks its length and turns each
 value into a filter on that group's column, in front of the user's filters (`blank` for the empty
 group).
+
+## Grouping by the user and custom summaries
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` lets users group the rows by a column: "Group by this column" in its column menu,
+or by dragging its header onto the group panel above the grid. The panel shows a button per
+level that removes it; at most three levels (`MAX_USER_GROUPS`). The groups travel in the user's
+view (`DataGridView::group_by`), are saved with it and replace the grid's own `group_by` while
+set. The server keeps only groupable columns, never masked ones, and groups exactly as for
+`group_by`, so the action answers `DataQuery::group` in the same way. Tree and virtual grids do
+not group.
+
+`summary(label, |t| ...)` adds a value of your own under a column, in the footer and in every
+group row. It is computed on the server from `Totals`, the totals the grid declares
+(`t.get(field, Aggregate::Sum)`), so it never needs the rows: a margin from two sums, an average
+from a sum and a count. `None` leaves it empty. Integers are grouped and money and decimals are
+formatted in the user's language.
 
 ## Tree data
 

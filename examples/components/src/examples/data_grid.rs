@@ -1,11 +1,12 @@
 //! DataGrid examples: rows of an action with paging, sorting and filters.
 
 use crate::data::{
-    Kind, Product, Warehouse, million_products, pretend_delete, pretend_delete_all, query_result,
-    search_products, search_warehouses,
+    Kind, Product, Warehouse, million_products, pretend_delete, pretend_delete_all,
+    pretend_save_product, query_result, search_products, search_warehouses,
 };
 use crate::{Entry, ex};
 use zeyn::prelude::*;
+use zeyn::{Aggregate, Value};
 
 pub fn overview(_ctx: &Ctx) -> Node {
     DataGrid::of(search_products)
@@ -83,6 +84,60 @@ pub fn search_and_bands(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn add_delete_batch(_ctx: &Ctx) -> Node {
+    DataGrid::of(search_products)
+        .paging(Paging::pages(5))
+        .column(Product::code)
+        .width(110)
+        .editable()
+        .column(Product::name)
+        .flex(1)
+        .editable()
+        .column(Product::price)
+        .width(130)
+        .editable()
+        .column(Product::stock)
+        .width(110)
+        .editable()
+        .edit_with(pretend_save_product)
+        .add_with(pretend_save_product)
+        .delete_with(pretend_delete_all, Product::id)
+        .batch_edit()
+        .into()
+}
+
+pub fn user_grouping(_ctx: &Ctx) -> Node {
+    DataGrid::of(search_products)
+        .paging(Paging::pages(5))
+        .column(Product::code)
+        .width(110)
+        .count()
+        .column(Product::name)
+        .flex(1)
+        .column(Product::kind)
+        .width(120)
+        .groupable()
+        .column(Product::active)
+        .width(100)
+        .groupable()
+        .check_icon()
+        .column(Product::stock)
+        .width(200)
+        .sum()
+        .summary("Per product", |t| {
+            match (
+                t.get(Product::stock, Aggregate::Sum),
+                t.get(Product::code, Aggregate::Count),
+            ) {
+                (Some(Value::Int(sum)), Some(Value::Int(n))) if *n > 0 => {
+                    Some(Value::Decimal(*sum as f64 / *n as f64))
+                }
+                _ => None,
+            }
+        })
+        .into()
+}
+
 pub fn computed_million(_ctx: &Ctx) -> Node {
     DataGrid::of(million_products)
         .paging(Paging::virtual_scroll())
@@ -123,6 +178,8 @@ pub const ENTRY: Entry = Entry {
         ex!(confirm_actions),
         ex!(numbers),
         ex!(search_and_bands),
+        ex!(add_delete_batch),
+        ex!(user_grouping),
         ex!(computed_million),
         ex!(dynamic_columns),
     ],

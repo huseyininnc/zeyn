@@ -116,6 +116,14 @@ impl ProductStore {
         Ok(n)
     }
 
+    /// Removes products. Returns how many went.
+    pub fn delete(&self, ids: &[ProductId]) -> Result<usize> {
+        let mut rows = self.0.write().map_err(poisoned)?;
+        let before = rows.len();
+        rows.retain(|p| !ids.contains(&p.id));
+        Ok(before - rows.len())
+    }
+
     pub fn save(&self, mut product: Product) -> Result<Product> {
         let mut rows = self.0.write().map_err(poisoned)?;
         if rows.iter().any(|p| {
@@ -195,6 +203,12 @@ pub async fn archive_product(code: String, store: ProductStore) -> Result<()> {
 }
 
 /// Adds ten units to every product with fewer than ten. From the product list's context menu.
+/// Deletes products by id.
+#[action(permission = "stock.product.write", audit)]
+pub async fn delete_products(ids: Vec<ProductId>, store: ProductStore) -> Result<usize> {
+    store.delete(&ids)
+}
+
 #[action(permission = "stock.product.write", audit)]
 pub async fn restock_low(_: (), store: ProductStore) -> Result<()> {
     for p in store
@@ -249,6 +263,7 @@ pub fn product_list() -> Screen {
                 .width(120)
                 .pin_start()
                 .filter()
+                .editable()
                 .link(|p| {
                     Effect::navigate(
                         product_page,
@@ -267,6 +282,7 @@ pub fn product_list() -> Screen {
                 .column(Product::unit)
                 .width(130)
                 .filter()
+                .groupable()
                 .editable()
                 .badge(|u| match u {
                     Unit::Piece => Tone::Neutral,
@@ -292,6 +308,8 @@ pub fn product_list() -> Screen {
                 .check_icon()
                 .editable()
                 .edit_with(save_product)
+                .add_with(save_product)
+                .delete_with(delete_products, Product::id)
                 .exportable()
                 .row_action(t!("stock.restock"), restock_product, |p| p.id)
                 .bulk_action(t!("stock.deactivate"), deactivate_products, Product::id)

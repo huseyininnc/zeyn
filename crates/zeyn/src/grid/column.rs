@@ -18,6 +18,37 @@ impl<E: Model, T> DataGridColumn<E, T> {
             .expect("DataGridColumn always has a column")
     }
 
+    /// Lets users group the rows by this column: from the column menu ("Group by this column")
+    /// or by dragging its header onto the group panel above the grid. The groups travel in the
+    /// user's view, are saved with it, and the server keeps only groupable columns, at most
+    /// [`MAX_USER_GROUPS`](crate::grid::MAX_USER_GROUPS) levels. The action answers
+    /// `DataQuery::group` as for [`DataGrid::group_by`]. Masked columns, tree grids and virtual
+    /// grids never group.
+    pub fn groupable(mut self) -> Self {
+        self.last().group = true;
+        self
+    }
+
+    /// A custom summary under this column, in the footer and in every group row: `label` and
+    /// a value computed on the server from the totals the grid declares, such as a margin from
+    /// two sums. `None` leaves it empty.
+    ///
+    /// ```ignore
+    /// .column(Order::profit).sum().summary(t!("orders.margin"), |t| {
+    ///     let profit = t.get(Order::profit, Aggregate::Sum)?;
+    ///     let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+    ///     ratio(profit, revenue)
+    /// })
+    /// ```
+    pub fn summary(
+        mut self,
+        label: impl Into<Text>,
+        compute: impl Fn(&Totals) -> Option<Value> + Send + Sync + 'static,
+    ) -> Self {
+        self.last().summary = Some((label.into(), Box::new(compute)));
+        self
+    }
+
     /// Fixed width in pixels.
     pub fn width(mut self, px: u32) -> Self {
         self.last().width = Some(px);
@@ -312,6 +343,27 @@ impl<E: Model, T> DataGridColumn<E, T> {
 
     pub fn search(self) -> DataGrid<E> {
         self.grid.search()
+    }
+
+    pub fn add_with<A>(self, create: A) -> DataGrid<E>
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.grid.add_with(create)
+    }
+
+    pub fn delete_with<A, K>(self, action: A, key: Field<E, K>) -> DataGrid<E>
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        self.grid.delete_with(action, key)
+    }
+
+    pub fn batch_edit(self) -> DataGrid<E> {
+        self.grid.batch_edit()
     }
 
     pub fn band<G: Into<DataGrid<E>>>(

@@ -188,6 +188,39 @@ mediante `Form::read`, de modo que los valores se leen y validan como lo haría 
 columna se rechaza con `403`. Una versión obsoleta devuelve `409`, y los errores de validación devuelven
 `422` y se muestran en sus celdas.
 
+## Añadir, borrar y editar filas por lotes
+
+```rust
+DataGrid::of(search_products)
+    .column(Product::name).editable()
+    .column(Product::price).editable()
+    .edit_with(save_product)
+    .add_with(create_product)
+    .delete_with(delete_products, Product::id)
+    .batch_edit()
+```
+
+`add_with(create)` muestra un botón "Añadir fila" encima de la cuadrícula. Abre una fila vacía
+arriba con una entrada por cada columna `editable()`; Enter la guarda y Escape la descarta. El
+servidor parte del valor por defecto del modelo, lee solo las columnas editables como lo haría un
+formulario (cualquier otro campo se rechaza con `403`, los valores no válidos vuelven como `422`
+y se muestran en sus celdas), comprueba el permiso de `create` y lo ejecuta; después la
+cuadrícula se recarga. Las cuadrículas virtuales no añaden filas.
+Los campos que el modelo no puede dejar con su valor por defecto, como una fecha que no es
+opcional, necesitan una columna editable.
+
+`delete_with(action, Model::key)` añade a la barra de selección un botón rojo "Borrar" que
+pregunta antes de ejecutarse, y la tecla Supr en una fila borra las filas seleccionadas, o esa
+fila si no hay ninguna seleccionada. La acción recibe las claves como una acción masiva, así que
+debe comprobar cada registro.
+
+`batch_edit()` guarda las ediciones en línea hasta que el usuario las guarda todas. Enter deja
+una fila cambiada en modo de edición con una marca al inicio, y una barra encima de la cuadrícula
+cuenta las filas cambiadas con "Guardar cambios" y "Descartar cambios". Al guardar, las filas se
+envían una tras otra por la ruta de edición en línea, así que cada una se lee, valida, versiona y
+comprueba por separado; las que fallan conservan sus cambios y muestran el motivo. Cargar otras
+filas (paginar, ordenar, filtrar, buscar) pregunta antes de descartar cambios sin guardar.
+
 ## Master detail
 
 `detail(|row| (screen, params))` permite que cada fila se expanda en una pantalla construida a partir de la fila, cargada solo
@@ -254,6 +287,35 @@ en memoria; SQL usa `GROUP BY`. `group` lo define el grid y nunca se lee del cli
 cliente envía solo la ruta de valores de grupo que abre; el servidor comprueba su longitud y convierte cada
 valor en un filtro sobre la columna de ese grupo, delante de los filtros del usuario (`blank` para el grupo
 vacío).
+
+## Agrupación por el usuario y resúmenes propios
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` permite al usuario agrupar las filas por una columna: con "Agrupar por esta columna"
+en su menú, o arrastrando su encabezado al panel de grupos encima de la cuadrícula. El panel
+muestra un botón por nivel que lo quita; tres niveles como máximo (`MAX_USER_GROUPS`). Los grupos
+viajan en la vista del usuario (`DataGridView::group_by`), se guardan con ella y sustituyen al
+`group_by` de la cuadrícula mientras existan. El servidor solo acepta columnas agrupables, nunca
+enmascaradas, y agrupa igual que con `group_by`, así que la acción responde a `DataQuery::group`
+de la misma forma. Las cuadrículas de árbol y las virtuales no agrupan.
+
+`summary(label, |t| ...)` añade un valor propio bajo una columna, en el pie y en cada fila de
+grupo. Se calcula en el servidor a partir de `Totals`, los totales que declara la cuadrícula
+(`t.get(field, Aggregate::Sum)`), así que nunca necesita las filas: un margen a partir de dos
+sumas, una media a partir de una suma y un recuento. `None` lo deja vacío. Los enteros se agrupan
+y el dinero y los decimales se formatean en el idioma del usuario.
 
 ## Datos en árbol
 

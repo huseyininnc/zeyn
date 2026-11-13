@@ -513,6 +513,12 @@ pub async fn pretend_save(_: ()) -> Result<()> {
     Ok(())
 }
 
+/// Pretends to save a product after the form rules checked it. Nothing is stored.
+#[action(public)]
+pub async fn pretend_save_product(_: Valid<Product>) -> Result<()> {
+    Ok(())
+}
+
 /// Pretends to delete one product. Nothing changes.
 #[action(public)]
 pub async fn pretend_delete(_: ProductId) -> Result<()> {

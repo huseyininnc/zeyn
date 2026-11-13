@@ -233,7 +233,31 @@ pub struct DataGridView {
     /// a view only for the same columns; typed grids ignore it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<String>,
+    /// Columns the user groups the rows by, outermost first. Only columns marked
+    /// `groupable()` count, at most [`MAX_USER_GROUPS`]; empty keeps the grid's own grouping.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub group_by: Vec<String>,
 }
+
+/// Most levels a user groups a grid by.
+pub const MAX_USER_GROUPS: usize = 3;
+
+/// Totals of a column, of a group or of every matching row, for a custom summary.
+pub struct Totals<'a>(&'a [Total]);
+
+impl Totals<'_> {
+    /// The total `op` of `field`, when the grid computed it: a column must declare it
+    /// (`sum()`, `avg()`, ...).
+    pub fn get<M: Model, T>(&self, field: Field<M, T>, op: Aggregate) -> Option<&Value> {
+        let name = field.meta().name;
+        self.0
+            .iter()
+            .find(|t| t.field == name && t.op == op)
+            .map(|t| &t.value)
+    }
+}
+
+type SummaryFn = Box<dyn Fn(&Totals) -> Option<Value> + Send + Sync>;
 
 /// Where saved grid views live, one per user and grid. Register one with `App::datagrid_views`.
 ///
@@ -462,6 +486,11 @@ struct Column<E> {
     wrap: bool,
     /// Index into `DataGrid::bands` of the band header this column sits under.
     band: Option<usize>,
+    /// Whether users may group the rows by this column.
+    group: bool,
+    /// A custom summary in the footer and in group rows: its label and how it is computed from
+    /// the totals.
+    summary: Option<(Text, SummaryFn)>,
 }
 
 impl<E> Column<E> {
@@ -484,6 +513,8 @@ impl<E> Column<E> {
             plain: false,
             wrap: false,
             band: None,
+            group: false,
+            summary: None,
         }
     }
 
@@ -535,6 +566,12 @@ pub struct DataGrid<E: Model> {
     search: bool,
     /// Labels of the band headers, which group columns under one header cell.
     bands: Vec<Text>,
+    /// Action that creates a row from the editable columns of a new row.
+    add: Option<SaveDef<E>>,
+    /// Index in `bulk` of the bulk action the Delete key runs.
+    delete: Option<usize>,
+    /// Whether inline edits wait until the user saves every changed row at once.
+    batch: bool,
 }
 
 /// Most levels a tree grid opens.
@@ -543,6 +580,8 @@ pub const MAX_TREE_DEPTH: usize = 32;
 /// Where rows sit in a grouped or tree grid.
 #[derive(Default)]
 struct Branch<'a> {
+    /// Whether the rows sit in groups the user picked.
+    nested: bool,
     depth: usize,
     path: &'a [Option<String>],
     parents: &'a [String],
@@ -785,6 +824,9 @@ impl<E: Model> DataGrid<E> {
             shape: None,
             search: false,
             bands: Vec::new(),
+            add: None,
+            delete: None,
+            batch: false,
         }
     }
 
@@ -832,6 +874,58 @@ impl<E: Model> DataGrid<E> {
     fn nested(&self) -> bool {
         !matches!(self.paging, Paging::Virtual { .. })
             && (self.tree.is_some() || !self.group_by.is_empty())
+    }
+
+    /// Whether users may group this grid: a groupable column, no tree and no virtual paging.
+    fn user_groups(&self) -> bool {
+        self.tree.is_none()
+            && !matches!(self.paging, Paging::Virtual { .. })
+            && self
+                .columns
+                .iter()
+                .any(|c| c.group && c.meta.mask.is_none())
+    }
+
+    /// The groupable columns a view groups by, in order, without repeats, at most
+    /// [`MAX_USER_GROUPS`].
+    fn picked_groups(&self, view: Option<&DataGridView>) -> Vec<&'static FieldMeta> {
+        let mut out: Vec<&'static FieldMeta> = Vec::new();
+        if !self.user_groups() {
+            return out;
+        }
+        for name in view
+            .map(|v| v.group_by.as_slice())
+            .unwrap_or_default()
+        {
+            let found = self
+                .columns
+                .iter()
+                .find(|c| c.group && c.meta.mask.is_none() && c.name == name.as_str());
+            if let Some(c) = found
+                && !out
+                    .iter()
+                    .any(|m| m.name == c.meta.name)
+                && out.len() < MAX_USER_GROUPS
+            {
+                out.push(c.meta);
+            }
+        }
+        out
+    }
+
+    /// The levels rows are grouped by for a view: the user's groups, or the grid's own.
+    fn levels(&self, view: Option<&DataGridView>) -> Vec<&'static FieldMeta> {
+        let picked = self.picked_groups(view);
+        if picked.is_empty() {
+            self.group_by.clone()
+        } else {
+            picked
+        }
+    }
+
+    /// Whether rows are grouped or a tree for a view.
+    fn nested_in(&self, view: Option<&DataGridView>) -> bool {
+        self.nested() || !self.picked_groups(view).is_empty()
     }
 
     /// Lets every row expand into a screen built from the row, loaded only when the user opens
@@ -1039,6 +1133,68 @@ impl<E: Model> DataGrid<E> {
             run: Box::new(|valid| runner::<A>(valid)),
         });
         self
+    }
+
+    /// Shows an "Add row" button above the grid. It opens an empty row at the top with an input
+    /// for every `editable()` column; Enter saves it through `create`, which takes `Valid<E>` as
+    /// an inline edit's save does, and the grid reloads. The server starts from `E::default()`,
+    /// reads only the editable columns as a form would and checks `create`'s permission. Escape
+    /// drops the new row. Virtual grids do not add rows.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products)
+    ///     .column(Product::name).editable()
+    ///     .add_with(create_product)
+    /// ```
+    pub fn add_with<A>(mut self, _create: A) -> Self
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.add = Some(SaveDef {
+            meta: A::META,
+            run: Box::new(|valid| runner::<A>(valid)),
+        });
+        self
+    }
+
+    /// Lets users delete the selected rows: a "Delete" button in the selection bar that asks
+    /// first, and the Delete key on a row, which deletes the selection or, with none, that row.
+    /// The action takes the keys as a bulk action does (`Vec<K>` of the key field), so it must
+    /// check each record it is given.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products).delete_with(delete_products, Product::id)
+    /// ```
+    pub fn delete_with<A, K>(self, action: A, key: Field<E, K>) -> Self
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        let mut grid = self.bulk_action(Text::key("zeyn.grid.delete"), action, key);
+        grid.delete = Some(grid.bulk.len() - 1);
+        grid.confirm(Text::key("zeyn.grid.delete_confirm"))
+            .tone(Tone::Danger)
+    }
+
+    /// Keeps inline edits until the user saves them all: Enter leaves a changed row in place,
+    /// marked, and a bar above the grid counts the changed rows with "Save changes" and
+    /// "Discard changes". Saving sends each row through the inline edit path, one after
+    /// another, so each is read, validated and checked like a single edit; rows that fail keep
+    /// their changes and show the errors. Loading other rows asks before it drops changes.
+    pub fn batch_edit(mut self) -> Self {
+        self.batch = true;
+        self
+    }
+
+    /// Whether this user may add rows here.
+    fn can_add(&self, r: &Render) -> bool {
+        !matches!(self.paging, Paging::Virtual { .. })
+            && self
+                .add
+                .as_ref()
+                .is_some_and(|s| r.can(&s.meta.access))
     }
 
     /// Indexes in `E::fields()` of the columns users may edit: marked `editable()`, not keys, read
@@ -1418,6 +1574,10 @@ impl<E: Model> DataGrid<E> {
     /// Cleans a view from the client: unknown fields, repeats and out of range widths go, sort and
     /// filters keep only what the grid allows and the limits.
     fn clean(&self, view: DataGridView) -> DataGridView {
+        let view_groups = DataGridView {
+            group_by: view.group_by.clone(),
+            ..DataGridView::default()
+        };
         let columns = self
             .layout(Some(&view))
             .into_iter()
@@ -1456,6 +1616,11 @@ impl<E: Model> DataGrid<E> {
             sort: query.sort,
             filters: query.filters,
             shape: None,
+            group_by: self
+                .picked_groups(Some(&view_groups))
+                .iter()
+                .map(|m| m.name.to_string())
+                .collect(),
         }
     }
 
@@ -1620,7 +1785,11 @@ impl<E: Model> DataGrid<E> {
             if let Some(p) = s.pin {
                 out.push_str(&format!(r#" data-pin="{}""#, p.code()));
             }
-            if self.can_edit(r) && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version
+            if (self.can_edit(r) || self.can_add(r))
+                && c.editable
+                && !c.meta.readonly
+                && !c.meta.key
+                && !c.meta.version
             {
                 out.push_str(&format!(r#" data-edit="{}""#, filter_kind(&c.meta.kind)));
                 if c.meta.optional {
@@ -1633,6 +1802,9 @@ impl<E: Model> DataGrid<E> {
                         .collect();
                     out.push_str(&format!(r#" data-options="{}""#, attr(&list)));
                 }
+            }
+            if c.group && c.meta.mask.is_none() && self.user_groups() {
+                out.push_str(r#" data-group="true""#);
             }
             if c.filter {
                 out.push_str(&format!(r#" data-filter="{}""#, filter_kind(&c.meta.kind)));
@@ -1671,7 +1843,7 @@ impl<E: Model> DataGrid<E> {
     fn rows(&self, rows: &[E], r: &Render, cols: &[Shown], b: &Branch) -> String {
         use std::fmt::Write;
         let mut out = String::with_capacity(rows.len() * (cols.len() + 1) * 32);
-        let nested = self.nested();
+        let nested = self.nested() || b.nested;
         let tree = nested && self.tree.is_some();
         let edit = self.can_edit(r);
         let key_at = Self::key_index();
@@ -1895,12 +2067,42 @@ impl<E: Model> DataGrid<E> {
         let scope = r.scope;
         let view = self.view_for(page.and_then(|p| p.view.as_ref()));
         let cols = self.layout(view);
-        if self.search {
-            out.push_str(&format!(
-                r#"<div class="z-grid-search" role="search"><span class="z-icon z-icon-search" aria-hidden="true"></span><input type="search" name="q" data-zeyn-grid-search data-testid="{scope}.grid.search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}"></div>"#,
-                crate::MAX_SEARCH_QUERY,
-                label = r.text(&Text::key("zeyn.grid.search")),
-            ));
+        let add = self.can_add(r);
+        let batch = self.batch && self.can_edit(r);
+        let panel = self.user_groups();
+        if self.search || add || batch || panel {
+            let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
+            out.push_str(r#"<div class="z-grid-tools">"#);
+            if self.search {
+                out.push_str(&format!(
+                    r#"<div class="z-grid-search" role="search"><span class="z-icon z-icon-search" aria-hidden="true"></span><input type="search" name="q" data-zeyn-grid-search data-testid="{scope}.grid.search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}"></div>"#,
+                    crate::MAX_SEARCH_QUERY,
+                    label = grid_text("search"),
+                ));
+            }
+            if panel {
+                out.push_str(&format!(
+                    r#"<div class="z-group-panel" role="group" data-zeyn-group-panel data-testid="{scope}.grid.groups" aria-label="{}" data-text-remove="{}"><span class="z-group-hint">{}</span></div>"#,
+                    grid_text("groups"),
+                    grid_text("ungroup_by"),
+                    grid_text("group_hint"),
+                ));
+            }
+            if add {
+                out.push_str(&format!(
+                    r#"<button type="button" class="z-button" data-zeyn-grid-add data-testid="{scope}.grid.add"><span class="z-icon z-icon-plus" aria-hidden="true"></span>{}</button>"#,
+                    grid_text("add_row"),
+                ));
+            }
+            if batch {
+                out.push_str(&format!(
+                    r#"<div class="z-batch" data-zeyn-batch-bar data-text-count="{}" hidden><span aria-live="polite"></span><button type="button" class="z-button z-primary" data-zeyn-batch-save data-testid="{scope}.grid.batch-save">{}</button><button type="button" class="z-button" data-zeyn-batch-discard>{}</button></div>"#,
+                    grid_text("batch_count"),
+                    grid_text("save_changes"),
+                    grid_text("discard_changes"),
+                ));
+            }
+            out.push_str("</div>");
         }
         if self.selectable {
             let t = |k: &str| r.text(&Text::key(format!("zeyn.grid.{k}")));
@@ -1922,8 +2124,13 @@ impl<E: Model> DataGrid<E> {
                     "z-button"
                 };
                 out.push_str(&format!(
-                    r#"<button type="button" class="{class}" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}"{}>{}</button>"#,
+                    r#"<button type="button" class="{class}" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}"{}{}>{}</button>"#,
                     b.ask.attr(r),
+                    if self.delete == Some(i) {
+                        " data-zeyn-delete"
+                    } else {
+                        ""
+                    },
                     r.text(&b.label)
                 ));
             }
@@ -1995,6 +2202,9 @@ impl<E: Model> DataGrid<E> {
                 (false, false) => r#" data-zeyn-exportable="csv""#,
             });
         }
+        if batch {
+            out.push_str(r#" data-zeyn-batch"#);
+        }
         if self.can_edit(r)
             && let Some(v) = E::fields().iter().find(|f| f.version)
         {
@@ -2002,7 +2212,11 @@ impl<E: Model> DataGrid<E> {
         }
         out.push_str(&format!(
             r#"><table role="{}" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
-            if self.nested() { "treegrid" } else { "grid" },
+            if self.nested_in(view) {
+                "treegrid"
+            } else {
+                "grid"
+            },
             self.columns.len() + usize::from(!self.row_actions.is_empty()) + self.lead(r),
             self.head_row(r, &cols)
         ));
@@ -2019,6 +2233,7 @@ impl<E: Model> DataGrid<E> {
                     if p.groups.is_none() && rows.len() > live_rows =>
                 {
                     let branch = Branch {
+                        nested: false,
                         depth: p.depth,
                         path: &p.path,
                         parents: &p.parents,
@@ -2033,7 +2248,7 @@ impl<E: Model> DataGrid<E> {
         if self
             .columns
             .iter()
-            .any(|c| !c.aggregates.is_empty())
+            .any(|c| !c.aggregates.is_empty() || c.summary.is_some())
         {
             out.push_str("<tfoot data-zeyn-foot>");
             out.push_str(
@@ -2136,7 +2351,7 @@ impl<E: Model> DataGrid<E> {
 
     /// The cell of one column with its totals, or an empty cell.
     fn total_cell(&self, c: &Column<E>, totals: &[Total], r: &Render) -> String {
-        if c.aggregates.is_empty() {
+        if c.aggregates.is_empty() && c.summary.is_none() {
             return "<td></td>".to_string();
         }
         let ops: Vec<&str> = c
@@ -2169,6 +2384,17 @@ impl<E: Model> DataGrid<E> {
                 r.text(&Text::key(format!("zeyn.grid.agg.{}", op.code()))),
             ));
         }
+        if let Some((label, summary)) = &c.summary {
+            let value = match summary(&Totals(totals)) {
+                Some(Value::Int(n)) => grouped(n, r.locale),
+                Some(v) => r.value(&v, &value_kind(&v, &c.meta.kind)),
+                None => String::new(),
+            };
+            out.push_str(&format!(
+                r#"<span class="z-agg z-agg-custom"><span class="z-agg-label">{}</span> <span class="z-agg-value">{value}</span></span>"#,
+                r.text(label),
+            ));
+        }
         out.push_str("</td>");
         out
     }
@@ -2181,10 +2407,11 @@ impl<E: Model> DataGrid<E> {
         groups: &[crate::action::Group],
         r: &Render,
         cols: &[Shown],
+        levels: &[&'static FieldMeta],
         depth: usize,
         path: &[Option<String>],
     ) -> String {
-        let Some(meta) = self.group_by.get(depth) else {
+        let Some(meta) = levels.get(depth) else {
             return String::new();
         };
         let lead = self.lead(r);
@@ -2243,9 +2470,11 @@ impl<E: Model> DataGrid<E> {
     fn rows_html_erased(&self, page: &LoadedPage, r: &Render) -> String {
         let cols = self.layout(page.view.as_ref());
         if let Some(groups) = &page.groups {
-            return self.group_rows(groups, r, &cols, page.depth, &page.path);
+            let levels = self.levels(self.view_for(page.view.as_ref()));
+            return self.group_rows(groups, r, &cols, &levels, page.depth, &page.path);
         }
         let branch = Branch {
+            nested: self.nested_in(self.view_for(page.view.as_ref())),
             depth: page.depth,
             path: &page.path,
             parents: &page.parents,
@@ -2279,6 +2508,7 @@ impl<E: Model> DataGrid<E> {
         ctx: Ctx,
         mut query: DataQuery,
         path: Vec<Option<String>>,
+        levels: Vec<&'static FieldMeta>,
     ) -> BoxFuture<Result<LoadedPage>> {
         use crate::action::Error;
         self.allow(&mut query, Some(&ctx));
@@ -2300,13 +2530,13 @@ impl<E: Model> DataGrid<E> {
                 ));
             }
             None => {
-                if depth > self.group_by.len() {
+                if depth > levels.len() {
                     return Box::pin(async { Err(Error::NotFound) });
                 }
-                for (meta, key) in self.group_by.iter().zip(&path) {
+                for (meta, key) in levels.iter().zip(&path) {
                     fixed.push(key_filter(meta, key.as_deref()));
                 }
-                if let Some(meta) = self.group_by.get(depth) {
+                if let Some(meta) = levels.get(depth) {
                     query.group = Some(meta.name.to_string());
                     query.aggregates = self.aggregate_requests();
                 }
@@ -2667,6 +2897,41 @@ impl<E: Model> GridSource for DataGrid<E> {
         })
     }
 
+    fn add_call(
+        &self,
+        values: &serde_json::Map<String, serde_json::Value>,
+        ctx: &Ctx,
+    ) -> Result<RowCall> {
+        use crate::action::Error;
+        let add = self
+            .add
+            .as_ref()
+            .ok_or(Error::NotFound)?;
+        if matches!(self.paging, Paging::Virtual { .. }) {
+            return Err(Error::NotFound);
+        }
+        if !ctx.identity().can(&add.meta.access) {
+            return Err(Error::Forbidden);
+        }
+        let editable = self.editable_fields();
+        let fields = E::fields();
+        let allowed = |name: &str| {
+            fields
+                .iter()
+                .enumerate()
+                .any(|(j, f)| f.name == name && editable.contains(&j))
+        };
+        if values.keys().any(|k| !allowed(k)) {
+            return Err(Error::Forbidden);
+        }
+        let valid =
+            crate::form::Form::with_fields(E::default(), &editable).read_for(values, ctx)?;
+        Ok(RowCall {
+            meta: add.meta,
+            run: (add.run)(valid),
+        })
+    }
+
     fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
         let i = Self::key_index()?;
         let rows = page.items.downcast_ref::<Vec<E>>()?;
@@ -2733,9 +2998,11 @@ impl<E: Model> GridSource for DataGrid<E> {
         ctx: Ctx,
         query: DataQuery,
         path: Vec<Option<String>>,
+        view: Option<&DataGridView>,
     ) -> BoxFuture<Result<LoadedPage>> {
-        if self.nested() {
-            self.fetch_nested(ctx, query, path)
+        let view = self.view_for(view);
+        if self.nested_in(view) {
+            self.fetch_nested(ctx, query, path, self.levels(view))
         } else {
             self.fetch(ctx, query)
         }
@@ -2904,6 +3171,10 @@ impl<E: Model> Component for DataGrid<E> {
             "group_by": self.group_by.iter().map(|m| m.name).collect::<Vec<_>>(),
             "tree": self.tree.map(|m| m.name),
             "search": self.search,
+            "groupable": self.columns.iter().filter(|c| c.group).map(|c| c.meta.name).collect::<Vec<_>>(),
+            "add": self.add.as_ref().map(|a| a.meta),
+            "delete": self.delete.map(|i| self.bulk[i].meta),
+            "batch_edit": self.batch,
         })
     }
 
@@ -2919,6 +3190,16 @@ impl<E: Model> From<DataGrid<E>> for Node {
 }
 
 /// Whole number with the locale's group separator: `4.680` in `tr`, `4,680` in `en`.
+/// The kind a summary value is shown as: its own for numbers and money, the column's otherwise.
+fn value_kind(value: &Value, column: &FieldKind) -> FieldKind {
+    match value {
+        Value::Money(_) => FieldKind::Money,
+        Value::Decimal(_) | Value::Number(_) => FieldKind::Decimal,
+        Value::Bool(_) => FieldKind::Bool,
+        _ => *column,
+    }
+}
+
 fn grouped(n: i64, locale: &str) -> String {
     let mut out = String::new();
     crate::render::push_grouped(&mut out, n, locale);
@@ -3002,6 +3283,8 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         ),
     );
     for k in [
+        "group_by",
+        "ungroup",
         "saved",
         "undo",
         "undone",
@@ -3018,6 +3301,9 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "paste_failed",
         "paste_readonly",
         "paste_too_many",
+        "added",
+        "batch_saved",
+        "discard_confirm",
     ] {
         map.insert(
             k.into(),
