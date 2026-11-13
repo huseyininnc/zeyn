@@ -90,6 +90,24 @@ List::of(search_people)
 
 @live list
 
+### 並べ替えられるリスト
+
+`.sortable(action)` を使うと、`List::of` や `CardGrid` の行を利用者が自分の順番に並べられます。各行にハンドルが付きます。マウスやペンはそのままドラッグし、タッチは少し長押ししてからドラッグします。落ちる位置は線で示されます。フォーカスのあるハンドルでは Space で行を持ち上げ、矢印キーで動かし、Space で置き、Escape で元に戻します。Alt と Up または Down ですぐに動かせます。クリックか Enter で移動メニュー(上へ、下へ、先頭へ、末尾へ)が開くので、単一のポインターで足ります。各操作は読み上げられます。
+
+移動はすぐに表示され、アクションは行のキーと新しい隣の行のキー(`after`、`before`)を持つ `ReorderRequest` を受け取ります。位置は送りません。`r.rank(lookup)` は隣の行の間の新しい `Rank` を返し、検索で見つからない隣の行(`NotFound`)や、もうその順番にない隣の行(`Conflict`、先に誰かが行を動かした)を拒否します。そのときは行が元に戻り、理由が表示されます。元のアクションは行をランク順に返すので並べ替えの選択肢は出ません。また、まだ読み込む行がある間はどの行も最後には移せません。
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
 ## Avatar
 
 人やチームの丸い画像で、サイズは 32、40、64 ピクセルです（`AvatarSize::Small`、`Medium`、`Large`）。名前は必須です。名前は代替テキストであり、画像がないとき、または画像がアプリの `img-src` で許可されたホストにないときに表示されるイニシャルの元になります（`Image` と同じ規則）。イニシャルはその言語の大文字に従うため、トルコ語の `i` は `İ` になります。名前がアバターのすぐ隣に書かれている場合は、`.decorative()` でアバターをスクリーンリーダーから隠し、名前が二度読まれないようにします。

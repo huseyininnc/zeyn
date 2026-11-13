@@ -90,6 +90,24 @@ List::of(search_people)
 
 @live list
 
+### Sortable lists
+
+`.sortable(action)` lets people put the rows of `List::of` or a `CardGrid` in their own order. Each row gets a handle: a mouse or pen drags it, a touch drags it after a short hold, and a line shows where it lands. On the focused handle Space lifts the row, the arrow keys move it, Space drops it and Escape puts it back; Alt with Up or Down moves it at once. A click or Enter opens a move menu (up, down, to the top, to the end), so one pointer is enough. Every step is announced.
+
+The move shows at once and the action gets a `ReorderRequest` with the key of the row and the keys of its new neighbors (`after`, `before`), never positions. `r.rank(lookup)` gives the new `Rank` between the neighbors and refuses a neighbor the lookup does not find (`NotFound`) or neighbors that are no longer in this order (`Conflict`, someone else moved rows first); then the row goes back and the reason is shown. The source action lists the rows by rank, so sort options are left out, and while more rows are still to load no row can become the last one.
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
 ## Avatar
 
 A round picture of a person or a team, 32, 40 or 64 pixels (`AvatarSize::Small`, `Medium`, `Large`). The name is required: it is the alternative text and the source of the initials shown when there is no picture, or when the picture is not on a host the app's `img-src` allows (the same rule as `Image`). Initials follow the language's capitals, so Turkish `i` becomes `İ`. When the name is written right next to the avatar, `.decorative()` hides it from screen readers so they do not read the name twice.

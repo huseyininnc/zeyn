@@ -90,6 +90,24 @@ List::of(search_people)
 
 @live list
 
+### Sıralanabilir listeler
+
+`.sortable(action)`, `List::of` ya da `CardGrid` satırlarını kullanıcıların kendi sırasına koymasını sağlar. Her satırın bir tutamacı olur: fare ya da kalem sürükler, dokunmada kısa bir basılı tutmadan sonra sürüklenir ve bir çizgi satırın nereye düşeceğini gösterir. Odaktaki tutamaçta Boşluk satırı kaldırır, ok tuşları taşır, Boşluk bırakır, Escape geri koyar; Alt ile Yukarı veya Aşağı satırı hemen taşır. Tıklama ya da Enter bir taşıma menüsü açar (yukarı, aşağı, en başa, en sona), böylece tek işaretçi yeter. Her adım sesli bildirilir.
+
+Taşıma hemen görünür ve eylem, satırın anahtarı ile yeni komşularının anahtarlarını (`after`, `before`) taşıyan bir `ReorderRequest` alır, hiçbir zaman sıra numarası almaz. `r.rank(lookup)` komşuların arasındaki yeni `Rank` değerini verir; aramanın bulamadığı bir komşuyu (`NotFound`) ya da artık bu sırada olmayan komşuları (`Conflict`, satırları önce başkası taşıdı) reddeder. O zaman satır geri döner ve neden gösterilir. Kaynak eylem satırları sıra değerine göre listeler, bu yüzden sıralama seçenekleri gösterilmez; yüklenecek satır varken hiçbir satır en sona geçemez.
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
 ## Avatar
 
 Bir kişinin ya da ekibin yuvarlak resmi; 32, 40 ya da 64 piksel (`AvatarSize::Small`, `Medium`, `Large`). Ad zorunludur: alternatif metindir ve resim yokken ya da resim uygulamanın `img-src` ayarının izin verdiği bir sunucuda değilken gösterilen baş harflerin kaynağıdır (`Image` ile aynı kural). Baş harfler dilin büyük harflerini izler, yani Türkçede `i` `İ` olur. Ad avatarın hemen yanında yazılıysa `.decorative()` onu ekran okuyuculardan gizler, böylece ad iki kez okunmaz.

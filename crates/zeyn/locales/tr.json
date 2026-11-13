@@ -748,6 +748,21 @@
         "count": "{n}",
         "count_wip": "{n} / {wip}"
       },
+      "sortable": {
+        "help": "Boşluk satırı kaldırır, ok tuşları taşır, Boşluk bırakır, Escape geri koyar. Alt ile Yukarı veya Aşağı satırı hemen taşır. Enter taşıma menüsünü açar.",
+        "handle_plain": "Satırı taşı",
+        "handle": "{item} öğesini taşı",
+        "lifted": "{item} kaldırıldı, sıra {pos} / {count}",
+        "moved": "{item}, sıra {pos} / {count}",
+        "dropped": "{item} {pos}. sıraya bırakıldı, toplam {count}",
+        "cancelled": "Taşıma iptal edildi, {item} yine {pos}. sırada",
+        "refused": "{item} taşınamadı, yine {pos}. sırada",
+        "up": "Yukarı taşı",
+        "down": "Aşağı taşı",
+        "top": "En başa taşı",
+        "bottom": "En sona taşı",
+        "menu": "{item} öğesini taşı"
+      },
       "calendar": {
         "navigation": "Dönem",
         "views": "Görünüm",

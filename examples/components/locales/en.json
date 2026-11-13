@@ -374,6 +374,7 @@
       "list": {
         "overview": "Example",
         "numbered_pages": "Numbered pages without a total",
+        "sortable": "Rows people put in their own order",
         "fixed": "Fixed items",
         "builder": "Rows built with any node, with a separator",
         "virtual_rows": "Virtual scrolling with a fixed row height",

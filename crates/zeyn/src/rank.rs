@@ -264,6 +264,70 @@ pub fn rebalance(n: usize) -> Vec<Rank> {
         .collect()
 }
 
+/// What a sortable list sends to its reorder action when a row moves: the key of the moved row
+/// and the keys of its new neighbors, never positions. `after` is the row the moved one now
+/// follows (`None` at the top), `before` the row it now precedes (`None` at the end). Keys stay
+/// right while other people add or move rows, and with lists that load only some rows (paging,
+/// virtual scrolling); sending the same request twice gives the same order.
+///
+/// The keys come from the browser: [`ReorderRequest::rank`] refuses a neighbor the action's own
+/// lookup does not find, so look neighbors up only in the list the user may change (the same
+/// scope as the list, such as `board_id`).
+///
+/// ```
+/// use zeyn::rank::ReorderRequest;
+/// use zeyn::{Error, Rank};
+/// let ranks = [("a", "F"), ("b", "V"), ("c", "k")];
+/// let rank_of = |k: &&str| {
+///     ranks
+///         .iter()
+///         .find(|(key, _)| key == k)
+///         .and_then(|(_, r)| Rank::parse(r))
+/// };
+/// let request = ReorderRequest { key: "c", after: Some("a"), before: Some("b") };
+/// let rank = request.rank(rank_of).unwrap();
+/// assert!(rank.as_str() > "F" && rank.as_str() < "V");
+///
+/// let foreign = ReorderRequest { key: "c", after: Some("x"), before: None };
+/// assert!(matches!(foreign.rank(rank_of), Err(Error::NotFound)));
+/// let stale = ReorderRequest { key: "a", after: Some("c"), before: Some("b") };
+/// assert!(matches!(stale.rank(rank_of), Err(Error::Conflict)));
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReorderRequest<K> {
+    /// The row that moved.
+    pub key: K,
+    /// The row the moved one now follows; `None` when it is first.
+    pub after: Option<K>,
+    /// The row the moved one now precedes; `None` when it is last.
+    pub before: Option<K>,
+}
+
+impl<K> ReorderRequest<K> {
+    /// The moved row's new rank, between the ranks `rank_of` finds for its neighbors.
+    /// `Error::NotFound` when a neighbor is not found (a key from another list, or deleted),
+    /// `Error::Conflict` when the neighbors are no longer in this order (someone else moved
+    /// them) or there is no room left between them: the browser then puts the row back and
+    /// loads the list again. Rebalance the list when the saved rank
+    /// [`Rank::needs_rebalance`].
+    pub fn rank(&self, mut rank_of: impl FnMut(&K) -> Option<Rank>) -> crate::action::Result<Rank> {
+        let mut find = |key: &Option<K>| match key {
+            Some(k) => rank_of(k)
+                .map(Some)
+                .ok_or(crate::action::Error::NotFound),
+            None => Ok(None),
+        };
+        let after = find(&self.after)?;
+        let before = find(&self.before)?;
+        if let (Some(a), Some(b)) = (&after, &before)
+            && a >= b
+        {
+            return Err(crate::action::Error::Conflict);
+        }
+        between(after.as_ref(), before.as_ref()).ok_or(crate::action::Error::Conflict)
+    }
+}
+
 /// `V`, the middle of the key space, so a new row has a valid rank before it gets a real one.
 impl Default for Rank {
     fn default() -> Self {

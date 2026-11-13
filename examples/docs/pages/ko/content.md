@@ -90,6 +90,24 @@ List::of(search_people)
 
 @live list
 
+### 순서를 바꿀 수 있는 목록
+
+`.sortable(action)`은 사람들이 `List::of`나 `CardGrid`의 행을 자기 순서대로 놓게 합니다. 각 행에 핸들이 생깁니다. 마우스나 펜은 바로 끌고, 터치는 잠깐 누르고 있으면 끌며, 선이 놓일 자리를 보여 줍니다. 포커스가 있는 핸들에서 Space는 행을 들어 올리고, 화살표 키는 옮기고, Space는 내려놓고, Escape는 되돌립니다. Alt와 Up 또는 Down은 바로 옮깁니다. 클릭이나 Enter는 이동 메뉴(위로, 아래로, 맨 위로, 맨 끝으로)를 열므로 포인터 하나로 충분합니다. 모든 단계를 읽어 줍니다.
+
+이동은 바로 보이고 액션은 행의 키와 새 이웃의 키(`after`, `before`)를 담은 `ReorderRequest`를 받습니다. 위치는 보내지 않습니다. `r.rank(lookup)`은 이웃 사이의 새 `Rank`를 주고, 조회가 찾지 못한 이웃(`NotFound`)이나 더는 그 순서가 아닌 이웃(`Conflict`, 다른 사람이 먼저 행을 옮김)을 거부합니다. 그러면 행이 되돌아가고 이유가 표시됩니다. 원본 액션은 행을 순위대로 나열하므로 정렬 선택지는 빠지며, 불러올 행이 남아 있는 동안에는 어떤 행도 마지막이 될 수 없습니다.
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
 ## Avatar
 
 사람이나 팀의 둥근 사진으로, 크기는 32, 40, 64픽셀입니다(`AvatarSize::Small`, `Medium`, `Large`). 이름은 필수입니다. 이름은 대체 텍스트이면서, 사진이 없거나 사진이 앱의 `img-src`가 허용하는 호스트에 있지 않을 때 표시되는 이니셜의 원본입니다(`Image`와 같은 규칙). 이니셜은 해당 언어의 대문자 규칙을 따르므로 튀르키예어의 `i`는 `İ`가 됩니다. 이름이 아바타 바로 옆에 적혀 있을 때는 `.decorative()`가 아바타를 스크린 리더에서 숨겨 이름이 두 번 읽히지 않게 합니다.

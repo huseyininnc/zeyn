@@ -1,0 +1,40 @@
+/* Sortable lists and card grids (`CardGrid::sortable`), linked only by pages that hold one. The
+   handles show once sortable.js runs; the line and the dragged row move by transform only. */
+
+.z-sortable .z-sort-handle { display: none; }
+.z-sortable.z-sort-on .z-sort-handle {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  inline-size: 32px; min-block-size: 32px; padding: 0; border: 0; border-radius: var(--z-radius-sm);
+  background: transparent; color: var(--z-text-muted); cursor: grab;
+}
+.z-sortable.z-sort-on .z-sort-handle:hover { background: var(--z-hover); color: var(--z-text); }
+.z-sortable.z-sort-on .z-sort-handle:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+.z-sortable.z-sort-on [data-zeyn-rows] { position: relative; }
+.z-sortable.z-sort-on .z-list > li[data-zeyn-key] { display: flex; align-items: center; position: relative; padding-inline-start: var(--z-s-1); }
+.z-sortable.z-sort-on .z-list > li[data-zeyn-key] > :not(.z-sort-handle):not(.z-sort-menu) { flex: 1; min-inline-size: 0; }
+.z-sortable.z-sort-on .z-cards-list > li[data-zeyn-key] { position: relative; }
+.z-sortable.z-sort-on .z-cards-list .z-sort-handle {
+  position: absolute; z-index: 2; inset-block-start: var(--z-s-2); inset-inline-start: var(--z-s-2);
+  background: var(--z-surface); box-shadow: var(--z-shadow-2);
+}
+.z-sortable .z-sort-line {
+  position: absolute; z-index: 3; top: 0; left: 0; block-size: 2px; border-radius: 1px;
+  background: var(--z-primary); pointer-events: none;
+}
+.z-sortable .z-sort-line-v { inline-size: 2px; }
+.z-sortable .z-sort-dragging { z-index: 4; background: var(--z-surface); box-shadow: var(--z-shadow-3); opacity: .95; }
+.z-sortable .z-sort-dragging .z-sort-handle { cursor: grabbing; }
+.z-sortable .z-sort-lifted { outline: 2px dashed var(--z-primary); outline-offset: -2px; background: var(--z-brand-subtle); }
+.z-sortable .z-sort-menu {
+  position: absolute; z-index: 20; inset-block-start: 100%; inset-inline-start: 0; min-inline-size: 180px; margin: 0;
+  padding: var(--z-s-1); list-style: none; background: var(--z-raised, var(--z-surface));
+  border: 1px solid var(--z-border); border-radius: var(--z-radius); box-shadow: var(--z-shadow-2);
+}
+.z-sortable .z-sort-menu [role="menuitem"] { padding: var(--z-s-2) var(--z-s-3); border-radius: var(--z-radius-sm); cursor: pointer; min-block-size: 24px; }
+.z-sortable .z-sort-menu [role="menuitem"]:hover, .z-sortable .z-sort-menu [role="menuitem"]:focus { background: var(--z-hover); outline: none; }
+.z-sortable .z-sort-menu [role="menuitem"]:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+@media (forced-colors: active) {
+  .z-sortable .z-sort-line { background: Highlight; }
+  .z-sortable .z-sort-lifted { outline-color: Highlight; }
+  .z-sortable .z-sort-menu [role="menuitem"]:focus { outline: 2px solid Highlight; }
+}
