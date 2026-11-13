@@ -12,11 +12,6 @@ max_file_lines = 300
 {{zeyn_dep}}
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
-[dev-dependencies]
-axum = "0.8"
-tower = { version = "0.5", features = ["util"] }
-http-body-util = "0.1"
-
 [lints.rust]
 unsafe_code = "forbid"
 unused_must_use = "deny"

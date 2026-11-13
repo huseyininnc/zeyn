@@ -13,7 +13,7 @@ categories = ["web-programming::http-server", "gui"]
 
 [features]
 default = ["server"]
-server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:futures-util", "futures-util/alloc", "dep:tracing-subscriber", "dep:flate2"]
+server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:tower-service", "dep:futures-core", "dep:futures-util", "futures-util/alloc", "dep:tracing-subscriber", "dep:flate2"]
 signed-licenses = ["dep:ed25519-dalek"]
 redis = ["server", "dep:redis"]
 otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
@@ -69,6 +69,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time",
 futures-core = { version = "0.3", optional = true }
 getrandom = { version = "0.2", optional = true }
 tower-http = { version = "0.6", features = ["cors", "compression-gzip"], optional = true }
+tower-service = { version = "0.3", optional = true }
 flate2 = { version = "1.1", optional = true }
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "json"], optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
