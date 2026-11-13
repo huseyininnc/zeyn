@@ -94,7 +94,7 @@ List::of(search_people)
 
 `.sortable(action)`, `List::of` ya da `CardGrid` satırlarını kullanıcıların kendi sırasına koymasını sağlar. Her satırın bir tutamacı olur: fare ya da kalem sürükler, dokunmada kısa bir basılı tutmadan sonra sürüklenir ve bir çizgi satırın nereye düşeceğini gösterir. Odaktaki tutamaçta Boşluk satırı kaldırır, ok tuşları taşır, Boşluk bırakır, Escape geri koyar; Alt ile Yukarı veya Aşağı satırı hemen taşır. Tıklama ya da Enter bir taşıma menüsü açar (yukarı, aşağı, en başa, en sona), böylece tek işaretçi yeter. Her adım sesli bildirilir.
 
-Taşıma hemen görünür ve eylem, satırın anahtarı ile yeni komşularının anahtarlarını (`after`, `before`) taşıyan bir `ReorderRequest` alır, hiçbir zaman sıra numarası almaz. `r.rank(lookup)` komşuların arasındaki yeni `Rank` değerini verir; aramanın bulamadığı bir komşuyu (`NotFound`) ya da artık bu sırada olmayan komşuları (`Conflict`, satırları önce başkası taşıdı) reddeder. O zaman satır geri döner ve neden gösterilir. Kaynak eylem satırları sıra değerine göre listeler, bu yüzden sıralama seçenekleri gösterilmez; yüklenecek satır varken hiçbir satır en sona geçemez.
+Taşıma hemen görünür ve eylem, satırın anahtarı ile yeni komşularının anahtarlarını (`after`, `before`) taşıyan bir `ReorderRequest` alır, hiçbir zaman sıra numarası almaz. `r.rank(lookup)` komşuların arasındaki yeni `Rank` değerini verir; aramanın bulamadığı bir komşuyu (`NotFound`) ya da artık bu sırada olmayan komşuları (`Conflict`, satırları önce başkası taşıdı) reddeder. O zaman satır geri döner ve neden gösterilir. Kaynak eylem satırları sıra değerine göre listeler, bu yüzden sıralama seçenekleri gösterilmez; yüklenecek satır varken hiçbir satır en sona geçemez. Sürüklenen satır bir kenara yakın tutulduğunda listeyi ya da sayfayı kaydırır. `Paging::virtual_scroll()` kullanan liste sanal kalır: bir çizgi satırın nereye düşeceğini gösterir, satırlar sunucu taşımayı kaydettikten sonra yeni sırayla görünür.
 
 ```rust
 #[action(permission = "tasks.write")]
@@ -106,6 +106,17 @@ pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
 List::of(search_tasks)
     .item(|t: &Task| ListItem::new(t.title.clone()))
     .sortable(Task::rank, reorder_tasks)
+```
+
+`.connect(group, id)`, bir ekranda aynı gruptaki sıralanabilir listeleri birleştirir: satırlar birinden diğerine sürüklenir ya da taşıma menüsündeki "Taşı" seçenekleriyle taşınır. Eylem, satırların vardığı listenin kimliğini (`r.list`) ve ayrıldığı listenin kimliğini (`r.from`) alır; iki kimlik de tarayıcıdan değil ekrandan gelir ve sunucu iki listenin eyleminin iznini de denetler. `.multi_select()` ile satırlar Control ya da Command ile tutamağa tıklanarak veya menüdeki "Taşımak için seç" ile seçilir ve en fazla 100 satır birlikte taşınır: diğer anahtarlar `r.rest` içindedir, `r.ranks(lookup)` ise `r.keys()` içindeki her satıra bir sıra verir. Taşınan anahtarları ayrıldıkları listede arayın. Sanal listeler ikisine de katılmaz.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
 ```
 
 ## Avatar

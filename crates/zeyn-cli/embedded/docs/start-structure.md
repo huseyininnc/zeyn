@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## Tests
 
-Tests build the router and call it in memory:
+`zeyn::testing::TestApp` drives the app in memory: the same router, checks and access rules as a served app, without opening a port. It plays the part of Angular's `TestBed` or Flutter's widget tester: build the app, sign a user in, open a screen, submit a form, page a grid or call an action, then read the status, the HTML or the JSON. It sends the CSRF token for you. `zeyn new` writes `tests/app.rs` this way.
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| Call | Does |
+|---|---|
+| `TestApp::new(app)` | The app with its own sign in. Panics with the problems `App::check` finds |
+| `TestApp::signed_in(app, identity)` | Every request signed in as `identity`, to try what each permission allows |
+| `.header(name, value)` | A header on every request, such as `accept-language` |
+| `get(path)` | A page, a file or an endpoint |
+| `submit(screen, params, node, values)` | Submits a form as the browser does: `200` with `effects()`, `422` with `errors` by field, `403` without the permission |
+| `grid(screen, params, node, query)` | A page of a grid, with a `DataQuery` as JSON: `rows` as HTML and `total` |
+| `api(feature, action, input)` | Calls an action published with `Feature::api` |
+| `send(request)` | Any other request |
+
+Each call returns a `TestResponse` with `status`, `headers`, `body`, `json()` and `effects()`.
+
+A screen also works without the server: a `#[screen]` without arguments has `run()`, `screen.html(&META)` renders it, `screen.schema(&META)` describes it and `App::check_page(&screen)` runs the page checks. Test what the user can do (a status, an effect, a row in the grid) rather than the exact HTML, and run `cargo test` after every change.

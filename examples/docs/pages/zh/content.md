@@ -94,7 +94,7 @@ List::of(search_people)
 
 `.sortable(action)` 让用户按自己的顺序排列 `List::of` 或 `CardGrid` 的行。每行有一个手柄：鼠标或笔直接拖动，触摸在短按之后拖动，一条线显示放下的位置。在获得焦点的手柄上，Space 提起该行，方向键移动它，Space 放下，Escape 放回原处；Alt 加上 Up 或 Down 立即移动。点击或 Enter 打开移动菜单（上移、下移、移到开头、移到末尾），因此单一指针就够用。每一步都会播报。
 
-移动会立即显示，操作收到一个 `ReorderRequest`，其中有该行的键和新邻居的键（`after`、`before`），从不传位置。`r.rank(lookup)` 给出邻居之间的新 `Rank`，并拒绝查找不到的邻居（`NotFound`）或已不在这个顺序的邻居（`Conflict`，有人先移动了行）；这时该行会回到原处并显示原因。源操作按排名列出各行，因此不提供排序选项；在还有行未加载时，任何行都不能移到最后。
+移动会立即显示，操作收到一个 `ReorderRequest`，其中有该行的键和新邻居的键（`after`、`before`），从不传位置。`r.rank(lookup)` 给出邻居之间的新 `Rank`，并拒绝查找不到的邻居（`NotFound`）或已不在这个顺序的邻居（`Conflict`，有人先移动了行）；这时该行会回到原处并显示原因。源操作按排名列出各行，因此不提供排序选项；在还有行未加载时，任何行都不能移到最后。 拖动的行停在边缘附近时，列表(或页面)会自动滚动。使用 `Paging::virtual_scroll()` 的列表保持虚拟：一条线标出行将落下的位置，服务器保存后各行按新顺序显示。
 
 ```rust
 #[action(permission = "tasks.write")]
@@ -106,6 +106,17 @@ pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
 List::of(search_tasks)
     .item(|t: &Task| ListItem::new(t.title.clone()))
     .sortable(Task::rank, reorder_tasks)
+```
+
+`.connect(group, id)` 把同一屏幕上属于同一组的可排序列表连接起来：行可以从一个列表拖到另一个列表，也可以用移动菜单中的"移动到"移动。操作会收到行进入的列表的 id（`r.list`）和行离开的列表的 id（`r.from`）；两个 id 都来自屏幕而不是浏览器，服务器会检查两个列表操作的权限。`.multi_select()` 让用户按住 Control 或 Command 点击手柄，或用菜单中的"选择以移动"来选择行，一次最多移动 100 行：其余的键在 `r.rest` 中，`r.ranks(lookup)` 为 `r.keys()` 中的每一行给出一个排名。请在行离开的列表中查找被移动的键。虚拟列表不参与这两项功能。
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
 ```
 
 ## Avatar

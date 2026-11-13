@@ -354,7 +354,8 @@ What to remember:
 
 ## 5. Verify before you finish
 
-1. `cargo test`: the app's tests drive it through its router; add a test for new behavior.
+1. `cargo test`: the app's tests drive it in memory with `zeyn::testing::TestApp` (open a
+   screen, submit a form, page a grid, call an action as a given user); add a test for new behavior.
 2. `zeyn check` (or the `zeyn_check` MCP tool): compiles, then reports structural problems and
    missing translations. It must say `ok`. Its warnings name a `#[screen]` or `#[action]` that no
    feature registers and a flat `screens.rs` or `actions.rs` that has grown too large to stay flat.

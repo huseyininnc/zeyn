@@ -15,9 +15,10 @@ const MODULE_GZIP: usize = 12 * 1024;
 
 /// What a page links in all, gzip compressed, by kind of page. Measured on 2026-11-12 at 81 KB
 /// (plain screen), 109 KB (grid) and 83 KB (form), with about 8 percent of room. The grid page
-/// grew to 118.3 KB by 2026-11-13 (page sizes, autofit, filter groups) and has 120 KB.
+/// grew to 118.0 KB on 2026-11-13 with grid search, bands, add/delete/batch edit, grouping, the
+/// filter builder, page sizes, autofit and drag auto scroll; its budget is 124 KB from then.
 const PLAIN_PAGE_GZIP: usize = 88 * 1024;
-const GRID_PAGE_GZIP: usize = 120 * 1024;
+const GRID_PAGE_GZIP: usize = 124 * 1024;
 const FORM_PAGE_GZIP: usize = 92 * 1024;
 
 #[model]
