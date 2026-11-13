@@ -23,6 +23,7 @@ pub struct Task {
     pub title: String,
     pub owner: String,
     pub state: TaskState,
+    pub rank: Rank,
 }
 
 /// The moves of a sample task and who may make them.
@@ -82,14 +83,17 @@ fn sample() -> Vec<Task> {
         TaskState::Done,
         TaskState::Done,
     ];
+    let ranks = zeyn::rank::rebalance(titles.len());
     titles
         .iter()
+        .zip(ranks)
         .enumerate()
-        .map(|(i, title)| Task {
+        .map(|(i, (title, rank))| Task {
             id: TaskId(i as i64 + 1),
             title: title.to_string(),
             owner: owners[i % owners.len()].to_string(),
             state: states[i],
+            rank,
         })
         .collect()
 }
@@ -131,6 +135,35 @@ pub async fn move_sample_task(r: TransitionRequest<TaskId>, ctx: Ctx) -> Result<
     Ok(task.id)
 }
 
+/// Gives a task the rank between its new neighbors in its column.
+#[action(public)]
+pub async fn reorder_sample_task(r: ReorderRequest<TaskId>) -> Result<()> {
+    let mut all = TASKS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let rank = r.rank(|k| {
+        all.iter()
+            .find(|t| t.id == *k)
+            .map(|t| t.rank.clone())
+    })?;
+    let task = all
+        .iter_mut()
+        .find(|t| t.id == r.key)
+        .ok_or(Error::NotFound)?;
+    task.rank = rank;
+    if all
+        .iter()
+        .any(|t| t.rank.needs_rebalance())
+    {
+        all.sort_by(|a, b| a.rank.cmp(&b.rank));
+        let fresh = zeyn::rank::rebalance(all.len());
+        for (t, rank) in all.iter_mut().zip(fresh) {
+            t.rank = rank;
+        }
+    }
+    Ok(())
+}
+
 pub fn overview(_ctx: &Ctx) -> Node {
     Kanban::of(task_flow(), sample_tasks, move_sample_task)
         .title("Sprint 14")
@@ -145,11 +178,27 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
+/// A board whose columns keep an order: drag a card onto another card, use its handle, or Alt
+/// with Up or Down.
+pub fn ordered(_ctx: &Ctx) -> Node {
+    Kanban::of(task_flow(), sample_tasks, move_sample_task)
+        .title("Sprint 14, in order")
+        .state(Task::state)
+        .card(|t: &Task| {
+            Stack::new()
+                .add(Paragraph::new(t.title.clone()))
+                .add(Badge::new(t.owner.clone()))
+        })
+        .row_height(104)
+        .sortable(Task::rank, reorder_sample_task)
+        .into()
+}
+
 /// What the catalog shows of `Kanban`.
 pub const ENTRY: Entry = Entry {
     name: "Kanban",
     docs: "components/admin#kanban",
     api: &["Kanban"],
     overview: &[ex!(overview)],
-    examples: &[],
+    examples: &[ex!(ordered)],
 };

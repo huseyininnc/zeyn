@@ -130,6 +130,10 @@ impl Component for KanbanCard {
 type CardFn<E> = Arc<dyn Fn(&E) -> Node + Send + Sync>;
 
 /// Builds the columns of a board again after a builder method changed them.
+/// Turns a column into a sortable list, set by [`Kanban::sortable`].
+type SortFn<E> = Arc<dyn Fn(CardGrid<E>) -> CardGrid<E> + Send + Sync>;
+
+/// Builds the columns of a board.
 type MakeFn<S, E> = Box<dyn Fn(&Kanban<S, E>) -> Vec<Node> + Send + Sync>;
 
 /// The records of an action as cards in columns, one per state of a workflow's `#[choice]`
@@ -144,9 +148,11 @@ type MakeFn<S, E> = Box<dyn Fn(&Kanban<S, E>) -> Vec<Node> + Send + Sync>;
 /// moves the card at once and puts it back with a message when the server refuses. Only moves
 /// the user may make are offered; `.confirm(name, message)` asks first.
 ///
-/// Pointer: drag a card with a mouse or pen. Keyboard and touch: the board is one tab stop;
-/// arrow keys move between cards, Enter or Space opens the move menu (also the button on each
-/// card), Shift with Left or Right moves the card to the column next to it.
+/// Pointer: drag a card with a mouse or pen, or hold it for a moment on a touch screen. Keyboard
+/// and single pointer: the board is one tab stop; arrow keys move between cards, Enter or Space
+/// opens the move menu (also the button on each card), Shift with Left or Right moves the card
+/// to the column next to it. With [`Kanban::sortable`] the cards also keep an order inside each
+/// column.
 ///
 /// ```ignore
 /// Kanban::of(task_flow(), search_tasks, move_task)
@@ -191,6 +197,7 @@ pub struct Kanban<S, E: Model> {
     source: Box<dyn DataSource>,
     make: MakeFn<S, E>,
     card: Option<CardFn<E>>,
+    sort: Option<SortFn<E>>,
     state: Option<Field<E, S>>,
     row_height: u32,
     _state: PhantomData<fn() -> S>,
@@ -241,6 +248,7 @@ where
             }),
             make: Box::new(move |board: &Kanban<S, E>| board.build(_cards)),
             card: None,
+            sort: None,
             state: None,
             row_height: 88,
             _state: PhantomData,
@@ -258,6 +266,31 @@ where
     /// [`Kanban::row_height`].
     pub fn card<N: Into<Node>>(mut self, build: impl Fn(&E) -> N + Send + Sync + 'static) -> Self {
         self.card = Some(Arc::new(move |row| build(row).into()));
+        self.columns = (self.make)(&self);
+        self
+    }
+
+    /// Keeps the cards of each column in the order of `rank`, set with `reorder` (the action of
+    /// [`CardGrid::sortable`]). Each card gets a handle that reorders it inside its column (drag,
+    /// keys, or its move menu), and a card dragged onto a card of another column lands before or
+    /// after it: the move runs the transition first, then `reorder` with the new neighbors. The
+    /// reorder action checks its own permission and the neighbors, as for any sortable list.
+    ///
+    /// ```ignore
+    /// Kanban::of(task_flow(), search_tasks, move_task)
+    ///     .state(Task::state)
+    ///     .card(|t: &Task| Heading::new(t.title.clone()))
+    ///     .sortable(Task::rank, reorder_tasks)
+    /// ```
+    pub fn sortable<A, K>(mut self, rank: Field<E, crate::Rank>, reorder: A) -> Self
+    where
+        A: Action<Input = crate::ReorderRequest<K>> + Copy + Send + Sync + 'static,
+        A::Output: Outcome,
+        K: DeserializeOwned + Send + Sync + 'static,
+    {
+        self.sort = Some(Arc::new(move |grid: CardGrid<E>| {
+            grid.sortable(rank, reorder)
+        }));
         self.columns = (self.make)(&self);
         self
     }
@@ -324,6 +357,7 @@ where
             .filter_map(|(value, _)| {
                 let state: S = serde_json::from_value(Json::String((*value).to_string())).ok()?;
                 let card = card.clone();
+                let sort = self.sort.clone();
                 let grid = CardGrid::<E>::of(cards)
                     .into_list()
                     .scope(field, state)
@@ -335,6 +369,10 @@ where
                         row_height: self.row_height,
                         block: KANBAN_BLOCK,
                     });
+                let grid = match sort {
+                    Some(sort) => sort(grid),
+                    None => grid,
+                };
                 Some(Node::from(grid))
             })
             .collect()

@@ -4,12 +4,19 @@
  * Every column is a virtual list (`vlist.js`). The board is one tab stop: the arrow keys move
  * between cards (Left and Right swap under `dir="rtl"`), Home and End go to the first and last
  * card in view, Enter or Space opens the move menu (APG menu button: Up, Down, Home, End,
- * Enter, Escape) and Shift with Left or Right moves the card to the column next to it. A mouse
- * or pen drags cards; touch uses the menu, so columns keep scrolling.
+ * Enter, Escape) and Shift with Left or Right moves the card to the column next to it; on a
+ * sortable board Alt with Up or Down moves it inside its column. Cards
+ * drag on the drag core (`drag.js`): a mouse or pen after 6 px, a touch after a 250 ms hold, so
+ * a swipe still scrolls the column. The board scrolls sideways while a card is held near its
+ * edge. On a board with `Kanban::sortable` a card dropped on another card lands before or after
+ * it (a line shows where), and inside a column the handle of each card reorders it
+ * (`sortable.js`, with its own keys and move menu).
  *
  * A move asks first when its transition has a confirmation (`zeyn:confirm`), then shows the card
  * in the target column at once (optimistic), sends `POST /_zeyn/data` (key `move`) and renders
- * both columns again with one `POST /_zeyn/nodes` when the server accepts. When it refuses, the
+ * both columns again with one `POST /_zeyn/nodes` when the server accepts. A drop on a card of a
+ * sortable column then sends the column's `reorder` with the card's new neighbors (the contract of
+ * `sortable.js`), so the card lands where it was dropped. When the server refuses, the
  * card goes back where it was, the counts too, and the reason is shown. Only moves of
  * `data-moves`, the ones the user may make, are offered; the server checks every move again.
  * `performance.measure('zeyn-kanban-move')` spans a move from the key or the drop to the
@@ -17,8 +24,10 @@
  * @module kanban
  */
 
-/** The shared request helpers (`net.js`). */
-const { parse, post } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
+const search = new URL(import.meta.url).search;
+/** The shared request helpers (`net.js`) and the drag core (`drag.js`). */
+const { parse, post } = await import(new URL(`net.js${search}`, import.meta.url).href);
+const { press, capture, swallowClick, scrollerOf, autoScroll } = await import(new URL(`drag.js${search}`, import.meta.url).href);
 
 /** Screen name and params of an element. */
 function screenOf(el) {
@@ -54,6 +63,7 @@ function init(root) {
   boards.forEach((board) => {
     boardOf(board);
     for (const b of board.querySelectorAll('.z-kanban-move[hidden]')) b.hidden = false;
+    for (const h of board.querySelectorAll('.z-sort-handle')) h.tabIndex = -1;
     if (!board.querySelector('[data-zeyn-kanban-card][tabindex="0"]')) {
       const first = board.querySelector('[data-zeyn-kanban-card]');
       if (first) first.tabIndex = 0;
@@ -107,8 +117,11 @@ async function rerender(board, nodes) {
   }
 }
 
-/** Moves a card to the column of state `to`. */
-async function move(card, to) {
+/**
+ * Moves a card to the column of state `to`; `spot` (`{after, before}`, the keys of its new
+ * neighbors) places it inside a sortable column.
+ */
+async function move(card, to, spot = null) {
   const board = boardOf(card);
   const fromCol = card.closest('.z-kanban-col');
   const toCol = cols(board).find((c) => c.dataset.state === to);
@@ -156,6 +169,15 @@ async function move(card, to) {
     say(board, board.zeynTexts.refused);
     document.dispatchEvent(new CustomEvent('zeyn:run', { detail: { effects: [{ effect: 'toast', message: r.body?.message || board.zeynTexts.refused, tone: 'danger' }] } }));
     return;
+  }
+  const sortable = spot && toCol.querySelector('[data-zeyn-sortable]');
+  if (sortable) {
+    await post('/_zeyn/data', {
+      ...screenOf(board),
+      node: sortable.closest('[data-zeyn-node]')?.dataset.zeynNode ?? null,
+      key: 'reorder',
+      input: { key, after: spot.after, before: spot.before },
+    });
   }
   const nodes = [fromCol, toCol].map((c) => c.querySelector('[data-zeyn-node]')).filter(Boolean);
   await rerender(board, nodes);
@@ -271,6 +293,18 @@ document.addEventListener('keydown', (e) => {
   const list = cardsOf(col);
   const i = list.indexOf(card);
   const key = reading(e.key, card);
+  if (e.altKey && (key === 'ArrowUp' || key === 'ArrowDown') && col.querySelector('[data-zeyn-sortable]')) {
+    const li = card.closest('li');
+    const n = Number(li.getAttribute('aria-posinset'));
+    const at = (k) => li.parentElement.querySelector(`:scope > li[aria-posinset="${k}"]`)?.dataset.zeynKey ?? null;
+    const total = Number(col.querySelector('[data-zeyn-total]')?.dataset.zeynTotal) || n;
+    const up = key === 'ArrowUp';
+    const spot = up ? { after: n > 2 ? at(n - 2) : null, before: at(n - 1) } : { after: at(n + 1), before: n + 1 < total ? at(n + 2) : null };
+    const known = up ? n > 1 && spot.before && (n <= 2 || spot.after) : n < total && spot.after && (n + 1 >= total || spot.before);
+    if (known) reorder(card, spot);
+    e.preventDefault();
+    return;
+  }
   if (e.shiftKey && (key === 'ArrowLeft' || key === 'ArrowRight')) {
     const target = columns[ci + (key === 'ArrowRight' ? 1 : -1)];
     if (target) move(card, target.dataset.state);
@@ -304,8 +338,6 @@ document.addEventListener('focusin', (e) => {
 
 /* Pointer ------------------------------------------------------------------------------------ */
 
-let drag = null;
-
 document.addEventListener('click', (e) => {
   const t = e.target instanceof Element ? e.target : null;
   const button = t?.closest('.z-kanban-move');
@@ -325,62 +357,118 @@ document.addEventListener('click', (e) => {
   if (menu && !menu.el.contains(t)) closeMenu(false);
 });
 
+/**
+ * Where a drop at `y` over `li` (a card of a sortable column) puts the dragged card: the keys of
+ * its new neighbors, or `null` when a neighbor is not loaded yet. Rows of the virtual list are
+ * found by `aria-posinset`, so this needs no layout beyond the one row under the pointer.
+ */
+function spotAt(li, y) {
+  const list = li.parentElement;
+  const n = Number(li.getAttribute('aria-posinset'));
+  const total = Number(li.closest('[data-zeyn-total]')?.dataset.zeynTotal) || n;
+  const r = li.getBoundingClientRect();
+  const above = y < r.top + r.height / 2;
+  const at = (i) => list.querySelector(`:scope > li[aria-posinset="${i}"]`)?.dataset.zeynKey ?? null;
+  const key = li.dataset.zeynKey;
+  const after = above ? (n > 1 ? at(n - 1) : null) : key;
+  const before = above ? key : n < total ? at(n + 1) : null;
+  if ((above && n > 1 && !after) || (!above && n < total && !before)) return null;
+  return { after, before, li, above };
+}
+
+/** Sends the `reorder` of the sortable column of `card` and draws the column again. */
+async function reorder(card, spot) {
+  const board = boardOf(card);
+  const col = card.closest('.z-kanban-col');
+  const section = col.querySelector('[data-zeyn-sortable]');
+  const key = card.closest('li').dataset.zeynKey;
+  const r = await post('/_zeyn/data', {
+    ...screenOf(board),
+    node: section.closest('[data-zeyn-node]')?.dataset.zeynNode ?? null,
+    key: 'reorder',
+    input: { key, after: spot.after, before: spot.before },
+  });
+  if (!r.ok) {
+    say(board, board.zeynTexts.refused);
+    document.dispatchEvent(new CustomEvent('zeyn:run', { detail: { effects: [{ effect: 'toast', message: r.body?.message || board.zeynTexts.refused, tone: 'danger' }] } }));
+    return;
+  }
+  await rerender(board, [section.closest('[data-zeyn-node]')]);
+  focusCard(col.querySelector(`li[data-zeyn-key="${CSS.escape(key)}"] [data-zeyn-kanban-card]`) ?? cardsOf(col)[0]);
+}
+
+/** Drags `card` from the pointer press `start`, on the drag core. */
+function drag(card, start) {
+  closeMenu(false);
+  const board = boardOf(card);
+  const from = card.closest('.z-kanban-col');
+  const allowed = new Set((board.zeynMoves[from.dataset.state] ?? []).map((m) => m.to));
+  for (const c of cols(board)) c.dataset.drop = c === from ? 'from' : allowed.has(c.dataset.state) ? 'ok' : 'no';
+  const r = card.getBoundingClientRect();
+  const ghost = card.cloneNode(true);
+  ghost.className = 'z-kanban-card z-kanban-ghost';
+  ghost.removeAttribute('data-zeyn-kanban-card');
+  ghost.setAttribute('aria-hidden', 'true');
+  Object.assign(ghost.style, { width: `${r.width}px`, height: `${r.height}px`, left: `${r.left}px`, top: `${r.top}px` });
+  document.body.append(ghost);
+  card.classList.add('z-kanban-dragging');
+  const scroll = autoScroll(scrollerOf(card.closest('.z-kanban-board'), 'x') ?? card.closest('.z-kanban-board'));
+  const noPan = (e) => e.cancelable && e.preventDefault();
+  if (start.pointerType === 'touch') document.addEventListener('touchmove', noPan, { passive: false });
+  const own = card.closest('li');
+  const sorts = !!from.querySelector('[data-zeyn-sortable]');
+  let over = null;
+  let spot = null;
+  const mark = (next) => {
+    spot?.li.classList.remove('z-kanban-before', 'z-kanban-after');
+    spot = next;
+    spot?.li.classList.add(spot.above ? 'z-kanban-before' : 'z-kanban-after');
+  };
+  const onMove = (e) => {
+    ghost.style.transform = `translate(${e.clientX - start.clientX}px, ${e.clientY - start.clientY}px)`;
+    scroll.at(e.clientX, e.clientY);
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const col = hit?.closest('.z-kanban-col');
+    if (col !== over) {
+      over?.classList.remove('z-kanban-target');
+      over = col?.dataset.drop === 'ok' || (sorts && col === from) ? col : null;
+      over?.classList.add('z-kanban-target');
+    }
+    const li = over?.querySelector('[data-zeyn-sortable]') ? hit.closest('li[data-zeyn-key]') : null;
+    mark(li && li !== own && li.closest('.z-kanban-col') === over ? spotAt(li, e.clientY) : null);
+  };
+  const onEnd = (e, cancelled) => {
+    document.removeEventListener('touchmove', noPan);
+    scroll.stop();
+    ghost.remove();
+    card.classList.remove('z-kanban-dragging');
+    const target = over;
+    const place = spot && { after: spot.after, before: spot.before };
+    mark(null);
+    for (const c of cols(board)) {
+      delete c.dataset.drop;
+      c.classList.remove('z-kanban-target');
+    }
+    if (cancelled) return;
+    swallowClick();
+    if (target === from) {
+      if (place && place.after !== own.dataset.zeynKey && place.before !== own.dataset.zeynKey) reorder(card, place);
+    } else if (target) move(card, target.dataset.state, place);
+  };
+  capture(card, start, onMove, onEnd);
+}
+
 document.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'touch' || e.button !== 0) return;
+  if (e.button !== 0) return;
   const t = e.target instanceof Element ? e.target : null;
   const card = t?.closest('[data-zeyn-kanban-card]');
   if (!card || t.closest('button, a, input, select, textarea, .z-kanban-menu')) return;
-  drag = { card, x: e.clientX, y: e.clientY, ghost: null, over: null };
+  press(e, { onStart: (ev) => drag(card, ev) });
 });
 
-document.addEventListener('pointermove', (e) => {
-  if (!drag) return;
-  const dx = e.clientX - drag.x;
-  const dy = e.clientY - drag.y;
-  if (!drag.ghost) {
-    if (Math.hypot(dx, dy) < 6) return;
-    const board = boardOf(drag.card);
-    const from = drag.card.closest('.z-kanban-col');
-    const allowed = new Set((board.zeynMoves[from.dataset.state] ?? []).map((m) => m.to));
-    for (const c of cols(board)) c.dataset.drop = c === from ? 'from' : allowed.has(c.dataset.state) ? 'ok' : 'no';
-    const r = drag.card.getBoundingClientRect();
-    const ghost = drag.card.cloneNode(true);
-    ghost.className = 'z-kanban-card z-kanban-ghost';
-    ghost.removeAttribute('data-zeyn-kanban-card');
-    ghost.setAttribute('aria-hidden', 'true');
-    Object.assign(ghost.style, { width: `${r.width}px`, height: `${r.height}px`, left: `${r.left}px`, top: `${r.top}px` });
-    document.body.append(ghost);
-    drag.ghost = ghost;
-    drag.card.classList.add('z-kanban-dragging');
-  }
-  drag.ghost.style.transform = `translate(${dx}px, ${dy}px)`;
-  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('.z-kanban-col');
-  if (under !== drag.over) {
-    drag.over?.classList.remove('z-kanban-target');
-    drag.over = under?.dataset.drop === 'ok' ? under : null;
-    drag.over?.classList.add('z-kanban-target');
-  }
+document.addEventListener('contextmenu', (e) => {
+  if (e.target instanceof Element && e.target.closest('.z-kanban-dragging')) e.preventDefault();
 });
-
-/** Ends a drag; drops on an allowed column. */
-function endDrag(drop) {
-  if (!drag) return;
-  const { card, ghost, over } = drag;
-  drag = null;
-  if (!ghost) return;
-  ghost.remove();
-  card.classList.remove('z-kanban-dragging');
-  const board = boardOf(card);
-  for (const c of cols(board)) {
-    delete c.dataset.drop;
-    c.classList.remove('z-kanban-target');
-  }
-  if (drop && over) move(card, over.dataset.state);
-}
-
-document.addEventListener('pointerup', () => endDrag(true));
-document.addEventListener('pointercancel', () => endDrag(false));
-document.addEventListener('keydown', (e) => e.key === 'Escape' && drag && endDrag(false));
 
 document.addEventListener('zeyn:content', (e) => init(e.detail instanceof Element ? e.detail.closest('[data-zeyn-kanban]') ?? e.detail : document));
 init(document);

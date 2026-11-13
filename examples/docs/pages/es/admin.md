@@ -103,7 +103,9 @@ Kanban::of(task_flow(), search_tasks, move_task)
 
 Mover una tarjeta de una columna a otra ejecuta la transición entre los dos estados con un `TransitionRequest`, como hace `Transitions`. El tablero solo ofrece los movimientos que el usuario puede hacer; el servidor encuentra la transición, comprueba su permiso y el de la acción de mover (CSRF y límite de escritura a través de `POST /_zeyn/data`), y la acción la aplica con `Workflow::apply`, que rechaza una tarjeta que ya está en otro estado. `.confirm(name, message)` pregunta antes en el diálogo compartido. La tarjeta se mueve al instante; si el servidor se niega, vuelve a su columna con el motivo, y si acepta, las dos columnas se vuelven a dibujar con una sola petición.
 
-Un ratón o un lápiz arrastran la tarjeta; las columnas a las que puede ir se resaltan y las demás se atenúan. En pantallas táctiles las columnas siguen desplazándose, y el botón de cada tarjeta abre el mismo menú que el teclado (WCAG 2.5.7). `kanban.js` (15,5 KB, 5 KB con gzip) y `kanban.css` (4 KB) se cargan solo con el tablero, `vlist.js` con sus columnas.
+Un ratón o un lápiz arrastran la tarjeta después de moverse 6 px, y en pantallas táctiles tras mantenerla pulsada 250 ms, así que deslizar sigue desplazando la columna (el núcleo de arrastre compartido, `drag.js`). Las columnas a las que puede ir se resaltan, las demás se atenúan, y el tablero se desplaza de lado mientras la tarjeta se mantiene cerca de su borde. El botón de cada tarjeta abre el mismo menú que el teclado, la forma de mover con un solo puntero (WCAG 2.5.7). `kanban.js` (19,7 KB, 6 KB con gzip), `drag.js` y `kanban.css` (4,5 KB) se cargan solo con el tablero, `vlist.js` con sus columnas.
+
+`.sortable(Task::rank, reorder_tasks)` mantiene las tarjetas de cada columna en el orden de un campo `Rank`, con la acción de reordenar de una lista ordenable (`ReorderRequest`). Cada tarjeta recibe un asa que la reordena dentro de su columna (arrastre, teclas o su menú de mover). Una tarjeta soltada sobre otra queda antes o después de ella, y una línea muestra dónde: dentro de su propia columna eso envía el reordenamiento; hacia otra columna primero se ejecuta la transición y luego el reordenamiento con los nuevos vecinos de la tarjeta. Ambas peticiones pasan los controles del servidor: el nodo de la columna, CSRF, el límite de escritura y el permiso de cada acción. `sortable.js` se carga solo con un tablero ordenable.
 
 | Tecla | Qué hace |
 |---|---|
@@ -113,6 +115,7 @@ Un ratón o un lápiz arrastran la tarjeta; las columnas a las que puede ir se r
 | Home, End | Primera o última tarjeta visible de la columna |
 | Enter, Space | Abre el menú de mover: Up y Down eligen columna, Enter mueve, Escape cierra |
 | Shift + Left, Shift + Right | Mueve la tarjeta a la columna anterior o siguiente, cuando el flujo lo permite |
+| Alt + Arriba, Alt + Abajo | En un tablero ordenable, mueve la tarjeta arriba o abajo en su columna |
 
 ## Calendar
 

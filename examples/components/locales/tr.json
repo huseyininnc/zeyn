@@ -531,7 +531,8 @@
         "bell": "Bildirim zili"
       },
       "kanban": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "ordered": "Her sütunda kendi sırasında duran kartlar"
       },
       "calendar": {
         "overview": "Örnek"
