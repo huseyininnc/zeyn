@@ -51,9 +51,10 @@ pub struct Indicator {
 
 impl Indicator {
     /// An indicator on `node`. It shows nothing until `.count` or `.dot` is called.
+    #[track_caller]
     pub fn on(node: impl Into<Node>) -> Self {
         Indicator {
-            nodes: vec![node.into()],
+            nodes: vec![Node::placed(node)],
             mark: Mark::None,
             tone: Tone::Danger,
             label: None,

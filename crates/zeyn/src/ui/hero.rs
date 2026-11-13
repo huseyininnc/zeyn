@@ -110,9 +110,10 @@ impl Hero {
     }
 
     /// A button, link or other node under the text.
+    #[track_caller]
     pub fn action(mut self, node: impl Into<Node>) -> Self {
         self.last().actions += 1;
-        self.actions.push(node.into());
+        self.actions.push(Node::placed(node));
         self
     }
 

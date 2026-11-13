@@ -797,15 +797,100 @@ pub trait Component: Send + Sync {
 }
 
 /// Type erased component: a node of the screen tree.
-pub struct Node(Box<dyn Component>);
+///
+/// Debug builds also keep the place in the Rust source that put the node on the screen (see
+/// [`Node::placed`]); release builds keep only the component, so a node is one boxed pointer.
+pub struct Node(
+    Box<dyn Component>,
+    #[cfg(debug_assertions)] Option<&'static std::panic::Location<'static>>,
+);
 
 impl Node {
     pub fn new(component: impl Component + 'static) -> Self {
-        Self(Box::new(component))
+        Self(
+            Box::new(component),
+            #[cfg(debug_assertions)]
+            None,
+        )
     }
 
+    /// Converts `node` and, in debug builds, records the source line of the caller. Container
+    /// methods that take a child are `#[track_caller]` and call this, so the line recorded is the
+    /// one in the app that added the child. Release builds record nothing.
+    #[track_caller]
+    pub fn placed(node: impl Into<Node>) -> Self {
+        #[cfg_attr(not(debug_assertions), allow(unused_mut))]
+        let mut node = node.into();
+        #[cfg(debug_assertions)]
+        {
+            node.1 = Some(std::panic::Location::caller());
+        }
+        node
+    }
+
+    /// The source line that placed this node, as `file:line:column`. Always `None` in release
+    /// builds and for nodes not added through a container method.
+    pub fn placed_at(&self) -> Option<String> {
+        #[cfg(debug_assertions)]
+        {
+            self.1
+                .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            None
+        }
+    }
+
+    /// Renders the component. When [`Node::tag_sources`] is on (debug builds served by
+    /// `App::serve`), the first element it writes gets a `data-zeyn-src` attribute with
+    /// [`Node::placed_at`], which the inspector overlay (Alt+Shift+I) shows.
     pub fn render(&self, out: &mut String, r: &Render) {
+        #[cfg(debug_assertions)]
+        let start = out.len();
         self.0.render(out, r);
+        #[cfg(debug_assertions)]
+        self.tag(out, start);
+    }
+
+    /// Writes the source attribute into the first element written after `start` (see
+    /// [`Node::render`]), for markup of the node written by other means, such as a grid's
+    /// preloaded first page.
+    #[cfg(debug_assertions)]
+    pub(crate) fn tag(&self, out: &mut String, start: usize) {
+        if TAG_SOURCES.load(std::sync::atomic::Ordering::Relaxed)
+            && let Some(src) = self.placed_at()
+        {
+            tag_source(out, start, &src);
+        }
+    }
+
+    /// Turns the `data-zeyn-src` attributes of rendered nodes on or off for the whole process.
+    /// `App::serve` turns them on in debug builds; tests and `App::router` leave them off, so
+    /// their HTML is the same as in release. An app that serves `App::router` itself calls
+    /// `Node::tag_sources(cfg!(debug_assertions))` to get them. Release builds ignore it.
+    pub fn tag_sources(on: bool) {
+        #[cfg(debug_assertions)]
+        TAG_SOURCES.store(on, std::sync::atomic::Ordering::Relaxed);
+        #[cfg(not(debug_assertions))]
+        let _ = on;
+    }
+
+    /// The node and every node below it as JSON: path, component type, source line and
+    /// children, for the `zeyn_inspect` tool.
+    pub fn tree(&self, path: String) -> serde_json::Value {
+        let children: Vec<_> = self
+            .children()
+            .iter()
+            .enumerate()
+            .map(|(i, c)| c.tree(format!("{path}.{i}")))
+            .collect();
+        json!({
+            "path": path,
+            "type": self.schema()["type"],
+            "source": self.placed_at(),
+            "children": children,
+        })
     }
 
     pub fn schema(&self) -> serde_json::Value {
@@ -873,6 +958,35 @@ impl Node {
             child.page_check(format!("{path}.{i}"), check);
         }
     }
+}
+
+/// Whether rendered nodes carry their source line (see [`Node::tag_sources`]).
+#[cfg(debug_assertions)]
+static TAG_SOURCES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Adds `data-zeyn-src="{src}"` to the first start tag written after `start`, when the output
+/// there begins with an element. Text, comments and elements that already carry a source keep
+/// their markup.
+#[cfg(debug_assertions)]
+fn tag_source(out: &mut String, start: usize, src: &str) {
+    let written = &out[start..];
+    let lead = written.len() - written.trim_start().len();
+    let tag = &written[lead..];
+    if !tag.starts_with('<') || !tag[1..].starts_with(|c: char| c.is_ascii_alphabetic()) {
+        return;
+    }
+    let Some(end) = tag.find('>') else {
+        return;
+    };
+    if tag[..end].contains(" data-zeyn-src=") {
+        return;
+    }
+    let at = match tag[..end].ends_with('/') {
+        true => end - 1,
+        false => end,
+    };
+    let attr = format!(" data-zeyn-src=\"{}\"", crate::render::escape(src));
+    out.insert_str(start + lead + at, &attr);
 }
 
 /// Plain text where a node is expected, escaped and in the user's language, so a slot that takes
@@ -1745,8 +1859,9 @@ impl Screen {
         self
     }
 
+    #[track_caller]
     pub fn body(mut self, node: impl Into<Node>) -> Self {
-        self.body.push(node.into());
+        self.body.push(Node::placed(node));
         self
     }
 

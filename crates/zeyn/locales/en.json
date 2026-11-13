@@ -95,6 +95,11 @@
       "reason_cancel": "Cancel",
       "reason_invalid": "Write a reason between 3 and 300 characters."
     },
+    "inspect": {
+      "title": "Source of the element",
+      "none": "This element has no source line.",
+      "hint": "Alt+Shift+I or Escape closes the inspector."
+    },
     "validation": {
       "required": "{label} is required.",
       "min_len": "{label} must be at least {n} characters.",

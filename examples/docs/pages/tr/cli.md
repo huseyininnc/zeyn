@@ -127,4 +127,4 @@ Oluşturulan bir uygulamanın imajı yaklaşık 43 MB'tır ve boşta çalışan 
 
 ## MCP sunucusu
 
-`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.
+`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_inspect` (bir screen'in node ağacı ve her node'u yerleştiren Rust satırı), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.
