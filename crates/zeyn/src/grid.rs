@@ -3353,6 +3353,8 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "columns",
         "reset",
         "filter",
+        "autofit",
+        "autofit_all",
     ];
     for k in menu {
         map.insert(

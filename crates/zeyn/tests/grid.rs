@@ -4012,3 +4012,15 @@ fn views_keep_only_page_sizes_the_grid_offers() {
     let q = zeyn::GridSource::first_query(&grid, Some(&view(37)));
     assert_eq!(q.limit(), 5);
 }
+
+#[tokio::test]
+async fn column_menus_carry_the_autofit_texts_in_the_users_language() {
+    let page = send(&router(reader()), get("/items")).await;
+    assert!(
+        page.body
+            .contains("Fit width to content")
+            && page.body.contains("Fit all columns"),
+        "{}",
+        page.body
+    );
+}

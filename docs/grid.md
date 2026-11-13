@@ -131,7 +131,7 @@ three per side). `hidden()` leaves a column out until the user shows it. Every h
 column menu (the button, a right click, Shift+F10 or the context menu key) with sort, pin, move
 left and right, hide, filter, a column chooser and reset. The edge of a header resizes the column,
 by dragging or with the arrow keys (Shift for bigger steps). Dragging a header onto another header
-of the same pinned group moves the column; a short press still sorts. All of it works right to left.
+of the same pinned group moves the column; a short press still sorts. All of it works right to left. A double click on the edge of a header, Enter on it, or "Fit width to content" in the column menu fits the column to its header and the rows in the page; "Fit all columns" does it for every shown column. The widths are saved with the view.
 
 ## Search
 

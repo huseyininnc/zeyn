@@ -106,7 +106,7 @@ tres por lado). `hidden()` deja una columna fuera hasta que el usuario la muestr
 menú de columna (el botón, un clic derecho, Shift+F10 o la tecla de menú contextual) con orden, fijar, mover
 a la izquierda y a la derecha, ocultar, filtro, un selector de columnas y restablecer. El borde de un encabezado redimensiona la columna,
 arrastrando o con las teclas de flecha (Shift para pasos mayores). Arrastrar un encabezado sobre otro encabezado
-del mismo grupo fijado mueve la columna; una pulsación corta sigue ordenando. Todo funciona de derecha a izquierda.
+del mismo grupo fijado mueve la columna; una pulsación corta sigue ordenando. Todo funciona de derecha a izquierda. Un doble clic en el borde de un encabezado, Intro sobre él o "Ajustar el ancho al contenido" en el menú de la columna ajusta la columna a su encabezado y a las filas de la página; "Ajustar todas las columnas" lo hace con cada columna visible. Los anchos se guardan con la vista.
 
 ## Búsqueda
 

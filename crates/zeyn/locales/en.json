@@ -237,7 +237,9 @@
         "hide": "Hide column",
         "columns": "Columns",
         "filter": "Filter",
-        "reset": "Reset view"
+        "reset": "Reset view",
+        "autofit": "Fit width to content",
+        "autofit_all": "Fit all columns"
       },
       "agg": {
         "sum": "Sum",
