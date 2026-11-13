@@ -98,6 +98,16 @@ koşulları tablonun süzgeçlerine yazar; böylece süzgeç satırı, kayıtlı
 bir yapay zekâ ajanının `zeyn:filter` olayı tek bir listeyi paylaşır ve sunucu onu yukarıdaki gibi
 temizler.
 
+Süzgeç oluşturucudaki her koşul grubunda "Tüm koşullar" ya da "Herhangi bir koşul" seçimi vardır;
+"Grup ekle" içine bir grup koyar, üç düzeye kadar. Sorgu grupları `DataQuery::filter_groups` içinde
+`{ "any": true, "filters": [...], "groups": [...] }` olarak gönderir; her satırın yine uyması gereken
+düz `filters` listesinin yanında. `any` taşıyan bir grup, süzgeçlerinden ya da gruplarından biri
+uyduğunda uyar; taşımayan bir grup hepsi uyduğunda uyar. Listedeki ve gruplardaki süzgeçler 32
+sınırına birlikte sayılır, gruplar en çok dört düzey iç içe girer (`MAX_FILTER_DEPTH`) ve sunucu
+grupları liste gibi temizler: `filter()` taşımayan sütunlardaki süzgeçler ve boş kalan gruplar
+düşer. `DataQuery::apply` ile PostgreSQL ve Oracle veri katmanları grupları aynı biçimde okur,
+tablonun yapay zekâ aracı onları sunar, kayıtlı görünümler ve dışa aktarmalar onları korur.
+
 Bir başlığa Shift+tıklamak, o sütunu sıralama anahtarlarına ekler. Başlıktaki bir sayı sırayı gösterir.
 
 ## Sütunlar: sabitleme, yeniden boyutlandırma, gizleme, taşıma

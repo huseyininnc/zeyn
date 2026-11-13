@@ -122,6 +122,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | 각 그룹을 괄호로 묶고, 그 필터와 그룹을 `OR`(`any`) 또는 `AND`로 잇습니다 |
 
 금액과 예/아니요 열의 `contains`는 SQL에서 무시됩니다. 텍스트는 데이터베이스 콜레이션(Oracle은 `NLS_SORT`)으로 정렬됩니다.
 
