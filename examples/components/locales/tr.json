@@ -374,6 +374,7 @@
       "list": {
         "overview": "Örnek",
         "numbered_pages": "Toplamı olmayan numaralı sayfalar",
+        "sortable": "Kullanıcının kendi sırasına koyduğu satırlar",
         "fixed": "Sabit öğeler",
         "builder": "Herhangi bir düğümle kurulan satırlar ve ayraç",
         "virtual_rows": "Sabit satır yüksekliğiyle sanal kaydırma",

@@ -736,6 +736,21 @@
         "count": "{n}",
         "count_wip": "{n} of {wip}"
       },
+      "sortable": {
+        "help": "Space lifts the row, the arrow keys move it, Space drops it and Escape puts it back. Alt with Up or Down moves it at once. Enter opens the move menu.",
+        "handle_plain": "Move row",
+        "handle": "Move {item}",
+        "lifted": "{item} lifted, position {pos} of {count}",
+        "moved": "{item}, position {pos} of {count}",
+        "dropped": "{item} dropped at position {pos} of {count}",
+        "cancelled": "Move cancelled, {item} is back at position {pos}",
+        "refused": "{item} could not be moved and is back at position {pos}",
+        "up": "Move up",
+        "down": "Move down",
+        "top": "Move to the top",
+        "bottom": "Move to the end",
+        "menu": "Move {item}"
+      },
       "calendar": {
         "navigation": "Period",
         "views": "View",

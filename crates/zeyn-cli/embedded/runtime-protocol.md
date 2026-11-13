@@ -55,6 +55,7 @@ A page loads and runs only the browser code its screen uses. Every page runs the
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | share buttons, filter chips, reactions, hero slides, the preference store, card previews (first hover), the assistant (chat panels, or the first press of the launcher) |
 | `topics.js`, `vlist.js` | nodes that listen to topics and the controls that drive them (`data-zeyn-listens`, `data-zeyn-drives`); virtual lists (`data-zeyn-vlist`) |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | the inbox and the notification bell; Kanban boards; calendars; diffs, code views and barcodes, which need no script (the copy button of a code view is in `share.js`) |
+| `sortable.js` | sortable lists and card grids (`data-zeyn-sortable`): handles, keyboard moves, the move menu and the reorder request; it imports `drag.js` and `net.js` |
 | `codeedit.js`, `codeedit.css` | code editors (`data-zeyn-code`): the highlighted copy, the gutter, suggestions and error markers; it posts to `/_zeyn/data` only after a pause in typing |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js` and `commerce.css` | range sliders, quantity steppers, product galleries and countdowns; the stylesheet of every shop component (prices, variant pickers, facet panels, review summaries) |
 | `imgcompare.js` | picture comparisons (`ImageCompare`): shows the slider and writes its value to `--z-imgcompare` |

@@ -56,6 +56,7 @@ mod range;
 mod rating;
 mod reactions;
 mod relative;
+mod reorder;
 mod reviews;
 mod sanitize;
 mod schema;

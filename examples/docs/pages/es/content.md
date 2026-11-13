@@ -90,6 +90,24 @@ List::of(search_people)
 
 @live list
 
+### Listas ordenables
+
+`.sortable(action)` permite que las personas pongan las filas de `List::of` o de una `CardGrid` en su propio orden. Cada fila tiene un asa: un ratón o lápiz la arrastra, un toque la arrastra tras mantenerlo un momento, y una línea muestra dónde caerá. En el asa con el foco, Espacio levanta la fila, las flechas la mueven, Espacio la suelta y Escape la devuelve; Alt con Arriba o Abajo la mueve al instante. Un clic o Enter abre un menú de mover (arriba, abajo, al principio, al final), así que basta con un solo puntero. Cada paso se anuncia.
+
+El movimiento se ve al instante y la acción recibe un `ReorderRequest` con la clave de la fila y las claves de sus nuevos vecinos (`after`, `before`), nunca posiciones. `r.rank(lookup)` da el nuevo `Rank` entre los vecinos y rechaza un vecino que la búsqueda no encuentra (`NotFound`) o vecinos que ya no están en ese orden (`Conflict`, otra persona movió filas antes); entonces la fila vuelve y se muestra el motivo. La acción de origen lista las filas por rango, por eso no hay opciones de orden, y mientras queden filas por cargar ninguna fila puede pasar a ser la última.
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
 ## Avatar
 
 Una imagen redonda de una persona o de un equipo, de 32, 40 o 64 píxeles (`AvatarSize::Small`, `Medium`, `Large`). El nombre es obligatorio: es el texto alternativo y el origen de las iniciales que se muestran cuando no hay imagen, o cuando la imagen no está en un host que permita el `img-src` de la aplicación (la misma regla que para `Image`). Las iniciales siguen las mayúsculas del idioma, de modo que la `i` turca pasa a `İ`. Cuando el nombre está escrito justo al lado del avatar, `.decorative()` lo oculta a los lectores de pantalla para que no lean el nombre dos veces.

@@ -462,7 +462,7 @@ document.addEventListener('zeyn:density', () => {
  */
 function windowCards(section, how) {
   const list = section.querySelector('[data-zeyn-rows]');
-  if (!list || !section.matches('.z-cards:not(.z-cards-rows)')) return;
+  if (!list || !section.matches('.z-cards:not(.z-cards-rows):not([data-zeyn-sortable])')) return;
   let w = windows.get(list);
   if (!w) {
     if (list.children.length < WINDOW_MIN || list.querySelector(':scope > .z-separator')) return;
