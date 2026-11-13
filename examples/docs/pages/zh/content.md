@@ -90,6 +90,24 @@ List::of(search_people)
 
 @live list
 
+### 可排序列表
+
+`.sortable(action)` 让用户按自己的顺序排列 `List::of` 或 `CardGrid` 的行。每行有一个手柄：鼠标或笔直接拖动，触摸在短按之后拖动，一条线显示放下的位置。在获得焦点的手柄上，Space 提起该行，方向键移动它，Space 放下，Escape 放回原处；Alt 加上 Up 或 Down 立即移动。点击或 Enter 打开移动菜单（上移、下移、移到开头、移到末尾），因此单一指针就够用。每一步都会播报。
+
+移动会立即显示，操作收到一个 `ReorderRequest`，其中有该行的键和新邻居的键（`after`、`before`），从不传位置。`r.rank(lookup)` 给出邻居之间的新 `Rank`，并拒绝查找不到的邻居（`NotFound`）或已不在这个顺序的邻居（`Conflict`，有人先移动了行）；这时该行会回到原处并显示原因。源操作按排名列出各行，因此不提供排序选项；在还有行未加载时，任何行都不能移到最后。
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
 ## Avatar
 
 一个人或一个团队的圆形头像，尺寸为 32、40 或 64 像素（`AvatarSize::Small`、`Medium`、`Large`）。名称是必填的：它是替代文本，也是没有图片、或图片不在应用的 `img-src` 允许的主机上时显示的首字母的来源（规则与 `Image` 相同）。首字母遵循该语言的大写规则，因此土耳其语的 `i` 会变成 `İ`。当名称就写在头像旁边时，`.decorative()` 会对屏幕阅读器隐藏头像，避免名称被读两遍。

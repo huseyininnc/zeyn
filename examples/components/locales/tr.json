@@ -304,7 +304,7 @@
         "numbers": "Yerel ayara göre gruplanmış sayılar, düz bir yıl",
         "search_and_bands": "Arama kutusu ve bir bant altında toplanan sütunlar",
         "add_delete_batch": "Satır ekleme, silme ve toplu düzenleme (hiçbir şey saklanmaz)",
-        "user_grouping": "Kullanıcının gruplaması ve özel bir özet",
+        "user_grouping": "Kullanıcının gruplaması, özel bir özet ve süzgeç oluşturucu",
         "computed_million": "Sayfa sayfa üretilen bir milyon hesaplanmış satır",
         "dynamic_columns": "Satırlarla gelen sütunlar: 30 sütunlu 10.000 satır"
       },
@@ -374,6 +374,7 @@
       "list": {
         "overview": "Örnek",
         "numbered_pages": "Toplamı olmayan numaralı sayfalar",
+        "sortable": "Kullanıcının kendi sırasına koyduğu satırlar",
         "fixed": "Sabit öğeler",
         "builder": "Herhangi bir düğümle kurulan satırlar ve ayraç",
         "virtual_rows": "Sabit satır yüksekliğiyle sanal kaydırma",

@@ -107,6 +107,11 @@
       "render": "Render",
       "hint": "Alt+Shift+D or Escape closes the panel."
     },
+    "inspect": {
+      "title": "Source of the element",
+      "none": "This element has no source line.",
+      "hint": "Alt+Shift+I or Escape closes the inspector."
+    },
     "validation": {
       "required": "{label} is required.",
       "min_len": "{label} must be at least {n} characters.",
@@ -153,6 +158,13 @@
       "next": "Next page",
       "load_more": "Load more",
       "search": "Search rows",
+      "filter_builder": "Filter",
+      "builder_title": "Filter rows",
+      "add_condition": "Add condition",
+      "remove_condition": "Remove condition",
+      "column": "Column",
+      "apply": "Apply",
+      "clear_all": "Clear all",
       "group_by": "Group by this column",
       "ungroup": "Ungroup",
       "groups": "Grouped by",
@@ -747,6 +759,21 @@
         "no_moves": "This card cannot be moved from here",
         "count": "{n}",
         "count_wip": "{n} of {wip}"
+      },
+      "sortable": {
+        "help": "Space lifts the row, the arrow keys move it, Space drops it and Escape puts it back. Alt with Up or Down moves it at once. Enter opens the move menu.",
+        "handle_plain": "Move row",
+        "handle": "Move {item}",
+        "lifted": "{item} lifted, position {pos} of {count}",
+        "moved": "{item}, position {pos} of {count}",
+        "dropped": "{item} dropped at position {pos} of {count}",
+        "cancelled": "Move cancelled, {item} is back at position {pos}",
+        "refused": "{item} could not be moved and is back at position {pos}",
+        "up": "Move up",
+        "down": "Move down",
+        "top": "Move to the top",
+        "bottom": "Move to the end",
+        "menu": "Move {item}"
       },
       "calendar": {
         "navigation": "Period",

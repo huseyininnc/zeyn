@@ -209,7 +209,7 @@ pub use prefs::{
 pub use privacy::output as __privacy;
 pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
 pub use problem::{DOCS_URL, Problem, problem_json};
-pub use rank::Rank;
+pub use rank::{Rank, ReorderRequest};
 #[cfg(feature = "redis")]
 pub use redis_store::RedisStore;
 pub use render::Render;
@@ -302,10 +302,10 @@ pub mod prelude {
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
         Decimal, DynamicColumn, DynamicKind, DynamicPage, Effect, Entity, Error, Export, Feature,
         Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import, Licensed,
-        LocalDateTime, Model, Money, Node, Page, Paging, Rank, Result, RowStyle, Screen, ScreenDef,
-        Secret, Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone,
-        Toast, Tone, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window,
-        Workflow, action, choice, entity, model, params, screen, t,
+        LocalDateTime, Model, Money, Node, Page, Paging, Rank, ReorderRequest, Result, RowStyle,
+        Screen, ScreenDef, Secret, Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text,
+        Time, TimeZone, Toast, Tone, TransitionRequest, Transitions, UiCtx, Valid,
+        ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

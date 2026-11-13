@@ -135,4 +135,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## خادم MCP
 
-يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_test` و`zeyn_new_feature` و`zeyn_new_screen`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).
+يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_inspect` (شجرة عُقد الشاشة مع سطر Rust الذي وضع كل عقدة) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_test` و`zeyn_new_feature` و`zeyn_new_screen`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).

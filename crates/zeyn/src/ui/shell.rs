@@ -287,10 +287,11 @@ enum InspectorBody {
 }
 
 impl PropertyInspector {
+    #[track_caller]
     pub fn new(title: impl Into<Text>, form: impl Into<Node>) -> Self {
         Self {
             title: title.into(),
-            body: InspectorBody::Form(form.into()),
+            body: InspectorBody::Form(Node::placed(form)),
         }
     }
 

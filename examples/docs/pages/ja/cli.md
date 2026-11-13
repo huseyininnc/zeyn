@@ -133,4 +133,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP サーバー
 
-`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。
+`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_inspect`（画面のノードツリーと、各ノードを置いた Rust の行）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。

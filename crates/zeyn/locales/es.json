@@ -107,6 +107,11 @@
       "render": "Renderizado",
       "hint": "Alt+Shift+D o Escape cierra el panel."
     },
+    "inspect": {
+      "title": "Origen del elemento",
+      "none": "Este elemento no tiene línea de código fuente.",
+      "hint": "Alt+Shift+I o Escape cierra el inspector."
+    },
     "validation": {
       "required": "{label} es obligatorio.",
       "min_len": "{label} debe tener al menos {n} caracteres.",

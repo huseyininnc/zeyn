@@ -107,6 +107,11 @@
       "render": "렌더링",
       "hint": "Alt+Shift+D 또는 Escape로 패널을 닫습니다."
     },
+    "inspect": {
+      "title": "요소의 소스",
+      "none": "이 요소에는 소스 줄이 없습니다.",
+      "hint": "Alt+Shift+I 또는 Escape로 검사기를 닫습니다."
+    },
     "validation": {
       "required": "{label}을(를) 입력하십시오.",
       "min_len": "{label}은(는) 최소 {n}자여야 합니다.",

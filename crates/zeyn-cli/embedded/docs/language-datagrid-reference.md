@@ -114,6 +114,14 @@ Values travel in a fixed machine form, whatever the user's language. The old
 characters), choices (100) and sort keys (4). A value that cannot be read is ignored. The time zone
 for date filters comes from the user's settings on the server.
 
+`filter_builder()` adds a "Filter" button above the grid, with the number of active conditions,
+that opens the filter builder: a dialog with one row per condition, each a column with `filter()`
+and that column's inputs from the filter row. "Add condition", "Clear all" and "Apply" edit the
+list; Escape or Cancel leave it as it was, and focus returns to the button. Conditions hold
+together, and a later one on the same column replaces an earlier one. Applying writes them into
+the grid's filters, so the filter row, saved views, exports and an AI agent's `zeyn:filter` event
+share one list, and the server cleans it as above.
+
 Shift+click on a header adds that column to the sort keys. A number in the header shows the order.
 
 ## Columns: pin, resize, hide, move

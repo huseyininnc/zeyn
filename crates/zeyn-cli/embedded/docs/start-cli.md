@@ -135,4 +135,4 @@ The image of a generated app is about 43 MB and an idle app uses a few MB of RAM
 
 ## The MCP server
 
-`zeyn mcp` speaks MCP over stdio. Its tools are `zeyn_docs` (framework reference by topic), `zeyn_describe` (features, screens, routes and problems of the app in the current directory), `zeyn_check` (with `fix: true` it runs `check --fix`), `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. See [MCP and AI agents](mcp.md).
+`zeyn mcp` speaks MCP over stdio. Its tools are `zeyn_docs` (framework reference by topic), `zeyn_describe` (features, screens, routes and problems of the app in the current directory), `zeyn_inspect` (the node tree of a screen with the Rust line that placed each node), `zeyn_check` (with `fix: true` it runs `check --fix`), `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. See [MCP and AI agents](mcp.md).

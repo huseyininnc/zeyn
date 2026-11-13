@@ -135,4 +135,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP-сервер
 
-`zeyn mcp` говорит по MCP через stdio. Его инструменты: `zeyn_docs` (справочник по фреймворку по темам), `zeyn_describe` (функции, экраны, маршруты и проблемы приложения в текущем каталоге), `zeyn_check` (с `fix: true` запускает `check --fix`), `zeyn_test`, `zeyn_new_feature` и `zeyn_new_screen`. См. [MCP и ИИ-агенты](mcp.md).
+`zeyn mcp` говорит по MCP через stdio. Его инструменты: `zeyn_docs` (справочник по фреймворку по темам), `zeyn_describe` (функции, экраны, маршруты и проблемы приложения в текущем каталоге), `zeyn_inspect` (дерево узлов экрана со строкой Rust, которая поставила каждый узел), `zeyn_check` (с `fix: true` запускает `check --fix`), `zeyn_test`, `zeyn_new_feature` и `zeyn_new_screen`. См. [MCP и ИИ-агенты](mcp.md).

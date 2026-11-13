@@ -35,7 +35,7 @@ This page and the docs are written in English. Translations of the site and the 
 - Built on axum
 - Every action and screen declares `permission = "..."` or `public`; missing access is a compile error
 - AI attributes on actions: `ai = "guidance"`, `ai = false` (never offered to a model), `confirm` (runs only after the user confirms)
-- `zeyn mcp`: an MCP server for coding agents with `zeyn_docs`, `zeyn_describe`, `zeyn_check`, `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`
+- `zeyn mcp`: an MCP server for coding agents with `zeyn_docs`, `zeyn_describe`, `zeyn_inspect`, `zeyn_check`, `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`
 - DataGrid with virtual scrolling over a million rows, filters, totals, grouping, inline editing and export
 - PostgreSQL and Oracle 11g or later
 - OpenID Connect, JWT, MFA, passkeys and an optional accounts system

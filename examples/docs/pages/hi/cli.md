@@ -133,4 +133,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP सर्वर
 
-`zeyn mcp` stdio पर MCP बोलता है। इसके टूल हैं `zeyn_docs` (विषय के अनुसार फ्रेमवर्क संदर्भ), `zeyn_describe` (मौजूदा डायरेक्टरी के ऐप के feature, Screen, रूट और समस्याएँ), `zeyn_check` (`fix: true` के साथ यह `check --fix` चलाता है), `zeyn_test`, `zeyn_new_feature` और `zeyn_new_screen`। देखें [MCP और AI एजेंट](mcp.md)।
+`zeyn mcp` stdio पर MCP बोलता है। इसके टूल हैं `zeyn_docs` (विषय के अनुसार फ्रेमवर्क संदर्भ), `zeyn_describe` (मौजूदा डायरेक्टरी के ऐप के feature, Screen, रूट और समस्याएँ), `zeyn_inspect` (किसी Screen का node ट्री, हर node को रखने वाली Rust पंक्ति के साथ), `zeyn_check` (`fix: true` के साथ यह `check --fix` चलाता है), `zeyn_test`, `zeyn_new_feature` और `zeyn_new_screen`। देखें [MCP और AI एजेंट](mcp.md)।

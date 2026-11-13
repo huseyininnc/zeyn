@@ -107,6 +107,11 @@
       "render": "العرض",
       "hint": "يغلق Alt+Shift+D أو Escape اللوحة."
     },
+    "inspect": {
+      "title": "مصدر العنصر",
+      "none": "ليس لهذا العنصر سطر مصدر.",
+      "hint": "يغلق Alt+Shift+I أو Escape أداة الفحص."
+    },
     "validation": {
       "required": "{label} مطلوب.",
       "min_len": "يجب ألا يقل {label} عن {n} أحرف.",

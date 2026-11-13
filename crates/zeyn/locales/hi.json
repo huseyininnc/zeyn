@@ -107,6 +107,11 @@
       "render": "रेंडर",
       "hint": "Alt+Shift+D या Escape पैनल बंद करता है।"
     },
+    "inspect": {
+      "title": "तत्व का स्रोत",
+      "none": "इस तत्व की कोई स्रोत पंक्ति नहीं है।",
+      "hint": "Alt+Shift+I या Escape इंस्पेक्टर बंद करता है।"
+    },
     "validation": {
       "required": "{label} आवश्यक है।",
       "min_len": "{label} में कम से कम {n} अक्षर होने चाहिए।",

@@ -54,6 +54,7 @@
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | शेयर बटन, फ़िल्टर चिप, रिएक्शन, हीरो स्लाइड, प्राथमिकता स्टोर, कार्ड पूर्वावलोकन (पहली बार होवर पर), असिस्टेंट (चैट पैनल, या लॉन्चर का पहला दबाव) |
 | `topics.js`, `vlist.js` | topic सुनने वाले node और उन्हें drive करने वाले कंट्रोल (`data-zeyn-listens`, `data-zeyn-drives`); वर्चुअल सूचियाँ (`data-zeyn-vlist`) |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | इनबॉक्स और सूचना घंटी; Kanban बोर्ड; कैलेंडर; बिना स्क्रिप्ट वाले diff, कोड व्यू और बारकोड (कोड व्यू का कॉपी बटन `share.js` में है) |
+| `sortable.js` | क्रमबद्ध सूचियाँ और कार्ड ग्रिड (`data-zeyn-sortable`): हैंडल, कीबोर्ड से खिसकाना, मूव मेनू और पुनःक्रम अनुरोध; यह `drag.js` और `net.js` आयात करता है |
 | `codeedit.js`, `codeedit.css` | कोड एडिटर (`data-zeyn-code`): हाइलाइट की गई प्रति, पंक्ति संख्याएँ, सुझाव और त्रुटि चिह्न; यह `/_zeyn/data` पर केवल टाइपिंग में ठहराव के बाद भेजता है |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js` और `commerce.css` | रेंज स्लाइडर, मात्रा स्टेपर, उत्पाद गैलरी और उलटी गिनती; दुकान के हर कॉम्पोनेंट की स्टाइलशीट (कीमतें, वैरिएंट पिकर, फ़ैसेट पैनल, समीक्षा सारांश) |
 | `imgcompare.js` | चित्रों की तुलना (`ImageCompare`): स्लाइडर दिखाता है और उसका मान `--z-imgcompare` में लिखता है |

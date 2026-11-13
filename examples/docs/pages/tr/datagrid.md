@@ -82,6 +82,7 @@ Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yaz
 - `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: "Satır ekle" düğmesi, Sil
   düğmesi ve tuşu, birlikte kaydedilen düzenlemeler. Ayrıntılar [DataGrid başvurusunda](grid.md).
 - Sütunda `.groupable()`, `.summary(label, |t| ...)`: kullanıcı menüsünden ya da gruplama alanından ona göre gruplar, toplamlardan hesaplanan bir değer altında görünür.
+- `.filter_builder()`: süzgeç koşullarını kurmak için bir iletişim kutusu açan "Süz" düğmesi; süzgeç satırı, kayıtlı görünümler ve yapay zekâ ajanları aynı listeyi kullanır.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
 
 ## Çalışma anında belli olan sütunlar

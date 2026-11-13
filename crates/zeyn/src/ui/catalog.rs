@@ -337,6 +337,49 @@ impl ImageCard {
     }
 }
 
+/// The id of a sortable list's help text, which every handle points to.
+fn help_id(r: &Render) -> String {
+    dom_id(r, "sort-help")
+}
+
+/// The drag handle of a row of a sortable list: hidden until `sortable.js` runs, which also
+/// names it after its row.
+fn handle(r: &Render) -> String {
+    format!(
+        r#"<button type="button" class="z-sort-handle z-drag-handle" aria-label="{}" aria-describedby="{}" aria-haspopup="menu" aria-expanded="false">{}</button>"#,
+        r.text(&Text::key("zeyn.ui.sortable.handle_plain")),
+        help_id(r),
+        crate::screen::Icon::Grip.html()
+    )
+}
+
+/// The texts `sortable.js` speaks and shows, as JSON for `data-texts`.
+fn sort_texts(r: &Render) -> String {
+    let mut texts = serde_json::Map::new();
+    for key in [
+        "handle",
+        "lifted",
+        "moved",
+        "dropped",
+        "cancelled",
+        "refused",
+        "up",
+        "down",
+        "top",
+        "bottom",
+        "menu",
+    ] {
+        texts.insert(
+            key.into(),
+            Json::String(
+                r.i18n
+                    .text(r.locale, &Text::key(format!("zeyn.ui.sortable.{key}"))),
+            ),
+        );
+    }
+    attr(&Json::Object(texts))
+}
+
 /// Whether an image address may go in a card or list row: a path of the app, an `https:`
 /// address or a `data:image/` URI.
 pub(crate) fn safe_image(src: &str) -> bool {
@@ -401,6 +444,7 @@ pub struct CardGrid<E: Model> {
     priority: usize,
     empty: Option<super::EmptyState>,
     empty_filtered: Option<super::EmptyState>,
+    reorder: Option<(&'static str, Box<dyn DataSource>)>,
 }
 
 type BuildFn<E> = Box<dyn Fn(&E) -> Node + Send + Sync>;
@@ -466,6 +510,7 @@ impl<E: Model> CardGrid<E> {
             priority: 0,
             empty: None,
             empty_filtered: None,
+            reorder: None,
         }
     }
 
@@ -526,8 +571,9 @@ impl<E: Model> CardGrid<E> {
     /// A node shown between two rows, such as a divider or a dot. It is hidden from screen
     /// readers, which count the rows themselves. Not used with virtual scrolling, where every
     /// row has the same height.
+    #[track_caller]
     pub fn separator(mut self, node: impl Into<Node>) -> Self {
-        self.separator = Some(node.into());
+        self.separator = Some(Node::placed(node));
         self
     }
 
@@ -544,7 +590,9 @@ impl<E: Model> CardGrid<E> {
     /// built with a builder and no row height falls back to loading more rows.
     fn virtual_rows(&self) -> Option<(u32, u32)> {
         match self.paging {
-            Paging::Virtual { row_height, block } if self.list && !self.rail => {
+            Paging::Virtual { row_height, block }
+                if self.list && !self.rail && self.reorder.is_none() =>
+            {
                 let height = match (self.row_height, &self.builder) {
                     (Some(h), _) => h,
                     (None, None) => row_height,
@@ -560,6 +608,41 @@ impl<E: Model> CardGrid<E> {
     /// lists do not scroll sideways, so it changes nothing for them.
     pub fn scrollbar(mut self) -> Self {
         self.scrollbar = true;
+        self
+    }
+
+    /// Lets people put the rows in their own order: each row gets a handle that drags it (mouse,
+    /// pen, or a touch held for a quarter second), moves it with the keyboard (Space lifts it,
+    /// the arrow keys move it, Space drops it, Escape puts it back; Alt with Up or Down moves it
+    /// at once) and opens a move menu on click or Enter (up, down, to the top, to the end), the
+    /// single pointer way to move (WCAG 2.5.7). Every step is announced.
+    ///
+    /// A move shows at once and sends `reorder` a [`crate::ReorderRequest`] with the keys of the
+    /// row and its new neighbors through `POST /_zeyn/data`; the action stores the rank from
+    /// [`crate::ReorderRequest::rank`] in the `rank` field, and the list asks the source action
+    /// for its rows rising by that field (on every request, whatever the client sends). When the
+    /// action refuses (no permission, a neighbor from another list, or `Error::Conflict` because
+    /// someone else moved rows first), the row goes back and the reason is shown. Sort options
+    /// are left out and numbered pages load more instead, because the user's order is the order.
+    ///
+    /// ```ignore
+    /// #[action(permission = "tasks.write")]
+    /// pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    ///     let rank = r.rank(|k| db.rank_of(*k))?;
+    ///     db.set_rank(r.key, rank).await
+    /// }
+    ///
+    /// List::of(search_tasks)
+    ///     .item(|t: &Task| ListItem::new(t.title.clone()))
+    ///     .sortable(Task::rank, reorder_tasks)
+    /// ```
+    pub fn sortable<A, K>(mut self, rank: crate::model::Field<E, crate::Rank>, _reorder: A) -> Self
+    where
+        A: crate::action::Action<Input = crate::ReorderRequest<K>>,
+        A::Output: crate::ctx::Outcome,
+        K: serde::de::DeserializeOwned + Send + Sync + 'static,
+    {
+        self.reorder = Some((rank.meta().name, super::reorder::source::<A, K>()));
         self
     }
 
@@ -705,7 +788,7 @@ impl<E: Model> CardGrid<E> {
     }
 
     fn pages(&self) -> bool {
-        matches!(self.paging, Paging::Pages { .. }) && !self.rail
+        matches!(self.paging, Paging::Pages { .. }) && !self.rail && self.reorder.is_none()
     }
 
     /// The query the server runs: the client's position and one of the offered sort orders; the
@@ -741,6 +824,12 @@ impl<E: Model> CardGrid<E> {
                     .first()
                     .map(|(_, s)| s.clone()),
             );
+        }
+        if let Some((rank, _)) = &self.reorder {
+            query.sort = vec![Sort {
+                field: rank.to_string(),
+                desc: false,
+            }];
         }
         query.filters.clone_from(&self.scope);
         query.q = self.search.clone();
@@ -790,7 +879,8 @@ impl<E: Model> CardGrid<E> {
                 ),
                 _ => continue,
             }
-            if self.builder.is_none() && place.is_none() && (self.list || self.rail) {
+            let sortable = self.reorder.is_some();
+            if self.builder.is_none() && place.is_none() && (self.list || self.rail) && !sortable {
                 continue;
             }
             let mut attrs = key
@@ -806,6 +896,9 @@ impl<E: Model> CardGrid<E> {
             }
             if out[start..].starts_with("<li") {
                 out.insert_str(start + 3, &attrs);
+                if let (true, Some(open)) = (sortable, out[start..].find('>')) {
+                    out.insert_str(start + open + 1, &handle(r));
+                }
             }
         }
         out
@@ -881,7 +974,12 @@ impl<E: Model> CardGrid<E> {
             String::new()
         };
         out.push_str(&format!(
-            r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-page-only="{}" data-text-error="{}""#,
+            r#"<section class="{class}{}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-page-only="{}" data-text-error="{}""#,
+            if self.reorder.is_some() {
+                " z-sortable"
+            } else {
+                ""
+            },
             if self.pages() { "pages" } else { "infinite" },
             r.scope,
             t("loaded"),
@@ -907,7 +1005,20 @@ impl<E: Model> CardGrid<E> {
                 out.push_str(&format!(r#" data-zeyn-next="{}""#, escape(next)));
             }
         }
+        if self.reorder.is_some() {
+            out.push_str(&format!(
+                r#" data-zeyn-sortable data-texts="{}""#,
+                sort_texts(r)
+            ));
+        }
         out.push('>');
+        if self.reorder.is_some() {
+            out.push_str(&format!(
+                r#"<p class="z-sr-only" id="{}">{}</p>"#,
+                help_id(r),
+                r.text(&Text::key("zeyn.ui.sortable.help"))
+            ));
+        }
         let title = self
             .title
             .as_ref()
@@ -918,7 +1029,7 @@ impl<E: Model> CardGrid<E> {
                 )
             })
             .unwrap_or_default();
-        let sorts = if self.sorts.len() > 1 && !self.rail {
+        let sorts = if self.sorts.len() > 1 && !self.rail && self.reorder.is_none() {
             let options: String = self
                 .sorts
                 .iter()
@@ -1090,11 +1201,25 @@ impl<E: Model> Component for CardGrid<E> {
             "paging": self.paging,
             "sorts": self.sorts.iter().map(|(l, s)| json!({ "label": l, "field": s.field, "desc": s.desc })).collect::<Vec<_>>(),
             "search": self.search,
+            "reorder": self
+                .reorder
+                .as_ref()
+                .map(|(rank, s)| json!({ "rank": rank, "action": s.action() })),
         })
     }
 
     fn grid(&self) -> Option<&dyn GridSource> {
         Some(self)
+    }
+
+    fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        match key {
+            "reorder" => self
+                .reorder
+                .as_ref()
+                .map(|(_, s)| s.as_ref()),
+            _ => None,
+        }
     }
 
     fn page_check(&self, check: &mut super::PageCheck) {

@@ -88,6 +88,15 @@ forma `{ "field", "contains" }` sigue funcionando. El servidor descarta los filt
 caracteres), las opciones (100) y las claves de orden (4). Un valor que no se puede leer se ignora. La zona horaria
 de los filtros de fecha proviene de los ajustes del usuario en el servidor.
 
+`filter_builder()` añade encima de la cuadrícula un botón "Filtrar", con el número de condiciones
+activas, que abre el generador de filtros: un diálogo con una fila por condición, cada una una
+columna con `filter()` y las entradas de esa columna en la fila de filtros. "Añadir condición",
+"Borrar todo" y "Aplicar" editan la lista; Escape o Cancelar la dejan como estaba y el foco vuelve
+al botón. Las condiciones se cumplen a la vez, y una posterior sobre la misma columna sustituye a
+la anterior. Al aplicar se escriben en los filtros de la cuadrícula, así que la fila de filtros,
+las vistas guardadas, las exportaciones y el evento `zeyn:filter` de un agente de IA comparten una
+sola lista, que el servidor limpia como se explica arriba.
+
 Shift+clic en un encabezado añade esa columna a las claves de orden. Un número en el encabezado muestra el orden.
 
 ## Columnas: fijar, redimensionar, ocultar, mover

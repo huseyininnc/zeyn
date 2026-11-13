@@ -107,6 +107,11 @@
       "render": "描画",
       "hint": "Alt+Shift+D または Escape でパネルを閉じます。"
     },
+    "inspect": {
+      "title": "要素のソース",
+      "none": "この要素にはソース行がありません。",
+      "hint": "Alt+Shift+I または Escape でインスペクターを閉じます。"
+    },
     "validation": {
       "required": "{label}は必須です。",
       "min_len": "{label}は{n}文字以上で入力してください。",

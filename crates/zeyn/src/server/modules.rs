@@ -210,6 +210,12 @@ pub(crate) const MODULES: &[Module] = &[
         needs: &[],
     },
     Module {
+        name: "sortable",
+        script: &["data-zeyn-sortable"],
+        style: &["z-sortable"],
+        needs: &["drag", "net"],
+    },
+    Module {
         name: "kanban",
         script: &["data-zeyn-kanban"],
         style: &["z-kanban"],
@@ -315,6 +321,8 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-doc"],
         needs: &[],
     },
+    #[cfg(debug_assertions)]
+    script("inspect", &["data-zeyn-src"]),
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -323,7 +331,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 23] = [
+const STYLES: [&str; 24] = [
     "components",
     "catalog",
     "content",
@@ -338,6 +346,7 @@ const STYLES: [&str; 23] = [
     "barcode",
     "inbox",
     "kanban",
+    "sortable",
     "calendar",
     "commerce",
     "thread",
@@ -511,7 +520,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 62] = [
+const FILES: [(&str, &str); 64] = [
     (
         "/_zeyn/display.css",
         include_str!("../../assets/display.css"),
@@ -551,6 +560,14 @@ const FILES: [(&str, &str); 62] = [
     ),
     ("/_zeyn/kanban.css", include_str!("../../assets/kanban.css")),
     ("/_zeyn/kanban.js", include_str!("../../assets/kanban.js")),
+    (
+        "/_zeyn/sortable.css",
+        include_str!("../../assets/sortable.css"),
+    ),
+    (
+        "/_zeyn/sortable.js",
+        include_str!("../../assets/sortable.js"),
+    ),
     ("/_zeyn/inbox.css", include_str!("../../assets/inbox.css")),
     ("/_zeyn/inbox.js", include_str!("../../assets/inbox.js")),
     (
@@ -642,6 +659,14 @@ const FILES: [(&str, &str); 62] = [
     ),
 ];
 
+/// The source inspector of debug builds (Alt+Shift+I), never part of a release build.
+#[cfg(debug_assertions)]
+const INSPECT_JS: &str = include_str!("../../assets/inspect.js");
+
+/// The stylesheet of the source inspector, which `inspect.js` links on first open.
+#[cfg(debug_assertions)]
+const INSPECT_CSS: &str = include_str!("../../assets/inspect.css");
+
 /// Asset paths served without authentication, like the runtime itself.
 pub(super) const ASSETS: [&str; FILES.len()] = {
     let mut paths = [""; FILES.len()];
@@ -664,6 +689,18 @@ pub(super) fn routes(mut router: Router<Arc<AppState>>) -> Router<Arc<AppState>>
                 }
             }),
         );
+    }
+    #[cfg(debug_assertions)]
+    {
+        router = router
+            .route(
+                "/_zeyn/inspect.js",
+                get(|| async { asset(INSPECT_JS, "text/javascript; charset=utf-8") }),
+            )
+            .route(
+                "/_zeyn/inspect.css",
+                get(|| async { asset(INSPECT_CSS, "text/css; charset=utf-8") }),
+            );
     }
     router
         .route("/_zeyn/prefs", get(prefs))

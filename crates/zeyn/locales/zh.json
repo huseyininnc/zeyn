@@ -107,6 +107,11 @@
       "render": "渲染",
       "hint": "按 Alt+Shift+D 或 Escape 关闭面板。"
     },
+    "inspect": {
+      "title": "元素的源码位置",
+      "none": "此元素没有源码行。",
+      "hint": "按 Alt+Shift+I 或 Escape 关闭检查器。"
+    },
     "validation": {
       "required": "{label}为必填项。",
       "min_len": "{label}至少需要 {n} 个字符。",

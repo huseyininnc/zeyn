@@ -82,6 +82,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.add_with(create)` و`.delete_with(action, M::id)` و`.batch_edit()`: زر "إضافة صف"، وزر ومفتاح
   للحذف، وتعديلات تُحفظ معًا. راجع [مرجع DataGrid](grid.md).
 - `.groupable()` و`.summary(label, |t| ...)` على عمود: يجمّع المستخدم حسبه من قائمته أو من لوحة التجميع، وتظهر تحته قيمة محسوبة من المجاميع.
+- `.filter_builder()`: زر "تصفية" يفتح نافذة لبناء شروط التصفية؛ وهي القائمة نفسها التي يستخدمها صف التصفية والعروض المحفوظة ووكلاء الذكاء الاصطناعي.
 - `.exportable()`: تصدير CSV للصفوف المصفّاة، يبثه الخادم (stream).
 
 ## أعمدة تُعرف وقت التشغيل

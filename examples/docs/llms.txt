@@ -18,7 +18,7 @@ The app listens on http://127.0.0.1:3000 (change `server.addr` in `config/app.js
 1. Read `my-app/AGENTS.md` and `my-app/.claude/skills/zeyn/SKILL.md`. They hold the rules and the patterns for this framework.
 2. Add features with `zeyn g feature <name>`: it creates `src/features/<name>/` with the folders `models/`, `services/`, `actions/` and `screens/`, one file per model, service, action and screen, and a working list screen. Add a screen with `zeyn g screen <feature> <name>`. Add `components/` by hand when a part of a screen is shared.
 3. Run `zeyn check` and `cargo test` after every change. Compiler errors say what to change.
-4. `.mcp.json` registers `zeyn mcp`, an MCP server with the tools `zeyn_docs`, `zeyn_describe`, `zeyn_check`, `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. `zeyn_docs` has the topics `rules`, `language` and `protocol`. With `search` or `page` the same tool searches and reads every docs page of the installed version.
+4. `.mcp.json` registers `zeyn mcp`, an MCP server with the tools `zeyn_docs`, `zeyn_describe`, `zeyn_inspect`, `zeyn_check`, `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. `zeyn_docs` has the topics `rules`, `language` and `protocol`. With `search` or `page` the same tool searches and reads every docs page of the installed version.
 
 For a library of features shared by several apps use `zeyn new my-domain --lib`.
 

@@ -1123,3 +1123,288 @@ async fn the_app_header_takes_the_site_header_slots_and_checks_data_permissions(
     let (status, _) = send(&plain, ask("1.0", "shop.read")).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[entity(table = "steps")]
+pub struct Step {
+    #[key]
+    pub id: StepId,
+    pub title: String,
+    pub list: i64,
+    pub rank: Rank,
+}
+
+/// Steps in two lists, ranked `F`, `V`, `k` in list 1 and `V` in list 2.
+#[derive(Clone)]
+pub struct Steps(std::sync::Arc<std::sync::Mutex<Vec<Step>>>);
+
+impl Service for Steps {}
+
+impl Steps {
+    fn seeded() -> Steps {
+        let step = |id: i64, title: &str, list: i64, rank: &str| Step {
+            id: StepId(id),
+            title: title.into(),
+            list,
+            rank: Rank::parse(rank).unwrap(),
+        };
+        Steps(std::sync::Arc::new(std::sync::Mutex::new(vec![
+            step(1, "Plan <it>", 1, "F"),
+            step(2, "Build", 1, "V"),
+            step(3, "Ship", 1, "k"),
+            step(4, "Other list", 2, "V"),
+        ])))
+    }
+
+    /// The ids of list 1 in rank order.
+    fn order(&self) -> Vec<i64> {
+        let mut rows: Vec<(Rank, i64)> = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|s| s.list == 1)
+            .map(|s| (s.rank.clone(), s.id.0))
+            .collect();
+        rows.sort();
+        rows.into_iter()
+            .map(|(_, id)| id)
+            .collect()
+    }
+}
+
+#[action(permission = "steps.read")]
+pub async fn search_steps(q: DataQuery, steps: Steps) -> Result<Page<Step>> {
+    let mut rows: Vec<Step> = steps
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|s| s.list == 1)
+        .cloned()
+        .collect();
+    rows.reverse();
+    Ok(q.apply(rows))
+}
+
+#[action(permission = "steps.write")]
+pub async fn reorder_steps(r: ReorderRequest<StepId>, steps: Steps) -> Result<()> {
+    let mut all = steps.0.lock().unwrap();
+    let rank = r.rank(|k| {
+        all.iter()
+            .find(|s| s.id == *k && s.list == 1)
+            .map(|s| s.rank.clone())
+    })?;
+    let row = all
+        .iter_mut()
+        .find(|s| s.id == r.key && s.list == 1)
+        .ok_or(Error::NotFound)?;
+    row.rank = rank;
+    Ok(())
+}
+
+#[screen(route = "/steps", permission = "steps.read")]
+pub fn steps_screen() -> Screen {
+    Screen::new("Steps")
+        .body(Paragraph::new("Plan the release"))
+        .body(
+            Card::new()
+                .add(Paragraph::new("Order"))
+                .add(
+                    Card::new().add(
+                        List::of(search_steps)
+                            .title("Steps")
+                            .item(|s: &Step| zeyn::ui::ListItem::new(s.title.clone()))
+                            .sort_option("By title", Step::title)
+                            .sort_option("By id", Step::id)
+                            .sortable(Step::rank, reorder_steps),
+                    ),
+                ),
+        )
+}
+
+fn steps_app(steps: Steps) -> axum::Router {
+    App::new("Test")
+        .i18n(I18n::new("en"))
+        .service(steps)
+        .auth(|h: &HeaderMap| {
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
+            Some(Identity::user("u").with_permissions(perms))
+        })
+        .feature(Feature::new("steps").screen(steps_screen))
+        .router()
+        .unwrap()
+}
+
+const STEPS_RW: &str = "steps.read,steps.write";
+
+fn reorder(perms: &str, node: &str, input: serde_json::Value) -> Request<Body> {
+    post(
+        "/_zeyn/data",
+        perms,
+        serde_json::json!({ "screen": "steps_screen", "params": null, "node": node, "key": "reorder", "input": input }),
+    )
+}
+
+#[tokio::test]
+async fn sortable_lists_render_a_handle_per_row_and_load_their_script() {
+    let router = steps_app(Steps::seeded());
+    let req = Request::get("/steps")
+        .header("x-perms", STEPS_RW)
+        .body(Body::empty())
+        .unwrap();
+    let (status, page) = send(&router, req).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains("data-zeyn-sortable"), "{page}");
+    assert!(page.contains("/_zeyn/sortable.css?v="), "its stylesheet");
+    assert!(page.contains(r#"data-zeyn-node="1.1.0""#), "a nested node");
+    assert_eq!(
+        page.matches(r#"class="z-sort-handle z-drag-handle""#)
+            .count(),
+        3
+    );
+    for key in ["1", "2", "3"] {
+        assert!(page.contains(&format!(r#"data-zeyn-key="{key}""#)), "{key}");
+    }
+    assert!(page.contains("Plan &lt;it&gt;") && !page.contains("Plan <it>"));
+    assert!(
+        !page.contains("data-zeyn-cards-sort"),
+        "the user's order is the order: no sort picker"
+    );
+    assert!(page.contains("Space lifts the row"));
+    for name in ["sortable.js", "drag.js", "net.js"] {
+        assert!(page.contains(&format!("/_zeyn/{name}?v=")), "{name}");
+    }
+    let (_, plain) = send(&app(None), get("/rows")).await;
+    assert!(
+        !plain.contains("/_zeyn/sortable.js"),
+        "only with a sortable list"
+    );
+}
+
+#[tokio::test]
+async fn reordering_takes_neighbor_keys_and_checks_csrf_and_permission() {
+    let steps = Steps::seeded();
+    let router = steps_app(steps.clone());
+    let to_top = serde_json::json!({ "key": "3", "after": null, "before": "1" });
+    let mut missing = reorder(STEPS_RW, "1.1.0", to_top.clone());
+    missing
+        .headers_mut()
+        .remove("x-zeyn-csrf");
+    assert_eq!(send(&router, missing).await.0, StatusCode::FORBIDDEN);
+    let (status, _) = send(&router, reorder("steps.read", "1.1.0", to_top.clone())).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the reorder action's permission"
+    );
+    assert_eq!(steps.order(), [1, 2, 3]);
+    let (status, body) = send(&router, reorder(STEPS_RW, "1.1.0", to_top.clone())).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(steps.order(), [3, 1, 2]);
+    let page = Request::get("/steps")
+        .header("x-perms", STEPS_RW)
+        .body(Body::empty())
+        .unwrap();
+    let (_, page) = send(&router, page).await;
+    let at = |text: &str| page.find(text).unwrap();
+    assert!(
+        at(">Ship<") < at(">Plan &lt;it&gt;<") && at(">Plan &lt;it&gt;<") < at(">Build<"),
+        "the list asks the action for its rows by rank"
+    );
+    let (status, _) = send(&router, reorder(STEPS_RW, "1.1.0", to_top)).await;
+    assert_eq!(status, StatusCode::OK, "the same request again");
+    assert_eq!(steps.order(), [3, 1, 2], "gives the same order");
+    let (status, _) = send(
+        &router,
+        reorder(
+            STEPS_RW,
+            "1.1.0",
+            serde_json::json!({ "key": "1", "after": "2", "before": null }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(steps.order(), [3, 2, 1]);
+    let bad = reorder(
+        STEPS_RW,
+        "x",
+        serde_json::json!({ "key": "1", "after": null, "before": "3" }),
+    );
+    assert_eq!(
+        send(&router, bad).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "not a node path"
+    );
+    for node in ["1.1", "1", "1.1.0.0"] {
+        let (status, _) = send(
+            &router,
+            reorder(
+                STEPS_RW,
+                node,
+                serde_json::json!({ "key": "1", "after": null, "before": "3" }),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{node}");
+    }
+}
+
+#[tokio::test]
+async fn reordering_refuses_foreign_and_bad_neighbors_and_stale_orders() {
+    let steps = Steps::seeded();
+    let router = steps_app(steps.clone());
+    let call = |input: serde_json::Value| reorder(STEPS_RW, "1.1.0", input);
+    let cases = [
+        (
+            serde_json::json!({ "key": "1", "after": "4", "before": null }),
+            StatusCode::NOT_FOUND,
+            "a neighbor from another list",
+        ),
+        (
+            serde_json::json!({ "key": "4", "after": "1", "before": "2" }),
+            StatusCode::NOT_FOUND,
+            "a row from another list",
+        ),
+        (
+            serde_json::json!({ "key": "1", "after": "1", "before": null }),
+            StatusCode::NOT_FOUND,
+            "the row as its own neighbor",
+        ),
+        (
+            serde_json::json!({ "key": "1", "after": "2", "before": "2" }),
+            StatusCode::NOT_FOUND,
+            "the same neighbor twice",
+        ),
+        (
+            serde_json::json!({ "key": "x".repeat(201), "after": null, "before": "2" }),
+            StatusCode::NOT_FOUND,
+            "a key over the cap",
+        ),
+        (
+            serde_json::json!({ "key": "abc", "after": null, "before": "2" }),
+            StatusCode::NOT_FOUND,
+            "a key of the wrong type",
+        ),
+        (
+            serde_json::json!({ "key": 1 }),
+            StatusCode::NOT_FOUND,
+            "not the shape of a request",
+        ),
+        (
+            serde_json::json!({ "key": "1", "after": "3", "before": "2" }),
+            StatusCode::CONFLICT,
+            "neighbors no longer in this order: someone moved them first",
+        ),
+    ];
+    for (input, want, why) in cases {
+        let (status, body) = send(&router, call(input)).await;
+        assert_eq!(status, want, "{why}: {body}");
+    }
+    assert_eq!(steps.order(), [1, 2, 3], "nothing moved");
+}

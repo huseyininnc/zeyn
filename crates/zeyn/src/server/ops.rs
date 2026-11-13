@@ -66,6 +66,7 @@ pub(super) fn is_asset(path: &str) -> bool {
         || path == "/_zeyn/enterprise.css"
         || path == "/_zeyn/dev.js"
         || (cfg!(debug_assertions) && path.starts_with("/_zeyn/devtools."))
+        || (cfg!(debug_assertions) && path.starts_with("/_zeyn/inspect."))
 }
 
 type Check = Arc<dyn Fn() -> BoxFuture<bool> + Send + Sync>;
@@ -638,6 +639,12 @@ const TEXTS: &[&str] = &[
     "devtools.render",
     #[cfg(debug_assertions)]
     "devtools.hint",
+    #[cfg(debug_assertions)]
+    "inspect.title",
+    #[cfg(debug_assertions)]
+    "inspect.none",
+    #[cfg(debug_assertions)]
+    "inspect.hint",
 ];
 
 /// Extra `<head>` markup: the enterprise runtime and its texts.

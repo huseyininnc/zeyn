@@ -62,8 +62,9 @@ impl ListItem {
     /// let row = ListItem::new("Release notes")
     ///     .meta(RelativeTime::new(DateTime::from_unix_ms(1_778_580_000_000)));
     /// ```
+    #[track_caller]
     pub fn meta(mut self, meta: impl Into<Node>) -> Self {
-        self.meta = Some(meta.into());
+        self.meta = Some(Node::placed(meta));
         self
     }
 
@@ -279,8 +280,9 @@ impl Repeat {
     }
 
     /// A node shown between two items, hidden from screen readers.
+    #[track_caller]
     pub fn separator(mut self, node: impl Into<Node>) -> Self {
-        self.separator = Some(node.into());
+        self.separator = Some(Node::placed(node));
         self
     }
 }

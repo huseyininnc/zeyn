@@ -22,6 +22,12 @@ const VERTICAL_GLYPH: &str =
 /// Declarations that keep a physical side, each with its reason.
 const ALLOWED: &[Allowed] = &[
     Allowed {
+        file: "sortable.css",
+        selector: ".z-sortable .z-sort-line",
+        property: "left",
+        reason: "the drop line is moved by a transform from boxes measured in page coordinates, which count from the left in both directions",
+    },
+    Allowed {
         file: "components.css",
         selector: ".z-chevron",
         property: "border-right",

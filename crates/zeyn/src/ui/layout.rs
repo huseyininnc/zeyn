@@ -44,8 +44,9 @@ impl Row {
     }
 
     /// Adds a column with weight 1.
+    #[track_caller]
     pub fn col(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self.weights.push(1);
         self
     }
@@ -117,8 +118,9 @@ impl Stack {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -174,8 +176,9 @@ impl Panel {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -286,16 +289,18 @@ impl Card {
 
     /// One action at the end of the title row, such as a link button or a menu button. Needs a
     /// title.
+    #[track_caller]
     pub fn action(mut self, node: impl Into<Node>) -> Self {
         self.action = Some(self.nodes.len());
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
     /// A footer under a divider, such as a "View all orders" link.
+    #[track_caller]
     pub fn footer(mut self, node: impl Into<Node>) -> Self {
         self.footer = Some(self.nodes.len());
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -303,8 +308,9 @@ impl Card {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 }
@@ -403,9 +409,10 @@ impl Tabs {
         }
     }
 
+    #[track_caller]
     pub fn tab(mut self, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.titles.push(title.into());
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -488,9 +495,10 @@ pub struct Split {
 
 impl Split {
     /// Two panes side by side; the first takes 40 percent.
+    #[track_caller]
     pub fn new(first: impl Into<Node>, second: impl Into<Node>) -> Self {
         Self {
-            nodes: vec![first.into(), second.into()],
+            nodes: vec![Node::placed(first), Node::placed(second)],
             ratio: 40,
             vertical: false,
         }
@@ -570,20 +578,22 @@ into_node!(ListDetail);
 
 impl ListDetail {
     /// The list, with the name of the list region for screen readers.
+    #[track_caller]
     pub fn new(label: impl Into<Text>, list: impl Into<Node>) -> Self {
         ListDetail {
             label: label.into(),
-            nodes: vec![list.into()],
+            nodes: vec![Node::placed(list)],
             has_detail: false,
             back: None,
         }
     }
 
     /// The detail of the selected row, `None` when no row is selected.
+    #[track_caller]
     pub fn detail(mut self, detail: Option<impl Into<Node>>) -> Self {
         if let Some(d) = detail {
             self.nodes.truncate(1);
-            self.nodes.push(d.into());
+            self.nodes.push(Node::placed(d));
             self.has_detail = true;
         }
         self
@@ -655,9 +665,10 @@ pub struct Deferred {
 into_node!(Deferred);
 
 impl Deferred {
+    #[track_caller]
     pub fn new(node: impl Into<Node>) -> Self {
         Deferred {
-            node: vec![node.into()],
+            node: vec![Node::placed(node)],
             lines: 3,
         }
     }
