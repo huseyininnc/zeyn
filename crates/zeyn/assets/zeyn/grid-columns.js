@@ -176,6 +176,12 @@ function pickPageSize(select) {
   loadGrid(grid, 'reset');
 }
 
+/** Fits a column from a double click on its resize handle and saves the width. */
+function fitColumn(th) {
+  autofit(th);
+  widthChanged(th.closest('[data-zeyn-grid]'));
+}
+
 /** Puts back the grid's own layout, sort and filters and forgets the saved view. */
 function resetView(grid) {
   const s = grids.get(grid);
@@ -481,6 +487,12 @@ function startResize(e, handle) {
 /** Arrow keys resize a focused handle by 16 px (64 px with Shift). Returns true when handled. */
 function resizeKey(e, handle) {
   const th = handle.closest('th');
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    autofit(th);
+    widthChanged(th.closest('[data-zeyn-grid]'));
+    return true;
+  }
   const rtl = getComputedStyle(th).direction === 'rtl';
   const step = e.shiftKey ? 64 : 16;
   const delta = { ArrowRight: step, ArrowLeft: -step }[e.key];
@@ -489,6 +501,41 @@ function resizeKey(e, handle) {
   setWidth(th, th.offsetWidth + (rtl ? -delta : delta));
   widthChanged(th.closest('[data-zeyn-grid]'));
   return true;
+}
+
+/** Width the contents of an element take on one line, without its own box. */
+function contentWidth(el) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  return range.getBoundingClientRect().width;
+}
+
+/**
+ * Fits a column to its widest content: the header label with its sort mark and menu button, and
+ * the cells of the rows in the page (the rows a virtual grid has drawn), within the resize
+ * limits. Contents are measured with a range, so a column can shrink as well as grow.
+ */
+function autofit(th) {
+  const grid = th.closest('[data-zeyn-grid]');
+  const i = cellsOf(th.parentElement).indexOf(th);
+  if (!grid || i < 0) return;
+  const pad = (el) => {
+    const cs = getComputedStyle(el);
+    return parseFloat(cs.paddingInlineStart) + parseFloat(cs.paddingInlineEnd);
+  };
+  const label = th.querySelector('.z-sort, .z-th-label');
+  let want = (label ? contentWidth(label) + 24 : contentWidth(th)) + (th.querySelector('.z-col-menu')?.offsetWidth ?? 0) + pad(th) + 8;
+  for (const tr of rows(grid)) {
+    const td = dataRow(tr) ? cellsOf(tr)[i] : null;
+    if (td?.isConnected) want = Math.max(want, contentWidth(td) + pad(td) + 4);
+  }
+  setWidth(th, Math.ceil(want));
+}
+
+/** Fits every shown column of a grid to its content and saves the widths with the view. */
+function autofitAll(grid) {
+  for (const th of grid.querySelectorAll(':scope > table > thead tr:not(.z-band-row) > th[data-field]')) autofit(th);
+  widthChanged(grid);
 }
 
 /** Items of the menu of one column: sort, pin, move, hide, choose columns, reset. */
@@ -538,6 +585,15 @@ function columnMenu(grid, th) {
     { label: t.menu_move_prev || 'Move left', disabled: i <= 0, run: move(-1) },
     { label: t.menu_move_next || 'Move right', disabled: i < 0 || i >= shown.length - 1, run: move(1) },
     { label: t.menu_hide || 'Hide column', disabled: shown.length <= 1, run: () => setColumns(grid, shown.filter((c) => c.field !== field)) },
+    { separator: true },
+    {
+      label: t.menu_autofit || 'Fit width to content',
+      run: () => {
+        autofit(th);
+        widthChanged(grid);
+      },
+    },
+    { label: t.menu_autofit_all || 'Fit all columns', run: () => autofitAll(grid) },
     {
       label: t.menu_filter || 'Filter',
       disabled: !th.dataset.filter,

@@ -237,7 +237,9 @@
         "hide": "Kolonu gizle",
         "columns": "Kolonlar",
         "filter": "Filtrele",
-        "reset": "Görünümü sıfırla"
+        "reset": "Görünümü sıfırla",
+        "autofit": "Genişliği içeriğe uydur",
+        "autofit_all": "Tüm sütunları uydur"
       },
       "agg": {
         "sum": "Toplam",
