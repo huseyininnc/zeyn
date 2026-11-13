@@ -79,6 +79,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - 紧跟在 `.row_action` 或 `.bulk_action` 之后的 `.confirm(message)` 和 `.tone(Tone::Danger)`：在该操作运行前，用与 `ActionButton::confirm` 相同的对话框询问（焦点先在“取消”上），并把按钮画成红色。
 - `.row_menu(|row| ContextMenu)`：行的右键菜单。
 - `.row_style(|row| Option<RowStyle>)`：危险、警告或成功样式的行。
+- `.add_with(create)`、`.delete_with(action, M::id)`、`.batch_edit()`:"添加行"按钮、删除按钮和
+  按键,以及一起保存的编辑。参见 [DataGrid 参考](grid.md)。
 - `.exportable()`：将筛选后的行导出为 CSV，由服务器以流方式输出。
 
 ## 运行时才确定的列

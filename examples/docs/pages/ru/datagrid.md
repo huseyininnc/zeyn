@@ -79,6 +79,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.confirm(message)` и `.tone(Tone::Danger)` сразу после `.row_action` или `.bulk_action`: спрашивает перед запуском этого действия в том же диалоге, что и `ActionButton::confirm` (фокус сначала на «Отмена»), и рисует его кнопку красной.
 - `.row_menu(|row| ContextMenu)`: контекстное меню строки по правому щелчку.
 - `.row_style(|row| Option<RowStyle>)`: строки danger, warning или success.
+- `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: кнопка «Добавить строку»,
+  кнопка и клавиша удаления и правки, сохраняемые вместе. См. [справочник DataGrid](grid.md).
 - `.exportable()`: экспорт отфильтрованных строк в CSV, потоком с сервера.
 
 ## Колонки, известные во время выполнения

@@ -165,14 +165,23 @@ function onFilter(control) {
 
 
 /**
- * Debounces the search box of a grid (`input[data-zeyn-grid-search]`, before the grid and its
- * selection bar) and reloads the grid from the start with the text as `q`. Each reload cancels
+ * The grid of an element in the tools above it (`.z-grid-tools`, before the selection bar and
+ * the grid), or `null`.
+ */
+function gridOfTools(el) {
+  let grid = el.closest('.z-grid-tools')?.nextElementSibling;
+  if (grid?.matches('[data-zeyn-bulk]')) grid = grid.nextElementSibling;
+  return grid?.matches('[data-zeyn-grid]') ? grid : null;
+}
+
+/**
+ * Debounces the search box of a grid (`input[data-zeyn-grid-search]`, in the tools before the
+ * grid) and reloads the grid from the start with the text as `q`. Each reload cancels
  * the one before it, and the result is announced in the grid's live region.
  */
 function onSearch(input) {
-  let grid = input.closest('.z-grid-search')?.nextElementSibling;
-  if (grid?.matches('[data-zeyn-bulk]')) grid = grid.nextElementSibling;
-  if (!grid?.matches('[data-zeyn-grid]')) return;
+  const grid = gridOfTools(input);
+  if (!grid) return;
   initGrid(grid);
   const s = grids.get(grid);
   grid.setAttribute('aria-busy', 'true');

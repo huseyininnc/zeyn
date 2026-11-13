@@ -99,6 +99,10 @@ async function loadGrid(grid, kind) {
   if (!grid) return;
   initGrid(grid);
   const s = grids.get(grid);
+  if (!mayLeave(grid)) {
+    grid.removeAttribute('aria-busy');
+    return;
+  }
   if (s.paging === 'virtual') return resetVirtual(grid, s, kind);
   const infinite = s.paging === 'infinite';
   const append = kind === 'more';

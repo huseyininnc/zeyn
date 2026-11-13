@@ -314,6 +314,27 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.search()
     }
 
+    pub fn add_with<A>(self, create: A) -> DataGrid<E>
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.grid.add_with(create)
+    }
+
+    pub fn delete_with<A, K>(self, action: A, key: Field<E, K>) -> DataGrid<E>
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        self.grid.delete_with(action, key)
+    }
+
+    pub fn batch_edit(self) -> DataGrid<E> {
+        self.grid.batch_edit()
+    }
+
     pub fn band<G: Into<DataGrid<E>>>(
         self,
         label: impl Into<Text>,

@@ -141,6 +141,32 @@ DataGrid::of(search_products)
 
 服务器按主键重新加载该行，并只通过 `Form::read` 应用可编辑的列和行版本，因此值的读取和验证与表单一致。对任何其他列提交的值会以 `403` 被拒绝。过期的版本返回 `409`，验证错误返回 `422` 并显示在对应的单元格中。
 
+## 添加、删除和批量编辑行
+
+```rust
+DataGrid::of(search_products)
+    .column(Product::name).editable()
+    .column(Product::price).editable()
+    .edit_with(save_product)
+    .add_with(create_product)
+    .delete_with(delete_products, Product::id)
+    .batch_edit()
+```
+
+`add_with(create)` 在表格上方显示"添加行"按钮。它在顶部打开一个空行,每个 `editable()` 列都有一个
+输入框;Enter 保存,Escape 放弃。服务器从模型的默认值开始,像表单一样只读取可编辑的列(其他字段
+以 `403` 拒绝,无效的值以 `422` 返回并显示在对应单元格中),检查 `create` 的权限后运行它,然后
+重新加载表格。虚拟表格不添加行。
+模型不能保留默认值的字段(例如非可选的日期)需要一个可编辑的列。
+
+`delete_with(action, Model::key)` 在选择栏中加入一个运行前会先询问的红色"删除"按钮,在某一行上按
+Delete 键会删除选中的行,没有选中时删除该行。动作像批量动作一样接收键,因此必须检查每条记录。
+
+`batch_edit()` 会保留行内编辑,直到用户全部保存。按 Enter 后,改动过的行保持编辑状态并在开头带有
+标记,表格上方的栏显示改动行的数量以及"保存更改"和"放弃更改"。保存时各行逐一通过行内编辑的路径
+发送,因此每行都单独读取、验证并检查版本;失败的行保留其改动并显示原因。加载其他行(翻页、排序、
+筛选、搜索)前,会先询问是否放弃未保存的更改。
+
 ## 主从明细
 
 `detail(|row| (screen, params))` 让每一行都能展开成一个基于该行构建的屏幕，只在用户打开时才加载：
