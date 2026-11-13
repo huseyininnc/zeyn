@@ -95,6 +95,18 @@
       "reason_cancel": "キャンセル",
       "reason_invalid": "理由を3〜300文字で入力してください。"
     },
+    "devtools": {
+      "title": "開発者ツール",
+      "refresh": "更新",
+      "close": "閉じる",
+      "empty": "記録されたリクエストはまだありません。",
+      "queries": "クエリ",
+      "effects": "エフェクト",
+      "topics": "トピック",
+      "build": "構築",
+      "render": "描画",
+      "hint": "Alt+Shift+D または Escape でパネルを閉じます。"
+    },
     "inspect": {
       "title": "要素のソース",
       "none": "この要素にはソース行がありません。",

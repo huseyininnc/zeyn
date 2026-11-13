@@ -95,6 +95,18 @@
       "reason_cancel": "Vazgeç",
       "reason_invalid": "3 ile 300 karakter arasında bir gerekçe yazın."
     },
+    "devtools": {
+      "title": "Geliştirici araçları",
+      "refresh": "Yenile",
+      "close": "Kapat",
+      "empty": "Henüz kaydedilmiş istek yok.",
+      "queries": "Sorgular",
+      "effects": "Etkiler",
+      "topics": "Konular",
+      "build": "Oluşturma",
+      "render": "Çizim",
+      "hint": "Alt+Shift+D veya Escape paneli kapatır."
+    },
     "inspect": {
       "title": "Öğenin kaynağı",
       "none": "Bu öğenin kaynak satırı yok.",
@@ -146,6 +158,7 @@
       "next": "Sonraki sayfa",
       "load_more": "Daha fazla yükle",
       "search": "Satırlarda ara",
+      "page_size": "Sayfa başına satır",
       "filter_builder": "Süz",
       "builder_title": "Satırları süz",
       "add_condition": "Koşul ekle",
@@ -224,7 +237,9 @@
         "hide": "Kolonu gizle",
         "columns": "Kolonlar",
         "filter": "Filtrele",
-        "reset": "Görünümü sıfırla"
+        "reset": "Görünümü sıfırla",
+        "autofit": "Genişliği içeriğe uydur",
+        "autofit_all": "Tüm sütunları uydur"
       },
       "agg": {
         "sum": "Toplam",

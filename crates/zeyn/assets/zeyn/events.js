@@ -60,6 +60,8 @@ document.addEventListener('paste', (e) => {
 });
 
 document.addEventListener('dblclick', (e) => {
+  const handle = e.target instanceof Element ? e.target.closest('[data-zeyn-grid] thead .z-resize') : null;
+  if (handle) return G?.fitColumn(handle.closest('th'));
   const td = e.target instanceof Element ? e.target.closest('[data-zeyn-rows] > tr > td[data-v]') : null;
   if (td && !td.closest('.z-editing') && G?.startEdit(td.parentElement, td)) return;
   if (e.target instanceof Element && e.target.closest('.z-editing')) return;
@@ -214,6 +216,7 @@ document.addEventListener('change', (e) => {
   else if (e.target.matches('[data-zeyn-timezone]')) changeTimeZone(e.target);
   else if (e.target.matches('[data-zeyn-theme-picker]')) changeTheme(e.target);
   else if (e.target.matches('[data-zeyn-density]')) changeDensity(e.target);
+  else if (e.target.matches('[data-zeyn-page-size-pick]')) G?.pickPageSize(e.target);
 });
 
 syncTimeZone();
