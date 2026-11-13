@@ -4024,3 +4024,41 @@ async fn column_menus_carry_the_autofit_texts_in_the_users_language() {
         page.body
     );
 }
+
+#[tokio::test]
+async fn export_takes_only_the_selected_rows_by_key() {
+    let (router, _) = export_router(reader());
+    let q = serde_json::json!({ "keys": ["3", "4", "999"], "columns": [{ "field": "code" }] });
+    let r = send(&router, export_get(0, q, "en")).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let lines: Vec<&str> = r.body.trim_end().lines().collect();
+    assert_eq!(lines.len(), 3, "{}", r.body);
+    assert!(
+        lines[1].contains("C-03") && lines[2].contains("C-04"),
+        "{}",
+        r.body
+    );
+    let q =
+        serde_json::json!({ "keys": ["3"], "filters": [{ "field": "code", "equals": "C-04" }] });
+    let r = send(&router, export_get(0, q, "en")).await;
+    assert_eq!(
+        r.body.trim_end().lines().count(),
+        1,
+        "the user's filters still apply: {}",
+        r.body
+    );
+}
+
+#[tokio::test]
+async fn export_refuses_too_many_selected_keys() {
+    let (router, _) = export_router(reader());
+    let keys: Vec<String> = (0..1_001)
+        .map(|i| i.to_string())
+        .collect();
+    let r = send(
+        &router,
+        export_get(0, serde_json::json!({ "keys": keys }), "en"),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.body);
+}

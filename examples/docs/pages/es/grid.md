@@ -397,7 +397,7 @@ el análisis de bloques de 200 filas con todas las columnas, algo que la virtual
 `exportable()` (y opcionalmente `export_permission(...)`, `export_limit(n)`) permite que el botón `Export::Csv`
 de la barra de herramientas descargue todas las filas coincidentes. El servidor pagina a través de la action del grid y
 transmite cada página de inmediato, con la disposición y el idioma del usuario. Las fórmulas se neutralizan. Hasta 100.000
-filas de forma predeterminada.
+filas de forma predeterminada. Mientras haya filas seleccionadas (una a una, no "todas las que coinciden"), las exportaciones CSV y Excel toman solo esas filas, como máximo 1.000, siempre dentro de los filtros del usuario; el servidor las busca por clave.
 
 Con la feature de Cargo `xlsx`, el botón `Export::Xlsx` de la barra de herramientas descarga las mismas filas como un
 libro de Excel (`GET /_zeyn/grid/export?format=xlsx`). Las celdas conservan sus tipos: números, dinero como

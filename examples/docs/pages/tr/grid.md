@@ -398,7 +398,7 @@ sütun sanallaştırmasının değiştirmediği, her sütunu içeren 200 satırl
 `exportable()` (ve isteğe bağlı olarak `export_permission(...)`, `export_limit(n)`) araç çubuğunun
 `Export::Csv` düğmesinin eşleşen her satırı indirmesini sağlar. Sunucu gridin action'ı üzerinden
 sayfaları gezer ve her sayfayı hemen, kullanıcının yerleşiminde ve dilinde akıtır. Formüller etkisiz
-hale getirilir. Varsayılan olarak 100.000 satıra kadar.
+hale getirilir. Varsayılan olarak 100.000 satıra kadar. Satırlar seçiliyken (tek tek; "eşleşen tümü" değil), CSV ve Excel dışa aktarmaları yalnızca o satırları alır, en çok 1.000 satır, yine kullanıcının süzgeçleri içinde; sunucu onları anahtarla bulur.
 
 `xlsx` Cargo özelliği (feature) ile araç çubuğunun `Export::Xlsx` düğmesi aynı satırları bir Excel
 çalışma kitabı olarak indirir (`GET /_zeyn/grid/export?format=xlsx`). Hücreler türlerini korur:

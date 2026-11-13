@@ -544,6 +544,18 @@ pub trait GridSource: Send + Sync {
 
     fn fetch(&self, ctx: Ctx, query: DataQuery) -> BoxFuture<Result<LoadedPage>>;
 
+    /// [`GridSource::fetch`] limited to the rows whose key is one of `keys`, for exporting the
+    /// selected rows. Sources without row keys refuse with `NotFound`.
+    fn fetch_keys(
+        &self,
+        ctx: Ctx,
+        query: DataQuery,
+        keys: &[String],
+    ) -> BoxFuture<Result<LoadedPage>> {
+        let _ = (ctx, query, keys);
+        Box::pin(async { Err(crate::action::Error::NotFound) })
+    }
+
     /// Loads rows as the user sees them: in a grouped or tree grid, the groups or rows under
     /// `path` (group values or ancestor keys from the client, checked here). Flat grids ignore
     /// `path`. Exports and bulk actions use [`GridSource::fetch`], which never groups.
