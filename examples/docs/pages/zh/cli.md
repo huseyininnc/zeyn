@@ -116,6 +116,12 @@ zeyn check --json
 
 `zeyn check` 还会读取应用的源代码，并附上文件和行号对以下情况发出警告：`W0106` 字符串包含没有 `src` 的 `<script>` 或 `onclick=` 这类内联事件处理器（CSP 会阻止两者），`W0107` 手写组件在没有 `escape(..)`、`r.text(..)` 或 `r.value(..)` 的情况下写出 HTML，`W0108` action 在没有限制范围的查询时返回整个 `Vec`，`W0109` 标记为 `.trusted()` 的 `DocumentViewer`。缺少 `permission` 或 `public` 不需要警告：它无法编译。
 
+## DevTools
+
+用 `cargo run`（或 `zeyn dev`）提供服务的调试构建会记录每个请求做了什么：运行的 screen 和 action、状态和耗时、screen 构建和渲染所用的时间、每条 SQL 语句及其耗时和受影响的行数，以及 action 返回的效果和主题。Alt+Shift+D 打开一个面板，列出最近 50 个请求；展开某个请求即可看到它的语句。`GET /_zeyn/devtools` 以 JSON 返回同样的列表。
+
+语句保存时不带参数，因此任何值都不会进入面板。发布构建中没有 DevTools：没有相关代码、路由，也不为它占用内存。自行提供 `App::router` 的应用或测试可以用 `zeyn::server::devtools(true)` 打开它。
+
 ## Docker
 
 生成的 `Dockerfile` 分两个阶段构建，并在 distroless 镜像上以没有 root 权限的用户运行。二进制文件用 `<app> health` 检查自身的健康状况，`HEALTHCHECK` 使用它。

@@ -116,6 +116,12 @@ zeyn check --json
 
 `zeyn check` también lee el código de la app y avisa, con archivo y línea, de `W0106` una cadena que contiene un `<script>` sin `src` o un manejador de eventos en línea como `onclick=` (la CSP bloquea ambos), `W0107` un componente escrito a mano que escribe HTML sin `escape(..)`, `r.text(..)` ni `r.value(..)`, `W0108` una action que devuelve un `Vec` entero sin una consulta que lo limite y `W0109` un `DocumentViewer` marcado `.trusted()`. Un `permission` o `public` ausente no necesita aviso: no compila.
 
+## DevTools
+
+Una compilación de depuración servida con `cargo run` (o `zeyn dev`) registra lo que hizo cada solicitud: la pantalla y la acción que ejecutó, su estado y su tiempo, cuánto tardó la pantalla en construirse y en renderizarse, cada sentencia SQL con su tiempo y las filas afectadas, y los efectos y temas que devolvió la acción. Alt+Shift+D abre un panel con las últimas 50 solicitudes; cada una se abre para mostrar sus sentencias. `GET /_zeyn/devtools` devuelve la misma lista en JSON.
+
+Las sentencias se guardan sin sus argumentos, así que ningún valor llega al panel. Las compilaciones de release no tienen DevTools: ni código, ni ruta, ni memoria para ellas. Una aplicación que sirve `App::router` por su cuenta, o una prueba, las activa con `zeyn::server::devtools(true)`.
+
 ## Docker
 
 El `Dockerfile` generado compila en dos etapas y se ejecuta sobre una imagen distroless con un usuario sin privilegios de root. El binario comprueba su propia salud con `<app> health`, que usa el `HEALTHCHECK`.

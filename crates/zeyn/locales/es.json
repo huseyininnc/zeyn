@@ -95,6 +95,18 @@
       "reason_cancel": "Cancelar",
       "reason_invalid": "Escribe un motivo de entre 3 y 300 caracteres."
     },
+    "devtools": {
+      "title": "Herramientas de desarrollo",
+      "refresh": "Actualizar",
+      "close": "Cerrar",
+      "empty": "Aún no hay solicitudes registradas.",
+      "queries": "Consultas",
+      "effects": "Efectos",
+      "topics": "Temas",
+      "build": "Construcción",
+      "render": "Renderizado",
+      "hint": "Alt+Shift+D o Escape cierra el panel."
+    },
     "validation": {
       "required": "{label} es obligatorio.",
       "min_len": "{label} debe tener al menos {n} caracteres.",

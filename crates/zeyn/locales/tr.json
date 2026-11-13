@@ -95,6 +95,18 @@
       "reason_cancel": "Vazgeç",
       "reason_invalid": "3 ile 300 karakter arasında bir gerekçe yazın."
     },
+    "devtools": {
+      "title": "Geliştirici araçları",
+      "refresh": "Yenile",
+      "close": "Kapat",
+      "empty": "Henüz kaydedilmiş istek yok.",
+      "queries": "Sorgular",
+      "effects": "Etkiler",
+      "topics": "Konular",
+      "build": "Oluşturma",
+      "render": "Çizim",
+      "hint": "Alt+Shift+D veya Escape paneli kapatır."
+    },
     "validation": {
       "required": "{label} alanı zorunludur.",
       "min_len": "{label} en az {n} karakter olmalıdır.",

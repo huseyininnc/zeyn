@@ -95,6 +95,18 @@
       "reason_cancel": "取消",
       "reason_invalid": "请填写 3 到 300 个字符的理由。"
     },
+    "devtools": {
+      "title": "开发者工具",
+      "refresh": "刷新",
+      "close": "关闭",
+      "empty": "尚未记录任何请求。",
+      "queries": "查询",
+      "effects": "效果",
+      "topics": "主题",
+      "build": "构建",
+      "render": "渲染",
+      "hint": "按 Alt+Shift+D 或 Escape 关闭面板。"
+    },
     "validation": {
       "required": "{label}为必填项。",
       "min_len": "{label}至少需要 {n} 个字符。",

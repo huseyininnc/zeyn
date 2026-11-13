@@ -95,6 +95,18 @@
       "reason_cancel": "रद्द करें",
       "reason_invalid": "3 से 300 अक्षरों के बीच का कारण लिखें।"
     },
+    "devtools": {
+      "title": "डेवलपर टूल",
+      "refresh": "रीफ़्रेश करें",
+      "close": "बंद करें",
+      "empty": "अभी तक कोई अनुरोध दर्ज नहीं हुआ।",
+      "queries": "क्वेरी",
+      "effects": "इफ़ेक्ट",
+      "topics": "टॉपिक",
+      "build": "बिल्ड",
+      "render": "रेंडर",
+      "hint": "Alt+Shift+D या Escape पैनल बंद करता है।"
+    },
     "validation": {
       "required": "{label} आवश्यक है।",
       "min_len": "{label} में कम से कम {n} अक्षर होने चाहिए।",
