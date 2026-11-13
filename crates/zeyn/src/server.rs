@@ -1857,6 +1857,66 @@ impl App {
         })
     }
 
+    /// Builds the screen named `name` with an anonymous user in the default language and returns
+    /// its node tree: each node's path, component type, the Rust source line that placed it
+    /// (debug builds) and its children. `ZEYN_INSPECT=<screen> cargo run` prints it, which is
+    /// what the `zeyn_inspect` tool of `zeyn mcp` returns.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/", public)]
+    /// pub fn home() -> Screen {
+    ///     Screen::new("Home").body(
+    ///         Stack::new()
+    ///             .add(Heading::h2("Hello"))
+    ///             .add(Badge::new("New")),
+    ///     )
+    /// }
+    ///
+    /// let app = App::new("Shop").feature(Feature::new("shop").screen(home));
+    /// let tree = tokio::runtime::Runtime::new()
+    ///     .unwrap()
+    ///     .block_on(app.inspect("home"));
+    /// assert_eq!(tree["nodes"][0]["children"][1]["path"], "0.1");
+    /// ```
+    pub async fn inspect(self, name: &str) -> Json {
+        let Some(entry) = self
+            .features
+            .iter()
+            .flat_map(|f| f.screens())
+            .find(|s| s.meta.name == name)
+            .copied()
+        else {
+            let names: Vec<&str> = self
+                .features
+                .iter()
+                .flat_map(|f| f.screens())
+                .map(|s| s.meta.name)
+                .collect();
+            return json!({ "error": format!("no screen named `{name}`"), "screens": names });
+        };
+        let locale = self.i18n.default_locale().to_string();
+        let ctx = Ctx::new(
+            Identity::anonymous(),
+            locale,
+            Arc::new(self.services),
+            Arc::new(self.i18n),
+        );
+        match (entry.build)(ctx, Json::Null).await {
+            Ok(screen) => json!({
+                "screen": name,
+                "nodes": screen
+                    .nodes()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| n.tree(i.to_string()))
+                    .collect::<Vec<_>>(),
+            }),
+            Err(e) => json!({ "error": format!("the screen could not be built: {e}") }),
+        }
+    }
+
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
@@ -2184,7 +2244,8 @@ impl App {
         Ok(router.layer(layer))
     }
 
-    /// Checks the app and serves it. With `ZEYN_DESCRIBE=1` it prints `describe()` and exits instead.
+    /// Checks the app and serves it. With `ZEYN_DESCRIBE=1` it prints `describe()` and exits
+    /// instead; with `ZEYN_INSPECT=<screen>` it prints `inspect(screen)` and exits.
     pub async fn serve(self, addr: &str) -> std::io::Result<()> {
         if std::env::var_os("ZEYN_DESCRIBE").is_some() {
             println!(
@@ -2193,6 +2254,15 @@ impl App {
             );
             return Ok(());
         }
+        if let Ok(screen) = std::env::var("ZEYN_INSPECT") {
+            let tree = self.inspect(&screen).await;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&tree).unwrap_or_default()
+            );
+            return Ok(());
+        }
+        crate::screen::Node::tag_sources(true);
         let flush = self.start_telemetry();
         let router = self.router().map_err(|problems| {
             for p in &problems {

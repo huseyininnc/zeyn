@@ -95,6 +95,11 @@
       "reason_cancel": "रद्द करें",
       "reason_invalid": "3 से 300 अक्षरों के बीच का कारण लिखें।"
     },
+    "inspect": {
+      "title": "तत्व का स्रोत",
+      "none": "इस तत्व की कोई स्रोत पंक्ति नहीं है।",
+      "hint": "Alt+Shift+I या Escape इंस्पेक्टर बंद करता है।"
+    },
     "validation": {
       "required": "{label} आवश्यक है।",
       "min_len": "{label} में कम से कम {n} अक्षर होने चाहिए।",

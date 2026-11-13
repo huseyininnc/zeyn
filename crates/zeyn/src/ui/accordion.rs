@@ -46,10 +46,11 @@ impl Accordion {
     }
 
     /// Adds a closed section with its title and content. At most [`MAX_ACCORDION_SECTIONS`].
+    #[track_caller]
     pub fn section(mut self, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         if self.nodes.len() < MAX_ACCORDION_SECTIONS {
             self.titles.push(title.into());
-            self.nodes.push(node.into());
+            self.nodes.push(Node::placed(node));
             self.open.push(false);
         }
         self

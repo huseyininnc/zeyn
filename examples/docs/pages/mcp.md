@@ -13,6 +13,7 @@ The project an agent works in carries its own rules and tools:
 |---|---|
 | `zeyn_docs` | Framework reference by topic: `rules`, `language`, `protocol`; `search: "words"` ranks the docs pages of this version, `page: "/language/forms"` returns one as Markdown |
 | `zeyn_describe` | Features, screens, routes, access, APIs, problems and missing translations of the app |
+| `zeyn_inspect` | The node tree of one screen: path, component type and the Rust `file:line:column` that placed each node |
 | `zeyn_check` | Compiles and reports problems; `fix: true` first rewrites renamed APIs |
 | `zeyn_test` | Runs `cargo test` and returns the end of the output |
 | `zeyn_new_feature` | Creates a feature folder and registers it |
@@ -26,6 +27,12 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ```
 
 `ZEYN_DESCRIBE=1 cargo run` prints the same description `zeyn_describe` returns and exits.
+
+### Source inspector
+
+Debug builds remember the line of Rust that placed each node on a screen (`Screen::body`, `Stack::add`, `Tabs::tab` and the other container methods). `ZEYN_INSPECT=<screen> cargo run` prints the node tree `zeyn_inspect` returns and exits.
+
+A debug build served with `cargo run` writes the line into the page as `data-zeyn-src` on each node's first element. Alt+Shift+I opens an overlay that outlines the node under the pointer or the focused element and names its line, followed by the lines of the nodes that hold it; Alt+Shift+I or Escape closes it. Release builds keep no lines: a node stays one boxed pointer, the page carries no attribute and the inspector script is not in the binary.
 
 ## Agents that use an app
 

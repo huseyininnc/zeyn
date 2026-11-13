@@ -254,27 +254,32 @@ pub struct SiteHeader {
 pub(crate) const SLOT_NAMES: [&str; 4] = ["start", "center", "end", "bottom"];
 
 impl SiteHeader {
+    #[track_caller]
     fn put(mut self, slot: usize, node: impl Into<Node>) -> Self {
-        self.slots[slot].push(node.into());
+        self.slots[slot].push(Node::placed(node));
         self
     }
 
     /// A component before the brand, such as a back link or a logo.
+    #[track_caller]
     pub fn start(self, node: impl Into<Node>) -> Self {
         self.put(0, node)
     }
 
     /// A component in the middle of the bar, such as a search box.
+    #[track_caller]
     pub fn center(self, node: impl Into<Node>) -> Self {
         self.put(1, node)
     }
 
     /// A component at the end of the bar, such as a cart link.
+    #[track_caller]
     pub fn end(self, node: impl Into<Node>) -> Self {
         self.put(2, node)
     }
 
     /// A full width row under the bar, such as chips or tabs.
+    #[track_caller]
     pub fn bottom(self, node: impl Into<Node>) -> Self {
         self.put(3, node)
     }

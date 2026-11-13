@@ -95,6 +95,11 @@
       "reason_cancel": "Vazgeç",
       "reason_invalid": "3 ile 300 karakter arasında bir gerekçe yazın."
     },
+    "inspect": {
+      "title": "Öğenin kaynağı",
+      "none": "Bu öğenin kaynak satırı yok.",
+      "hint": "Alt+Shift+I veya Escape denetçiyi kapatır."
+    },
     "validation": {
       "required": "{label} alanı zorunludur.",
       "min_len": "{label} en az {n} karakter olmalıdır.",

@@ -129,4 +129,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP 서버
 
-`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.
+`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_inspect`(Screen의 노드 트리와 각 노드를 배치한 Rust 줄), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.

@@ -62,7 +62,10 @@ async fn dev_events() -> Response {
 
 /// Static assets that skip IP rules and rate limits like the other runtime files.
 pub(super) fn is_asset(path: &str) -> bool {
-    path == "/_zeyn/enterprise.js" || path == "/_zeyn/enterprise.css" || path == "/_zeyn/dev.js"
+    path == "/_zeyn/enterprise.js"
+        || path == "/_zeyn/enterprise.css"
+        || path == "/_zeyn/dev.js"
+        || (cfg!(debug_assertions) && path.starts_with("/_zeyn/inspect."))
 }
 
 type Check = Arc<dyn Fn() -> BoxFuture<bool> + Send + Sync>;
@@ -615,6 +618,12 @@ const TEXTS: &[&str] = &[
     "privacy.reason_continue",
     "privacy.reason_cancel",
     "privacy.reason_invalid",
+    #[cfg(debug_assertions)]
+    "inspect.title",
+    #[cfg(debug_assertions)]
+    "inspect.none",
+    #[cfg(debug_assertions)]
+    "inspect.hint",
 ];
 
 /// Extra `<head>` markup: the enterprise runtime and its texts.
