@@ -1,4 +1,5 @@
-//! Drives the app through its router, without opening a port.
+//! Drives the app in memory with `zeyn::testing::TestApp`: the same router, checks and access
+//! rules as the served app, without opening a port. See "Testing" in the Zeyn docs.
 
 #![allow(clippy::unwrap_used)]
 
@@ -7,65 +8,69 @@ mod app;
 #[path = "../src/features/mod.rs"]
 mod features;
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use http_body_util::BodyExt;
-use tower::ServiceExt;
-use zeyn::{Config, StaticSource};
+use zeyn::testing::{TestApp, json};
+use zeyn::{Config, Identity, StaticSource};
 
-async fn router() -> axum::Router {
-    let config = Config::load(vec![Box::new(StaticSource(Default::default()))])
+async fn config() -> Config {
+    Config::load(vec![Box::new(StaticSource(Default::default()))])
         .await
-        .unwrap();
-    app::app(config)
         .unwrap()
-        .router()
-        .unwrap()
+}
+
+/// The app with its own sign in (`DevAuth` in debug builds).
+async fn test_app() -> TestApp {
+    TestApp::new(app::app(config().await).unwrap())
 }
 
 #[tokio::test]
 async fn the_app_has_no_structural_problems() {
-    let config = Config::load(vec![]).await.unwrap();
-    assert_eq!(app::app(config).unwrap().check(), Ok(()));
+    assert_eq!(
+        app::app(config().await)
+            .unwrap()
+            .check(),
+        Ok(())
+    );
 }
 
 #[tokio::test]
 async fn the_notes_list_opens() {
-    let res = router()
-        .await
-        .oneshot(
-            Request::get("/notes/")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
-    let body = String::from_utf8(
-        res.into_body()
-            .collect()
-            .await
-            .unwrap()
-            .to_bytes()
-            .to_vec(),
-    )
-    .unwrap();
-    assert!(body.contains("data-zeyn-grid"));
+    let page = test_app().await.get("/notes/").await;
+    assert_eq!(page.status, 200);
+    assert!(page.body.contains("data-zeyn-grid"));
 }
 
 #[tokio::test]
 async fn saving_through_the_api_validates_the_title() {
-    let req = Request::post("/api/v1/notes/save_note")
-        .header("authorization", "Bearer dev")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            r#"{"id":0,"title":"","body":null,"due":null,"done":false,"version":0}"#,
-        ))
-        .unwrap();
-    let res = router()
+    let note =
+        json!({ "id": 0, "title": "", "body": null, "due": null, "done": false, "version": 0 });
+    let res = test_app()
         .await
-        .oneshot(req)
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        .api("notes", "save_note", note)
+        .await;
+    assert_eq!(res.status, 422);
+}
+
+#[tokio::test]
+async fn the_editor_saves_a_note_and_the_list_shows_it() {
+    let app = test_app().await;
+    let saved = app
+        .submit(
+            "note_editor",
+            json!({ "id": null }),
+            "0",
+            json!({ "title": "Call Ada" }),
+        )
+        .await;
+    assert_eq!(saved.status, 200, "{}", saved.body);
+    assert_eq!(saved.effects(), ["toast", "close_and_refresh"]);
+    let rows = app
+        .grid("note_list", json!(null), "0", json!({}))
+        .await;
+    assert!(rows.body.contains("Call Ada"), "{}", rows.body);
+}
+
+#[tokio::test]
+async fn a_user_without_permissions_cannot_open_the_notes() {
+    let app = TestApp::signed_in(app::app(config().await).unwrap(), Identity::user("guest"));
+    assert_eq!(app.get("/notes/").await.status, 403);
 }

@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## テスト
 
-テストはルーターを構築し、メモリ上で呼び出します。
+`zeyn::testing::TestApp` はアプリをメモリ上で動かします。提供中のアプリと同じルーター、チェック、アクセスルールを使い、ポートは開きません。Angular の `TestBed` や Flutter のウィジェットテスターに当たるもので、アプリを構築し、ユーザーでサインインし、画面を開き、フォームを送信し、グリッドのページを読み込み、アクションを呼び出してから、ステータス、HTML、JSON を確認します。CSRF トークンは自動で送ります。`zeyn new` はこの形で `tests/app.rs` を書きます。
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| 呼び出し | 内容 |
+|---|---|
+| `TestApp::new(app)` | アプリ自身のサインイン方法のままのアプリ。`App::check` が問題を見つけると、その問題とともに panic します |
+| `TestApp::signed_in(app, identity)` | すべてのリクエストを `identity` としてサインインさせ、各権限で何ができるかを試します |
+| `.header(name, value)` | すべてのリクエストに付けるヘッダー。たとえば `accept-language` |
+| `get(path)` | ページ、ファイル、エンドポイント |
+| `submit(screen, params, node, values)` | ブラウザーと同じようにフォームを送信します。成功すると `effects()` 付きの `200`、ルール違反ではフィールドごとの `errors` 付きの `422`、権限がなければ `403` |
+| `grid(screen, params, node, query)` | JSON の `DataQuery` でグリッドの 1 ページを取得します。HTML の `rows` と `total` |
+| `api(feature, action, input)` | `Feature::api` で公開したアクションを呼び出します |
+| `send(request)` | その他のリクエスト |
+
+どの呼び出しも、`status`、`headers`、`body`、`json()`、`effects()` を持つ `TestResponse` を返します。
+
+画面はサーバーなしでも動きます。引数のない `#[screen]` には `run()` があり、`screen.html(&META)` で描画し、`screen.schema(&META)` で記述を得て、`App::check_page(&screen)` でページのチェックを実行します。HTML そのものではなく、ユーザーにできること（ステータス、エフェクト、グリッドの行）をテストし、変更のたびに `cargo test` を実行してください。

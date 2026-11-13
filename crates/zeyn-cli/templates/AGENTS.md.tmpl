@@ -35,7 +35,7 @@ src/features/<name>/     one folder per feature
     actions/             #[action] functions, one file each
     screens/             #[screen] functions, one file each
     components/          parts of screens (a toolbar, a panel), added by hand when needed
-tests/                   tests that drive the app through its router
+tests/                   `zeyn::testing::TestApp` drives the app in memory
 ```
 
 Each folder has a `mod.rs` that lists its files. `zeyn g feature` creates `models/`, `services/`,

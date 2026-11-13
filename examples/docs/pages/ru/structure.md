@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## Тесты
 
-Тесты создают роутер и вызывают его в памяти:
+`zeyn::testing::TestApp` запускает приложение в памяти: тот же маршрутизатор, те же проверки и те же правила доступа, что и у работающего приложения, без открытия порта. Он играет роль `TestBed` в Angular или widget tester во Flutter: соберите приложение, войдите от имени пользователя, откройте экран, отправьте форму, загрузите страницу таблицы или вызовите действие, а затем проверьте статус, HTML или JSON. Токен CSRF он отправляет сам. `zeyn new` пишет `tests/app.rs` именно так.
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| Вызов | Что делает |
+|---|---|
+| `TestApp::new(app)` | Приложение со своим входом. Завершается panic с проблемами, которые нашёл `App::check` |
+| `TestApp::signed_in(app, identity)` | Каждый запрос выполняется от имени `identity`, чтобы проверить, что разрешает каждое право |
+| `.header(name, value)` | Заголовок для каждого запроса, например `accept-language` |
+| `get(path)` | Страница, файл или endpoint |
+| `submit(screen, params, node, values)` | Отправляет форму так же, как браузер: `200` с `effects()`, `422` с `errors` по полям, `403` без права |
+| `grid(screen, params, node, query)` | Страница таблицы с `DataQuery` в JSON: `rows` в HTML и `total` |
+| `api(feature, action, input)` | Вызывает действие, опубликованное через `Feature::api` |
+| `send(request)` | Любой другой запрос |
+
+Каждый вызов возвращает `TestResponse` с `status`, `headers`, `body`, `json()` и `effects()`.
+
+Экран работает и без сервера: у `#[screen]` без аргументов есть `run()`, `screen.html(&META)` отрисовывает его, `screen.schema(&META)` описывает, а `App::check_page(&screen)` запускает проверки страницы. Проверяйте то, что может сделать пользователь (статус, эффект, строку таблицы), а не точный HTML, и запускайте `cargo test` после каждого изменения.
