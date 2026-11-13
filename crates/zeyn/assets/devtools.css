@@ -1,0 +1,108 @@
+/* DevTools panel of debug builds (devtools.js), linked on first open. */
+.z-devtools {
+  position: fixed;
+  z-index: 2147483645;
+  inset-inline: 0;
+  inset-block-end: 0;
+  max-block-size: 50vh;
+  overflow: auto;
+  padding: 0.5rem 1rem 1rem;
+  border-block-start: 1px solid var(--z-border-strong, var(--z-border));
+  background: var(--z-surface);
+  color: var(--z-text);
+  box-shadow: var(--z-shadow-3);
+  font-size: var(--z-font-size-sm, 0.875rem);
+}
+
+.z-devtools-head {
+  position: sticky;
+  inset-block-start: -0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+  background: var(--z-surface);
+}
+
+.z-devtools-head h2 {
+  margin: 0;
+  margin-inline-end: auto;
+  font-size: var(--z-font-size, 1rem);
+}
+
+.z-devtools-button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-sm, 4px);
+  background: var(--z-surface-2, var(--z-surface));
+  color: var(--z-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.z-devtools-button:hover {
+  background: var(--z-hover, var(--z-surface-2));
+}
+
+.z-devtools-button:focus-visible,
+.z-devtools summary:focus-visible {
+  outline: 2px solid var(--z-focus, var(--z-accent));
+  outline-offset: 2px;
+}
+
+.z-devtools-hint {
+  margin: 0 0 0.5rem;
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs, 0.75rem);
+}
+
+.z-devtools-item {
+  border-block-start: 1px solid var(--z-border);
+  padding-block: 0.25rem;
+}
+
+.z-devtools summary {
+  cursor: pointer;
+  font-family: var(--z-font-mono, monospace);
+  overflow-wrap: anywhere;
+}
+
+.z-devtools-failed {
+  color: var(--z-danger);
+}
+
+.z-devtools-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.125rem 1rem;
+  margin-block: 0.25rem 0;
+  margin-inline: 1rem 0;
+}
+
+.z-devtools-facts dt {
+  color: var(--z-text-muted);
+}
+
+.z-devtools-facts dd {
+  margin: 0;
+}
+
+.z-devtools h3 {
+  margin-block: 0.5rem 0.25rem;
+  margin-inline: 1rem 0;
+  font-size: inherit;
+}
+
+.z-devtools-queries {
+  margin: 0;
+  padding-inline-start: 2.5rem;
+}
+
+.z-devtools-queries code {
+  font-family: var(--z-font-mono, monospace);
+  overflow-wrap: anywhere;
+}
+
+.z-devtools-ms {
+  color: var(--z-text-muted);
+}

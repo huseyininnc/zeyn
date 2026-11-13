@@ -95,6 +95,18 @@
       "reason_cancel": "إلغاء",
       "reason_invalid": "اكتب سببًا بين 3 و300 حرف."
     },
+    "devtools": {
+      "title": "أدوات المطوّر",
+      "refresh": "تحديث",
+      "close": "إغلاق",
+      "empty": "لا توجد طلبات مسجّلة بعد.",
+      "queries": "الاستعلامات",
+      "effects": "التأثيرات",
+      "topics": "المواضيع",
+      "build": "البناء",
+      "render": "العرض",
+      "hint": "يغلق Alt+Shift+D أو Escape اللوحة."
+    },
     "inspect": {
       "title": "مصدر العنصر",
       "none": "ليس لهذا العنصر سطر مصدر.",

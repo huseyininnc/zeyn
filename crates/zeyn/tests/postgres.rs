@@ -125,3 +125,60 @@ async fn postgres_runs_migrations() {
         std::fs::remove_dir_all(&dir).ok();
     }
 }
+
+/// A screen that reads the database while it is built, for the DevTools test.
+#[cfg(debug_assertions)]
+#[zeyn::prelude::screen(route = "/counted", public)]
+async fn counted(_: (), db: Db) -> zeyn::prelude::Result<zeyn::prelude::Screen> {
+    db.execute("SELECT 1", vec![]).await?;
+    Ok(zeyn::prelude::Screen::new("Counted"))
+}
+
+#[cfg(debug_assertions)]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_statements_show_in_the_devtools_with_their_time() {
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+    use zeyn::prelude::{App, Feature};
+    for url in urls("ZEYN_TEST_PG") {
+        let db = Db::connect(&url, PoolLimits::default())
+            .await
+            .unwrap();
+        let router = App::new("Counted")
+            .service(db)
+            .feature(Feature::new("counted").screen(counted))
+            .router()
+            .unwrap();
+        let get = |path: &str| {
+            axum::http::Request::get(path)
+                .body(axum::body::Body::empty())
+                .unwrap()
+        };
+        zeyn::server::devtools(true);
+        router
+            .clone()
+            .oneshot(get("/counted"))
+            .await
+            .unwrap();
+        let res = router
+            .oneshot(get("/_zeyn/devtools"))
+            .await
+            .unwrap();
+        zeyn::server::devtools(false);
+        let bytes = res
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let log: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let page = &log["requests"][0];
+        assert_eq!(page["query_count"], 1, "{log}");
+        assert_eq!(page["queries"][0]["sql"], "SELECT 1");
+        assert!(
+            page["queries"][0]["ms"]
+                .as_f64()
+                .is_some()
+        );
+    }
+}

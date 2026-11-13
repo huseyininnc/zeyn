@@ -116,6 +116,12 @@ zeyn check --json
 
 `zeyn check`는 앱의 소스도 읽고 파일과 줄을 붙여 다음을 경고합니다. `W0106`은 `src` 없는 `<script>`나 `onclick=` 같은 인라인 이벤트 핸들러를 담은 문자열(CSP가 둘 다 막습니다), `W0107`은 `escape(..)`, `r.text(..)`, `r.value(..)` 없이 HTML을 쓰는 직접 작성한 컴포넌트, `W0108`은 범위를 제한하는 쿼리 없이 `Vec` 전체를 반환하는 action, `W0109`는 `.trusted()`로 표시한 `DocumentViewer`입니다. `permission`이나 `public`이 빠지면 경고할 필요도 없이 컴파일되지 않습니다.
 
+## DevTools
+
+`cargo run`(또는 `zeyn dev`)으로 서비스하는 디버그 빌드는 각 요청이 한 일을 기록합니다. 실행한 Screen과 Action, 상태와 시간, Screen을 빌드하고 렌더링하는 데 걸린 시간, 각 SQL 문과 그 시간 및 영향받은 행 수, Action이 반환한 효과와 토픽입니다. Alt+Shift+D는 최근 50개 요청을 보여 주는 패널을 열고, 각 요청을 펼치면 SQL 문이 나타납니다. `GET /_zeyn/devtools`는 같은 목록을 JSON으로 반환합니다.
+
+SQL 문은 인수 없이 저장되므로 어떤 값도 패널에 도달하지 않습니다. 릴리스 빌드에는 DevTools가 없습니다. 코드도, 경로도, 그것을 위한 메모리도 없습니다. `App::router`를 직접 서비스하는 앱이나 테스트는 `zeyn::server::devtools(true)`로 켭니다.
+
 ## Docker
 
 생성된 `Dockerfile`은 두 단계로 빌드하며 distroless 이미지에서 루트 권한이 없는 사용자로 실행됩니다. 바이너리는 `<app> health`로 스스로 상태를 확인하며, `HEALTHCHECK`가 이를 사용합니다.

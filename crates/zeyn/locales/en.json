@@ -95,6 +95,18 @@
       "reason_cancel": "Cancel",
       "reason_invalid": "Write a reason between 3 and 300 characters."
     },
+    "devtools": {
+      "title": "DevTools",
+      "refresh": "Refresh",
+      "close": "Close",
+      "empty": "No requests recorded yet.",
+      "queries": "Queries",
+      "effects": "Effects",
+      "topics": "Topics",
+      "build": "Build",
+      "render": "Render",
+      "hint": "Alt+Shift+D or Escape closes the panel."
+    },
     "inspect": {
       "title": "Source of the element",
       "none": "This element has no source line.",
