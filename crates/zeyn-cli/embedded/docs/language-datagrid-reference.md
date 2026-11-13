@@ -309,6 +309,35 @@ client sends only the path of group values it opens; the server checks its lengt
 value into a filter on that group's column, in front of the user's filters (`blank` for the empty
 group).
 
+## Grouping by the user and custom summaries
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` lets users group the rows by a column: "Group by this column" in its column menu,
+or by dragging its header onto the group panel above the grid. The panel shows a button per
+level that removes it; at most three levels (`MAX_USER_GROUPS`). The groups travel in the user's
+view (`DataGridView::group_by`), are saved with it and replace the grid's own `group_by` while
+set. The server keeps only groupable columns, never masked ones, and groups exactly as for
+`group_by`, so the action answers `DataQuery::group` in the same way. Tree and virtual grids do
+not group.
+
+`summary(label, |t| ...)` adds a value of your own under a column, in the footer and in every
+group row. It is computed on the server from `Totals`, the totals the grid declares
+(`t.get(field, Aggregate::Sum)`), so it never needs the rows: a margin from two sums, an average
+from a sum and a count. `None` leaves it empty. Integers are grouped and money and decimals are
+formatted in the user's language.
+
 ## Tree data
 
 `tree(Model::parent)` shows rows as a tree by an optional parent key: rows without a parent at the

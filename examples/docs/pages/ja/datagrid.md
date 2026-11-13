@@ -81,6 +81,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger、warning、success の行。
 - `.add_with(create)`、`.delete_with(action, M::id)`、`.batch_edit()`: 「行を追加」ボタン、削除の
   ボタンとキー、まとめて保存する編集。[DataGrid リファレンス](grid.md)を参照してください。
+- 列の `.groupable()`、`.summary(label, |t| ...)`: ユーザーは列メニューかグループパネルからその列でグループ化でき、集計から計算した値が列の下に表示されます。
 - `.exportable()`: フィルター後の行の CSV エクスポート。サーバーがストリーミングします。
 
 ## 実行時に決まる列

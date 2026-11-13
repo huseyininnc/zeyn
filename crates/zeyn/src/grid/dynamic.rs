@@ -576,6 +576,7 @@ impl GridSource for DynamicGrid {
             sort: Vec::new(),
             filters: Vec::new(),
             shape: view.shape.filter(|s| s.len() <= 32),
+            group_by: Vec::new(),
         }
     }
 

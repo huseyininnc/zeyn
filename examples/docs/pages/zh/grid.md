@@ -212,6 +212,31 @@ DataGrid::of(search_today)
 
 数据层负责响应 `DataQuery::group`：设置它之后，数据层返回 `Page::groups`（每个组的值、计数以及查询所要求的合计），按该字段上排序键的方向以值排序，像行一样分页，`total` 统计的是组数。`DataQuery::apply` 为内存中的数据完成这项工作；SQL 使用 `GROUP BY`。`group` 由网格设置，绝不从客户端读取。客户端只发送它所展开的组值路径；服务器检查其长度，并把每个值转换成针对该组所在列的过滤条件，放在用户的过滤条件之前（空组使用 `blank`）。
 
+## 用户分组与自定义汇总
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` 让用户按某一列对行分组:使用列菜单中的"按此列分组",或把列标题拖到表格上方的分组
+面板。面板为每一层显示一个可移除该层的按钮;最多三层(`MAX_USER_GROUPS`)。分组保存在用户的视图
+(`DataGridView::group_by`)中并随之保存,设置期间会取代表格自身的 `group_by`。服务器只接受可分组的
+列,从不接受掩码列,分组方式与 `group_by` 完全相同,因此动作以同样的方式响应 `DataQuery::group`。
+树形表格和虚拟表格不分组。
+
+`summary(label, |t| ...)` 在列下方的页脚和每个分组行中加入你自己的值。它在服务器上根据 `Totals`,
+即表格声明的合计(`t.get(field, Aggregate::Sum)`)计算,因此从不需要行数据:用两个总和算出利润率,
+用一个总和和一个计数算出平均值。返回 `None` 时留空。整数按位分组,金额和小数按用户的语言格式化。
+
 ## 树形数据
 
 `tree(Model::parent)` 通过一个可选的父主键以树形显示行：没有父级的行位于顶层，一行的子行在其展开时加载，每次一页，最多 32 层。

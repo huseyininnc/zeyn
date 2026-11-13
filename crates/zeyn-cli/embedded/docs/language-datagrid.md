@@ -82,6 +82,7 @@ Numbers and money are right aligned with tabular digits. Whole numbers are group
 - `.row_style(|row| Option<RowStyle>)`: danger, warning or success rows.
 - `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: an "Add row" button, a
   Delete button and key, and edits saved together. See the [DataGrid reference](grid.md).
+- `.groupable()`, `.summary(label, |t| ...)` on a column: users group by it from its menu or the group panel, and a value computed from the totals shows under it.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.
 
 ## Columns known at run time

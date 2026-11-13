@@ -81,6 +81,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger, warning या success पंक्तियाँ।
 - `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: "पंक्ति जोड़ें" बटन, हटाने का
   बटन और कुंजी, और साथ में सहेजे जाने वाले बदलाव। [DataGrid संदर्भ](grid.md) देखें।
+- कॉलम पर `.groupable()`, `.summary(label, |t| ...)`: उपयोगकर्ता उसके मेनू या समूह पैनल से उसके अनुसार समूह बनाता है, और योगों से गणना किया गया मान उसके नीचे दिखता है।
 - `.exportable()`: फ़िल्टर की गई पंक्तियों का CSV निर्यात, सर्वर द्वारा स्ट्रीम किया गया।
 
 ## रन टाइम पर पता चलने वाले कॉलम

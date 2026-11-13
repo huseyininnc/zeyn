@@ -220,6 +220,34 @@ DataGrid::of(search_today)
 
 データ層は `DataQuery::group` に応答します。これが設定されている場合、`Page::groups`（グループごとの値、件数、クエリが求める合計）を、そのフィールドの並べ替えキーの方向で値の順に並べ、行と同様にページングして返し、`total` はグループを数えます。`DataQuery::apply` はメモリ上のデータに対してこれを行い、SQL は `GROUP BY` を使います。`group` はグリッドが設定し、クライアントから読み取られることはありません。クライアントが送るのは、開いたグループの値のパスだけです。サーバーはその長さを検査し、各値を、そのグループの列に対するフィルターに変換して、ユーザーのフィルターの前に置きます（空のグループには `blank`）。
 
+## ユーザーによるグループ化と独自の集計
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` を付けた列で、ユーザーは行をグループ化できます。列メニューの「この列でグループ化」
+を使うか、ヘッダーをグリッドの上のグループパネルへドラッグします。パネルには階層ごとに、それを
+外すボタンが表示されます。階層は最大三つです (`MAX_USER_GROUPS`)。グループはユーザーのビュー
+(`DataGridView::group_by`) に含まれて保存され、設定されている間はグリッド自身の `group_by` の
+代わりになります。サーバーはグループ化できる列だけを受け入れ、マスクされた列は決して受け入れず、
+`group_by` と同じようにグループ化します。そのためアクションは `DataQuery::group` に同じ方法で
+答えます。ツリーと仮想グリッドはグループ化しません。
+
+`summary(label, |t| ...)` は、列の下のフッターと各グループ行に独自の値を加えます。値はサーバーで
+`Totals`、つまりグリッドが宣言した集計 (`t.get(field, Aggregate::Sum)`) から計算されるので、
+行を必要としません。二つの合計から利益率を、合計と件数から平均を出せます。`None` なら空のままです。
+整数は桁区切りされ、金額と小数はユーザーの言語で表示されます。
+
 ## ツリーデータ
 
 `tree(Model::parent)` は、任意の親キーによって行をツリーとして表示します。親のない行が最上位に置かれ、ある行の子は、それが開かれたときに 1 ページずつ、最大 32 階層まで読み込まれます。

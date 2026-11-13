@@ -81,6 +81,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger, warning, success 행.
 - `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: "행 추가" 버튼, 삭제 버튼과
   키, 함께 저장되는 편집. [DataGrid 참조](grid.md)를 보세요.
+- 열의 `.groupable()`, `.summary(label, |t| ...)`: 사용자가 열 메뉴나 그룹 패널에서 그 열로 그룹화하고, 합계로 계산한 값이 열 아래에 표시됩니다.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.
 
 ## 실행 시점에 정해지는 열

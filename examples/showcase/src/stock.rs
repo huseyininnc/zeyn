@@ -282,6 +282,7 @@ pub fn product_list() -> Screen {
                 .column(Product::unit)
                 .width(130)
                 .filter()
+                .groupable()
                 .editable()
                 .badge(|u| match u {
                     Unit::Piece => Tone::Neutral,

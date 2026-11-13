@@ -291,6 +291,35 @@ asla okunmaz. İstemci yalnızca açtığı grup değerlerinin yolunu gönderir;
 ve her değeri o grubun sütunu üzerinde bir filtreye, kullanıcının filtrelerinin önüne koyarak
 dönüştürür (boş grup için `blank`).
 
+## Kullanıcının gruplaması ve özel özetler
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` kullanıcının satırları bir sütuna göre gruplamasını sağlar: sütun menüsündeki "Bu
+sütuna göre grupla" ile ya da başlığını tablonun üstündeki gruplama alanına sürükleyerek. Alan her
+düzey için onu kaldıran bir düğme gösterir; en çok üç düzey (`MAX_USER_GROUPS`). Gruplar
+kullanıcının görünümünde (`DataGridView::group_by`) taşınır, onunla kaydedilir ve seçili olduğu
+sürece tablonun kendi `group_by` ayarının yerine geçer. Sunucu yalnızca gruplanabilir sütunları
+tutar, maskeli olanları asla; gruplamayı `group_by` ile aynı biçimde yapar, yani eylem
+`DataQuery::group` alanını aynı şekilde yanıtlar. Ağaç ve sanal tablolar gruplanmaz.
+
+`summary(label, |t| ...)` bir sütunun altına, alt bilgide ve her grup satırında kendi değerinizi
+ekler. Değer sunucuda `Totals` üzerinden, yani tablonun bildirdiği toplamlardan
+(`t.get(field, Aggregate::Sum)`) hesaplanır, bu yüzden satırlara hiç ihtiyaç duymaz: iki toplamdan
+bir kâr oranı, bir toplam ve bir sayımdan bir ortalama. `None` hücreyi boş bırakır. Tam sayılar
+gruplanır, para ve ondalıklı sayılar kullanıcının dilinde biçimlenir.
+
 ## Ağaç verisi
 
 `tree(Model::parent)` satırları isteğe bağlı bir üst anahtara göre ağaç olarak gösterir: üstü olmayan
