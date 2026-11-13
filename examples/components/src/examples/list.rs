@@ -17,44 +17,54 @@ pub struct Step {
     pub rank: Rank,
 }
 
-static STEPS: LazyLock<Mutex<Vec<Step>>> = LazyLock::new(|| {
-    let titles = [
-        "Collect the requirements",
-        "Sketch the screens",
-        "Write the entities",
-        "Add the actions",
-        "Review with the team",
-        "Ship it",
-    ];
+/// Steps with the given titles, ranked in that order.
+fn seed(titles: impl Iterator<Item = String>) -> Mutex<Vec<Step>> {
+    let titles: Vec<String> = titles.collect();
     let ranks = zeyn::rank::rebalance(titles.len());
     Mutex::new(
         titles
-            .iter()
+            .into_iter()
             .zip(ranks)
             .enumerate()
             .map(|(i, (title, rank))| Step {
                 id: StepId(i as i64 + 1),
-                title: title.to_string(),
+                title,
                 rank,
             })
             .collect(),
     )
+}
+
+static STEPS: LazyLock<Mutex<Vec<Step>>> = LazyLock::new(|| {
+    seed(
+        [
+            "Collect the requirements",
+            "Sketch the screens",
+            "Write the entities",
+            "Add the actions",
+            "Review with the team",
+            "Ship it",
+        ]
+        .into_iter()
+        .map(String::from),
+    )
 });
 
-/// The sample steps, in the order the list asks for (by rank).
-#[action(public)]
-pub async fn sample_steps(q: DataQuery) -> Result<Page<Step>> {
-    let all = STEPS
+static BACKLOG: LazyLock<Mutex<Vec<Step>>> =
+    LazyLock::new(|| seed((1..=500).map(|n| format!("Backlog item {n}"))));
+
+/// The rows of `store` in the order the list asks for (by rank).
+fn rows(store: &Mutex<Vec<Step>>, q: DataQuery) -> Page<Step> {
+    let all = store
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clone();
-    Ok(q.apply(all))
+    q.apply(all)
 }
 
-/// Gives a moved step the rank between its new neighbors.
-#[action(public)]
-pub async fn reorder_steps(r: ReorderRequest<StepId>) -> Result<()> {
-    let mut all = STEPS
+/// Gives a moved step of `store` the rank between its new neighbors.
+fn reorder(store: &Mutex<Vec<Step>>, r: ReorderRequest<StepId>) -> Result<()> {
+    let mut all = store
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     let rank = r.rank(|k| {
@@ -80,11 +90,44 @@ pub async fn reorder_steps(r: ReorderRequest<StepId>) -> Result<()> {
     Ok(())
 }
 
+/// The sample steps, in the order the list asks for (by rank).
+#[action(public)]
+pub async fn sample_steps(q: DataQuery) -> Result<Page<Step>> {
+    Ok(rows(&STEPS, q))
+}
+
+/// Gives a moved step the rank between its new neighbors.
+#[action(public)]
+pub async fn reorder_steps(r: ReorderRequest<StepId>) -> Result<()> {
+    reorder(&STEPS, r)
+}
+
+/// The sample backlog of 500 items, by rank.
+#[action(public)]
+pub async fn sample_backlog(q: DataQuery) -> Result<Page<Step>> {
+    Ok(rows(&BACKLOG, q))
+}
+
+/// Gives a moved backlog item the rank between its new neighbors.
+#[action(public)]
+pub async fn reorder_backlog(r: ReorderRequest<StepId>) -> Result<()> {
+    reorder(&BACKLOG, r)
+}
+
 pub fn sortable(_ctx: &Ctx) -> Node {
     List::of(sample_steps)
         .title("Release plan")
         .item(|s: &Step| ListItem::new(s.title.clone()))
         .sortable(Step::rank, reorder_steps)
+        .into()
+}
+
+pub fn sortable_virtual(_ctx: &Ctx) -> Node {
+    List::of(sample_backlog)
+        .title("Backlog")
+        .item(|s: &Step| ListItem::new(s.title.clone()))
+        .paging(Paging::virtual_scroll())
+        .sortable(Step::rank, reorder_backlog)
         .into()
 }
 
@@ -164,6 +207,7 @@ pub const ENTRY: Entry = Entry {
     examples: &[
         ex!(numbered_pages),
         ex!(sortable),
+        ex!(sortable_virtual),
         ex!(fixed),
         ex!(builder),
         ex!(virtual_rows),

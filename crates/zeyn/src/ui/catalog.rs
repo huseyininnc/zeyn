@@ -590,9 +590,7 @@ impl<E: Model> CardGrid<E> {
     /// built with a builder and no row height falls back to loading more rows.
     fn virtual_rows(&self) -> Option<(u32, u32)> {
         match self.paging {
-            Paging::Virtual { row_height, block }
-                if self.list && !self.rail && self.reorder.is_none() =>
-            {
+            Paging::Virtual { row_height, block } if self.list && !self.rail => {
                 let height = match (self.row_height, &self.builder) {
                     (Some(h), _) => h,
                     (None, None) => row_height,
@@ -624,6 +622,9 @@ impl<E: Model> CardGrid<E> {
     /// action refuses (no permission, a neighbor from another list, or `Error::Conflict` because
     /// someone else moved rows first), the row goes back and the reason is shown. Sort options
     /// are left out and numbered pages load more instead, because the user's order is the order.
+    /// A list with `Paging::virtual_scroll()` stays virtual: a dragged row scrolls the list when
+    /// it is held near its top or bottom edge (as every sortable list and the page do), and the
+    /// rows show the new order once the server has stored it.
     ///
     /// ```ignore
     /// #[action(permission = "tasks.write")]
@@ -934,10 +935,30 @@ impl<E: Model> CardGrid<E> {
             .map(|t| r.text(t))
             .unwrap_or_else(|| t("list"));
         out.push_str(&format!(
-            r#"<section class="z-cards z-cards-rows z-vlist" data-zeyn-vlist data-zeyn-row-height="{height}" data-zeyn-block="{block}" data-zeyn-total="{total}" data-testid="{}.cards" data-text-error="{}">"#,
+            r#"<section class="z-cards z-cards-rows z-vlist{}" data-zeyn-vlist data-zeyn-row-height="{height}" data-zeyn-block="{block}" data-zeyn-total="{total}" data-testid="{}.cards" data-text-error="{}"{}>"#,
+            if self.reorder.is_some() {
+                " z-sortable"
+            } else {
+                ""
+            },
             r.scope,
             t("error"),
+            if self.reorder.is_some() {
+                format!(
+                    r#" data-zeyn-sortable data-texts="{}""#,
+                    sort_texts(r)
+                )
+            } else {
+                String::new()
+            },
         ));
+        if self.reorder.is_some() {
+            out.push_str(&format!(
+                r#"<p class="z-sr-only" id="{}">{}</p>"#,
+                help_id(r),
+                r.text(&Text::key("zeyn.ui.sortable.help"))
+            ));
+        }
         if self.title.is_some() {
             out.push_str(&format!(
                 r#"<div class="z-cards-head"><h2 class="z-cards-title" id="{id}-title">{title}</h2></div>"#

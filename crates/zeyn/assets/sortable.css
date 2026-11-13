@@ -24,6 +24,7 @@
 .z-sortable .z-sort-line-v { inline-size: 2px; }
 .z-sortable .z-sort-dragging { z-index: 4; background: var(--z-surface); box-shadow: var(--z-shadow-3); opacity: .95; }
 .z-sortable .z-sort-dragging .z-sort-handle { cursor: grabbing; }
+.z-sortable.z-vlist [data-zeyn-rows] > li.z-sort-open { overflow: visible !important; z-index: 5; }
 .z-sortable .z-sort-lifted { outline: 2px dashed var(--z-primary); outline-offset: -2px; background: var(--z-brand-subtle); }
 .z-sortable .z-sort-menu {
   position: absolute; z-index: 20; inset-block-start: 100%; inset-inline-start: 0; min-inline-size: 180px; margin: 0;

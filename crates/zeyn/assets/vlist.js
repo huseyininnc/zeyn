@@ -7,7 +7,12 @@
  * fetched by offset through `POST /_zeyn/grid`, where the server sets the block size, and at most
  * `MAX_BLOCKS` are kept. Every row carries `aria-posinset` and `aria-setsize` from the server, so
  * screen readers hear its place in the whole list. A row that holds focus stays in the page while
- * it is scrolled out of view.
+ * it is scrolled out of view, and so does a row being dragged (`.z-sort-dragging`).
+ *
+ * New rows are announced with `zeyn:content` on the list's section, so modules such as
+ * `sortable.js` set them up. `zeyn:vlist-reload` on the section drops the loaded blocks and
+ * loads the rows in view again (after a row moved); the rows on screen stay until the new ones
+ * arrive.
  * @module vlist
  */
 
@@ -56,6 +61,7 @@ async function load(section, b) {
   }
   keep(s, b, parse(body.rows ?? ''));
   draw(section);
+  document.dispatchEvent(new CustomEvent('zeyn:content', { detail: section }));
 }
 
 /** Places the rows in view, asking for the blocks that are missing. */
@@ -75,8 +81,10 @@ function draw(section) {
     }
     for (const [i, li] of items) if (i >= from && i < to) want.set(li, i);
   }
+  if (!want.size) return;
   const active = document.activeElement?.closest?.('[data-zeyn-rows] > li');
-  for (const li of [...s.list.children]) if (!want.has(li) && li !== active) li.remove();
+  for (const li of s.list.querySelectorAll(':scope > li[aria-posinset]:not(.z-sort-dragging)')) if (!want.has(li) && (li !== active || s.old?.has(li))) li.remove();
+  s.old = null;
   for (const [li, i] of want) {
     if (li.parentElement !== s.list) {
       Object.assign(li.style, { position: 'absolute', insetInline: '0', top: `${i * s.h}px`, height: `${s.h}px`, overflow: 'hidden', boxSizing: 'border-box' });
@@ -98,6 +106,11 @@ function init(root) {
     keep(s, 0, [...list.children].map((li) => [Number(li.getAttribute('aria-posinset')) - 1, li]));
     Object.assign(view.style, { overflowY: 'auto', maxHeight: `min(70vh, ${s.total * s.h}px)` });
     Object.assign(list.style, { position: 'relative', height: `${s.total * s.h}px`, margin: '0', padding: '0' });
+    section.addEventListener('zeyn:vlist-reload', () => {
+      s.blocks.clear();
+      s.old = new Set(s.list.querySelectorAll(':scope > li[aria-posinset]'));
+      draw(section);
+    });
     view.addEventListener('scroll', () => (s.frame ||= requestAnimationFrame(() => draw(section))), { passive: true });
     draw(section);
   });

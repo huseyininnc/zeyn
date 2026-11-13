@@ -375,6 +375,7 @@
         "overview": "Örnek",
         "numbered_pages": "Toplamı olmayan numaralı sayfalar",
         "sortable": "Kullanıcının kendi sırasına koyduğu satırlar",
+        "sortable_virtual": "Sanal kalan uzun sıralanabilir liste",
         "fixed": "Sabit öğeler",
         "builder": "Herhangi bir düğümle kurulan satırlar ve ayraç",
         "virtual_rows": "Sabit satır yüksekliğiyle sanal kaydırma",

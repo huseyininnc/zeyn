@@ -1222,6 +1222,18 @@ pub fn steps_screen() -> Screen {
         )
 }
 
+#[screen(route = "/steps/virtual", permission = "steps.read")]
+pub fn steps_virtual() -> Screen {
+    Screen::new("Steps").body(
+        Card::new().add(
+            List::of(search_steps)
+                .item(|s: &Step| zeyn::ui::ListItem::new(s.title.clone()))
+                .paging(Paging::virtual_scroll())
+                .sortable(Step::rank, reorder_steps),
+        ),
+    )
+}
+
 fn steps_app(steps: Steps) -> axum::Router {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -1236,7 +1248,11 @@ fn steps_app(steps: Steps) -> axum::Router {
                 .collect();
             Some(Identity::user("u").with_permissions(perms))
         })
-        .feature(Feature::new("steps").screen(steps_screen))
+        .feature(
+            Feature::new("steps")
+                .screen(steps_screen)
+                .screen(steps_virtual),
+        )
         .router()
         .unwrap()
 }
@@ -1285,6 +1301,45 @@ async fn sortable_lists_render_a_handle_per_row_and_load_their_script() {
         !plain.contains("/_zeyn/sortable.js"),
         "only with a sortable list"
     );
+}
+
+#[tokio::test]
+async fn virtual_sortable_lists_stay_virtual_and_reorder_by_neighbor_keys() {
+    let steps = Steps::seeded();
+    let router = steps_app(steps.clone());
+    let req = Request::get("/steps/virtual")
+        .header("x-perms", STEPS_RW)
+        .body(Body::empty())
+        .unwrap();
+    let (status, page) = send(&router, req).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(
+        page.contains("data-zeyn-vlist") && page.contains("data-zeyn-sortable"),
+        "a virtual list, not load more: {page}"
+    );
+    assert!(
+        page.contains(r#"aria-posinset="1""#),
+        "rows know their index"
+    );
+    assert_eq!(
+        page.matches(r#"class="z-sort-handle z-drag-handle""#)
+            .count(),
+        3
+    );
+    assert!(page.contains("Space lifts the row"));
+    for name in ["sortable.js", "vlist.js", "drag.js"] {
+        assert!(page.contains(&format!("/_zeyn/{name}?v=")), "{name}");
+    }
+    assert!(page.contains(r#"data-zeyn-node="0.0""#), "a nested node");
+    let input = serde_json::json!({ "key": "3", "after": null, "before": "1" });
+    let req = post(
+        "/_zeyn/data",
+        STEPS_RW,
+        serde_json::json!({ "screen": "steps_virtual", "params": null, "node": "0.0", "key": "reorder", "input": input }),
+    );
+    let (status, body) = send(&router, req).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(steps.order(), vec![3, 1, 2]);
 }
 
 #[tokio::test]
