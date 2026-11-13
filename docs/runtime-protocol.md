@@ -200,7 +200,7 @@ Grids with `data-zeyn-paging="virtual"` show one scrollable list over every row,
 The runtime:
 
 - Puts the table body in a scroll container whose inner spacer is `total * rowHeight` pixels high, capped at 8,000,000 px. Above the cap, scroll position maps to row index by ratio (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), so 1,000,000 rows still reach the end.
-- Keeps only the visible rows plus 20 rows above and below in the DOM, positioned with `transform: translateY(...)`. Rows have a fixed height; long text is cut with an ellipsis.
+- Keeps only the visible rows plus 10 rows above and below in the DOM, positioned with `transform: translateY(...)`. Rows have a fixed height; long text is cut with an ellipsis.
 - Loads blocks of `data-zeyn-page-size` rows with `POST /_zeyn/grid` and `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, `with_total: false` after the first call. Keeps up to 20 blocks and at most 100,000 cells in a cache (least recently used out; 7 blocks for a 63 column grid, never fewer than 3), with the blocks kept for a `reload` counted in the same cap and dropped first, prefetches the next block in the scroll direction, and cancels requests for blocks that left the view (`AbortController`).
 - Never clears the visible rows while a block loads. Missing rows show a placeholder row with `aria-busy="true"` until their block arrives, so the screen does not flash.
 - Sort and filter changes drop the cache and scroll to the top.

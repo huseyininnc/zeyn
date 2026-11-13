@@ -199,7 +199,7 @@ Effects：
 运行时的行为：
 
 - 把表格主体放进一个滚动容器，其内部占位元素高度为 `total * rowHeight` 像素，上限为 8,000,000 px。超过上限时，滚动位置按比例映射到行索引（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`），因此 1,000,000 行仍然可以滚到末尾。
-- DOM 中只保留可见行以及上下各 20 行，并用 `transform: translateY(...)` 定位。行高固定；过长的文本以省略号截断。
+- DOM 中只保留可见行以及上下各 10 行，并用 `transform: translateY(...)` 定位。行高固定；过长的文本以省略号截断。
 - 以 `POST /_zeyn/grid` 加载每块 `data-zeyn-page-size` 行的数据块，使用 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`，首次调用之后 `with_total: false`。缓存最多保留 20 个块且最多 100,000 个单元格（最近最少使用者先淘汰；63 列的 grid 为 7 个块，但不少于 3 个），为 `reload` 保留的块计入同一上限并最先被丢弃，沿滚动方向预取下一个块，并取消已离开视野的块的请求（`AbortController`）。
 - 块加载期间从不清空可见行。缺失的行显示带有 `aria-busy="true"` 的占位行，直到其块到达，因此界面不会闪烁。
 - 排序和筛选变化会丢弃缓存并滚动到顶部。

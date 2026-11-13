@@ -199,7 +199,7 @@ Los grids con `data-zeyn-paging="virtual"` muestran una única lista desplazable
 El runtime:
 
 - Coloca el cuerpo de la tabla en un contenedor con scroll cuyo espaciador interno mide `total * rowHeight` píxeles de alto, con un tope de 8 000 000 px. Por encima del tope, la posición del scroll se asigna al índice de fila por proporción (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), de modo que 1 000 000 de filas aún llegan hasta el final.
-- Mantiene en el DOM solo las filas visibles más 20 filas por encima y por debajo, posicionadas con `transform: translateY(...)`. Las filas tienen una altura fija; el texto largo se corta con puntos suspensivos.
+- Mantiene en el DOM solo las filas visibles más 10 filas por encima y por debajo, posicionadas con `transform: translateY(...)`. Las filas tienen una altura fija; el texto largo se corta con puntos suspensivos.
 - Carga bloques de `data-zeyn-page-size` filas con `POST /_zeyn/grid` y `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, con `with_total: false` después de la primera llamada. Mantiene hasta 20 bloques y como máximo 100.000 celdas en una caché (sale el menos usado recientemente; 7 bloques para un grid de 63 columnas, nunca menos de 3), y los bloques guardados para un `reload` cuentan en el mismo tope y salen primero, precarga el siguiente bloque en la dirección del scroll y cancela las peticiones de los bloques que salieron de la vista (`AbortController`).
 - Nunca borra las filas visibles mientras se carga un bloque. Las filas ausentes muestran una fila marcadora con `aria-busy="true"` hasta que llega su bloque, de modo que la pantalla no parpadea.
 - Los cambios de ordenación y de filtro descartan la caché y vuelven al inicio.
