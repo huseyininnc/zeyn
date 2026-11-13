@@ -572,6 +572,8 @@ pub struct DataGrid<E: Model> {
     delete: Option<usize>,
     /// Whether inline edits wait until the user saves every changed row at once.
     batch: bool,
+    /// Whether a "Filter" button opens the filter builder.
+    builder: bool,
 }
 
 /// Most levels a tree grid opens.
@@ -827,6 +829,7 @@ impl<E: Model> DataGrid<E> {
             add: None,
             delete: None,
             batch: false,
+            builder: false,
         }
     }
 
@@ -1185,6 +1188,18 @@ impl<E: Model> DataGrid<E> {
     /// their changes and show the errors. Loading other rows asks before it drops changes.
     pub fn batch_edit(mut self) -> Self {
         self.batch = true;
+        self
+    }
+
+    /// Shows a "Filter" button above the grid that opens the filter builder: a dialog listing a
+    /// condition per row (a column with `filter()` and its operator and values, the same inputs
+    /// as the filter row), with "Add condition", "Clear all" and "Apply". Conditions hold
+    /// together; a later condition on the same column replaces an earlier one. Applying writes
+    /// the conditions into the grid's filters, so the filter row, saved views, exports and the
+    /// `zeyn:filter` event an AI agent sends all see the same list, and the server checks it as
+    /// always.
+    pub fn filter_builder(mut self) -> Self {
+        self.builder = true;
         self
     }
 
@@ -2070,7 +2085,8 @@ impl<E: Model> DataGrid<E> {
         let add = self.can_add(r);
         let batch = self.batch && self.can_edit(r);
         let panel = self.user_groups();
-        if self.search || add || batch || panel {
+        let builder = self.builder && self.columns.iter().any(|c| c.filter);
+        if self.search || add || batch || panel || builder {
             let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
             out.push_str(r#"<div class="z-grid-tools">"#);
             if self.search {
@@ -2078,6 +2094,12 @@ impl<E: Model> DataGrid<E> {
                     r#"<div class="z-grid-search" role="search"><span class="z-icon z-icon-search" aria-hidden="true"></span><input type="search" name="q" data-zeyn-grid-search data-testid="{scope}.grid.search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}"></div>"#,
                     crate::MAX_SEARCH_QUERY,
                     label = grid_text("search"),
+                ));
+            }
+            if builder {
+                out.push_str(&format!(
+                    r#"<button type="button" class="z-button" data-zeyn-filter-builder data-testid="{scope}.grid.filter-builder" aria-haspopup="dialog"><span class="z-icon z-icon-filter" aria-hidden="true"></span>{}<span class="z-badge" data-zeyn-filter-count hidden></span></button>"#,
+                    grid_text("filter_builder"),
                 ));
             }
             if panel {
@@ -3171,6 +3193,7 @@ impl<E: Model> Component for DataGrid<E> {
             "group_by": self.group_by.iter().map(|m| m.name).collect::<Vec<_>>(),
             "tree": self.tree.map(|m| m.name),
             "search": self.search,
+            "filter_builder": self.builder,
             "groupable": self.columns.iter().filter(|c| c.group).map(|c| c.meta.name).collect::<Vec<_>>(),
             "add": self.add.as_ref().map(|a| a.meta),
             "delete": self.delete.map(|i| self.bulk[i].meta),
@@ -3283,6 +3306,12 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         ),
     );
     for k in [
+        "builder_title",
+        "add_condition",
+        "remove_condition",
+        "column",
+        "apply",
+        "clear_all",
         "group_by",
         "ungroup",
         "saved",

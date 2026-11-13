@@ -82,6 +82,7 @@ Los números y los importes se alinean a la derecha con cifras tabulares. Los en
 - `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: un botón "Añadir fila", un
   botón y una tecla para borrar, y ediciones guardadas juntas. Consulta la [referencia de DataGrid](grid.md).
 - `.groupable()`, `.summary(label, |t| ...)` en una columna: el usuario agrupa por ella desde su menú o el panel de grupos, y bajo ella aparece un valor calculado a partir de los totales.
+- `.filter_builder()`: un botón "Filtrar" que abre un diálogo para crear las condiciones del filtro; la misma lista que usan la fila de filtros, las vistas guardadas y los agentes de IA.
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.
 
 ## Columnas conocidas en tiempo de ejecución

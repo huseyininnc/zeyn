@@ -345,6 +345,10 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.search()
     }
 
+    pub fn filter_builder(self) -> DataGrid<E> {
+        self.grid.filter_builder()
+    }
+
     pub fn add_with<A>(self, create: A) -> DataGrid<E>
     where
         A: crate::form::FormAction<E> + Action<Input = Valid<E>>,

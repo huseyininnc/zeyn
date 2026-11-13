@@ -118,6 +118,7 @@ fn app(identity: Identity) -> App {
                 .screen(list)
                 .screen(banded)
                 .screen(rows_edit)
+                .screen(built)
                 .api(search),
         )
 }
@@ -3908,4 +3909,53 @@ fn saved_views_keep_only_groupable_groups() {
         .done();
     let cleaned = zeyn::GridSource::clean_view(&source, view);
     assert_eq!(cleaned.group_by, ["kind", "active"]);
+}
+
+#[screen(route = "/built", permission = "items.read")]
+pub fn built() -> Screen {
+    Screen::new("Built").body(
+        Stack::new()
+            .add(
+                DataGrid::of(search)
+                    .filter_builder()
+                    .column(Item::code)
+                    .filter()
+                    .column(Item::qty),
+            )
+            .add(
+                DataGrid::of(search)
+                    .filter_builder()
+                    .column(Item::code),
+            ),
+    )
+}
+
+#[tokio::test]
+async fn filter_builder_shows_a_button_only_for_grids_with_filters() {
+    let router = router(reader());
+    let page = send(&router, get("/built")).await;
+    assert_eq!(
+        page.body
+            .matches("data-zeyn-filter-builder")
+            .count(),
+        1,
+        "{}",
+        page.body
+    );
+    assert!(page.body.contains(r#"aria-haspopup="dialog"><span class="z-icon z-icon-filter" aria-hidden="true"></span>Filter<span class="z-badge" data-zeyn-filter-count hidden></span></button>"#), "{}", page.body);
+    let q = serde_json::json!({ "with_total": true, "filters": [{ "field": "code", "starts_with": "C-1" }, { "field": "qty", "from": "1" }] });
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "built", "node": "0.0", "query": q }),
+        ),
+    )
+    .await;
+    assert_eq!(
+        r.json()["total"],
+        10,
+        "conditions on columns without filter() are dropped: {}",
+        r.body
+    );
 }
