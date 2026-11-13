@@ -108,7 +108,7 @@ vardır (düğme, sağ tıklama, Shift+F10 veya bağlam menüsü tuşu); menüde
 sağa taşıma, gizleme, filtre, sütun seçici ve sıfırlama bulunur. Başlığın kenarı sütunu yeniden
 boyutlandırır, sürükleyerek veya ok tuşlarıyla (daha büyük adımlar için Shift). Bir başlığı aynı
 sabitlenmiş gruptaki başka bir başlığın üzerine sürüklemek sütunu taşır; kısa bir basış ise yine
-sıralar. Hepsi sağdan sola yönde de çalışır.
+sıralar. Hepsi sağdan sola yönde de çalışır. Bir başlığın kenarına çift tıklamak, kenardayken Enter ya da sütun menüsündeki "Genişliği içeriğe uydur", sütunu başlığına ve sayfadaki satırlara uydurur; "Tüm sütunları uydur" bunu gösterilen her sütun için yapar. Genişlikler görünümle kaydedilir.
 
 ## Arama
 

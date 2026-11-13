@@ -940,25 +940,41 @@ impl Link {
         err: OnError,
         each: &mut (dyn FnMut(&mut Vec<Cell>) -> Result<()> + Send),
     ) -> Result<()> {
-        match self {
+        #[cfg(all(debug_assertions, feature = "server"))]
+        let traced =
+            crate::server::devtools_on().then(|| (sql.text.clone(), std::time::Instant::now()));
+        let done = match self {
             #[cfg(feature = "postgres")]
             Link::Pg(c) => pg::fetch(c, sql, err, each).await,
             #[cfg(feature = "postgres")]
             Link::PgTx(c) => pg::fetch(c, sql, err, each).await,
             #[cfg(feature = "oracle")]
             Link::Ora(c) => c.fetch(sql, err, each).await,
+        };
+        #[cfg(all(debug_assertions, feature = "server"))]
+        if let Some((text, started)) = traced {
+            crate::server::devtools_query(&text, started.elapsed(), None);
         }
+        done
     }
 
     async fn execute(&mut self, sql: Sql, err: OnError) -> Result<u64> {
-        match self {
+        #[cfg(all(debug_assertions, feature = "server"))]
+        let traced =
+            crate::server::devtools_on().then(|| (sql.text.clone(), std::time::Instant::now()));
+        let done = match self {
             #[cfg(feature = "postgres")]
             Link::Pg(c) => pg::execute(c, sql, err).await,
             #[cfg(feature = "postgres")]
             Link::PgTx(c) => pg::execute(c, sql, err).await,
             #[cfg(feature = "oracle")]
             Link::Ora(c) => c.execute(sql, err).await,
+        };
+        #[cfg(all(debug_assertions, feature = "server"))]
+        if let Some((text, started)) = traced {
+            crate::server::devtools_query(&text, started.elapsed(), done.as_ref().ok().copied());
         }
+        done
     }
 
     async fn commit(self) -> Result<()> {

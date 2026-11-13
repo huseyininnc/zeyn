@@ -32,6 +32,8 @@ pub(crate) mod accounts;
 mod agent;
 mod auth;
 mod checks;
+#[cfg(debug_assertions)]
+mod devtools;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod charts;
@@ -64,6 +66,10 @@ mod pdf;
 mod xlsx;
 
 pub use checks::render_checks;
+#[cfg(debug_assertions)]
+pub use devtools::devtools;
+#[cfg(all(debug_assertions, any(feature = "postgres", feature = "oracle")))]
+pub(crate) use devtools::{on as devtools_on, query as devtools_query};
 pub use ops::{READY_CACHE, build_id, probe};
 
 /// Sent on sign out with the value `"storage"`: the browser drops what the runtime kept for the
@@ -2173,6 +2179,8 @@ impl App {
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
         let router = modules::routes(site::routes(charts::routes(files::routes(router))));
+        #[cfg(debug_assertions)]
+        let router = devtools::routes(router);
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(
             data::routes(ops::routes(agent::routes(grid::routes(router)))),
         )))))
@@ -2213,6 +2221,8 @@ impl App {
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
             .with_state(state.clone());
+        #[cfg(debug_assertions)]
+        let router = router.layer(axum::middleware::from_fn(devtools::layer));
         let router = if state.locale_paths {
             Router::new()
                 .fallback_service(router)
@@ -2263,6 +2273,8 @@ impl App {
             return Ok(());
         }
         crate::screen::Node::tag_sources(true);
+        #[cfg(debug_assertions)]
+        devtools::devtools(true);
         let flush = self.start_telemetry();
         let router = self.router().map_err(|problems| {
             for p in &problems {
@@ -2823,6 +2835,8 @@ impl AppState {
         }
         feature.check_guards(ctx)?;
         data::check_reason(ctx, &entry.meta)?;
+        #[cfg(debug_assertions)]
+        let building = Instant::now();
         let only_return_to = params
             .as_object()
             .is_some_and(|o| o.len() == 1 && o.contains_key("return_to"));
@@ -2836,6 +2850,8 @@ impl AppState {
             }
             other => other?,
         };
+        #[cfg(debug_assertions)]
+        devtools::build(building.elapsed());
         if let Some((to, params, permanent)) = screen.take_moved() {
             return Err(Failure::Moved(to, params, permanent));
         }
@@ -2912,6 +2928,14 @@ impl AppState {
             },
             duration: started.elapsed(),
         };
+        #[cfg(debug_assertions)]
+        devtools::call(
+            call.kind,
+            call.screen,
+            call.action.as_ref().map(|a| a.name),
+            outcome.ok,
+            outcome.error,
+        );
         let span = tracing::Span::current();
         if !span.is_disabled() {
             span.record("ok", outcome.ok);
@@ -4152,7 +4176,11 @@ async fn page(
             .preload(&ctx, screen.walk(), name)
             .await;
         let r = user_render(name, &ctx);
+        #[cfg(debug_assertions)]
+        let rendering = Instant::now();
         let html = screen.render(&r, &entry.meta, &params, &loaded);
+        #[cfg(debug_assertions)]
+        devtools::render(rendering.elapsed());
         let head = screen.head_html(&r, &st.site_url, &st.prefix);
         Ok::<_, Failure>((ctx.t(screen.title()), html, head))
     }
@@ -4560,6 +4588,8 @@ impl AppState {
             })
             .await;
         let effects = result?;
+        #[cfg(debug_assertions)]
+        devtools::effects(&effects);
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }

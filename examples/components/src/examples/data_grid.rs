@@ -66,6 +66,7 @@ pub fn numbers(_ctx: &Ctx) -> Node {
 pub fn search_and_bands(_ctx: &Ctx) -> Node {
     DataGrid::of(search_products)
         .paging(Paging::pages(5))
+        .page_sizes(&[10, 25])
         .search()
         .column(Product::code)
         .width(100)

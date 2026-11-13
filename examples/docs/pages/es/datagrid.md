@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 El servidor limita el tamaño de página pida lo que pida el cliente.
 
+`.page_sizes(&[10, 25, 50, 100])` añade una lista "Filas por página" al paginador de páginas numeradas. El tamaño propio de la cuadrícula siempre se ofrece, la elección se guarda con la vista del usuario y el servidor solo acepta los tamaños que ofrece la cuadrícula.
+
 ## Columnas
 
 | Llamada | Resultado |

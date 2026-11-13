@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 The server caps the page size whatever the client asks for.
 
+`.page_sizes(&[10, 25, 50, 100])` adds a "Rows per page" list to the pager of numbered pages. The grid's own size is always offered, the pick is saved with the user's view, and the server keeps only sizes the grid offers.
+
 ## Columns
 
 | Call | Result |

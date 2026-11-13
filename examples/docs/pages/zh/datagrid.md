@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 无论客户端请求多少，服务器都会限制页大小。
 
+`.page_sizes(&[10, 25, 50, 100])` 在编号分页的分页器中加入"每页行数"列表。表格自身的大小始终可选,选择随用户视图保存,服务器只接受表格提供的大小。
+
 ## 列
 
 | 调用 | 结果 |

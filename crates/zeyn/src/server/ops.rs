@@ -65,6 +65,7 @@ pub(super) fn is_asset(path: &str) -> bool {
     path == "/_zeyn/enterprise.js"
         || path == "/_zeyn/enterprise.css"
         || path == "/_zeyn/dev.js"
+        || (cfg!(debug_assertions) && path.starts_with("/_zeyn/devtools."))
         || (cfg!(debug_assertions) && path.starts_with("/_zeyn/inspect."))
 }
 
@@ -619,6 +620,26 @@ const TEXTS: &[&str] = &[
     "privacy.reason_cancel",
     "privacy.reason_invalid",
     #[cfg(debug_assertions)]
+    "devtools.title",
+    #[cfg(debug_assertions)]
+    "devtools.refresh",
+    #[cfg(debug_assertions)]
+    "devtools.close",
+    #[cfg(debug_assertions)]
+    "devtools.empty",
+    #[cfg(debug_assertions)]
+    "devtools.queries",
+    #[cfg(debug_assertions)]
+    "devtools.effects",
+    #[cfg(debug_assertions)]
+    "devtools.topics",
+    #[cfg(debug_assertions)]
+    "devtools.build",
+    #[cfg(debug_assertions)]
+    "devtools.render",
+    #[cfg(debug_assertions)]
+    "devtools.hint",
+    #[cfg(debug_assertions)]
     "inspect.title",
     #[cfg(debug_assertions)]
     "inspect.none",
@@ -655,6 +676,18 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
         base = escape(&st.prefix),
         v = asset_version(),
     ) + &accounts_head(st)
+        + &devtools_head(st)
+}
+
+/// The DevTools script of debug builds, while they are on.
+fn devtools_head(st: &AppState) -> String {
+    #[cfg(debug_assertions)]
+    return super::devtools::head(&st.prefix);
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = st;
+        String::new()
+    }
 }
 
 /// The passkey script of the accounts system, when it is on.
