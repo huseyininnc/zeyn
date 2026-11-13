@@ -69,8 +69,9 @@ impl Popover {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 }
@@ -150,8 +151,9 @@ impl Busy {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 }

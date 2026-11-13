@@ -83,6 +83,7 @@ Numbers and money are right aligned with tabular digits. Whole numbers are group
 - `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: an "Add row" button, a
   Delete button and key, and edits saved together. See the [DataGrid reference](grid.md).
 - `.groupable()`, `.summary(label, |t| ...)` on a column: users group by it from its menu or the group panel, and a value computed from the totals shows under it.
+- `.filter_builder()`: a "Filter" button that opens a dialog to build the filter conditions; the same list the filter row, saved views and AI agents use.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.
 
 ## Columns known at run time

@@ -230,6 +230,7 @@ impl Dock {
 
     /// Adds a panel. `id` names it in saved layouts: keep it stable, lower case, unique in the
     /// dock.
+    #[track_caller]
     pub fn panel(
         mut self,
         area: DockArea,
@@ -242,22 +243,26 @@ impl Dock {
             title: title.into(),
             area,
         });
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
+    #[track_caller]
     pub fn left(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Left, id, title, node)
     }
 
+    #[track_caller]
     pub fn right(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Right, id, title, node)
     }
 
+    #[track_caller]
     pub fn bottom(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Bottom, id, title, node)
     }
 
+    #[track_caller]
     pub fn center(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Center, id, title, node)
     }

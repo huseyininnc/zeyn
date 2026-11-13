@@ -321,6 +321,8 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-doc"],
         needs: &[],
     },
+    #[cfg(debug_assertions)]
+    script("inspect", &["data-zeyn-src"]),
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -657,6 +659,14 @@ const FILES: [(&str, &str); 64] = [
     ),
 ];
 
+/// The source inspector of debug builds (Alt+Shift+I), never part of a release build.
+#[cfg(debug_assertions)]
+const INSPECT_JS: &str = include_str!("../../assets/inspect.js");
+
+/// The stylesheet of the source inspector, which `inspect.js` links on first open.
+#[cfg(debug_assertions)]
+const INSPECT_CSS: &str = include_str!("../../assets/inspect.css");
+
 /// Asset paths served without authentication, like the runtime itself.
 pub(super) const ASSETS: [&str; FILES.len()] = {
     let mut paths = [""; FILES.len()];
@@ -679,6 +689,18 @@ pub(super) fn routes(mut router: Router<Arc<AppState>>) -> Router<Arc<AppState>>
                 }
             }),
         );
+    }
+    #[cfg(debug_assertions)]
+    {
+        router = router
+            .route(
+                "/_zeyn/inspect.js",
+                get(|| async { asset(INSPECT_JS, "text/javascript; charset=utf-8") }),
+            )
+            .route(
+                "/_zeyn/inspect.css",
+                get(|| async { asset(INSPECT_CSS, "text/css; charset=utf-8") }),
+            );
     }
     router
         .route("/_zeyn/prefs", get(prefs))

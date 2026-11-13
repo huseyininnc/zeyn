@@ -530,6 +530,27 @@ fn describe(root: &Path) -> Result<Value, String> {
         .map_err(|e| format!("the app did not print a description: {e}"))
 }
 
+/// The node tree of one screen with the source line of each node: runs the app with
+/// `ZEYN_INSPECT=<screen>`, which builds the screen, prints the tree and exits.
+fn inspect(root: &Path, screen: &str) -> Result<Value, String> {
+    if screen.is_empty() {
+        return Err("give `screen` a screen name; zeyn_describe lists them".into());
+    }
+    let out = Command::new("cargo")
+        .args(["run", "--quiet"])
+        .current_dir(root)
+        .env("ZEYN_INSPECT", screen)
+        .output()
+        .map_err(|e| format!("cargo could not be started: {e}"))?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr)
+            .trim()
+            .to_string());
+    }
+    serde_json::from_slice(&out.stdout)
+        .map_err(|e| format!("the app did not print a node tree: {e}"))
+}
+
 fn routes_table(d: &Value) -> String {
     let mut out = String::new();
     for f in d["features"]
@@ -908,6 +929,12 @@ fn tools() -> Value {
             &[]
         ),
         tool(
+            "zeyn_inspect",
+            "Build one screen of the app in the current directory and return its node tree: each node's path (as in `1.0.2`), component type, the Rust file:line:column that placed it (debug builds) and its children.",
+            json!({ "screen": { "type": "string", "description": "a screen name from zeyn_describe" } }),
+            &["screen"]
+        ),
+        tool(
             "zeyn_check",
             "Compile the app and report compiler errors, structural problems and missing translations. With fix: true, first rewrite renamed Zeyn APIs (Grid to DataGrid and others).",
             json!({ "fix": { "type": "boolean" } }),
@@ -1068,6 +1095,8 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
         "zeyn_describe" => {
             describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default())
         }
+        "zeyn_inspect" => inspect(root, args["screen"].as_str().unwrap_or(""))
+            .map(|d| serde_json::to_string_pretty(&d).unwrap_or_default()),
         "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false))
             .and_then(|fixed| check(root).map(|r| fixed + &check_text(&r))),
         "zeyn_test" => {

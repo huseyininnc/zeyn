@@ -1858,6 +1858,29 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-grid tr[data-zeyn-dirty] > td:first-child { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-warning); }
 
+/** Filter builder (`DataGrid::filter_builder`): a condition per row, actions at the end. */
+.z-filter-builder { --z-width: 44rem; }
+
+.z-fb-list { display: grid; gap: calc(var(--z-space) * 2); margin-block: calc(var(--z-space) * 3); }
+
+.z-fb-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+}
+
+.z-filter-builder .z-filter-pair .z-filter-select { width: 9rem; }
+
+.z-fb-actions { display: flex; flex-wrap: wrap; gap: calc(var(--z-space) * 2); }
+
+.z-fb-gap { flex: 1; }
+
+@media (max-width: 40rem) {
+  .z-fb-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .z-fb-row > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+}
+
 /** Group panel above a grid: a drop target for headers and a button per group level. */
 .z-group-panel {
   display: flex;

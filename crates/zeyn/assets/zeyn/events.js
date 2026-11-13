@@ -19,6 +19,7 @@ document.addEventListener('click', (e) => {
   if ((el = t.closest('[data-zeyn-branch-more]'))) return G?.moreBranch(el);
   if ((el = t.closest('[data-zeyn-bulk-run]'))) return G?.runBulk(el);
   if ((el = t.closest('[data-zeyn-grid-add]'))) return G?.addRow(el);
+  if ((el = t.closest('[data-zeyn-filter-builder]'))) return G?.openBuilder(el);
   if ((el = t.closest('[data-zeyn-ungroup]'))) return G?.ungroup(el);
   if ((el = t.closest('[data-zeyn-batch-save]'))) return G?.saveBatch(el);
   if ((el = t.closest('[data-zeyn-batch-discard]'))) return G?.discardBatch(el);
@@ -256,7 +257,7 @@ document.addEventListener('zeyn:filter', (e) => {
     const { field, ...rest } = f ?? {};
     if (typeof field === 'string') s.filters[field] = rest;
   }
-  for (const cell of grid.querySelectorAll('.z-filter-cell[data-field]')) G?.fillFilter(cell, s.filters[cell.dataset.field], s.texts);
+  G?.showFilters(grid, s);
   s.allMatching = false;
   G?.loadGrid(grid, 'reset');
 });

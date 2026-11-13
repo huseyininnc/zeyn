@@ -95,6 +95,11 @@
       "reason_cancel": "取消",
       "reason_invalid": "请填写 3 到 300 个字符的理由。"
     },
+    "inspect": {
+      "title": "元素的源码位置",
+      "none": "此元素没有源码行。",
+      "hint": "按 Alt+Shift+I 或 Escape 关闭检查器。"
+    },
     "validation": {
       "required": "{label}为必填项。",
       "min_len": "{label}至少需要 {n} 个字符。",

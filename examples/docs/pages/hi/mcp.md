@@ -13,6 +13,7 @@ Zeyn दो तरफ़ के एजेंट के लिए बना ह�
 |---|---|
 | `zeyn_docs` | विषय के अनुसार फ्रेमवर्क संदर्भ: `rules`, `language`, `protocol`; `search: "शब्द"` इस संस्करण के डॉक्स पेजों को क्रम देता है, `page: "/language/forms"` एक पेज Markdown में लौटाता है |
 | `zeyn_describe` | ऐप के feature, Screen, रूट, एक्सेस, API, समस्याएँ और छूटे अनुवाद |
+| `zeyn_inspect` | एक Screen का node ट्री: पाथ, कंपोनेंट का प्रकार और हर node को रखने वाला Rust `file:line:column` |
 | `zeyn_check` | कंपाइल करता है और समस्याएँ बताता है; `fix: true` पहले नाम बदले गए API को फिर से लिखता है |
 | `zeyn_test` | `cargo test` चलाता है और आउटपुट का अंत लौटाता है |
 | `zeyn_new_feature` | feature फ़ोल्डर बनाता है और उसे पंजीकृत करता है |
@@ -26,6 +27,12 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ```
 
 `ZEYN_DESCRIBE=1 cargo run` वही विवरण छापता है जो `zeyn_describe` लौटाता है और बाहर निकल जाता है।
+
+### Source inspector
+
+डिबग बिल्ड याद रखते हैं कि Rust की किस पंक्ति ने हर node को Screen पर रखा (`Screen::body`, `Stack::add`, `Tabs::tab` और कंटेनर के बाकी मेथड)। `ZEYN_INSPECT=<screen> cargo run` वही node ट्री छापता है जो `zeyn_inspect` लौटाता है और बाहर निकल जाता है।
+
+`cargo run` से चलने वाला डिबग बिल्ड यह पंक्ति पेज में हर node के पहले एलिमेंट पर `data-zeyn-src` के रूप में लिखता है। Alt+Shift+I एक ओवरले खोलता है जो पॉइंटर के नीचे वाले node या फ़ोकस वाले एलिमेंट को घेरता है और उसकी पंक्ति बताता है, फिर उसे रखने वाले node की पंक्तियाँ; Alt+Shift+I या Escape इसे बंद करता है। रिलीज़ बिल्ड कोई पंक्ति नहीं रखते: node एक बॉक्स किया हुआ पॉइंटर ही रहता है, पेज में यह एट्रिब्यूट नहीं होता और इंस्पेक्टर की स्क्रिप्ट बाइनरी में नहीं होती।
 
 ## ऐप इस्तेमाल करने वाले एजेंट
 

@@ -345,10 +345,14 @@ fn walk_into<'a>(path: NodePath, node: &'a Node, out: &mut Vec<(NodePath, &'a No
 pub fn render_node(out: &mut String, r: &Render, path: &str, node: &Node) {
     out.push_str(&format!(r#"<div class="z-node" data-zeyn-node="{path}">"#));
     let r = Render { path, ..*r };
+    #[cfg(debug_assertions)]
+    let start = out.len();
     match (node.grid(), r.loaded.and_then(|l| l.get(path))) {
         (Some(grid), Some(page)) => grid.render_loaded(out, &r, page),
         _ => node.render(out, &r),
     }
+    #[cfg(debug_assertions)]
+    node.tag(out, start);
     out.push_str("</div>");
 }
 
