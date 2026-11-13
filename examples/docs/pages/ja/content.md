@@ -108,6 +108,17 @@ List::of(search_tasks)
     .sortable(Task::rank, reorder_tasks)
 ```
 
+`.connect(group, id)` は、同じグループの画面上の並べ替え可能なリストをつなぎます。行は一方から他方へドラッグするか、移動メニューの「移動先」で移せます。アクションは行が入ったリストの id (`r.list`) と、行が出たリストの id (`r.from`) を受け取ります。どちらの id もブラウザーではなく画面から来ており、サーバーは両方のリストのアクションの権限を確認します。`.multi_select()` を使うと、Control または Command を押しながらハンドルをクリックするか、メニューの「移動用に選択」で行を選び、最大 100 行をまとめて移せます。残りのキーは `r.rest` に入り、`r.ranks(lookup)` は `r.keys()` の各行に順位を 1 つずつ返します。移動したキーは、行が出たリストで探してください。仮想リストはどちらにも参加しません。
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
+
 ## Avatar
 
 人やチームの丸い画像で、サイズは 32、40、64 ピクセルです（`AvatarSize::Small`、`Medium`、`Large`）。名前は必須です。名前は代替テキストであり、画像がないとき、または画像がアプリの `img-src` で許可されたホストにないときに表示されるイニシャルの元になります（`Image` と同じ規則）。イニシャルはその言語の大文字に従うため、トルコ語の `i` は `İ` になります。名前がアバターのすぐ隣に書かれている場合は、`.decorative()` でアバターをスクリーンリーダーから隠し、名前が二度読まれないようにします。

@@ -17,8 +17,13 @@ pub struct Step {
     pub rank: Rank,
 }
 
-/// Steps with the given titles, ranked in that order.
+/// Steps with the given titles, ranked in that order, with ids from 1.
 fn seed(titles: impl Iterator<Item = String>) -> Mutex<Vec<Step>> {
+    seed_from(1, titles)
+}
+
+/// Steps with the given titles, ranked in that order, with ids from `first`.
+fn seed_from(first: i64, titles: impl Iterator<Item = String>) -> Mutex<Vec<Step>> {
     let titles: Vec<String> = titles.collect();
     let ranks = zeyn::rank::rebalance(titles.len());
     Mutex::new(
@@ -27,7 +32,7 @@ fn seed(titles: impl Iterator<Item = String>) -> Mutex<Vec<Step>> {
             .zip(ranks)
             .enumerate()
             .map(|(i, (title, rank))| Step {
-                id: StepId(i as i64 + 1),
+                id: StepId(first + i as i64),
                 title,
                 rank,
             })
@@ -122,6 +127,121 @@ pub fn sortable(_ctx: &Ctx) -> Node {
         .into()
 }
 
+/// The two lists of the connected example: "1" is the sprint, "2" the done list.
+static SPRINT: LazyLock<Mutex<Vec<Step>>> = LazyLock::new(|| {
+    seed_from(
+        201,
+        [
+            "Fix the login form",
+            "Translate the help",
+            "Add the export",
+            "Check the dark theme",
+        ]
+        .into_iter()
+        .map(String::from),
+    )
+});
+
+static DONE: LazyLock<Mutex<Vec<Step>>> = LazyLock::new(|| {
+    seed_from(
+        301,
+        ["Set up the project", "Write the entities"]
+            .into_iter()
+            .map(String::from),
+    )
+});
+
+/// The store of a connected list by its id.
+fn board(id: Option<&str>) -> Result<&'static Mutex<Vec<Step>>> {
+    match id {
+        Some("1") => Ok(&SPRINT),
+        Some("2") => Ok(&DONE),
+        _ => Err(Error::NotFound),
+    }
+}
+
+/// The steps of the sprint, by rank.
+#[action(public)]
+pub async fn sprint_steps(q: DataQuery) -> Result<Page<Step>> {
+    Ok(rows(&SPRINT, q))
+}
+
+/// The finished steps, by rank.
+#[action(public)]
+pub async fn done_steps(q: DataQuery) -> Result<Page<Step>> {
+    Ok(rows(&DONE, q))
+}
+
+/// Moves one or more steps within a list or from the other list: the rows are looked up in the
+/// list they left, the neighbors in the list they land in.
+#[action(public)]
+pub async fn move_steps(r: ReorderRequest<StepId>) -> Result<()> {
+    let to = board(r.list.as_deref())?;
+    let from = match r.from.as_deref() {
+        Some(id) => board(Some(id))?,
+        None => to,
+    };
+    let ranks = {
+        let target = to
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        r.ranks(|k| {
+            target
+                .iter()
+                .find(|s| s.id == *k)
+                .map(|s| s.rank.clone())
+        })?
+    };
+    let mut moved = Vec::new();
+    {
+        let mut source = from
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if !r
+            .keys()
+            .all(|k| source.iter().any(|s| s.id == *k))
+        {
+            return Err(Error::NotFound);
+        }
+        for (k, rank) in r.keys().zip(ranks) {
+            let i = source
+                .iter()
+                .position(|s| s.id == *k)
+                .ok_or(Error::NotFound)?;
+            let mut step = source.remove(i);
+            step.rank = rank;
+            moved.push(step);
+        }
+    }
+    to.lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .extend(moved);
+    Ok(())
+}
+
+pub fn connected(_ctx: &Ctx) -> Node {
+    let item = |s: &Step| ListItem::new(s.title.clone());
+    AutoGrid::new()
+        .min(260)
+        .add(
+            List::of(sprint_steps)
+                .title("Sprint")
+                .item(item)
+                .sortable(Step::rank, move_steps)
+                .connect("board", "1")
+                .multi_select(),
+        )
+        .add(
+            List::of(done_steps)
+                .title("Done")
+                .item(item)
+                .sortable(Step::rank, move_steps)
+                .connect("board", "2")
+                .multi_select(),
+        )
+        .into()
+}
+
 pub fn sortable_virtual(_ctx: &Ctx) -> Node {
     List::of(sample_backlog)
         .title("Backlog")
@@ -208,6 +328,7 @@ pub const ENTRY: Entry = Entry {
         ex!(numbered_pages),
         ex!(sortable),
         ex!(sortable_virtual),
+        ex!(connected),
         ex!(fixed),
         ex!(builder),
         ex!(virtual_rows),

@@ -108,6 +108,17 @@ List::of(search_tasks)
     .sortable(Task::rank, reorder_tasks)
 ```
 
+`.connect(group, id)` 把同一屏幕上属于同一组的可排序列表连接起来：行可以从一个列表拖到另一个列表，也可以用移动菜单中的"移动到"移动。操作会收到行进入的列表的 id（`r.list`）和行离开的列表的 id（`r.from`）；两个 id 都来自屏幕而不是浏览器，服务器会检查两个列表操作的权限。`.multi_select()` 让用户按住 Control 或 Command 点击手柄，或用菜单中的"选择以移动"来选择行，一次最多移动 100 行：其余的键在 `r.rest` 中，`r.ranks(lookup)` 为 `r.keys()` 中的每一行给出一个排名。请在行离开的列表中查找被移动的键。虚拟列表不参与这两项功能。
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
+
 ## Avatar
 
 一个人或一个团队的圆形头像，尺寸为 32、40 或 64 像素（`AvatarSize::Small`、`Medium`、`Large`）。名称是必填的：它是替代文本，也是没有图片、或图片不在应用的 `img-src` 允许的主机上时显示的首字母的来源（规则与 `Image` 相同）。首字母遵循该语言的大写规则，因此土耳其语的 `i` 会变成 `İ`。当名称就写在头像旁边时，`.decorative()` 会对屏幕阅读器隐藏头像，避免名称被读两遍。

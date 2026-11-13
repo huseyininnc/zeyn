@@ -108,6 +108,17 @@ List::of(search_tasks)
     .sortable(Task::rank, reorder_tasks)
 ```
 
+`.connect(group, id)` une las listas ordenables de una pantalla que comparten un grupo: las filas se arrastran de una a otra, o se mueven con "Mover a" en el menú de mover. La acción recibe el id de la lista a la que llegan las filas (`r.list`) y el de la lista que dejan (`r.from`); los dos ids vienen de la pantalla, nunca del navegador, y el servidor comprueba el permiso de las acciones de ambas listas. `.multi_select()` permite seleccionar filas con Control o Comando y un clic en el asa, o con "Seleccionar para mover" en el menú, y mover hasta 100 a la vez: las demás claves están en `r.rest`, y `r.ranks(lookup)` da un rango para cada una de `r.keys()`. Busque las claves movidas en la lista que dejan. Las listas virtuales no participan en ninguna de las dos cosas.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
+
 ## Avatar
 
 Una imagen redonda de una persona o de un equipo, de 32, 40 o 64 píxeles (`AvatarSize::Small`, `Medium`, `Large`). El nombre es obligatorio: es el texto alternativo y el origen de las iniciales que se muestran cuando no hay imagen, o cuando la imagen no está en un host que permita el `img-src` de la aplicación (la misma regla que para `Image`). Las iniciales siguen las mayúsculas del idioma, de modo que la `i` turca pasa a `İ`. Cuando el nombre está escrito justo al lado del avatar, `.decorative()` lo oculta a los lectores de pantalla para que no lean el nombre dos veces.

@@ -108,6 +108,17 @@ List::of(search_tasks)
     .sortable(Task::rank, reorder_tasks)
 ```
 
+`.connect(group, id)`, bir ekranda aynı gruptaki sıralanabilir listeleri birleştirir: satırlar birinden diğerine sürüklenir ya da taşıma menüsündeki "Taşı" seçenekleriyle taşınır. Eylem, satırların vardığı listenin kimliğini (`r.list`) ve ayrıldığı listenin kimliğini (`r.from`) alır; iki kimlik de tarayıcıdan değil ekrandan gelir ve sunucu iki listenin eyleminin iznini de denetler. `.multi_select()` ile satırlar Control ya da Command ile tutamağa tıklanarak veya menüdeki "Taşımak için seç" ile seçilir ve en fazla 100 satır birlikte taşınır: diğer anahtarlar `r.rest` içindedir, `r.ranks(lookup)` ise `r.keys()` içindeki her satıra bir sıra verir. Taşınan anahtarları ayrıldıkları listede arayın. Sanal listeler ikisine de katılmaz.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
+
 ## Avatar
 
 Bir kişinin ya da ekibin yuvarlak resmi; 32, 40 ya da 64 piksel (`AvatarSize::Small`, `Medium`, `Large`). Ad zorunludur: alternatif metindir ve resim yokken ya da resim uygulamanın `img-src` ayarının izin verdiği bir sunucuda değilken gösterilen baş harflerin kaynağıdır (`Image` ile aynı kural). Baş harfler dilin büyük harflerini izler, yani Türkçede `i` `İ` olur. Ad avatarın hemen yanında yazılıysa `.decorative()` onu ekran okuyuculardan gizler, böylece ad iki kez okunmaz.

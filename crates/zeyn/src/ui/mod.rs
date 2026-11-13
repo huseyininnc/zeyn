@@ -380,6 +380,19 @@ pub trait DataSource: Send + Sync {
     /// Runs the action with the client's input. The input is untrusted: it is read as the
     /// action's input type, and anything that does not fit is refused.
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>>;
+
+    /// The group and the list id of a source joined to other lists, such as a sortable list with
+    /// `connect(group, id)`. Rows move only between sources of the same group.
+    fn link(&self) -> Option<(&str, &str)> {
+        None
+    }
+
+    /// Runs the action for rows that come from the connected list with id `from`. The server
+    /// calls it only after it found that list on the same screen, in the same group, and
+    /// checked the permission of its action.
+    fn fetch_from(&self, _ctx: Ctx, _input: Json, _from: String) -> BoxFuture<Result<Json>> {
+        Box::pin(async { Err(crate::action::Error::NotFound) })
+    }
 }
 
 /// A data source backed by an action that returns `Result<T>`.

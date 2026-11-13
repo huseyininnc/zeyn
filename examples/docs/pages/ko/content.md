@@ -108,6 +108,17 @@ List::of(search_tasks)
     .sortable(Task::rank, reorder_tasks)
 ```
 
+`.connect(group, id)`는 같은 그룹에 속한 화면의 정렬 가능한 목록을 연결합니다. 행은 한 목록에서 다른 목록으로 끌어 옮기거나 이동 메뉴의 "이동 대상"으로 옮길 수 있습니다. 액션은 행이 들어간 목록의 id(`r.list`)와 행이 떠난 목록의 id(`r.from`)를 받습니다. 두 id 모두 브라우저가 아니라 화면에서 오며, 서버는 두 목록 액션의 권한을 모두 확인합니다. `.multi_select()`를 쓰면 Control 또는 Command를 누른 채 핸들을 클릭하거나 메뉴의 "이동할 항목으로 선택"으로 행을 고르고 최대 100개를 한 번에 옮길 수 있습니다. 나머지 키는 `r.rest`에 있고, `r.ranks(lookup)`는 `r.keys()`의 각 행에 순위를 하나씩 줍니다. 옮긴 키는 행이 떠난 목록에서 찾으세요. 가상 목록은 두 기능 모두에 참여하지 않습니다.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
+
 ## Avatar
 
 사람이나 팀의 둥근 사진으로, 크기는 32, 40, 64픽셀입니다(`AvatarSize::Small`, `Medium`, `Large`). 이름은 필수입니다. 이름은 대체 텍스트이면서, 사진이 없거나 사진이 앱의 `img-src`가 허용하는 호스트에 있지 않을 때 표시되는 이니셜의 원본입니다(`Image`와 같은 규칙). 이니셜은 해당 언어의 대문자 규칙을 따르므로 튀르키예어의 `i`는 `İ`가 됩니다. 이름이 아바타 바로 옆에 적혀 있을 때는 `.decorative()`가 아바타를 스크린 리더에서 숨겨 이름이 두 번 읽히지 않게 합니다.

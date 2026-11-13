@@ -368,6 +368,14 @@ fn sort_texts(r: &Render) -> String {
         "top",
         "bottom",
         "menu",
+        "to_list",
+        "select",
+        "deselect",
+        "selected",
+        "deselected",
+        "too_many",
+        "is_selected",
+        "moved_to",
     ] {
         texts.insert(
             key.into(),
@@ -444,7 +452,7 @@ pub struct CardGrid<E: Model> {
     priority: usize,
     empty: Option<super::EmptyState>,
     empty_filtered: Option<super::EmptyState>,
-    reorder: Option<(&'static str, Box<dyn DataSource>)>,
+    reorder: Option<super::reorder::Sortable>,
 }
 
 type BuildFn<E> = Box<dyn Fn(&E) -> Node + Send + Sync>;
@@ -643,7 +651,45 @@ impl<E: Model> CardGrid<E> {
         A::Output: crate::ctx::Outcome,
         K: serde::de::DeserializeOwned + Send + Sync + 'static,
     {
-        self.reorder = Some((rank.meta().name, super::reorder::source::<A, K>()));
+        self.reorder = Some(super::reorder::Sortable::new(
+            rank.meta().name,
+            super::reorder::source::<A, K>,
+        ));
+        self
+    }
+
+    /// Joins this sortable list to the other lists of the screen with the same `group`, so rows
+    /// move between them: dragged onto another list, or with "Move to" in the move menu. `id`
+    /// names this list for the reorder action ([`crate::ReorderRequest::list`] and
+    /// [`crate::ReorderRequest::from`]); it comes from the screen, never from the browser, and
+    /// the server checks the permission of both lists' actions. Give each list a title, which the
+    /// move menu shows. Virtual lists do not take part.
+    /// Call it after [`CardGrid::sortable`]; without it, it does nothing.
+    ///
+    /// ```ignore
+    /// List::of(todo_tasks)
+    ///     .title("To do")
+    ///     .item(|t: &Task| ListItem::new(t.title.clone()))
+    ///     .sortable(Task::rank, move_tasks)
+    ///     .connect("tasks", "todo")
+    /// ```
+    pub fn connect(mut self, group: &'static str, id: impl Into<String>) -> Self {
+        let id = id.into();
+        self.reorder = self
+            .reorder
+            .map(|s| s.with(|setup| setup.link = Some((group, id))));
+        self
+    }
+
+    /// Lets people select several rows of a sortable list (Control or Command with a click on a
+    /// handle, or "Select for moving" in the move menu) and move them together, up to
+    /// [`crate::ReorderRequest::MAX_ROWS`]. The reorder action then gets the other rows in
+    /// [`crate::ReorderRequest::rest`] and stores [`crate::ReorderRequest::ranks`]. Call it after
+    /// [`CardGrid::sortable`].
+    pub fn multi_select(mut self) -> Self {
+        self.reorder = self
+            .reorder
+            .map(|s| s.with(|setup| setup.multi = true));
         self
     }
 
@@ -826,9 +872,9 @@ impl<E: Model> CardGrid<E> {
                     .map(|(_, s)| s.clone()),
             );
         }
-        if let Some((rank, _)) = &self.reorder {
+        if let Some(sortable) = &self.reorder {
             query.sort = vec![Sort {
-                field: rank.to_string(),
+                field: sortable.rank.to_string(),
                 desc: false,
             }];
         }
@@ -945,8 +991,12 @@ impl<E: Model> CardGrid<E> {
             t("error"),
             if self.reorder.is_some() {
                 format!(
-                    r#" data-zeyn-sortable data-texts="{}""#,
-                    sort_texts(r)
+                    r#" data-zeyn-sortable data-texts="{}"{}"#,
+                    sort_texts(r),
+                    self.reorder
+                        .as_ref()
+                        .map(|s| s.attrs())
+                        .unwrap_or_default()
                 )
             } else {
                 String::new()
@@ -1026,10 +1076,11 @@ impl<E: Model> CardGrid<E> {
                 out.push_str(&format!(r#" data-zeyn-next="{}""#, escape(next)));
             }
         }
-        if self.reorder.is_some() {
+        if let Some(sortable) = &self.reorder {
             out.push_str(&format!(
-                r#" data-zeyn-sortable data-texts="{}""#,
-                sort_texts(r)
+                r#" data-zeyn-sortable data-texts="{}"{}"#,
+                sort_texts(r),
+                sortable.attrs()
             ));
         }
         out.push('>');
@@ -1225,7 +1276,7 @@ impl<E: Model> Component for CardGrid<E> {
             "reorder": self
                 .reorder
                 .as_ref()
-                .map(|(rank, s)| json!({ "rank": rank, "action": s.action() })),
+                .map(|s| json!({ "rank": s.rank, "action": s.source.action(), "group": s.source.link().map(|(g, _)| g) })),
         })
     }
 
@@ -1238,7 +1289,7 @@ impl<E: Model> Component for CardGrid<E> {
             "reorder" => self
                 .reorder
                 .as_ref()
-                .map(|(_, s)| s.as_ref()),
+                .map(|s| s.source.as_ref()),
             _ => None,
         }
     }

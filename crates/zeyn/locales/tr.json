@@ -761,7 +761,15 @@
         "down": "Aşağı taşı",
         "top": "En başa taşı",
         "bottom": "En sona taşı",
-        "menu": "{item} öğesini taşı"
+        "menu": "{item} öğesini taşı",
+        "to_list": "{list} listesine taşı",
+        "select": "Taşımak için seç",
+        "deselect": "Seçimden çıkar",
+        "selected": "{item} seçildi, {count} seçili",
+        "deselected": "{item} seçilmedi, {count} seçili",
+        "too_many": "Bir kerede en fazla {count} satır taşınır",
+        "is_selected": "seçili",
+        "moved_to": "{item} {list} listesine taşındı, sıra {pos} / {count}"
       },
       "calendar": {
         "navigation": "Dönem",
