@@ -649,7 +649,7 @@ async function loadBranch(grid, anchor, level, path, offset) {
   const r = await post(BASE + '/_zeyn/grid', {
     ...address(grid),
     path,
-    query: { page: { type: 'offset', offset, limit: s.size }, sort: s.sort, filters: filterList(s), q: s.q, with_total: true, aggregates: [] },
+    query: { page: { type: 'offset', offset, limit: s.size }, sort: s.sort, filters: filterList(s), filter_groups: s.filterGroups, q: s.q, with_total: true, aggregates: [] },
     view: viewOf(grid, s),
   });
   anchor.removeAttribute('aria-busy');

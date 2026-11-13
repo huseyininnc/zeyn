@@ -5,8 +5,8 @@
 //! between databases: placeholders, quoting, date conversion, paging and column types.
 
 use super::decode::{Arg, Col, args_of};
-use crate::action::{Aggregate, Cursor, DataQuery, Error, MAX_FILTERS, PageRequest, Result};
-use crate::grid::{Cond, Key, MAX_SORT, TextOp};
+use crate::action::{Aggregate, Cursor, DataQuery, Error, PageRequest, Result};
+use crate::grid::{Cond, CondGroup, Key, MAX_SORT, TextOp};
 use crate::i18n::Text;
 use crate::model::{Entity, FieldError, FieldMeta, Model, Rule, ValidationErrors};
 use crate::time::{Date, DateTime, LocalDateTime, Time};
@@ -556,11 +556,7 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
     let fields = E::fields();
     sql.push(" FROM ");
     sql.push(&ident(d, E::TABLE)?);
-    let mut conds = Vec::new();
-    for f in q.filters.iter().take(MAX_FILTERS) {
-        Cond::read(f, fields, q.time_zone, &mut conds);
-    }
-    conds.extend(Cond::search(&q.q, fields));
+    let (conds, mut groups) = q.conditions(fields);
     let mut first = true;
     for c in &conds {
         if let Cond::Search(cols, needle) = c {
@@ -585,24 +581,87 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
             sql.push(")");
             continue;
         }
-        let i = match c {
-            Cond::Text(i, ..)
-            | Cond::Range(i, ..)
-            | Cond::AnyOf(i, ..)
-            | Cond::Is(i, ..)
-            | Cond::Blank(i, ..)
-            | Cond::AnyKey(i, ..) => *i,
-            Cond::Search(..) => continue,
+        let Some(i) = field_of(c) else {
+            continue;
         };
-        let f = &fields[i];
-        if matches!(c, Cond::Text(..)) && matches!(f.kind, FieldKind::Money | FieldKind::Bool) {
+        if unwritten(fields, c) {
             continue;
         }
         sql.push(if first { " WHERE " } else { " AND " });
         first = false;
-        condition(d, sql, f, c)?;
+        condition(d, sql, &fields[i], c)?;
+    }
+    groups.retain_mut(|g| written(fields, g));
+    for g in &groups {
+        sql.push(if first { " WHERE " } else { " AND " });
+        first = false;
+        group(d, sql, fields, g)?;
     }
     Ok(!first)
+}
+
+/// The column a condition reads; `None` for [`Cond::Search`], which reads several.
+fn field_of(c: &Cond) -> Option<usize> {
+    match c {
+        Cond::Text(i, ..)
+        | Cond::Range(i, ..)
+        | Cond::AnyOf(i, ..)
+        | Cond::Is(i, ..)
+        | Cond::Blank(i, ..)
+        | Cond::AnyKey(i, ..) => Some(*i),
+        Cond::Search(..) => None,
+    }
+}
+
+/// Whether SQL leaves the condition out: text conditions on money and yes/no columns.
+fn unwritten(fields: &[FieldMeta], c: &Cond) -> bool {
+    matches!(c, Cond::Text(..))
+        && field_of(c).is_some_and(|i| matches!(fields[i].kind, FieldKind::Money | FieldKind::Bool))
+}
+
+/// Drops the conditions SQL leaves out from a group; `false` when nothing is left in it.
+fn written(fields: &[FieldMeta], g: &mut CondGroup) -> bool {
+    for conds in &mut g.filters {
+        conds.retain(|c| field_of(c).is_some() && !unwritten(fields, c));
+    }
+    g.filters
+        .retain(|conds| !conds.is_empty());
+    g.groups
+        .retain_mut(|s| written(fields, s));
+    !g.filters.is_empty() || !g.groups.is_empty()
+}
+
+/// Writes a filter group in parentheses: its filters (each in parentheses, conditions joined
+/// by `AND`) and nested groups, joined by `OR` for `any` and `AND` for `all`.
+fn group(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], g: &CondGroup) -> Result<()> {
+    let join = if g.any { " OR " } else { " AND " };
+    sql.push("(");
+    let mut first = true;
+    for conds in &g.filters {
+        if !first {
+            sql.push(join);
+        }
+        first = false;
+        sql.push("(");
+        for (n, c) in conds.iter().enumerate() {
+            if n > 0 {
+                sql.push(" AND ");
+            }
+            if let Some(i) = field_of(c) {
+                condition(d, sql, &fields[i], c)?;
+            }
+        }
+        sql.push(")");
+    }
+    for s in &g.groups {
+        if !first {
+            sql.push(join);
+        }
+        first = false;
+        group(d, sql, fields, s)?;
+    }
+    sql.push(")");
+    Ok(())
 }
 
 fn condition(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, c: &Cond) -> Result<()> {

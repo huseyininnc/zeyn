@@ -59,12 +59,16 @@ pub(super) struct GridCall {
     pub(super) shape: Option<String>,
 }
 
+/// Most selected rows one export takes by key; the keys travel in the export URL.
+pub const MAX_EXPORT_KEYS: usize = 1_000;
+
 #[derive(Deserialize)]
 struct ExportQuery {
     screen: String,
     params: Option<String>,
     node: crate::ui::NodePath,
-    /// JSON of `{ "sort": [...], "filters": [...], "q": "...", "columns": [...] }`, all optional.
+    /// JSON of `{ "sort": [...], "filters": [...], "filter_groups": [...], "q": "...", "columns": [...], "keys": [...] }`,
+    /// all optional. `keys` limits a CSV or XLSX export to the selected rows.
     q: Option<String>,
     /// `csv` (the default) or `xlsx`.
     format: Option<String>,
@@ -221,10 +225,18 @@ async fn grid_export(
     let mut query: DataQuery = serde_json::from_value(json!({
         "sort": spec.get("sort").cloned().unwrap_or(json!([])),
         "filters": spec.get("filters").cloned().unwrap_or(json!([])),
+        "filter_groups": spec.get("filter_groups").cloned().unwrap_or(json!([])),
         "q": spec.get("q").cloned().unwrap_or(json!("")),
     }))
     .unwrap_or_default();
     query.with_total = false;
+    let keys: Option<Vec<String>> = match spec.get("keys") {
+        None | Some(Json::Null) => None,
+        Some(k) => match serde_json::from_value::<Vec<String>>(k.clone()) {
+            Ok(k) if k.len() <= MAX_EXPORT_KEYS && k.iter().all(|k| k.len() <= 200) => Some(k),
+            _ => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+        },
+    };
     #[cfg(feature = "pdf")]
     if q.format.as_deref() == Some("pdf") {
         return pdf::grid_report(
@@ -286,10 +298,11 @@ async fn grid_export(
                     limit: size,
                 },
             };
-            let mut page = match state
-                .timed(grid.fetch(ctx.clone(), q))
-                .await
-            {
+            let rows = match &keys {
+                Some(keys) => grid.fetch_keys(ctx.clone(), q, keys),
+                None => grid.fetch(ctx.clone(), q),
+            };
+            let mut page = match state.timed(rows).await {
                 Ok(p) => p,
                 Err(f) => {
                     outcome = Err(f);
@@ -368,7 +381,11 @@ pub(super) fn note_export(
     query: &DataQuery,
 ) {
     if let Some(model) = grid.sensitive_model() {
-        let query = json!({ "sort": query.sort, "filters": query.filters });
+        let query = json!({
+            "sort": query.sort,
+            "filters": query.filters,
+            "filter_groups": query.filter_groups,
+        });
         ctx.update_trail(|t| {
             t.export = Some(crate::audit::ExportRecord {
                 model,

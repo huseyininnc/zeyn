@@ -1,7 +1,7 @@
 use crate::action::{
     Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, DataQuery, Filter,
-    MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result,
-    Sort, Total,
+    FilterGroup, MAX_FILTER_CHOICES, MAX_FILTER_DEPTH, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE,
+    Page, PageRequest, Result, Sort, Total,
 };
 use crate::ctx::Outcome;
 use crate::ctx::{BoxFuture, Ctx};
@@ -35,7 +35,7 @@ pub use dynamic::{
 };
 
 #[cfg(any(feature = "postgres", feature = "oracle"))]
-pub(crate) use memory::{Cond, Key, TextOp};
+pub(crate) use memory::{Cond, CondGroup, Key, TextOp};
 pub use memory::{position_cursor, total};
 
 /// Where sorting and filtering happen.
@@ -229,6 +229,9 @@ pub struct DataGridView {
     pub sort: Vec<Sort>,
     #[serde(default)]
     pub filters: Vec<Filter>,
+    /// Groups of filters joined by `any` or `all`, as in [`DataQuery::filter_groups`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filter_groups: Vec<FilterGroup>,
     /// Fingerprint of the columns of a dynamic grid the view was made for. A dynamic grid uses
     /// a view only for the same columns; typed grids ignore it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1091,6 +1094,44 @@ impl<E: Model> DataGrid<E> {
         pins
     }
 
+    /// Loads a page after cleaning the query, behind the scope filters and, when given, one more
+    /// filter the server built (the keys of the selected rows), which the client cannot remove.
+    fn fetch_only(
+        &self,
+        ctx: Ctx,
+        mut query: DataQuery,
+        only: Option<Filter>,
+    ) -> BoxFuture<Result<LoadedPage>> {
+        self.allow(&mut query, Some(&ctx));
+        self.scoped(&mut query);
+        if let Some(f) = only {
+            query.filters.insert(0, f);
+        }
+        query.time_zone = ctx.time_zone();
+        let fetch = self.fetch;
+        let offset = match &query.page {
+            PageRequest::Offset { offset, .. } => *offset,
+            PageRequest::After { .. } => 0,
+        };
+        Box::pin(async move {
+            let page = fetch(ctx, query).await?;
+            Ok(LoadedPage {
+                count: page.items.len(),
+                total: page.total,
+                next: page.next,
+                offset,
+                totals: page.totals,
+                items: Box::new(page.items),
+                view: None,
+                saved_views: false,
+                depth: 0,
+                path: Vec::new(),
+                groups: None,
+                parents: Vec::new(),
+            })
+        })
+    }
+
     /// Puts the grid's scope filters in front of the client's.
     fn scoped(&self, query: &mut DataQuery) {
         if !self.scope.is_empty() {
@@ -1653,10 +1694,11 @@ impl<E: Model> DataGrid<E> {
         let mut query = DataQuery {
             sort: view.sort,
             filters: view.filters,
+            filter_groups: view.filter_groups,
             ..DataQuery::default()
         };
         self.allow(&mut query, None);
-        query.filters.retain(|f| {
+        query.retain_filters(|f| {
             let short = |s: &Option<String>| {
                 s.as_deref()
                     .is_none_or(|t| t.chars().count() <= MAX_FILTER_TEXT)
@@ -1675,6 +1717,7 @@ impl<E: Model> DataGrid<E> {
             columns,
             sort: query.sort,
             filters: query.filters,
+            filter_groups: query.filter_groups,
             shape: None,
             group_by: self
                 .picked_groups(Some(&view_groups))
@@ -1715,10 +1758,7 @@ impl<E: Model> DataGrid<E> {
                 .iter()
                 .any(|c| c.filter && c.name == name)
         };
-        query
-            .filters
-            .retain(|f| filterable(&f.field) && !f.is_empty());
-        query.filters.truncate(MAX_FILTERS);
+        query.retain_filters(|f| filterable(&f.field) && !f.is_empty());
         let mut seen = Vec::new();
         query.sort.retain(|s| {
             sortable(&s.field) && !seen.contains(&s.field) && {
@@ -2649,6 +2689,7 @@ impl<E: Model> DataGrid<E> {
                         .cloned()
                         .chain(user.iter().cloned())
                         .collect(),
+                    filter_groups: query.filter_groups.clone(),
                     aggregates: query.aggregates.clone(),
                     time_zone: query.time_zone,
                     ..DataQuery::default()
@@ -2736,6 +2777,9 @@ impl<E: Model> GridSource for DataGrid<E> {
                 .unwrap_or_else(|| self.default_sort.clone()),
             filters: view
                 .map(|v| v.filters.clone())
+                .unwrap_or_default(),
+            filter_groups: view
+                .map(|v| v.filter_groups.clone())
                 .unwrap_or_default(),
             ..DataQuery::default()
         }
@@ -3051,32 +3095,24 @@ impl<E: Model> GridSource for DataGrid<E> {
         })
     }
 
-    fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
-        self.allow(&mut query, Some(&ctx));
-        self.scoped(&mut query);
-        query.time_zone = ctx.time_zone();
-        let fetch = self.fetch;
-        let offset = match &query.page {
-            PageRequest::Offset { offset, .. } => *offset,
-            PageRequest::After { .. } => 0,
-        };
-        Box::pin(async move {
-            let page = fetch(ctx, query).await?;
-            Ok(LoadedPage {
-                count: page.items.len(),
-                total: page.total,
-                next: page.next,
-                offset,
-                totals: page.totals,
-                items: Box::new(page.items),
-                view: None,
-                saved_views: false,
-                depth: 0,
-                path: Vec::new(),
-                groups: None,
-                parents: Vec::new(),
-            })
-        })
+    fn fetch(&self, ctx: Ctx, query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
+        self.fetch_only(ctx, query, None)
+    }
+
+    fn fetch_keys(
+        &self,
+        ctx: Ctx,
+        query: DataQuery,
+        keys: &[String],
+    ) -> BoxFuture<Result<LoadedPage>> {
+        match Self::key_index() {
+            Some(i) => self.fetch_only(
+                ctx,
+                query,
+                Some(Filter::any_of(E::fields()[i].name, keys.to_vec())),
+            ),
+            None => Box::pin(async { Err(crate::action::Error::NotFound) }),
+        }
     }
 
     fn fetch_at(
@@ -3162,6 +3198,31 @@ impl<E: Model> GridSource for DataGrid<E> {
             .filter(|c| c.filter)
             .map(|c| c.meta.name)
             .collect();
+        let filter = json!({
+            "type": "object",
+            "properties": {
+                "field": { "type": "string", "enum": filterable },
+                "contains": { "type": "string" },
+                "starts_with": { "type": "string" },
+                "equals": { "type": "string" },
+                "from": { "type": "string" },
+                "to": { "type": "string" },
+                "any_of": { "type": "array", "items": { "type": "string" } },
+                "is": { "type": "boolean" }
+            },
+            "required": ["field"]
+        });
+        let mut group = serde_json::Value::Null;
+        for _ in 0..MAX_FILTER_DEPTH {
+            let mut properties = json!({
+                "any": { "type": "boolean" },
+                "filters": { "type": "array", "items": filter }
+            });
+            if !group.is_null() {
+                properties["groups"] = json!({ "type": "array", "items": group });
+            }
+            group = json!({ "type": "object", "properties": properties });
+        }
         let mut schema = json!({
             "type": "object",
             "properties": {
@@ -3187,20 +3248,14 @@ impl<E: Model> GridSource for DataGrid<E> {
                 "filters": {
                     "type": "array",
                     "description": "Every set condition must hold. Numbers as 1234.56, dates as YYYY-MM-DD (a whole day in the user's time zone for moments), times as HH:MM.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "field": { "type": "string", "enum": filterable },
-                            "contains": { "type": "string" },
-                            "starts_with": { "type": "string" },
-                            "equals": { "type": "string" },
-                            "from": { "type": "string" },
-                            "to": { "type": "string" },
-                            "any_of": { "type": "array", "items": { "type": "string" } },
-                            "is": { "type": "boolean" }
-                        },
-                        "required": ["field"]
-                    }
+                    "items": filter
+                },
+                "filter_groups": {
+                    "type": "array",
+                    "description": format!(
+                        "Groups that must also hold, for OR conditions. A group with any true matches when one of its filters or groups matches, with any false when all match. Groups nest up to {MAX_FILTER_DEPTH} deep; at most {MAX_FILTERS} filters in all."
+                    ),
+                    "items": group
                 },
                 "with_total": { "type": "boolean" },
                 "aggregates": {
@@ -3376,6 +3431,12 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "builder_title",
         "add_condition",
         "remove_condition",
+        "add_group",
+        "remove_group",
+        "condition_group",
+        "rows_match",
+        "match_all",
+        "match_any",
         "column",
         "apply",
         "clear_all",
@@ -3397,6 +3458,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "paste_failed",
         "paste_readonly",
         "paste_too_many",
+        "too_many",
         "added",
         "batch_saved",
         "discard_confirm",

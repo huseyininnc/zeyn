@@ -241,13 +241,13 @@ document.addEventListener('zeyn:content', (e) => {
 });
 
 /**
- * Filters a grid from another script (the assistant): `detail` is `{ filters, node? }` with
- * filters as the grid query sends them (`{ field, contains }`, `{ field, from, to }`, ...). The
+ * Filters a grid from another script (the assistant): `detail` is `{ filters, filter_groups?,
+ * node? }` as the grid query sends them (`{ field, contains }`, `{ field, from, to }`, ...). The
  * grid of the main screen with that node path (the first one without it) shows the filters in
  * its header and reloads through `POST /_zeyn/grid`, where the server checks them as always.
  */
 document.addEventListener('zeyn:filter', (e) => {
-  const { filters, node } = e.detail ?? {};
+  const { filters, filter_groups: groups, node } = e.detail ?? {};
   const all = [...document.querySelectorAll('.z-main [data-zeyn-grid]')];
   const grid = node == null ? all[0] : all.find((g) => nodeOf(g) === String(node));
   if (!grid || !Array.isArray(filters)) return;
@@ -260,6 +260,7 @@ document.addEventListener('zeyn:filter', (e) => {
     const { field, ...rest } = f ?? {};
     if (typeof field === 'string') s.filters[field] = rest;
   }
+  s.filterGroups = Array.isArray(groups) ? groups : [];
   G?.showFilters(grid, s);
   s.allMatching = false;
   G?.loadGrid(grid, 'reset');

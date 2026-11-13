@@ -8,6 +8,8 @@
  *   still scrolls. Scrolling before the drag starts cancels it.
  * - `capture` follows a started drag with pointer capture: moves are coalesced to one call per
  *   animation frame, release, cancel, a lost capture and Escape end it.
+ * - `scrollerOf` and `autoScroll` scroll the list (or the page) while a dragged item is held
+ *   near its edge, so an item can travel past what is on screen.
  * - `swallowClick` cancels the click that follows the release of a drag.
  * - `announce` speaks a text in one polite live region per page, at most every `ANNOUNCE_MS`;
  *   callers pass texts from the locale files.
@@ -154,6 +156,67 @@ export function swallowClick() {
   };
   document.addEventListener('click', swallow, { capture: true, once: true });
   setTimeout(() => document.removeEventListener('click', swallow, true), 0);
+}
+
+/**
+ * The nearest box around `el` that scrolls along `axis` (`'y'` or `'x'`), or `null` when only
+ * the page scrolls. Read once when a drag starts.
+ * @param {Element} el
+ * @param {'x' | 'y'} [axis]
+ * @returns {Element | null}
+ */
+export function scrollerOf(el, axis = 'y') {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const s = getComputedStyle(p);
+    const over = axis === 'x' ? s.overflowX : s.overflowY;
+    const room = axis === 'x' ? p.scrollWidth > p.clientWidth : p.scrollHeight > p.clientHeight;
+    if (room && (over === 'auto' || over === 'scroll')) return p;
+  }
+  return null;
+}
+
+/**
+ * Scrolls `box` (or the page when `null`) while a dragging pointer stays within `edge` pixels of
+ * its sides, faster the nearer it gets, at most `speed` pixels a frame. The box's rectangle is
+ * measured once; `at(x, y)` takes the pointer's client position, `stop()` ends the scrolling.
+ * The caller follows the scroll through its own `scroll` listener.
+ * @param {Element | null} box
+ * @param {{edge?: number, speed?: number}} [options]
+ * @returns {{at: (x: number, y: number) => void, stop: () => void}}
+ * @example
+ * const scroll = autoScroll(scrollerOf(list));
+ * capture(handle, e, (ev) => scroll.at(ev.clientX, ev.clientY), () => scroll.stop());
+ */
+export function autoScroll(box, { edge = 48, speed = 20 } = {}) {
+  const r = box?.getBoundingClientRect() ?? { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+  let x = 0;
+  let y = 0;
+  let frame = 0;
+  const pace = (p, lo, hi) => {
+    const near = Math.min(edge, (hi - lo) / 3);
+    if (p < lo + near) return -Math.ceil(speed * Math.min(1, (lo + near - p) / near));
+    if (p > hi - near) return Math.ceil(speed * Math.min(1, (p - hi + near) / near));
+    return 0;
+  };
+  const tick = () => {
+    frame = 0;
+    const dx = pace(x, r.left, r.right);
+    const dy = pace(y, r.top, r.bottom);
+    if (!dx && !dy) return;
+    (box ?? window).scrollBy(dx, dy);
+    frame = requestAnimationFrame(tick);
+  };
+  return {
+    at(px, py) {
+      x = px;
+      y = py;
+      frame ||= requestAnimationFrame(tick);
+    },
+    stop() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    },
+  };
 }
 
 let region = null;

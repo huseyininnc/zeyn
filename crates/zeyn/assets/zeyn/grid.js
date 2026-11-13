@@ -38,6 +38,7 @@ function initGrid(grid) {
     count: rows(grid).length,
     sort: sorted.length ? sorted.map((th) => ({ field: th.dataset.field, desc: th.getAttribute('aria-sort') === 'descending' })) : defaultSort(grid),
     filters: {},
+    filterGroups: [],
     groups: [],
     q: '',
     texts: textsOf(grid),
@@ -61,6 +62,7 @@ function initGrid(grid) {
       const { field, ...rest } = f;
       state.filters[field] = rest;
     }
+    if (Array.isArray(saved.view.filter_groups)) state.filterGroups = saved.view.filter_groups;
     if (saved.view.columns?.length) state.columns = saved.view.columns;
     if (Array.isArray(saved.view.group_by)) state.groups = saved.view.group_by;
     const pick = own(grid, '[data-zeyn-page-size-pick]');
@@ -136,7 +138,7 @@ async function loadGrid(grid, kind) {
     BASE + '/_zeyn/grid',
     {
       ...address(grid),
-      query: { page, sort: s.sort, filters, q: s.q, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
+      query: { page, sort: s.sort, filters, filter_groups: s.filterGroups, q: s.q, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
       view: viewOf(grid, s),
       head: layout,
       shape: grid.dataset.zeynShape,
@@ -233,7 +235,7 @@ function gridState(grid, kind) {
   box.hidden = false;
   box.dataset.kind = kind;
   const s = grids.get(grid);
-  const filtered = !!s && (filterList(s).length > 0 || !!s.q);
+  const filtered = !!s && (hasFilters(s) || !!s.q);
   const custom = kind === 'empty' && (filtered && grid.querySelector(':scope > template[data-zeyn-empty-filtered]') || grid.querySelector(':scope > template[data-zeyn-empty]'));
   if (custom) {
     box.replaceChildren(custom.content.cloneNode(true));
@@ -545,7 +547,7 @@ async function fetchBlock(grid, s, b) {
     BASE + '/_zeyn/grid',
     {
       ...address(grid),
-      query: { page, sort: s.sort, filters, q: s.q, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
+      query: { page, sort: s.sort, filters, filter_groups: s.filterGroups, q: s.q, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
       view: viewOf(grid, s),
       head,
       shape: grid.dataset.zeynShape,

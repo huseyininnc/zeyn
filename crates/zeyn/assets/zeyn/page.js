@@ -130,12 +130,19 @@ async function submitForm(form, submitter) {
 
 /**
  * Downloads the whole filtered result from `GET /_zeyn/grid/export` as CSV or XLSX, which the
- * server builds page by page. Sends the sort, filters and column layout the user sees.
+ * server builds page by page. Sends the sort, filters and column layout the user sees, and the
+ * keys of the selected rows (at most 1,000) so only they are exported; a PDF report prints every
+ * matching row.
  */
 function exportServer(grid, format) {
   const s = grids.get(grid);
   const a = address(grid);
-  const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], q: s?.q ?? '', columns: s?.columns ?? [] });
+  const spec = { sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], filter_groups: s?.filterGroups ?? [], q: s?.q ?? '', columns: s?.columns ?? [] };
+  if (s?.selected.size && !s.allMatching && format !== 'pdf') {
+    if (s.selected.size > 1000) return toast(fill(s.texts.too_many || 'Select at most {n} rows for this action.', { n: fmt(1000) }), 'error');
+    spec.keys = [...s.selected];
+  }
+  const q = JSON.stringify(spec);
   const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
   const link = document.createElement('a');
   link.href = `${BASE}/_zeyn/grid/export?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}&format=${format}&q=${encodeURIComponent(q)}`;

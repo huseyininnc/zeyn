@@ -112,6 +112,8 @@ mod slug;
 /// Data layer for SQL databases (`postgres` and `oracle` features).
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub mod sql;
+#[cfg(feature = "server")]
+pub mod testing;
 pub mod text;
 mod time;
 pub mod ui;
@@ -122,8 +124,8 @@ mod xlsx;
 
 pub use action::{
     Access, Action, ActionMeta, Aggregate, AggregateRequest, Ai, Cursor, DEFAULT_PAGE_SIZE,
-    DataQuery, Error, Filter, MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE,
-    Page, PageRequest, Result, Sort, Span, Total,
+    DataQuery, Error, Filter, FilterGroup, MAX_FILTER_CHOICES, MAX_FILTER_DEPTH, MAX_FILTER_TEXT,
+    MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Sort, Span, Total,
 };
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 #[cfg(feature = "assistant")]

@@ -94,7 +94,7 @@ List::of(search_people)
 
 `.sortable(action)` lets people put the rows of `List::of` or a `CardGrid` in their own order. Each row gets a handle: a mouse or pen drags it, a touch drags it after a short hold, and a line shows where it lands. On the focused handle Space lifts the row, the arrow keys move it, Space drops it and Escape puts it back; Alt with Up or Down moves it at once. A click or Enter opens a move menu (up, down, to the top, to the end), so one pointer is enough. Every step is announced.
 
-The move shows at once and the action gets a `ReorderRequest` with the key of the row and the keys of its new neighbors (`after`, `before`), never positions. `r.rank(lookup)` gives the new `Rank` between the neighbors and refuses a neighbor the lookup does not find (`NotFound`) or neighbors that are no longer in this order (`Conflict`, someone else moved rows first); then the row goes back and the reason is shown. The source action lists the rows by rank, so sort options are left out, and while more rows are still to load no row can become the last one.
+The move shows at once and the action gets a `ReorderRequest` with the key of the row and the keys of its new neighbors (`after`, `before`), never positions. `r.rank(lookup)` gives the new `Rank` between the neighbors and refuses a neighbor the lookup does not find (`NotFound`) or neighbors that are no longer in this order (`Conflict`, someone else moved rows first); then the row goes back and the reason is shown. The source action lists the rows by rank, so sort options are left out, and while more rows are still to load no row can become the last one. A dragged row scrolls the list, or the page, while it is held near an edge. A list with `Paging::virtual_scroll()` stays virtual: a line shows where the row lands, and the rows show the new order once the server has stored it.
 
 ```rust
 #[action(permission = "tasks.write")]
@@ -106,6 +106,17 @@ pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
 List::of(search_tasks)
     .item(|t: &Task| ListItem::new(t.title.clone()))
     .sortable(Task::rank, reorder_tasks)
+```
+
+`.connect(group, id)` joins the sortable lists of a screen that share a group: rows are dragged from one onto another, or moved with "Move to" in the move menu. The action gets the id of the list the rows land in (`r.list`) and of the list they left (`r.from`); both ids come from the screen, never from the browser, and the server checks the permission of both lists' actions. `.multi_select()` lets people select rows with Control or Command and a click on the handle, or with "Select for moving" in the menu, and move up to 100 of them at once: the other keys are in `r.rest`, and `r.ranks(lookup)` gives one rank for each of `r.keys()`. Look the moved keys up in the list they left. Virtual lists take part in neither.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
 ```
 
 ## Avatar

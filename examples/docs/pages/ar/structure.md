@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## الاختبارات
 
-تبني الاختبارات الموجّه وتستدعيه في الذاكرة:
+يشغّل `zeyn::testing::TestApp` التطبيق في الذاكرة: الموجّه نفسه والفحوص نفسها وقواعد الوصول نفسها كما في التطبيق المخدوم، دون فتح منفذ. يؤدي دور `TestBed` في Angular أو أداة اختبار الواجهات في Flutter: ابنِ التطبيق، وسجّل دخول مستخدم، وافتح شاشة، وأرسل نموذجًا، وانتقل بين صفحات جدول، أو استدعِ إجراءً، ثم اقرأ الحالة أو HTML أو JSON. يرسل رمز CSRF نيابةً عنك. ويكتب `zeyn new` الملف `tests/app.rs` بهذه الطريقة.
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| الاستدعاء | ما يفعله |
+|---|---|
+| `TestApp::new(app)` | التطبيق بطريقة تسجيل الدخول الخاصة به. يتوقف مع المشكلات التي يجدها `App::check` |
+| `TestApp::signed_in(app, identity)` | كل طلب مسجّل الدخول بوصفه `identity`، لتجربة ما يسمح به كل إذن |
+| `.header(name, value)` | ترويسة على كل طلب، مثل `accept-language` |
+| `get(path)` | صفحة أو ملف أو نقطة نهاية |
+| `submit(screen, params, node, values)` | يرسل نموذجًا كما يفعل المتصفح: `200` مع `effects()`، و`422` مع `errors` لكل حقل، و`403` دون الإذن |
+| `grid(screen, params, node, query)` | صفحة من جدول، مع `DataQuery` بصيغة JSON: `rows` بصيغة HTML و`total` |
+| `api(feature, action, input)` | يستدعي إجراءً منشورًا بـ `Feature::api` |
+| `send(request)` | أي طلب آخر |
+
+يعيد كل استدعاء `TestResponse` فيه `status` و`headers` و`body` و`json()` و`effects()`.
+
+تعمل الشاشة أيضًا دون الخادم: لكل `#[screen]` بلا وسائط الدالة `run()`، ويعرضها `screen.html(&META)` ويصفها `screen.schema(&META)` ويشغّل `App::check_page(&screen)` فحوص الصفحة. اختبر ما يستطيع المستخدم فعله (حالة أو تأثير أو صف في الجدول) بدل HTML الحرفي، وشغّل `cargo test` بعد كل تغيير.

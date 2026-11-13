@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## Testler
 
-Testler router'ı oluşturur ve bellekte çağırır:
+`zeyn::testing::TestApp` uygulamayı bellekte çalıştırır: sunulan bir uygulamayla aynı router, denetimler ve erişim kuralları, port açmadan. Angular'daki `TestBed` ya da Flutter'daki widget tester'ın rolünü üstlenir: uygulamayı kur, bir kullanıcıyla oturum aç, bir screen aç, bir form gönder, bir grid'in sayfasını getir ya da bir action çağır, sonra durumu, HTML'i ya da JSON'u oku. CSRF token'ını senin yerine gönderir. `zeyn new`, `tests/app.rs` dosyasını bu şekilde yazar.
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| Çağrı | Yaptığı |
+|---|---|
+| `TestApp::new(app)` | Uygulama kendi oturum açma yöntemiyle. `App::check` sorun bulursa sorunlarla birlikte panic eder |
+| `TestApp::signed_in(app, identity)` | Her istek `identity` olarak oturum açmış olur; her iznin neye izin verdiğini denemek için |
+| `.header(name, value)` | Her isteğe bir header, örneğin `accept-language` |
+| `get(path)` | Bir sayfa, bir dosya ya da bir endpoint |
+| `submit(screen, params, node, values)` | Bir formu tarayıcının yaptığı gibi gönderir: `effects()` ile `200`, alan bazında `errors` ile `422`, izin yoksa `403` |
+| `grid(screen, params, node, query)` | JSON olarak bir `DataQuery` ile bir grid sayfası: HTML olarak `rows` ve `total` |
+| `api(feature, action, input)` | `Feature::api` ile yayımlanan bir action'ı çağırır |
+| `send(request)` | Diğer her istek |
+
+Her çağrı `status`, `headers`, `body`, `json()` ve `effects()` içeren bir `TestResponse` döndürür.
+
+Bir screen sunucu olmadan da çalışır: argümansız bir `#[screen]` için `run()` vardır, `screen.html(&META)` onu çizer, `screen.schema(&META)` tarif eder ve `App::check_page(&screen)` sayfa denetimlerini çalıştırır. Tam HTML yerine kullanıcının yapabildiğini test et (bir durum, bir etki, grid'de bir satır) ve her değişiklikten sonra `cargo test` çalıştır.

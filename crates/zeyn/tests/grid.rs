@@ -533,6 +533,102 @@ async fn grid_endpoint_ignores_filters_and_sorts_on_fields_it_does_not_offer() {
     assert!(rows.find("C-01").unwrap() < rows.find("C-02").unwrap());
 }
 
+fn with_groups(filters: Vec<zeyn::Filter>, groups: Vec<zeyn::FilterGroup>) -> Vec<String> {
+    let q = DataQuery {
+        filters,
+        filter_groups: groups,
+        page: zeyn::PageRequest::Offset {
+            offset: 0,
+            limit: 100,
+        },
+        ..DataQuery::default()
+    };
+    codes(&q.apply((1..=20).map(item).collect()))
+}
+
+#[test]
+fn filter_groups_match_any_or_all_next_to_the_flat_filters() {
+    use zeyn::{Filter, FilterGroup};
+    let low_or_high = FilterGroup::any([
+        Filter::range("qty", None, Some("2")),
+        Filter::range("qty", Some("19"), None),
+    ]);
+    assert_eq!(
+        with_groups(vec![], vec![low_or_high.clone()]),
+        ["C-01", "C-02", "C-19", "C-20"]
+    );
+    assert_eq!(
+        with_groups(vec![Filter::is("active", true)], vec![low_or_high.clone()]),
+        ["C-02", "C-20"]
+    );
+    let nested = low_or_high.group(FilterGroup::all([
+        Filter::any_of("kind", ["Tool"]),
+        Filter::range("qty", Some("10"), Some("13")),
+    ]));
+    assert_eq!(
+        with_groups(vec![], vec![nested]),
+        ["C-01", "C-02", "C-12", "C-19", "C-20"]
+    );
+    let unreadable = FilterGroup::any([Filter::range("qty", Some("abc"), None)]);
+    assert_eq!(with_groups(vec![], vec![unreadable]).len(), 20);
+}
+
+#[test]
+fn filter_groups_stay_within_the_depth_and_count_caps() {
+    use zeyn::{Filter, FilterGroup, MAX_FILTER_DEPTH, MAX_FILTERS};
+    let mut deep = FilterGroup::any([Filter::range("qty", None, Some("1"))]);
+    for _ in 0..MAX_FILTER_DEPTH {
+        deep = FilterGroup::any([Filter::range("qty", Some("99"), None)]).group(deep);
+    }
+    assert!(
+        with_groups(vec![], vec![deep.clone()]).is_empty(),
+        "the group below the deepest level is dropped"
+    );
+    let mut q = DataQuery {
+        filters: vec![Filter::contains("code", "C"); 30],
+        filter_groups: vec![
+            deep,
+            FilterGroup::any(vec![Filter::contains("code", "1"); 5]),
+        ],
+        ..DataQuery::default()
+    };
+    q.retain_filters(|_| true);
+    assert_eq!(q.filters.len(), 30);
+    assert_eq!(
+        q.filter_groups.len(),
+        1,
+        "the second group has no filter left"
+    );
+    let first = &q.filter_groups[0];
+    assert_eq!(first.filters.len(), 1);
+    assert_eq!(first.groups[0].filters.len(), 1);
+    assert!(first.groups[0].groups.is_empty());
+    let over = with_groups(
+        vec![Filter::contains("code", "C"); MAX_FILTERS],
+        vec![FilterGroup::any([Filter::range("qty", Some("99"), None)])],
+    );
+    assert_eq!(over.len(), 20, "filters over the cap are not read");
+}
+
+#[tokio::test]
+async fn grid_endpoint_cleans_filter_groups_like_the_flat_filters() {
+    let q = serde_json::json!({
+        "with_total": true,
+        "filter_groups": [{ "any": true, "filters": [
+            { "field": "price", "to": "20" },
+            { "field": "note", "contains": "note 1" },
+            { "field": "price", "from": "190" }
+        ] }, { "any": true, "filters": [{ "field": "secret", "contains": "x" }] }]
+    });
+    let r = send(&router(reader()), post("/_zeyn/grid", grid_call(q))).await;
+    assert_eq!(r.status, StatusCode::OK);
+    let j = r.json();
+    assert_eq!(
+        j["total"], 4,
+        "note has no filter(), so it cannot widen the any group"
+    );
+}
+
 #[tokio::test]
 async fn grid_endpoint_sorts_by_several_columns() {
     let q = serde_json::json!({
@@ -3577,6 +3673,26 @@ fn search_shows_in_the_grid_schema_and_the_agent_tool() {
     );
 }
 
+#[test]
+fn agent_tool_offers_filter_groups_as_deep_as_the_server_reads() {
+    let grid = DataGrid::of(search)
+        .column(Item::code)
+        .filter()
+        .done();
+    let schema = zeyn::GridSource::tool_schema(&grid);
+    let mut group = &schema["properties"]["filter_groups"]["items"];
+    let mut depth = 1;
+    while !group["properties"]["groups"].is_null() {
+        assert_eq!(
+            group["properties"]["filters"]["items"]["properties"]["field"]["enum"],
+            serde_json::json!(["code"])
+        );
+        group = &group["properties"]["groups"]["items"];
+        depth += 1;
+    }
+    assert_eq!(depth, zeyn::MAX_FILTER_DEPTH);
+}
+
 /// Creates an item.
 #[action(permission = "items.write")]
 pub async fn create_item(item: Valid<Item>, store: Store) -> Result<()> {
@@ -4023,4 +4139,42 @@ async fn column_menus_carry_the_autofit_texts_in_the_users_language() {
         "{}",
         page.body
     );
+}
+
+#[tokio::test]
+async fn export_takes_only_the_selected_rows_by_key() {
+    let (router, _) = export_router(reader());
+    let q = serde_json::json!({ "keys": ["3", "4", "999"], "columns": [{ "field": "code" }] });
+    let r = send(&router, export_get(0, q, "en")).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let lines: Vec<&str> = r.body.trim_end().lines().collect();
+    assert_eq!(lines.len(), 3, "{}", r.body);
+    assert!(
+        lines[1].contains("C-03") && lines[2].contains("C-04"),
+        "{}",
+        r.body
+    );
+    let q =
+        serde_json::json!({ "keys": ["3"], "filters": [{ "field": "code", "equals": "C-04" }] });
+    let r = send(&router, export_get(0, q, "en")).await;
+    assert_eq!(
+        r.body.trim_end().lines().count(),
+        1,
+        "the user's filters still apply: {}",
+        r.body
+    );
+}
+
+#[tokio::test]
+async fn export_refuses_too_many_selected_keys() {
+    let (router, _) = export_router(reader());
+    let keys: Vec<String> = (0..1_001)
+        .map(|i| i.to_string())
+        .collect();
+    let r = send(
+        &router,
+        export_get(0, serde_json::json!({ "keys": keys }), "en"),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.body);
 }
