@@ -164,6 +164,9 @@ struct DataCall {
     key: String,
     #[serde(default)]
     input: Json,
+    /// The node rows come from when they move between connected lists.
+    #[serde(default)]
+    from: Option<NodePath>,
 }
 
 /// Most nodes one `POST /_zeyn/nodes` renders.
@@ -450,6 +453,37 @@ fn reply_stream(reply: crate::ui::Reply) -> Response {
     r
 }
 
+/// The list id of the node at `path` that rows leave for `to`: its source of the same `key`
+/// must be in the same group as `to`, be another list, and allow the user its action.
+fn linked(
+    ctx: &crate::ctx::Ctx,
+    screen: &crate::screen::Screen,
+    path: &NodePath,
+    key: &str,
+    to: &dyn crate::ui::DataSource,
+) -> Result<String, Failure> {
+    let other = screen
+        .node(path)
+        .and_then(|n| n.source(key))
+        .ok_or(Failure::App(Error::NotFound))?;
+    let (group, from) = other
+        .link()
+        .ok_or(Failure::App(Error::NotFound))?;
+    let (own, id) = to
+        .link()
+        .ok_or(Failure::App(Error::NotFound))?;
+    if group != own || from == id {
+        return Err(Failure::App(Error::NotFound));
+    }
+    if !ctx
+        .identity()
+        .can(&other.action().access)
+    {
+        return Err(Failure::App(Error::Forbidden));
+    }
+    Ok(from.to_string())
+}
+
 async fn data_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -477,6 +511,10 @@ async fn data_call(
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
+        let from = match &call.from {
+            Some(path) => Some(linked(&ctx, &screen, path, &call.key, source)?),
+            None => None,
+        };
         let info = Call {
             kind: CallKind::DataGrid,
             screen: entry.meta.name,
@@ -484,7 +522,10 @@ async fn data_call(
             via_agent: ctx.via_agent(),
         };
         st.intercept(&ctx, &info, || {
-            st.timed(source.fetch(ctx.clone(), call.input))
+            st.timed(match from {
+                Some(from) => source.fetch_from(ctx.clone(), call.input, from),
+                None => source.fetch(ctx.clone(), call.input),
+            })
         })
         .await
     }

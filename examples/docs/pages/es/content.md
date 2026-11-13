@@ -94,7 +94,7 @@ List::of(search_people)
 
 `.sortable(action)` permite que las personas pongan las filas de `List::of` o de una `CardGrid` en su propio orden. Cada fila tiene un asa: un ratón o lápiz la arrastra, un toque la arrastra tras mantenerlo un momento, y una línea muestra dónde caerá. En el asa con el foco, Espacio levanta la fila, las flechas la mueven, Espacio la suelta y Escape la devuelve; Alt con Arriba o Abajo la mueve al instante. Un clic o Enter abre un menú de mover (arriba, abajo, al principio, al final), así que basta con un solo puntero. Cada paso se anuncia.
 
-El movimiento se ve al instante y la acción recibe un `ReorderRequest` con la clave de la fila y las claves de sus nuevos vecinos (`after`, `before`), nunca posiciones. `r.rank(lookup)` da el nuevo `Rank` entre los vecinos y rechaza un vecino que la búsqueda no encuentra (`NotFound`) o vecinos que ya no están en ese orden (`Conflict`, otra persona movió filas antes); entonces la fila vuelve y se muestra el motivo. La acción de origen lista las filas por rango, por eso no hay opciones de orden, y mientras queden filas por cargar ninguna fila puede pasar a ser la última.
+El movimiento se ve al instante y la acción recibe un `ReorderRequest` con la clave de la fila y las claves de sus nuevos vecinos (`after`, `before`), nunca posiciones. `r.rank(lookup)` da el nuevo `Rank` entre los vecinos y rechaza un vecino que la búsqueda no encuentra (`NotFound`) o vecinos que ya no están en ese orden (`Conflict`, otra persona movió filas antes); entonces la fila vuelve y se muestra el motivo. La acción de origen lista las filas por rango, por eso no hay opciones de orden, y mientras queden filas por cargar ninguna fila puede pasar a ser la última. Una fila arrastrada desplaza la lista, o la página, mientras se mantiene cerca de un borde. Una lista con `Paging::virtual_scroll()` sigue siendo virtual: una línea muestra dónde cae la fila, y las filas muestran el nuevo orden cuando el servidor lo ha guardado.
 
 ```rust
 #[action(permission = "tasks.write")]
@@ -106,6 +106,17 @@ pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
 List::of(search_tasks)
     .item(|t: &Task| ListItem::new(t.title.clone()))
     .sortable(Task::rank, reorder_tasks)
+```
+
+`.connect(group, id)` une las listas ordenables de una pantalla que comparten un grupo: las filas se arrastran de una a otra, o se mueven con "Mover a" en el menú de mover. La acción recibe el id de la lista a la que llegan las filas (`r.list`) y el de la lista que dejan (`r.from`); los dos ids vienen de la pantalla, nunca del navegador, y el servidor comprueba el permiso de las acciones de ambas listas. `.multi_select()` permite seleccionar filas con Control o Comando y un clic en el asa, o con "Seleccionar para mover" en el menú, y mover hasta 100 a la vez: las demás claves están en `r.rest`, y `r.ranks(lookup)` da un rango para cada una de `r.keys()`. Busque las claves movidas en la lista que dejan. Las listas virtuales no participan en ninguna de las dos cosas.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
 ```
 
 ## Avatar

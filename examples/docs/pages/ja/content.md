@@ -94,7 +94,7 @@ List::of(search_people)
 
 `.sortable(action)` を使うと、`List::of` や `CardGrid` の行を利用者が自分の順番に並べられます。各行にハンドルが付きます。マウスやペンはそのままドラッグし、タッチは少し長押ししてからドラッグします。落ちる位置は線で示されます。フォーカスのあるハンドルでは Space で行を持ち上げ、矢印キーで動かし、Space で置き、Escape で元に戻します。Alt と Up または Down ですぐに動かせます。クリックか Enter で移動メニュー(上へ、下へ、先頭へ、末尾へ)が開くので、単一のポインターで足ります。各操作は読み上げられます。
 
-移動はすぐに表示され、アクションは行のキーと新しい隣の行のキー(`after`、`before`)を持つ `ReorderRequest` を受け取ります。位置は送りません。`r.rank(lookup)` は隣の行の間の新しい `Rank` を返し、検索で見つからない隣の行(`NotFound`)や、もうその順番にない隣の行(`Conflict`、先に誰かが行を動かした)を拒否します。そのときは行が元に戻り、理由が表示されます。元のアクションは行をランク順に返すので並べ替えの選択肢は出ません。また、まだ読み込む行がある間はどの行も最後には移せません。
+移動はすぐに表示され、アクションは行のキーと新しい隣の行のキー(`after`、`before`)を持つ `ReorderRequest` を受け取ります。位置は送りません。`r.rank(lookup)` は隣の行の間の新しい `Rank` を返し、検索で見つからない隣の行(`NotFound`)や、もうその順番にない隣の行(`Conflict`、先に誰かが行を動かした)を拒否します。そのときは行が元に戻り、理由が表示されます。元のアクションは行をランク順に返すので並べ替えの選択肢は出ません。また、まだ読み込む行がある間はどの行も最後には移せません。 ドラッグ中の行を端の近くに保つと、リスト(またはページ)がスクロールします。`Paging::virtual_scroll()` のリストは仮想のままです。線が行の落ちる位置を示し、サーバーが保存したあとで行が新しい順に表示されます。
 
 ```rust
 #[action(permission = "tasks.write")]
@@ -106,6 +106,17 @@ pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
 List::of(search_tasks)
     .item(|t: &Task| ListItem::new(t.title.clone()))
     .sortable(Task::rank, reorder_tasks)
+```
+
+`.connect(group, id)` は、同じグループの画面上の並べ替え可能なリストをつなぎます。行は一方から他方へドラッグするか、移動メニューの「移動先」で移せます。アクションは行が入ったリストの id (`r.list`) と、行が出たリストの id (`r.from`) を受け取ります。どちらの id もブラウザーではなく画面から来ており、サーバーは両方のリストのアクションの権限を確認します。`.multi_select()` を使うと、Control または Command を押しながらハンドルをクリックするか、メニューの「移動用に選択」で行を選び、最大 100 行をまとめて移せます。残りのキーは `r.rest` に入り、`r.ranks(lookup)` は `r.keys()` の各行に順位を 1 つずつ返します。移動したキーは、行が出たリストで探してください。仮想リストはどちらにも参加しません。
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
 ```
 
 ## Avatar
