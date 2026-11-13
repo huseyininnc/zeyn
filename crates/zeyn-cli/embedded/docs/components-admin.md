@@ -103,7 +103,9 @@ Kanban::of(task_flow(), search_tasks, move_task)
 
 Moving a card from one column to another runs the transition between the two states with a `TransitionRequest`, as `Transitions` does. The board offers only the moves the user may make; the server finds the transition, checks its permission and the move action's permission (CSRF and the write limit through `POST /_zeyn/data`), and the action applies it with `Workflow::apply`, which refuses a card that is in another state by now. `.confirm(name, message)` asks first in the shared dialog. The card moves at once; when the server refuses, it goes back to its column with the reason, and when it accepts, both columns render again with one request.
 
-A mouse or pen drags a card; the columns it may go to are outlined, the others dimmed. On touch screens the columns keep scrolling, and the button on each card opens the same menu as the keyboard (WCAG 2.5.7). `kanban.js` (15.5 KB, 5 KB gzip) and `kanban.css` (4 KB) load only with the board, `vlist.js` with its columns.
+A mouse or pen drags a card after it moves 6 px, a touch after a 250 ms hold, so a swipe still scrolls the column (the shared drag core, `drag.js`); the columns it may go to are outlined, the others dimmed, and the board scrolls sideways while the card is held near its edge. The button on each card opens the same menu as the keyboard, the single pointer way to move (WCAG 2.5.7). `kanban.js` (19.7 KB, 6 KB gzip), `drag.js` and `kanban.css` (4.5 KB) load only with the board, `vlist.js` with its columns.
+
+`.sortable(Task::rank, reorder_tasks)` keeps the cards of each column in the order of a `Rank` field, with the reorder action of a sortable list (`ReorderRequest`). Each card gets a handle that reorders it inside its column (drag, keys, or its move menu). A card dropped on another card lands before or after it, and a line shows where: inside its own column that sends the reorder; into another column the transition runs first and the reorder follows with the card's new neighbors. Both requests pass the server's checks: the column's node, CSRF, the write limit and the permission of each action. `sortable.js` loads only with a sortable board.
 
 | Key | What it does |
 |---|---|
@@ -113,6 +115,7 @@ A mouse or pen drags a card; the columns it may go to are outlined, the others d
 | Home, End | First or last card in view in the column |
 | Enter, Space | Opens the move menu: Up and Down choose a column, Enter moves, Escape closes |
 | Shift + Left, Shift + Right | Moves the card to the column before or after, when the workflow allows it |
+| Alt + Up, Alt + Down | On a sortable board, moves the card up or down in its column |
 
 ## Calendar
 
