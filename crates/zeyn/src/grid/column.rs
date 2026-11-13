@@ -349,6 +349,10 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.filter_builder()
     }
 
+    pub fn page_sizes(self, sizes: &[u32]) -> DataGrid<E> {
+        self.grid.page_sizes(sizes)
+    }
+
     pub fn add_with<A>(self, create: A) -> DataGrid<E>
     where
         A: crate::form::FormAction<E> + Action<Input = Valid<E>>,

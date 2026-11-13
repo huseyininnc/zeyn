@@ -63,6 +63,11 @@ function initGrid(grid) {
     }
     if (saved.view.columns?.length) state.columns = saved.view.columns;
     if (Array.isArray(saved.view.group_by)) state.groups = saved.view.group_by;
+    const pick = own(grid, '[data-zeyn-page-size-pick]');
+    if (pick && [...pick.options].some((o) => Number(o.value) === saved.view.page_size)) {
+      state.size = saved.view.page_size;
+      pick.value = String(state.size);
+    }
   }
   state.role = grid.querySelector(':scope > table')?.getAttribute('role');
   setupHead(grid, state);

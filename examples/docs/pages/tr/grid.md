@@ -108,7 +108,7 @@ vardır (düğme, sağ tıklama, Shift+F10 veya bağlam menüsü tuşu); menüde
 sağa taşıma, gizleme, filtre, sütun seçici ve sıfırlama bulunur. Başlığın kenarı sütunu yeniden
 boyutlandırır, sürükleyerek veya ok tuşlarıyla (daha büyük adımlar için Shift). Bir başlığı aynı
 sabitlenmiş gruptaki başka bir başlığın üzerine sürüklemek sütunu taşır; kısa bir basış ise yine
-sıralar. Hepsi sağdan sola yönde de çalışır.
+sıralar. Hepsi sağdan sola yönde de çalışır. Bir başlığın kenarına çift tıklamak, kenardayken Enter ya da sütun menüsündeki "Genişliği içeriğe uydur", sütunu başlığına ve sayfadaki satırlara uydurur; "Tüm sütunları uydur" bunu gösterilen her sütun için yapar. Genişlikler görünümle kaydedilir.
 
 ## Arama
 
@@ -398,7 +398,7 @@ sütun sanallaştırmasının değiştirmediği, her sütunu içeren 200 satırl
 `exportable()` (ve isteğe bağlı olarak `export_permission(...)`, `export_limit(n)`) araç çubuğunun
 `Export::Csv` düğmesinin eşleşen her satırı indirmesini sağlar. Sunucu gridin action'ı üzerinden
 sayfaları gezer ve her sayfayı hemen, kullanıcının yerleşiminde ve dilinde akıtır. Formüller etkisiz
-hale getirilir. Varsayılan olarak 100.000 satıra kadar.
+hale getirilir. Varsayılan olarak 100.000 satıra kadar. Satırlar seçiliyken (tek tek; "eşleşen tümü" değil), CSV ve Excel dışa aktarmaları yalnızca o satırları alır, en çok 1.000 satır, yine kullanıcının süzgeçleri içinde; sunucu onları anahtarla bulur.
 
 `xlsx` Cargo özelliği (feature) ile araç çubuğunun `Export::Xlsx` düğmesi aynı satırları bir Excel
 çalışma kitabı olarak indirir (`GET /_zeyn/grid/export?format=xlsx`). Hücreler türlerini korur:

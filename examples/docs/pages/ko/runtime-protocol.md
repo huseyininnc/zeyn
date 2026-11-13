@@ -54,7 +54,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 공유 버튼, 필터 칩, 반응, 히어로 슬라이드, 환경 설정 저장소, 카드 미리보기(처음 마우스를 올릴 때), 어시스턴트(채팅 패널 또는 런처를 처음 누를 때) |
 | `topics.js`, `vlist.js` | 토픽을 listen하는 노드와 이를 drive하는 컨트롤(`data-zeyn-listens`, `data-zeyn-drives`), 가상 목록(`data-zeyn-vlist`) |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 받은 편지함과 알림 종; Kanban 보드; 달력; 스크립트가 필요 없는 비교, 코드 보기, 바코드(코드 보기의 복사 버튼은 `share.js`에 있음) |
-| `sortable.js` | 순서를 바꿀 수 있는 목록과 카드 그리드(`data-zeyn-sortable`): 핸들, 키보드 이동, 이동 메뉴, 재정렬 요청; `drag.js`와 `net.js`를 가져옴 |
+| `sortable.js` | 순서를 바꿀 수 있는 목록과 카드 그리드(`data-zeyn-sortable`): 핸들, 키보드 이동, 이동 메뉴, 재정렬 요청; `drag.js`와 `net.js`를 가져옴. 연결된 목록 사이(`data-zeyn-sort-group`)에서는 요청이 행이 떠난 노드를 `from`에 담고, 서버가 그 노드의 그룹과 권한을 확인합니다 |
 | `codeedit.js`, `codeedit.css` | 코드 편집기(`data-zeyn-code`): 강조 표시한 사본, 줄 번호, 제안, 오류 표시. `/_zeyn/data`에는 입력이 멈춘 뒤에만 보냅니다 |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js`, `commerce.css` | 범위 슬라이더, 수량 선택기, 상품 갤러리, 카운트다운; 모든 쇼핑 컴포넌트의 스타일시트(가격, 옵션 선택기, 패싯 패널, 리뷰 요약) |
 | `imgcompare.js` | 그림 비교(`ImageCompare`): 슬라이더를 보여 주고 그 값을 `--z-imgcompare`에 기록합니다 |

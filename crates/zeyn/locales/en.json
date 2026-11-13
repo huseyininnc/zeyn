@@ -158,6 +158,7 @@
       "next": "Next page",
       "load_more": "Load more",
       "search": "Search rows",
+      "page_size": "Rows per page",
       "filter_builder": "Filter",
       "builder_title": "Filter rows",
       "add_condition": "Add condition",
@@ -236,7 +237,9 @@
         "hide": "Hide column",
         "columns": "Columns",
         "filter": "Filter",
-        "reset": "Reset view"
+        "reset": "Reset view",
+        "autofit": "Fit width to content",
+        "autofit_all": "Fit all columns"
       },
       "agg": {
         "sum": "Sum",
@@ -773,7 +776,15 @@
         "down": "Move down",
         "top": "Move to the top",
         "bottom": "Move to the end",
-        "menu": "Move {item}"
+        "menu": "Move {item}",
+        "to_list": "Move to {list}",
+        "select": "Select for moving",
+        "deselect": "Remove from selection",
+        "selected": "{item} selected, {count} selected",
+        "deselected": "{item} not selected, {count} selected",
+        "too_many": "At most {count} rows move at once",
+        "is_selected": "selected",
+        "moved_to": "{item} moved to {list}, position {pos} of {count}"
       },
       "calendar": {
         "navigation": "Period",
