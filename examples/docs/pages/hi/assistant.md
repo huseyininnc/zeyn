@@ -105,7 +105,7 @@ pub trait ChatStore: Send + Sync + 'static {
 
 मॉडल वही टूल देखता है जो MCP और WebMCP (देखें `docs/runtime-protocol.md` खंड 9) में हैं, हर बार साइन इन उपयोगकर्ता के लिए बने: ग्रिड खोज, फ़ॉर्म सेव और API action जिन्हें उपयोगकर्ता इस्तेमाल कर सकता है, `ai = false` चिह्नित हर चीज़ को छोड़कर, `///` डॉक टिप्पणियों और `ai = "..."` मार्गदर्शन के विवरण के साथ। दो बिल्ट इन टूल जोड़े जाते हैं:
 
-- `navigate`: उपयोगकर्ता जो रूट वाली Screen खोल सकता है उसे बिना पृष्ठ लोड के खोलता है (`zeyn:navigate`), और उसके ग्रिड को फ़िल्टर कर सकता है (`zeyn:filter`)। ग्रिड फिर `POST /_zeyn/grid` से लोड होता है, जहाँ सर्वर अपनी सामान्य जाँचें लागू करता है।
+- `navigate`: उपयोगकर्ता जो रूट वाली Screen खोल सकता है उसे बिना पृष्ठ लोड के खोलता है (`zeyn:navigate`), और उसके ग्रिड को फ़िल्टर कर सकता है (`zeyn:filter`), सीधे फ़िल्टर और OR समूहों (`filter_groups`, जैसे `DataQuery::filter_groups` में) के साथ। सर्वर खाली फ़िल्टर हटा देता है और `DataQuery::retain_filters` की सीमाएँ रखता है। ग्रिड फिर `POST /_zeyn/grid` से लोड होता है, जहाँ सर्वर अपनी सामान्य जाँचें लागू करता है।
 - `suggest`: अनुवर्ती प्रॉम्प्ट जो चिप के रूप में दिखते हैं।
 
 हर कॉल सामान्य action पथ से गुज़रती है, कॉन्टेक्स्ट को एजेंट के रूप में चिह्नित करके: Screen का एक्सेस, feature के गार्ड, action की अनुमति, इंटरसेप्टर, दर सीमाएँ, समय सीमा, ऑडिट (हर असिस्टेंट कॉल `via_agent: true` के साथ दर्ज होती है) और मास्किंग।
@@ -150,7 +150,7 @@ pub trait ChatStore: Send + Sync + 'static {
 | `POST /_zeyn/assistant/stt` (ऑडियो बॉडी) | `{ text }`; सर्वर speech to text के बिना `404` |
 | `POST /_zeyn/assistant/tts` `{ text }` | स्ट्रीम किया ऑडियो; सर्वर text to speech के बिना `404` |
 
-घटनाएँ, प्रति पंक्ति एक JSON ऑब्जेक्ट: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters}`, `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`, `{t:"error",message}`, `{t:"done"}`।
+घटनाएँ, प्रति पंक्ति एक JSON ऑब्जेक्ट: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters,filter_groups}`, `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`, `{t:"error",message}`, `{t:"done"}`।
 
 `assistant.js` और `assistant.css` केवल उन उपयोगकर्ताओं के लिए लोड होते हैं जो असिस्टेंट इस्तेमाल कर सकते हैं। चैट लॉग एक `role="log"` लाइव रीजन है (उत्तर स्ट्रीम होते समय `aria-busy`), Enter भेजता है, Shift+Enter नई पंक्ति शुरू करता है, Escape साइड पैनल बंद करता है और फ़ोकस लॉन्चर पर लौटाता है, और पुष्टि कार्ड पहले Cancel पर फ़ोकस रखता है।
 
