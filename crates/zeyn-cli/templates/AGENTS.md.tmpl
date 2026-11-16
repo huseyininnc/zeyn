@@ -14,11 +14,11 @@ runtime in the browser applies changes, and there is no JavaScript to write.
 - Standards are fixed by the project files: `rustfmt.toml`, `clippy.toml` and `[lints]` in `Cargo.toml`, `.editorconfig`, `deny.toml` (licenses and advisories), `rust-toolchain.toml`. CI runs all of them; do not loosen them to make a change pass.
 - Show every route, screen, API and missing translation: `zeyn routes`
 - New feature folder: `zeyn g feature <name>`
-- New screen, one file: `zeyn g screen <feature> <name>`. It registers the screen in the feature and adds its title to every locale file (other languages get the English text to translate).
+- New screen, one file: `zeyn g screen <feature> <name>`. It registers the screen in the feature and adds its title to every locale file (other languages get the English text).
 
-The `zeyn` MCP server (see `.mcp.json`) gives agents the same commands plus the framework reference.
+The `zeyn` MCP server (see `.mcp.json`) gives agents the same commands, the framework reference and the running app's request log (`zeyn_devtools`).
 `.claude/skills/zeyn/SKILL.md` is the Zeyn skill: where to read the docs, the rules, the language in
-short, common mistakes and how to verify a change. Any agent can read it as plain Markdown.
+short, common mistakes and how to verify a change.
 
 ## Structure
 

@@ -64,6 +64,7 @@ mod share;
 mod shell;
 mod stepper;
 mod story;
+mod surface;
 mod table;
 mod thread;
 mod toc;
@@ -179,6 +180,7 @@ pub(crate) use schema::{limits_attr, open_section, render_spec, render_templates
 pub use share::{CopyButton, MAX_COPY_BYTES, Share};
 pub use stepper::{MAX_STEPS, Stepper};
 pub use story::{MAX_STORY_RINGS, StoryRing, StoryRow, StoryState};
+pub use surface::{Axis, Draggable, MAX_SURFACE, Surface, SurfaceMove};
 pub use table::{MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, Table};
 pub use thread::{
     Delivery, MAX_CONVERSATION, MAX_MESSAGE_CHARS, MAX_REPLY_CHARS, MAX_SHOWN_FILES, MessageThread,

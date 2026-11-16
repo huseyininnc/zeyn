@@ -85,6 +85,7 @@ Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yaz
   düğmesi ve tuşu, birlikte kaydedilen düzenlemeler. Ayrıntılar [DataGrid başvurusunda](grid.md).
 - Sütunda `.groupable()`, `.summary(label, |t| ...)`: kullanıcı menüsünden ya da gruplama alanından ona göre gruplar, toplamlardan hesaplanan bir değer altında görünür.
 - `.filter_builder()`: süzgeç koşullarını kurmak için bir iletişim kutusu açan "Süz" düğmesi; süzgeç satırı, kayıtlı görünümler ve yapay zekâ ajanları aynı listeyi kullanır.
+- `.filter_chips()`: etkin süzgeçler tablonun üstünde, her biri kaldırma düğmesiyle çip olarak; süzgeç satırı, süzgeç kurucusu ve kayıtlı görünümlerle uyumlu.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
 
 ## Çalışma anında belli olan sütunlar

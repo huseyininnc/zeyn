@@ -1410,7 +1410,10 @@ tr:last-child > .z-lines-actions [data-zeyn-line-move="1"] { visibility: hidden;
   mask: var(--z-i) center / contain no-repeat;
 }
 
-.z-skeleton { display: grid; gap: calc(var(--z-space) * 2.5); padding: calc(var(--z-space) * 1) 0; }
+/** Shown after 300 ms of waiting, so fast loads do not flash it (tabs.js keeps it 400 ms). */
+.z-skeleton { display: grid; gap: calc(var(--z-space) * 2.5); padding: calc(var(--z-space) * 1) 0; animation: z-skeleton-wait 300ms step-end; }
+
+@keyframes z-skeleton-wait { from { visibility: hidden; } }
 
 /** Skeletons pulse in step (opacity only, cheaper to paint than a shimmer); static with reduced
  * motion. */

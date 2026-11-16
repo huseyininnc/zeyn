@@ -323,6 +323,10 @@ async fn commands_the_user_may_not_run_never_reach_the_html() {
         "the palette button is in the menu"
     );
     assert!(html.contains(r#"/_zeyn/palette.js"#));
+    assert!(
+        !html.contains("/_zeyn/drag.js"),
+        "a menu bar without a dock never links the drag core"
+    );
     assert!(html.contains(r#"data-zeyn-command="orders.hello""#));
     assert!(!html.contains("orders.new"), "needs orders.write");
     assert!(!html.contains("orders.archive"), "needs orders.admin");
@@ -653,7 +657,11 @@ async fn dock_renders_areas_tabs_and_dividers_with_node_paths() {
         ),
         "an area without panels starts hidden"
     );
-    assert!(html.contains(r#"role="tab" class="z-dock-tab" id="work-dock-0-1-tab-main" aria-controls="work-dock-0-1-panel-main" aria-selected="true" tabindex="0" draggable="true" data-panel="main""#));
+    assert!(html.contains(r#"role="tab" class="z-dock-tab" id="work-dock-0-1-tab-main" aria-controls="work-dock-0-1-panel-main" aria-selected="true" tabindex="0" data-panel="main""#));
+    assert!(
+        html.contains("/_zeyn/drag.js?v="),
+        "dock tabs drag through the drag core, linked with the first paint"
+    );
     assert!(html.contains(
         r#"id="work-dock-0-1-tab-notes" aria-controls="work-dock-0-1-panel-notes" aria-selected="false" tabindex="-1""#
     ));

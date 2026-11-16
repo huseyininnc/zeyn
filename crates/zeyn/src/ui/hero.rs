@@ -173,8 +173,13 @@ impl Component for Hero {
                 String::new()
             };
             let hidden = if i > 0 { " hidden" } else { "" };
+            let photo = if image.is_empty() {
+                ""
+            } else {
+                " z-hero-photo"
+            };
             slides.push_str(&format!(
-                r#"<div class="z-hero-slide" id="{id}-{i}"{group}{hidden}>{image}<div class="z-hero-body"><h2 class="z-hero-title">{}</h2>"#,
+                r#"<div class="z-hero-slide{photo}" id="{id}-{i}"{group}{hidden}>{image}<div class="z-hero-body"><h2 class="z-hero-title">{}</h2>"#,
                 r.text(&slide.title)
             ));
             if let Some(text) = &slide.text {
