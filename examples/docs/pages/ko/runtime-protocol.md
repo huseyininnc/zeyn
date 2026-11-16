@@ -61,7 +61,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `tour.js` | 페이지 둘러보기(`Tour`): 시작 버튼을 보여 주고 대화 상자를 페이지의 정류장마다 옮깁니다 |
 | `thread.js` 및 `thread.css`, `stream.js`, `composer.js` 및 `composer.css`, `typing.js` 및 `typing.css` | 메시지 스레드; 스레드와 어시스턴트가 함께 쓰는 스트리밍 Markdown과 JSON 줄; 채팅 composer; 입력 중 표시기 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 게시물 피드; 이미지와 동영상 라이트박스; 스토리 링과 그 행, 스크립트 필요 없음 |
-| `drag.js`, `net.js` | 자체 마커가 없는 공유 도우미로, 이를 가져오는 모듈과 함께 연결됨(아래) |
+| `drag.js`, `net.js` | 공유 도우미로, 이를 가져오는 모듈과 함께 연결됨(아래). `drag.js`는 dock(`data-zeyn-dock`)과도 함께 오며, `pro.js`가 그 탭을 끈다 |
 
 두 도우미 모듈은 여러 모듈이 각자 복사했을 코드를 담습니다. `net.js`(`kanban.js`, `files.js`, `vlist.js`가 가져옴)는 `BASE`, `csrf()`, `parse(text)`, `post(path, body)`를 내보냅니다. `post`는 페이지의 출처에서 `x-zeyn-csrf` 헤더와 함께 JSON을 보내고 `{ ok, body }`를 돌려줍니다. `drag.js`(열 이동에 `grid.js`, 레일 드래그 스크롤에 `catalog.js`가 가져옴)는 앞으로 정렬 가능한 목록, 보드, 표면이 기반으로 삼을 드래그 코어입니다. `press(e, { threshold, longPress, tolerance, axis, onStart })`는 마우스나 펜이 6 px 움직이거나 터치가 5 px 안에서 250 ms 유지될 때 `pointerdown`을 드래그로 바꿉니다(스와이프는 계속 스크롤하고, 먼저 스크롤하면 누름이 취소됩니다). `capture(el, e, move, end)`는 포인터 캡처로 드래그를 따라가며 `move`를 애니메이션 프레임마다 최대 한 번, 놓을 때나 취소 또는 Escape 시 `end(event, cancelled)`를 호출합니다. `swallowClick()`은 놓은 뒤의 클릭을 취소합니다. `announce(text)`는 현지화된 텍스트를 페이지마다 하나인 polite 라이브 영역에서 최대 500 ms마다 한 번 읽습니다. `.z-drag-handle`(`zeyn.css`에 있음)은 드래그 핸들에서만 터치 패닝을 끕니다. 드래그하는 모든 컴포넌트는 키보드와 단일 포인터로 옮기는 방법(이동 메뉴, WCAG 2.5.7)도 제공합니다. 두 모듈 모두 HTML을 쓰지 않습니다.
 
@@ -206,7 +206,7 @@ Effect:
 - 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
 - 위치 텍스트(`data-zeyn-page-info`)는 `data-zeyn-text-range-total`을 사용합니다.
 
-카드 그리드(`zeyn::ui::CardGrid`이며 rail이나 행 목록은 해당하지 않음)는 카드가 200개가 되면 스크롤 컨테이너 대신 페이지 자체의 스크롤에 윈도우를 적용합니다. `catalog.js`는 목록에 `data-zeyn-window`를 표시하고, 뷰포트에서 800 px 이내의 행을 그 안에 유지하며 위아래 행은 패딩으로 바꾸고, 모든 행에 처음 카드들 중 가장 높은 카드의 높이를 주며(`grid-auto-rows`), 각 카드에 `aria-posinset`과 `aria-setsize`(페이지가 더 올 수 있는 동안은 `-1`)를 설정합니다. 윈도우 밖에 있는 포커스된 카드는 `z-cards-kept`와 함께 DOM에 남아 자기 셀 위에 배치됩니다. "더 보기"나 다른 페이지에서 온 카드도 같은 윈도우에 합류합니다. 페이지가 ms당 3 px보다 빠르게 스크롤되는 동안 카드는 이미지를 보류한 채 들어오고(`data-zeyn-park`, `src`와 `srcset`은 따로 보관) 120 ms 동안 스크롤이 없으면 이미지를 되찾습니다.
+카드 그리드(`zeyn::ui::CardGrid`이며 rail이나 행 목록은 해당하지 않음)는 카드가 200개가 되면 스크롤 컨테이너 대신 페이지 자체의 스크롤에 윈도우를 적용합니다. `catalog.js`는 목록에 `data-zeyn-window`를 표시하고, 뷰포트에서 800 px 이내의 행을 그 안에 유지하며 위아래 행은 패딩으로 바꾸고, 모든 행에 처음 카드들 중 가장 높은 카드의 높이를 주며(`grid-auto-rows`), 각 카드에 `aria-posinset`과 `aria-setsize`(페이지가 더 올 수 있는 동안은 `-1`)를 설정합니다. 윈도우 밖에 있는 포커스된 카드는 `z-cards-kept`와 함께 DOM에 남아 자기 셀 위에 배치됩니다. "더 보기"나 다른 페이지에서 온 카드도 같은 윈도우에 합류합니다. 페이지가 ms당 3 px보다 빠르게 스크롤되는 동안 카드는 이미지를 보류한 채 들어오고(`data-zeyn-park`, `src`와 `srcset`은 따로 보관) 120 ms 동안 스크롤이 없으면 이미지를 되찾습니다. 보류된 이미지는 스크롤이 ms당 1 px 아래로 느려지는 즉시 돌아오기도 합니다. 윈도우 너머 600 px까지의 행은 `z-cards-far`(`content-visibility: hidden`)와 함께 DOM에 남아 레이아웃을 유지하므로 다시 스크롤해 돌아가는 비용이 적습니다. 더 먼 카드 중에서는 마지막으로 빠진 200장만 이미지를 유지하고, 더 오래된 카드는 같은 방식으로 `src`와 `srcset`을 놓습니다.
 
 ### 4.3 폼 제출
 
