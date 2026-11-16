@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## チャート
 
-`Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge`、`funnel` は、サーバー上で SVG を描画します。ブラウザにチャートライブラリはなく、チャートはページの HTML の一部です。
+`Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge`、`funnel` は、サーバー上で SVG を描画します。ブラウザにチャートライブラリはなく、チャートはページの HTML の一部です。 donut には 0 より大きい部分が 2 から 5 個必要で、最大の部分は全体の 75% 未満でなければなりません。それ以外の donut は棒リスト（名前、割合に応じた幅の棒、値と割合）として描かれ、デバッグビルドは警告をログに出します。
 
 ```rust
 Row::new()

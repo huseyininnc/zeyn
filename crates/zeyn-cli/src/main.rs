@@ -551,6 +551,82 @@ fn inspect(root: &Path, screen: &str) -> Result<Value, String> {
         .map_err(|e| format!("the app did not print a node tree: {e}"))
 }
 
+/// The address of the app in `root`: `addr` when given, else `APP_SERVER__ADDR`, else
+/// `server.addr` in `config/app.json`, else the template's `127.0.0.1:3000`.
+fn app_addr(root: &Path, addr: Option<&str>) -> String {
+    addr.map(str::to_string)
+        .or_else(|| std::env::var("APP_SERVER__ADDR").ok())
+        .or_else(|| {
+            let text = std::fs::read_to_string(root.join("config/app.json")).ok()?;
+            let config: Value = serde_json::from_str(&text).ok()?;
+            config["server"]["addr"]
+                .as_str()
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "127.0.0.1:3000".into())
+}
+
+/// The DevTools request log of the running app: `GET /_zeyn/devtools` over plain HTTP, the
+/// newest `limit` requests (at most 50, as many as the app keeps). Only debug builds served with
+/// `App::serve` answer; others answer 404.
+fn devtools(root: &Path, addr: Option<&str>, limit: u64) -> Result<String, String> {
+    use std::io::Read;
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::Duration;
+    let addr = app_addr(root, addr);
+    let mut target = addr
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut a| a.next())
+        .ok_or_else(|| format!("`{addr}` is not a host:port address"))?;
+    if target.ip().is_unspecified() {
+        target.set_ip(if target.is_ipv4() {
+            [127, 0, 0, 1].into()
+        } else {
+            std::net::Ipv6Addr::LOCALHOST.into()
+        });
+    }
+    let limit_time = Duration::from_secs(5);
+    let mut stream = TcpStream::connect_timeout(&target, limit_time).map_err(|e| {
+        format!("no app answers at {addr} ({e}); start it with `cargo run`, or pass `addr`")
+    })?;
+    stream
+        .set_read_timeout(Some(limit_time))
+        .map_err(|e| e.to_string())?;
+    stream
+        .write_all(b"GET /_zeyn/devtools HTTP/1.0\r\nHost: localhost\r\n\r\n")
+        .map_err(|e| e.to_string())?;
+    let mut bytes = Vec::new();
+    stream
+        .take(16 * 1024 * 1024)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    let text = String::from_utf8_lossy(&bytes);
+    let (head, body) = text
+        .split_once("\r\n\r\n")
+        .ok_or("the app sent no HTTP response")?;
+    match head.get(9..12) {
+        Some("200") => {}
+        Some("404") => {
+            return Err(format!(
+                "the app at {addr} has no DevTools: they exist only in debug builds served with `App::serve` (`cargo run`)"
+            ));
+        }
+        _ => {
+            return Err(format!(
+                "the app at {addr} answered `{}`",
+                head.lines().next().unwrap_or("")
+            ));
+        }
+    }
+    let mut log: Value =
+        serde_json::from_str(body).map_err(|e| format!("the DevTools sent no JSON: {e}"))?;
+    if let Some(requests) = log["requests"].as_array_mut() {
+        requests.truncate(limit.clamp(1, 50) as usize);
+    }
+    Ok(serde_json::to_string_pretty(&log).unwrap_or_default())
+}
+
 fn routes_table(d: &Value) -> String {
     let mut out = String::new();
     for f in d["features"]
@@ -935,6 +1011,15 @@ fn tools() -> Value {
             &["screen"]
         ),
         tool(
+            "zeyn_devtools",
+            "The DevTools request log of the app running from the current directory (a debug build served with `cargo run`): the newest requests first, each with its screen, action, status, times, SQL statements (text and time, no arguments), effects and topics. The address comes from `addr`, else APP_SERVER__ADDR, else server.addr in config/app.json.",
+            json!({
+                "addr": { "type": "string", "description": "host:port of the running app, such as 127.0.0.1:3000" },
+                "limit": { "type": "integer", "description": "most requests to return, newest first (default 20, at most 50)" }
+            }),
+            &[]
+        ),
+        tool(
             "zeyn_check",
             "Compile the app and report compiler errors, structural problems and missing translations. With fix: true, first rewrite renamed Zeyn APIs (Grid to DataGrid and others).",
             json!({ "fix": { "type": "boolean" } }),
@@ -1097,6 +1182,11 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
         }
         "zeyn_inspect" => inspect(root, args["screen"].as_str().unwrap_or(""))
             .map(|d| serde_json::to_string_pretty(&d).unwrap_or_default()),
+        "zeyn_devtools" => devtools(
+            root,
+            args["addr"].as_str(),
+            args["limit"].as_u64().unwrap_or(20),
+        ),
         "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false))
             .and_then(|fixed| check(root).map(|r| fixed + &check_text(&r))),
         "zeyn_test" => {
@@ -1204,6 +1294,53 @@ mod drift;
 
 #[cfg(test)]
 mod tests {
+
+    /// Serves `answer` once to the next connection and returns the address.
+    fn answer_once(answer: &'static str) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener
+            .local_addr()
+            .unwrap()
+            .to_string();
+        std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 1024];
+            let n = s.read(&mut buf).unwrap();
+            assert!(String::from_utf8_lossy(&buf[..n]).starts_with("GET /_zeyn/devtools HTTP/1.0"));
+            s.write_all(answer.as_bytes()).unwrap();
+        });
+        addr
+    }
+
+    #[test]
+    fn zeyn_devtools_returns_the_newest_requests_of_the_running_app() {
+        let addr = answer_once(
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{\"requests\":[{\"path\":\"/b\"},{\"path\":\"/a\"}]}",
+        );
+        let out = super::devtools(std::path::Path::new("."), Some(&addr), 1).unwrap();
+        let log: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            log["requests"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(log["requests"][0]["path"], "/b");
+
+        let addr = answer_once("HTTP/1.1 404 Not Found\r\n\r\n");
+        let err = super::devtools(std::path::Path::new("."), Some(&addr), 20).unwrap_err();
+        assert!(err.contains("debug builds"), "{err}");
+
+        let closed = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .to_string();
+        let err = super::devtools(std::path::Path::new("."), Some(&closed), 20).unwrap_err();
+        assert!(err.contains("no app answers"), "{err}");
+    }
 
     #[test]
     fn zeyn_check_flags_scripts_unescaped_components_unbounded_lists_and_trusted_documents() {

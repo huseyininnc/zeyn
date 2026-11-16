@@ -347,8 +347,14 @@ fn a_hero_is_static_unless_it_has_slides() {
         "en",
     );
     assert!(
-        one.starts_with(r#"<section class="z-hero"><div class="z-hero-slide" id="s-hero-"#),
+        one.starts_with(
+            r#"<section class="z-hero"><div class="z-hero-slide z-hero-photo" id="s-hero-"#
+        ),
         "{one}"
+    );
+    assert!(
+        !html(&Hero::new("Plain"), "en").contains("z-hero-photo"),
+        "only a slide with an image gets the photo style"
     );
     assert!(one.contains(
         r#"<img class="z-hero-img" src="/img/a.jpg" alt="" fetchpriority="high" decoding="async">"#

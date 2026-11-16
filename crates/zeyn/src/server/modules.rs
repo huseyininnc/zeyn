@@ -74,7 +74,7 @@ pub(crate) const MODULES: &[Module] = &[
         style: &[],
         needs: &["drag"],
     },
-    script("drag", &[]),
+    script("drag", &["data-zeyn-dock"]),
     script("net", &[]),
     script(
         "components",
@@ -332,6 +332,12 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-filter-chips"],
         needs: &[],
     },
+    Module {
+        name: "surface",
+        script: &["data-zeyn-surface"],
+        style: &["z-surface"],
+        needs: &["drag", "net"],
+    },
     #[cfg(debug_assertions)]
     script("inspect", &["data-zeyn-src"]),
 ];
@@ -342,7 +348,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 25] = [
+const STYLES: [&str; 26] = [
     "components",
     "catalog",
     "content",
@@ -368,6 +374,7 @@ const STYLES: [&str; 25] = [
     "feed",
     "document",
     "gridchips",
+    "surface",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -572,6 +579,11 @@ const FILES: [(&str, &str); 67] = [
     ),
     ("/_zeyn/kanban.css", include_str!("../../assets/kanban.css")),
     ("/_zeyn/kanban.js", include_str!("../../assets/kanban.js")),
+    (
+        "/_zeyn/surface.css",
+        include_str!("../../assets/surface.css"),
+    ),
+    ("/_zeyn/surface.js", include_str!("../../assets/surface.js")),
     (
         "/_zeyn/sortable.css",
         include_str!("../../assets/sortable.css"),

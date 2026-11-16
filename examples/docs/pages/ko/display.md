@@ -80,7 +80,7 @@ DescriptionList::of(&invoice)
 
 ## EmptyState와 Skeleton
 
-`EmptyState::new(title).text(text)`는 빈 영역을 다음 단계로 채웁니다. `.link(label, screen, params)`는 `LinkButton`을 통해 다른 페이지로 이동하고, `.opens(label, screen, params)`는 앱의 Screen을 창(Window)으로 엽니다. `Skeleton::lines(n)`은 무언가를 불러오는 동안의 자리 표시자입니다.
+`EmptyState::new(title).text(text)`는 빈 영역을 다음 단계로 채웁니다. `.link(label, screen, params)`는 `LinkButton`을 통해 다른 페이지로 이동하고, `.opens(label, screen, params)`는 앱의 Screen을 창(Window)으로 엽니다. `Skeleton::lines(n)`은 무언가를 불러오는 동안의 자리 표시자입니다. 스켈레톤은 300 ms를 기다린 뒤에만 나타나므로 빠른 로드에서는 깜박이지 않으며, 늦게 도착하는 지연 부분은 이를 최소 400 ms 유지합니다.
 
 ## LinkButton
 

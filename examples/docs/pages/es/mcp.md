@@ -14,6 +14,7 @@ El proyecto en el que trabaja un agente incluye sus propias reglas y herramienta
 | `zeyn_docs` | Referencia del framework por tema: `rules`, `language`, `protocol`; `search: "palabras"` ordena las páginas de la documentación de esta versión, `page: "/language/forms"` devuelve una en Markdown |
 | `zeyn_describe` | Features, pantallas, rutas, accesos, APIs, problemas y traducciones que faltan de la aplicación |
 | `zeyn_inspect` | El árbol de nodos de una pantalla: ruta, tipo de componente y el `file:line:column` de Rust que colocó cada nodo |
+| `zeyn_devtools` | El registro de peticiones de DevTools de la app en modo de depuración: las más nuevas primero, cada una con su pantalla, acción, estado, tiempos y sentencias SQL (texto y tiempo, sin valores); `addr` y `limit` son opcionales |
 | `zeyn_check` | Compila e informa de problemas; `fix: true` reescribe primero las APIs renombradas |
 | `zeyn_test` | Ejecuta `cargo test` y devuelve el final de la salida |
 | `zeyn_new_feature` | Crea una carpeta de feature y la registra |

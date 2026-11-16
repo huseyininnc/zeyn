@@ -14,6 +14,7 @@ Zeyn 从两个方面为智能体而设计：编写 Zeyn 应用的智能体，以
 | `zeyn_docs` | 按主题提供框架参考：`rules`、`language`、`protocol`；`search: "关键词"` 对此版本的文档页面排序，`page: "/language/forms"` 以 Markdown 返回一页 |
 | `zeyn_describe` | 应用的 feature、界面、路由、访问控制、API、问题和缺失的翻译 |
 | `zeyn_inspect` | 一个 screen 的节点树：路径、组件类型，以及放置每个节点的 Rust `file:line:column` |
+| `zeyn_devtools` | 以调试模式运行的应用的 DevTools 请求日志：最新的请求在前，每个请求带有 screen、action、状态、耗时和 SQL 语句（文本和耗时，不含值）；`addr` 和 `limit` 可选 |
 | `zeyn_check` | 编译并报告问题；`fix: true` 会先重写已更名的 API |
 | `zeyn_test` | 运行 `cargo test` 并返回输出的末尾部分 |
 | `zeyn_new_feature` | 创建 feature 文件夹并注册它 |

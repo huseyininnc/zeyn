@@ -156,6 +156,7 @@ catalog! {
         list_detail "/ui/list-detail";
         deferred "/ui/deferred";
         auto_grid "/ui/auto-grid";
+        surface "/ui/surface";
         screen_header "/ui/screen-header";
     }
     "text" FileText {
