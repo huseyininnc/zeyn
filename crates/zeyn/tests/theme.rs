@@ -397,3 +397,83 @@ async fn density_is_a_cookie_rendered_on_html_and_sets_the_virtual_row_height() 
         .unwrap();
     assert_eq!(bad.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn a_signed_in_users_density_is_saved_next_to_the_theme_and_follows_them_to_a_new_device() {
+    let r = build(
+        App::new("T")
+            .auth(|h: &HeaderMap| Some(Identity::user(h.get("x-user")?.to_str().ok()?)))
+            .datagrid_views(MemoryViewStore::default()),
+    );
+    assert_eq!(choose(&r, "dark").await.0, StatusCode::NO_CONTENT);
+    let density = |csrf: bool| {
+        let mut req = Request::post("/_zeyn/density")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+            .header("x-user", "ada");
+        if csrf {
+            req = req.header("x-zeyn-csrf", TOKEN);
+        }
+        req.body(Body::from(r#"{"density":"compact"}"#))
+            .unwrap()
+    };
+    let refused = r
+        .clone()
+        .oneshot(density(false))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+    let (_, _, fresh) = get(&r, "/home", "").await;
+    assert!(
+        !html_tag(&fresh).contains("data-density"),
+        "a refused save stores nothing"
+    );
+    let saved = r
+        .clone()
+        .oneshot(density(true))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), StatusCode::NO_CONTENT);
+    let (_, h, page) = get(&r, "/home", "").await;
+    assert_eq!(
+        html_tag(&page),
+        r#"<html lang="en" data-theme="dark" data-density="compact">"#,
+        "a new device gets the theme and the density from one read, and saving the density kept the theme"
+    );
+    let cookies: Vec<_> = h
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .map(|v| v.to_str().unwrap().to_string())
+        .collect();
+    assert!(
+        cookies
+            .iter()
+            .any(|c| c.starts_with("zeyn_density=compact;"))
+    );
+    assert!(
+        cookies
+            .iter()
+            .any(|c| c.starts_with("zeyn_theme=dark;"))
+    );
+    let (_, h, here) = get(&r, "/home", "zeyn_theme=dark; zeyn_density=comfortable").await;
+    assert!(
+        !html_tag(&here).contains("data-density"),
+        "the cookie of this device wins"
+    );
+    assert!(
+        h.get_all(header::SET_COOKIE)
+            .iter()
+            .all(|c| !c
+                .to_str()
+                .unwrap()
+                .starts_with("zeyn_density")),
+        "pages with both cookies do not read the store"
+    );
+    assert_eq!(choose(&r, "light").await.0, StatusCode::NO_CONTENT);
+    let (_, _, other) = get(&r, "/home", "").await;
+    assert!(
+        html_tag(&other).contains(r#"data-density="compact""#),
+        "choosing a theme keeps the saved density: {}",
+        html_tag(&other)
+    );
+}
