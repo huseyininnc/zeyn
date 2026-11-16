@@ -218,11 +218,30 @@ function clearFilter(cell, t) {
   choiceLabel(cell, t);
 }
 
-/** Puts the grid's filters into its filter row and the count on its "Filter" button. */
+/** Replaces the grid's filters and filter groups, shows them, saves the view and reloads. */
+function setFilters(grid, s, filters, groups) {
+  s.filters = {};
+  for (const { field, ...f } of filters) s.filters[field] = f;
+  s.filterGroups = groups;
+  s.allMatching = false;
+  showFilters(grid, s);
+  saveView(grid);
+  loadGrid(grid, 'reset');
+}
+
+/**
+ * Puts the grid's filters into its filter row, the count on its "Filter" button and, for the
+ * filter chips (`gridchips.js`), the list on the chips box with a `zeyn:filters` event.
+ */
 function showFilters(grid, s) {
   for (const cell of grid.querySelectorAll(':scope > table > thead .z-filter-cell[data-field]')) {
     clearFilter(cell, s.texts);
     fillFilter(cell, s.filters[cell.dataset.field], s.texts);
+  }
+  const chips = toolsOf(grid)?.querySelector('[data-zeyn-filter-chips]');
+  if (chips) {
+    chips.zeynFilters = { grid, filters: filterList(s), groups: s.filterGroups, set: (f, g) => setFilters(grid, s, f, g) };
+    chips.dispatchEvent(new Event('zeyn:filters', { bubbles: true }));
   }
   const badge = toolsOf(grid)?.querySelector('[data-zeyn-filter-count]');
   if (!badge) return;

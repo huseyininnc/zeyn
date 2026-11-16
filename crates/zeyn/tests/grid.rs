@@ -119,6 +119,7 @@ fn app(identity: Identity) -> App {
                 .screen(banded)
                 .screen(rows_edit)
                 .screen(built)
+                .screen(chipped)
                 .screen(sized)
                 .api(search),
         )
@@ -4074,6 +4075,60 @@ async fn filter_builder_shows_a_button_only_for_grids_with_filters() {
         10,
         "conditions on columns without filter() are dropped: {}",
         r.body
+    );
+}
+
+#[screen(route = "/chipped", permission = "items.read")]
+pub fn chipped() -> Screen {
+    Screen::new("Chipped").body(
+        Stack::new()
+            .add(
+                DataGrid::of(search)
+                    .filter_chips()
+                    .column(Item::code)
+                    .filter(),
+            )
+            .add(
+                DataGrid::of(search)
+                    .filter_chips()
+                    .column(Item::code),
+            ),
+    )
+}
+
+#[tokio::test]
+async fn filter_chips_render_a_box_and_link_their_module_only_where_used() {
+    let router = router(reader());
+    let page = send(&router, get("/chipped")).await;
+    assert_eq!(
+        page.body
+            .matches("data-zeyn-filter-chips")
+            .count(),
+        1,
+        "only grids with a filter() column get chips: {}",
+        page.body
+    );
+    assert!(
+        page.body.contains(r#"role="group" aria-label="Active filters" data-text-remove="Remove filter {label}" data-text-clear="Clear all" data-text-group="{n} conditions" data-text-yes="Yes" data-text-no="No" hidden></div>"#),
+        "{}",
+        page.body
+    );
+    assert!(
+        page.body
+            .contains("/_zeyn/gridchips.js"),
+        "{}",
+        page.body
+    );
+    assert!(
+        page.body
+            .contains("/_zeyn/gridchips.css"),
+        "{}",
+        page.body
+    );
+    let plain = send(&router, get("/built")).await;
+    assert!(
+        !plain.body.contains("gridchips"),
+        "grids without chips do not load the module"
     );
 }
 
