@@ -574,7 +574,7 @@
         "brand": "Not"
       },
       "upload": {
-        "drop": "Dosyaları buraya bırakın ya da seçin.",
+        "drop": "Dosyaları ya da klasörleri buraya bırakın, yapıştırın ya da seçin.",
         "hint": "{types}, en fazla {max}.",
         "hint_many": "{types}, her biri en fazla {max}, en çok {n} dosya.",
         "list": "Dosyalar",
@@ -586,7 +586,9 @@
         "cancel": "İptal",
         "retry": "Yeniden dene",
         "remove": "Kaldır",
-        "remove_name": "{name} dosyasını kaldır"
+        "remove_name": "{name} dosyasını kaldır",
+        "waiting": "{name} yüklenmeyi bekliyor",
+        "skipped": "Bu alanın almadığı türde {n} dosya atlandı."
       },
       "kpi": {
         "up": "Önceki döneme göre yüzde {pct} artış",

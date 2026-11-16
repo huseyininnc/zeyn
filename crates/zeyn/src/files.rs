@@ -621,6 +621,8 @@ pub(crate) fn render_upload(
         "retry": key("retry"),
         "remove": key("remove"),
         "remove_name": key("remove_name"),
+        "waiting": key("waiting"),
+        "skipped": key("skipped"),
         "too_large": raw(&too_large(rules, r.locale)),
         "too_many": raw(&Text::key("zeyn.files.too_many").arg("label", m.label_text()).arg("n", rules.files().to_string())),
         "type": raw(&Text::key("zeyn.files.type")),

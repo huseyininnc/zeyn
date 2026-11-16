@@ -510,7 +510,7 @@
         "brand": "注意"
       },
       "upload": {
-        "drop": "将文件拖放到此处，或选择文件。",
+        "drop": "将文件或文件夹拖放到此处、粘贴，或选择文件。",
         "hint": "{types}，最大 {max}。",
         "hint_many": "{types}，每个最大 {max}，最多 {n} 个文件。",
         "list": "文件",
@@ -522,7 +522,9 @@
         "cancel": "取消",
         "retry": "重试",
         "remove": "移除",
-        "remove_name": "移除 {name}"
+        "remove_name": "移除 {name}",
+        "waiting": "{name} 正在等待上传",
+        "skipped": "已跳过 {n} 个此字段不接受的类型的文件。"
       },
       "kpi": {
         "up": "较上期增长 {pct}%",

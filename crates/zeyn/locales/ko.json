@@ -510,7 +510,7 @@
         "brand": "참고"
       },
       "upload": {
-        "drop": "파일을 여기에 놓거나 선택하십시오.",
+        "drop": "파일이나 폴더를 여기에 놓거나, 붙여넣거나, 선택하십시오.",
         "hint": "{types}, 최대 {max}.",
         "hint_many": "{types}, 각각 최대 {max}, 최대 {n}개 파일.",
         "list": "파일",
@@ -522,7 +522,9 @@
         "cancel": "취소",
         "retry": "다시 시도",
         "remove": "제거",
-        "remove_name": "{name} 제거"
+        "remove_name": "{name} 제거",
+        "waiting": "{name} 업로드 대기 중",
+        "skipped": "이 필드가 받지 않는 형식의 파일 {n}개를 건너뛰었습니다."
       },
       "kpi": {
         "up": "이전 기간 대비 {pct}% 증가",

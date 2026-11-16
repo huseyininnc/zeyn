@@ -50,6 +50,8 @@
 
 .z-upload-item[data-state="failed"] { border-color: var(--z-danger); }
 
+.z-upload-item[data-state="queued"] .z-upload-name { color: var(--z-text-muted); }
+
 .z-upload-preview { width: 40px; height: 40px; object-fit: cover; border-radius: var(--z-radius); background: var(--z-surface-2); }
 
 .z-upload-name { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; color: var(--z-text); }

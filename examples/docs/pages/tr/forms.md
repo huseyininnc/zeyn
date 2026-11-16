@@ -112,10 +112,13 @@ Tek bir izin adı aynı kullanıcılara hem yükleme hem indirme verir. Okuyucul
 
 Kontrol, bir bırakma alanının içindeki yerel bir dosya girdisidir. Her dosya kendi ilerleme çubuğuyla ayrı ayrı yüklenir; çalışırken iptal edilebilir, başarısız olduysa yeniden denenebilir ve bittiğinde kaldırılabilir. Görseller, seçilen dosyanın bir nesne URL'sinden üretilen bir önizleme gösterir. İlerleme ve sonuçlar, nazik (polite) bir canlı bölgede duyurulur. Showcase'in `/uploads` adresinde çalışan bir örnek vardır; bu dokümantasyon sitesinde oturum açmış kullanıcı olmadığı için canlı yükleme göstermez.
 
+Bırakılan bir klasör, içindeki ve alt klasörlerindeki dosyaları ekler; klasör, bitene kadar en fazla 100 girdilik sayfalarla okunur. Alanın almadığı türdeki dosyalar atlanır ve sayıları canlı bölgede duyurulur. Alan odaktayken yapıştırılan dosyalar da yüklenir. Uzantısı veya türü `accept` içinde olmayan bir dosya, tek bir bayt gönderilmeden tarayıcıda reddedilir; sunucu içeriği yine denetler. Bir alanın en fazla üç dosyası aynı anda yüklenir; diğerleri meşgul bir ilerleme çubuğuyla sırada bekler.
+
 | Tuş | Ne yapar |
 |---|---|
 | Tab | Dosya girdisine, sonra her dosyanın indirme bağlantısına ve İptal, Yeniden dene ya da Kaldır düğmesine geçer |
 | Dosya girdisinde Enter veya Space | Sistemin dosya seçicisini açar (sürükle bırak için klavye yolu) |
+| Dosya girişinde Ctrl+V veya Cmd+V | Panodaki dosyaları, örneğin bir ekran görüntüsünü yükler |
 | İptal, Yeniden dene, Kaldır üzerinde Enter veya Space | Çalıştırır; İptal'den sonra odak Yeniden dene'ye, Kaldır'dan sonra sonraki dosyaya ya da girdiye döner |
 
 Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:

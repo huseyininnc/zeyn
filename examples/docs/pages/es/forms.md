@@ -112,10 +112,13 @@ Un nombre de permiso permite a los mismos usuarios subir y descargar. Para que l
 
 El control es una entrada de archivo nativa dentro de una zona de arrastre. Cada archivo se sube por separado con una barra de progreso, se puede cancelar mientras se ejecuta, reintentar si falló y quitar cuando termina. Las imágenes muestran una vista previa hecha a partir de una URL de objeto del archivo elegido. El progreso y los resultados se anuncian en una región en vivo educada. El showcase tiene un ejemplo funcional en `/uploads`; este sitio de documentación no tiene ningún usuario con sesión iniciada, así que no muestra ninguna subida en vivo.
 
+Una carpeta soltada añade los archivos que contiene y los de sus subcarpetas, leídos en páginas de como mucho 100 entradas hasta terminar la carpeta; los archivos de un tipo que el campo no admite se omiten y se cuentan en la región en vivo. También se suben los archivos pegados mientras el campo tiene el foco. Un archivo cuya extensión o tipo no está en `accept` se rechaza en el navegador antes de enviar ningún byte, y el servidor vuelve a comprobar el contenido. Como mucho tres archivos de un campo se suben a la vez; los demás esperan en fila con una barra de progreso ocupada.
+
 | Tecla | Qué hace |
 |---|---|
 | Tab | Pasa a la entrada de archivo, y después al enlace de descarga de cada archivo y a su botón Cancel, Retry o Remove |
 | Enter o Espacio en la entrada de archivo | Abre el selector de archivos del sistema (el camino con teclado para arrastrar y soltar) |
+| Ctrl+V o Cmd+V en la entrada de archivo | Sube los archivos del portapapeles, como una captura de pantalla |
 | Enter o Espacio en Cancel, Retry, Remove | Lo ejecuta; tras Cancel el foco pasa a Retry, tras Remove al siguiente archivo o de vuelta a la entrada |
 
 Lo que hace el servidor para `POST /_zeyn/files/{store}`:
