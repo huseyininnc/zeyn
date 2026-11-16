@@ -118,7 +118,7 @@ zeyn check --json
 
 ## DevTools
 
-Una compilación de depuración servida con `cargo run` (o `zeyn dev`) registra lo que hizo cada solicitud: la pantalla y la acción que ejecutó, su estado y su tiempo, cuánto tardó la pantalla en construirse y en renderizarse, cada sentencia SQL con su tiempo y las filas afectadas, y los efectos y temas que devolvió la acción. Alt+Shift+D abre un panel con las últimas 50 solicitudes; cada una se abre para mostrar sus sentencias. `GET /_zeyn/devtools` devuelve la misma lista en JSON.
+Una compilación de depuración servida con `cargo run` (o `zeyn dev`) registra lo que hizo cada solicitud: la pantalla y la acción que ejecutó, su estado y su tiempo, cuánto tardó la pantalla en construirse y en renderizarse, cada sentencia SQL con su tiempo y las filas afectadas, y los efectos y temas que devolvió la acción. Alt+Shift+D abre un panel con las últimas 50 solicitudes; cada una se abre para mostrar sus sentencias. `GET /_zeyn/devtools` devuelve la misma lista en JSON, y la herramienta MCP `zeyn_devtools` la lee para un agente.
 
 Las sentencias se guardan sin sus argumentos, así que ningún valor llega al panel. Las compilaciones de release no tienen DevTools: ni código, ni ruta, ni memoria para ellas. Una aplicación que sirve `App::router` por su cuenta, o una prueba, las activa con `zeyn::server::devtools(true)`.
 
@@ -135,4 +135,4 @@ La imagen de una aplicación generada pesa unos 43 MB y una aplicación inactiva
 
 ## El servidor MCP
 
-`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_inspect` (el árbol de nodos de una pantalla con la línea de Rust que colocó cada nodo), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_test`, `zeyn_new_feature` y `zeyn_new_screen`. Consulta [MCP y agentes de IA](mcp.md).
+`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_inspect` (el árbol de nodos de una pantalla con la línea de Rust que colocó cada nodo), `zeyn_devtools` (el registro de peticiones de DevTools de la compilación de depuración en marcha: pantalla, acción, tiempos, sentencias SQL), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_test`, `zeyn_new_feature` y `zeyn_new_screen`. Consulta [MCP y agentes de IA](mcp.md).

@@ -118,7 +118,7 @@ zeyn check --json
 
 ## DevTools
 
-`cargo run`(또는 `zeyn dev`)으로 서비스하는 디버그 빌드는 각 요청이 한 일을 기록합니다. 실행한 Screen과 Action, 상태와 시간, Screen을 빌드하고 렌더링하는 데 걸린 시간, 각 SQL 문과 그 시간 및 영향받은 행 수, Action이 반환한 효과와 토픽입니다. Alt+Shift+D는 최근 50개 요청을 보여 주는 패널을 열고, 각 요청을 펼치면 SQL 문이 나타납니다. `GET /_zeyn/devtools`는 같은 목록을 JSON으로 반환합니다.
+`cargo run`(또는 `zeyn dev`)으로 서비스하는 디버그 빌드는 각 요청이 한 일을 기록합니다. 실행한 Screen과 Action, 상태와 시간, Screen을 빌드하고 렌더링하는 데 걸린 시간, 각 SQL 문과 그 시간 및 영향받은 행 수, Action이 반환한 효과와 토픽입니다. Alt+Shift+D는 최근 50개 요청을 보여 주는 패널을 열고, 각 요청을 펼치면 SQL 문이 나타납니다. `GET /_zeyn/devtools`는 같은 목록을 JSON으로 반환하고, MCP 도구 `zeyn_devtools`가 에이전트를 위해 이를 읽습니다.
 
 SQL 문은 인수 없이 저장되므로 어떤 값도 패널에 도달하지 않습니다. 릴리스 빌드에는 DevTools가 없습니다. 코드도, 경로도, 그것을 위한 메모리도 없습니다. `App::router`를 직접 서비스하는 앱이나 테스트는 `zeyn::server::devtools(true)`로 켭니다.
 
@@ -135,4 +135,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP 서버
 
-`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_inspect`(Screen의 노드 트리와 각 노드를 배치한 Rust 줄), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.
+`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_inspect`(Screen의 노드 트리와 각 노드를 배치한 Rust 줄), `zeyn_devtools`(실행 중인 디버그 빌드의 DevTools 요청 로그: Screen, action, 시간, SQL 문), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.
