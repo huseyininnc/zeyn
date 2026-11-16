@@ -70,3 +70,25 @@ Accordion::new()
 ## Dock
 
 `Dock`은 중앙 영역 주위에 패널을 배치합니다. 사용자가 이동하고, 크기를 바꾸고, 닫고, 다시 가져올 수 있는 왼쪽, 오른쪽, 아래쪽, 중앙 탭이 있습니다. 각 사용자의 레이아웃은 Screen별로 저장됩니다. [셸과 명령](shell.md)을 참고하십시오.
+
+## Surface
+
+`Surface::new(label, width, height)`는 평면도 위의 테이블처럼 사람들이 항목을 자유롭게 배치하는 고정 크기 영역입니다. `.item(Draggable::new(id, node).at(x, y).size(w, h))`는 항목을 추가하고, `.axis(Axis::X)` 또는 `Axis::Y`는 한 방향으로만 움직이게 하며, `.snap(step)`은 모든 위치를 격자에 맞춥니다. `.on_move(action)`은 각 이동을 저장합니다. 서버가 id가 이 영역에 속하는지 확인하고 위치를 경계 안, 격자 위, 축 위로 맞춘 뒤 액션은 항목의 id와 새 `x`, `y`를 담은 `SurfaceMove`를 받습니다.
+
+```rust
+Surface::new(t!("floor.plan"), 800, 480)
+    .snap(20)
+    .on_move(move_table)
+    .item(
+        Draggable::new("t1", Paragraph::new(t!("floor.table")))
+            .at(40, 60)
+            .size(120, 80),
+    )
+```
+
+마우스나 펜으로 항목을 끌 수 있고, 터치는 짧게 길게 누른 뒤 끕니다. 포인터 하나만 쓸 때는 클릭으로 항목을 고르고 영역을 클릭하면 그 자리에 놓입니다.
+
+| 키 | 동작 |
+|---|---|
+| 화살표 키 | 포커스된 항목을 격자 한 칸 옮깁니다 (격자가 없으면 10픽셀) |
+| `Escape` | 고른 항목을 해제하거나 끌던 항목을 제자리로 돌립니다 |

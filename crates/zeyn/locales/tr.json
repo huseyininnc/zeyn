@@ -400,6 +400,13 @@
         "empty": "Açık panel yok. Panel seçeneklerinden birini açın.",
         "resize": "{area} alanı yeniden boyutlandır"
       },
+      "surface": {
+        "item": "taşınabilir öğe",
+        "hint": "Ok tuşları öğeyi taşır. Ya da bir öğeye tıklayın, sonra alanda koymak istediğiniz yere tıklayın.",
+        "moved": "{item} {x}, {y} konumuna taşındı.",
+        "picked": "{item} seçildi. Koymak için alanda bir yere tıklayın ya da Escape tuşuna basın.",
+        "refused": "Taşıma kaydedilmedi."
+      },
       "loading": "Yükleniyor…",
       "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
       "date": {

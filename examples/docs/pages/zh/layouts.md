@@ -70,3 +70,25 @@ Accordion::new()
 ## Dock
 
 `Dock` 围绕中心区域排列面板：左侧、右侧、底部和中心标签页，用户可以移动、调整大小、关闭并重新打开它们。每个用户的布局按界面保存。参见[外壳与命令](shell.md)。
+
+## Surface
+
+`Surface::new(label, width, height)` 是一个固定大小的区域，用户可以在其中自由放置项目，例如平面图上的桌子。`.item(Draggable::new(id, node).at(x, y).size(w, h))` 添加一个项目，`.axis(Axis::X)` 或 `Axis::Y` 让它保持在一条线上，`.snap(step)` 让每个位置对齐网格。`.on_move(action)` 保存每次移动：服务器先检查 id 属于该区域，并把位置限制在边界内、网格上和轴上，然后操作会收到一个包含项目 id 及新 `x` 和 `y` 的 `SurfaceMove`。
+
+```rust
+Surface::new(t!("floor.plan"), 800, 480)
+    .snap(20)
+    .on_move(move_table)
+    .item(
+        Draggable::new("t1", Paragraph::new(t!("floor.table")))
+            .at(40, 60)
+            .size(120, 80),
+    )
+```
+
+鼠标或触控笔可以拖动项目；触摸时短按后即可拖动。只用一个指针时，点击选中项目，再点击区域即可放到那里。
+
+| 按键 | 作用 |
+|---|---|
+| 方向键 | 将获得焦点的项目移动一个网格步长（无网格时为 10 像素） |
+| `Escape` | 取消选中的项目，或把正在拖动的项目放回原处 |

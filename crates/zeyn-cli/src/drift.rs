@@ -343,6 +343,7 @@ fn the_component_index_names_only_what_the_zeyn_crate_has() {
 /// live and event nodes, dynamic grids, submit forms), parts of another component, and ones an
 /// app reaches through its guide page, since the template stays under its size budget.
 const NOT_IN_INDEX: &[&str] = &[
+    "Surface",
     "AlphaIndex",
     "AssistantChat",
     "Busy",
