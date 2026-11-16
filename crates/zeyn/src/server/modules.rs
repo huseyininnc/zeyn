@@ -539,7 +539,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 67] = [
+const FILES: [(&str, &str); 69] = [
     (
         "/_zeyn/display.css",
         include_str!("../../assets/display.css"),
