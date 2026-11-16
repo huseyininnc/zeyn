@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## 图表
 
-`Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge` 和 `funnel` 在服务器上绘制 SVG。浏览器中没有图表库；图表是页面 HTML 的一部分。
+`Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge` 和 `funnel` 在服务器上绘制 SVG。浏览器中没有图表库；图表是页面 HTML 的一部分。donut 需要 2 到 5 个大于零的部分，且最大部分低于整体的 75%；其他 donut 会画成条形列表（名称、与占比同宽的条、数值和百分比），调试构建会记录一条警告。
 
 ```rust
 Row::new()

@@ -80,7 +80,7 @@ DescriptionList::of(&invoice)
 
 ## EmptyState और Skeleton
 
-`EmptyState::new(title).text(text)` खाली जगह को अगले कदम से भरता है: `.link(label, screen, params)` `LinkButton` के माध्यम से दूसरे पेज पर जाता है, और `.opens(label, screen, params)` ऐप की एक स्क्रीन को विंडो के रूप में खोलता है। `Skeleton::lines(n)` कुछ लोड होते समय का प्लेसहोल्डर है।
+`EmptyState::new(title).text(text)` खाली जगह को अगले कदम से भरता है: `.link(label, screen, params)` `LinkButton` के माध्यम से दूसरे पेज पर जाता है, और `.opens(label, screen, params)` ऐप की एक स्क्रीन को विंडो के रूप में खोलता है। `Skeleton::lines(n)` कुछ लोड होते समय का प्लेसहोल्डर है। स्केलेटन केवल 300 ms प्रतीक्षा के बाद दिखता है, ताकि तेज़ लोड में वह कभी न झपके, और देर से आने वाला deferred भाग उसे कम से कम 400 ms रखता है।
 
 ## LinkButton
 

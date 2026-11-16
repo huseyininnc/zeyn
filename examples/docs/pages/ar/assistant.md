@@ -105,7 +105,7 @@ pub trait ChatStore: Send + Sync + 'static {
 
 يرى النموذج الأدوات نفسها التي يراها MCP وWebMCP (انظر `docs/runtime-protocol.md` القسم 9)، وتُبنى للمستخدم المسجل الدخول في كل مرة: عمليات بحث الشبكات وحفظ النماذج وإجراءات API التي يحق للمستخدم استخدامها، مطروحاً منها كل ما وُسم بـ `ai = false`، مع أوصاف من تعليقات `///` وإرشادات `ai = "..."`. وتُضاف أداتان مدمجتان:
 
-- `navigate`: يفتح شاشة ذات مسار يحق للمستخدم فتحها، دون تحميل صفحة (`zeyn:navigate`)، ويستطيع ترشيح شبكتها (`zeyn:filter`). ثم تُحمَّل الشبكة عبر `POST /_zeyn/grid`، حيث يطبق الخادم فحوصه المعتادة.
+- `navigate`: يفتح شاشة ذات مسار يحق للمستخدم فتحها، دون تحميل صفحة (`zeyn:navigate`)، ويستطيع ترشيح شبكتها (`zeyn:filter`) بمرشحات مسطحة ومجموعات OR (`filter_groups`، كما في `DataQuery::filter_groups`). يحذف الخادم المرشحات الفارغة ويحافظ على حدود `DataQuery::retain_filters`. ثم تُحمَّل الشبكة عبر `POST /_zeyn/grid`، حيث يطبق الخادم فحوصه المعتادة.
 - `suggest`: مطالبات متابعة تُعرض رقائق.
 
 يمر كل استدعاء عبر مسار الإجراء العادي مع سياق موسوم بأنه وكيل (agent): وصول الشاشة، وحراس الميزة (Feature)، وصلاحية الإجراء، والمعترضات، وحدود المعدل، وحد الوقت، والتدقيق (يُسجَّل كل استدعاء من المساعد مع `via_agent: true`)، والتقنيع.
@@ -150,7 +150,7 @@ pub trait ChatStore: Send + Sync + 'static {
 | `POST /_zeyn/assistant/stt` (جسم صوتي) | `{ text }`؛ و`404` عند غياب تحويل الكلام إلى نص على الخادم |
 | `POST /_zeyn/assistant/tts` `{ text }` | صوت متدفق؛ و`404` عند غياب تحويل النص إلى كلام على الخادم |
 
-الأحداث، كائن JSON واحد في كل سطر: `{t:"text",v}` و`{t:"tool",name,id}` و`{t:"navigate",url,screen,filters}` و`{t:"suggest",v}` و`{t:"confirm",id,tool,title,question,details}` و`{t:"resolved",id,approved}` و`{t:"error",message}` و`{t:"done"}`.
+الأحداث، كائن JSON واحد في كل سطر: `{t:"text",v}` و`{t:"tool",name,id}` و`{t:"navigate",url,screen,filters,filter_groups}` و`{t:"suggest",v}` و`{t:"confirm",id,tool,title,question,details}` و`{t:"resolved",id,approved}` و`{t:"error",message}` و`{t:"done"}`.
 
 يُحمَّل `assistant.js` و`assistant.css` فقط للمستخدمين الذين يحق لهم استخدام المساعد. سجل المحادثة منطقة حية `role="log"` (مع `aria-busy` أثناء تدفق الإجابة)، وEnter يرسل، وShift+Enter يبدأ سطراً جديداً، وEscape يغلق اللوحة الجانبية ويعيد التركيز إلى الزر، وبطاقة التأكيد تضع التركيز على إلغاء (Cancel) أولاً.
 

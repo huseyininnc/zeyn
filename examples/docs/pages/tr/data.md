@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## Grafikler
 
-`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` ve `funnel` SVG'yi sunucuda çizer. Tarayıcıda grafik kütüphanesi yoktur; grafik, sayfa HTML'inin bir parçasıdır.
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` ve `funnel` SVG'yi sunucuda çizer. Tarayıcıda grafik kütüphanesi yoktur; grafik, sayfa HTML'inin bir parçasıdır. Bir donut sıfırın üstünde 2 ile 5 parça ister ve en büyüğü bütünün %75'inin altında olmalıdır; diğer her donut bir çubuk listesi (ad, payı kadar geniş bir çubuk, değer ve yüzde) olarak çizilir ve debug derlemesi bir uyarı yazar.
 
 ```rust
 Row::new()

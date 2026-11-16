@@ -257,16 +257,22 @@ document.addEventListener('zeyn:content', (e) => {
  * node? }` as the grid query sends them (`{ field, contains }`, `{ field, from, to }`, ...). The
  * grid of the main screen with that node path (the first one without it) shows the filters in
  * its header and reloads through `POST /_zeyn/grid`, where the server checks them as always.
+ * A screen that just arrived may not have the grid runtime yet; the filters wait for it.
  */
 document.addEventListener('zeyn:filter', (e) => {
   const { filters, filter_groups: groups, node } = e.detail ?? {};
   const all = [...document.querySelectorAll('.z-main [data-zeyn-grid]')];
   const grid = node == null ? all[0] : all.find((g) => nodeOf(g) === String(node));
   if (!grid || !Array.isArray(filters)) return;
+  e.preventDefault();
+  initGrids(grid.parentElement).then(() => filterGrid(grid, filters, groups));
+});
+
+/** Puts `filters` and the filter groups on a set up grid and reloads its first page. */
+function filterGrid(grid, filters, groups) {
   G?.initGrid(grid);
   const s = grids.get(grid);
   if (!s) return;
-  e.preventDefault();
   s.filters = {};
   for (const f of filters) {
     const { field, ...rest } = f ?? {};
@@ -276,7 +282,7 @@ document.addEventListener('zeyn:filter', (e) => {
   G?.showFilters(grid, s);
   s.allMatching = false;
   G?.loadGrid(grid, 'reset');
-});
+}
 
 /**
  * `zeyn:reload` on an element reloads the grids inside it in place (`live.js` and `topics.js`

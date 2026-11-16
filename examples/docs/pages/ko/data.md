@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## 차트
 
-`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge`, `funnel`은 서버에서 SVG를 그립니다. 브라우저에는 차트 라이브러리가 없으며, 차트는 페이지 HTML의 일부입니다.
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge`, `funnel`은 서버에서 SVG를 그립니다. 브라우저에는 차트 라이브러리가 없으며, 차트는 페이지 HTML의 일부입니다. donut에는 0보다 큰 부분이 2개에서 5개 필요하고 가장 큰 부분은 전체의 75% 미만이어야 합니다. 그 밖의 donut은 막대 목록(이름, 비중만큼 넓은 막대, 값과 백분율)으로 그려지며 디버그 빌드는 경고를 기록합니다.
 
 ```rust
 Row::new()

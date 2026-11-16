@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## Gráficos
 
-`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` y `funnel` dibujan SVG en el servidor. No hay biblioteca de gráficos en el navegador; un gráfico es parte del HTML de la página.
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` y `funnel` dibujan SVG en el servidor. No hay biblioteca de gráficos en el navegador; un gráfico es parte del HTML de la página. Un donut necesita de 2 a 5 partes mayores que cero y la mayor por debajo del 75% del total; cualquier otro donut se dibuja como una lista de barras (nombre, una barra tan ancha como su parte, valor y porcentaje) y una compilación de depuración registra un aviso.
 
 ```rust
 Row::new()

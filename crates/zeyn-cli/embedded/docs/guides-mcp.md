@@ -14,6 +14,7 @@ The project an agent works in carries its own rules and tools:
 | `zeyn_docs` | Framework reference by topic: `rules`, `language`, `protocol`; `search: "words"` ranks the docs pages of this version, `page: "/language/forms"` returns one as Markdown |
 | `zeyn_describe` | Features, screens, routes, access, APIs, problems and missing translations of the app |
 | `zeyn_inspect` | The node tree of one screen: path, component type and the Rust `file:line:column` that placed each node |
+| `zeyn_devtools` | The DevTools request log of the app running in debug mode: newest requests first, each with its screen, action, status, times and SQL statements (text and time, no values); `addr` and `limit` are optional |
 | `zeyn_check` | Compiles and reports problems; `fix: true` first rewrites renamed APIs |
 | `zeyn_test` | Runs `cargo test` and returns the end of the output |
 | `zeyn_new_feature` | Creates a feature folder and registers it |
