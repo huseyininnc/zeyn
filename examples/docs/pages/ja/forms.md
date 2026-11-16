@@ -135,4 +135,17 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 `FileRules::quota(bytes, window)` は、1 人のユーザーがウィンドウごとにストアへアップロードできる量を制限し、アプリの rate store で数えます。上限を超えたアップロード自体は保存され、次のアップロードが `429` を返します。`DiskStore` は 1 時間より古い `.part` ファイル (クラッシュで止まったアップロード) を 1 時間に最大 1 回削除します。`ZipGuard` は ZIP ベースのアップロード (ZIP、Word、Excel、PowerPoint) 用のスキャナーで、中央ディレクトリが 10,000 件を超えるエントリ、合計 1 GiB 超、またはファイルサイズの 200 倍超を宣言するアーカイブと、ZIP64 アーカイブを拒否します。受け入れたアーカイブを展開するコードも、これらの上限で止める必要があります。
 
-予算: 256 MiB のアップロードでサーバーのヒープは約 0.4 MiB 増えます（`tests/files_memory.rs`）。コントロールは DOM ノードを 10 個と、ファイルごとに 5 個描画します。`files.js` は生で 12 KB、gzip で 4 KB、`files.css` は生で 3 KB、gzip で 1 KB 追加します。
+予算: 256 MiB のアップロードでサーバーのヒープは約 0.4 MiB 増えます（`tests/files_memory.rs`）。コントロールは DOM ノードを 10 個と、ファイルごとに 5 個描画します。`files.js` は生で 17 KB、gzip で 6 KB、`files.css` は生で 3 KB、gzip で 1 KB 追加します。
+
+## File drop
+
+`FileDrop::new(label, rules)` は同じアップロードコントロールをフォームの外で単独で使うもので、文書の受信箱のようにファイルが作業のすべてである画面向けです。フォームのフィールドと同じくフォルダー、貼り付けたファイル、accept リストを受け付け、`rules` のストアにアップロードします。ストアは `Feature::files` が権限とともに登録します。`.single()` は一度に 1 ファイルを受け付けます。`.on_upload(action)` は保存された各 `File` でアクションを実行します。サーバーはまず id が自分の生成する形であることを確かめ、名前をもう一度整え、ルールのコンテンツタイプだけを残すので、アクションはブラウザーが作ったものを何も受け取りません。アクションが拒否すると、項目にその理由が表示されます。ゾーン内のファイル選択がキーボードと単一ポインターの経路です。
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

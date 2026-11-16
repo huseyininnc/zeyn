@@ -135,4 +135,17 @@ Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:
 
 `FileRules::quota(bytes, window)` bir kullanıcının bir depoya belirli bir sürede yükleyebileceği miktarı sınırlar ve uygulamanın rate store'u ile sayılır; sınırı aşan yükleme yine kaydedilir, sonraki `429` alır. `DiskStore`, bir saatten eski `.part` dosyalarını (çökme nedeniyle yarım kalan yüklemeler) saatte en fazla bir kez siler. `ZipGuard`, ZIP tabanlı yüklemeler (ZIP, Word, Excel, PowerPoint) için bir tarayıcıdır: merkezi dizini 10.000'den fazla girdi, toplam 1 GiB'tan fazla veya dosya boyutunun 200 katından fazla açılacağını söyleyen arşivleri ve ZIP64 arşivlerini reddeder; kabul edilen bir arşivi açan kod da bu sınırlarda durmalıdır.
 
-Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 12 KB ve gzip 4 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 17 KB ve gzip 6 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+
+## File drop
+
+`FileDrop::new(label, rules)`, aynı yükleme kontrolünün form dışında, tek başına kullanılan hâlidir; bir belge gelen kutusu gibi işin tamamının dosyalar olduğu ekranlar içindir. Form alanı gibi klasörleri, yapıştırılan dosyaları ve kabul listesini alır ve `rules` deposuna yükler; bu depoyu izniyle birlikte `Feature::files` kaydeder. `.single()` bir seferde tek dosya alır. `.on_upload(action)` saklanan her `File` için bir eylem çalıştırır; sunucu önce kimliğin kendi ürettiği biçimde olduğunu denetler, adı yeniden temizler ve yalnızca kurallardaki bir içerik türünü bırakır, böylece eylem tarayıcının uydurduğu hiçbir şeyi almaz. Eylem reddederse öğe nedeni gösterir. Alanın içindeki dosya seçici, klavye ve tek işaretçi yoludur.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

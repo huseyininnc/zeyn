@@ -135,4 +135,17 @@ Las descargas (`GET /_zeyn/files/{store}/{id}`) comprueban la forma del id, el p
 
 `FileRules::quota(bytes, window)` limita lo que un usuario sube a un almacén por ventana, contado con el rate store de la aplicación; la subida que lo supera se guarda igualmente y la siguiente responde `429`. `DiskStore` elimina los archivos `.part` de más de una hora (subidas detenidas por una caída) como mucho una vez por hora. `ZipGuard` es un escáner para subidas basadas en ZIP (ZIP, Word, Excel, PowerPoint): rechaza archivos cuyo directorio central declara más de 10.000 entradas, más de 1 GiB en total o más de 200 veces el tamaño del archivo, y los archivos ZIP64; el código que descomprime un archivo aceptado debe detenerse igualmente en esos límites.
 
-Presupuesto: una subida de 256 MiB hace crecer el heap del servidor unos 0,4 MiB (`tests/files_memory.rs`); el control renderiza 10 nodos DOM más 5 por archivo; `files.js` añade 12 KB sin comprimir y 4 KB con gzip, `files.css` 3 KB sin comprimir y 1 KB con gzip.
+Presupuesto: una subida de 256 MiB hace crecer el heap del servidor unos 0,4 MiB (`tests/files_memory.rs`); el control renderiza 10 nodos DOM más 5 por archivo; `files.js` añade 17 KB sin comprimir y 6 KB con gzip, `files.css` 3 KB sin comprimir y 1 KB con gzip.
+
+## File drop
+
+`FileDrop::new(label, rules)` es el mismo control de subida por sí solo, fuera de un formulario, para pantallas donde los archivos son toda la tarea, como una bandeja de documentos. Acepta carpetas, archivos pegados y la lista de tipos como el campo del formulario, y sube al almacén de `rules`, que `Feature::files` registra con su permiso. `.single()` toma un archivo cada vez. `.on_upload(action)` ejecuta una acción con cada `File` guardado; el servidor comprueba antes que el id tiene la forma que genera, vuelve a limpiar el nombre y solo conserva un tipo de contenido de las reglas, así que la acción no recibe nada inventado por el navegador. Si la acción lo rechaza, el elemento muestra el motivo. El selector de archivos dentro de la zona es el camino de teclado y de puntero único.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

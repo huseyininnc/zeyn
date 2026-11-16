@@ -94,6 +94,7 @@
       "line_editor": "Form içinde toplamlı model satırları.",
       "masked_inputs": "Maskeli, ondalık, yüzde ve parola girişleri.",
       "action_button": "Bir eylemi çalıştıran düğme.",
+      "file_drop": "Dosyaları, klasörleri ve yapıştırılan görselleri bir depoya yükleyen, form dışında bir bırakma alanı.",
       "data_grid": "Sayfalama, sıralama ve süzgeçli eylem satırları.",
       "card_grid": "Kart olarak gösterilen eylem satırları.",
       "image_card": "Resimli, rozetli ve ilerlemeli kart.",
@@ -244,6 +245,10 @@
       "progress_ring": {
         "overview": "Örnek",
         "sizes": "Boyutlar"
+      },
+      "file_drop": {
+        "overview": "Örnek",
+        "single": "Tek dosya"
       },
       "action_button": {
         "overview": "Örnek"

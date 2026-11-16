@@ -601,7 +601,8 @@
         "remove": "Kaldır",
         "remove_name": "{name} dosyasını kaldır",
         "waiting": "{name} yüklenmeyi bekliyor",
-        "skipped": "Bu alanın almadığı türde {n} dosya atlandı."
+        "skipped": "Bu alanın almadığı türde {n} dosya atlandı.",
+        "not_added": "Dosya yüklendi ama eklenemedi."
       },
       "kpi": {
         "up": "Önceki döneme göre yüzde {pct} artış",
