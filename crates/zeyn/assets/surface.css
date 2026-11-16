@@ -33,3 +33,15 @@
 .z-surface-item[data-dragging] { cursor: grabbing; box-shadow: var(--z-shadow-2); z-index: 1; }
 
 .z-surface-item[data-picked] { outline: 2px dashed var(--z-focus); outline-offset: 2px; }
+
+.z-surface-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 24px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--z-border-strong) 50%, var(--z-border-strong) 60%, transparent 60%, transparent 70%, var(--z-border-strong) 70%, var(--z-border-strong) 80%, transparent 80%);
+}
+
+.z-surface-item[data-picked="size"] .z-surface-resize { background-color: var(--z-focus); }

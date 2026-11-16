@@ -75,6 +75,8 @@ Every section is a native disclosure (`<details>` and `<summary>`), not the ARIA
 
 `Surface::new(label, width, height)` is an area of a fixed size where people place items freely, such as tables on a floor plan. `.item(Draggable::new(id, node).at(x, y).size(w, h))` adds an item, `.axis(Axis::X)` or `Axis::Y` keeps it on one line, and `.snap(step)` puts every place on a grid. `.on_move(action)` stores each move: the action gets a `SurfaceMove` with the item's id and its new `x` and `y`, after the server has checked that the id belongs to the surface and kept the place inside the bounds, on the grid and on the axis.
 
+`.resizable()` gives an item a handle in its bottom right corner; `.min_size(w, h)`, `.max_size(w, h)` and `.aspect(w, h)` limit the size and make the item resizable as well. The action then also gets the new `w` and `h`, kept inside those limits, the surface and the grid. With an aspect ratio the height follows the width.
+
 ```rust
 Surface::new(t!("floor.plan"), 800, 480)
     .snap(20)
@@ -86,9 +88,10 @@ Surface::new(t!("floor.plan"), 800, 480)
     )
 ```
 
-A mouse or pen drags an item; a touch drags it after a short hold. With one pointer, a click picks an item and a click on the surface puts it there.
+A mouse or pen drags an item; a touch drags it after a short hold. With one pointer, a click picks an item and a click on the surface puts it there. A click on the corner handle picks the size, and a click on the surface puts the corner there.
 
 | Key | What it does |
 |---|---|
 | Arrow keys | Move the focused item one grid step (10 pixels without a grid) |
+| `Shift` + arrow keys | Resize a resizable item one grid step |
 | `Escape` | Drops a picked item, or puts a dragged item back |

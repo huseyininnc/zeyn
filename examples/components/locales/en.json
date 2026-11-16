@@ -257,7 +257,8 @@
       },
       "surface": {
         "overview": "Example",
-        "on_one_axis": "On one axis"
+        "on_one_axis": "On one axis",
+        "resizable": "Resizable, with an aspect ratio"
       },
       "auto_grid": {
         "overview": "Example",

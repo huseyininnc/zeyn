@@ -1,6 +1,7 @@
 //! `Surface`: an area where people place items freely, such as tables on a floor plan or widgets
-//! on a board, with [`Draggable`] items that move along one or both axes, inside the surface's
-//! bounds and on its snap grid.
+//! on a board, with [`Draggable`] items that move along one or both axes and, when resizable,
+//! change size between limits and at a fixed aspect ratio, inside the surface's bounds and on its
+//! snap grid.
 
 use super::{DataSource, dom_id, render_child};
 use crate::action::{Action, ActionMeta, Error, Result};
@@ -35,9 +36,10 @@ impl Axis {
     }
 }
 
-/// A move of one item, as the move action of a [`Surface`] gets it. The server has already
-/// checked that `id` is an item of the surface, kept the position inside the bounds, on the snap
-/// grid and on the item's axis; the action only stores it.
+/// A move or resize of one item, as the move action of a [`Surface`] gets it. The server has
+/// already checked that `id` is an item of the surface, kept the size inside the item's limits and
+/// aspect ratio and the position inside the bounds, on the snap grid and on the item's axis; the
+/// action only stores it.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SurfaceMove {
     /// The id the screen gave the item with [`Draggable::new`].
@@ -46,6 +48,10 @@ pub struct SurfaceMove {
     pub x: u32,
     /// Top edge, in CSS pixels from the top of the surface.
     pub y: u32,
+    /// Width in CSS pixels; the size the screen gave unless the item is resizable.
+    pub w: u32,
+    /// Height in CSS pixels; the size the screen gave unless the item is resizable.
+    pub h: u32,
 }
 
 /// An item of a [`Surface`] at a position the app keeps, usually read from the database.
@@ -55,6 +61,8 @@ pub struct SurfaceMove {
 ///     .label("Table 1")
 ///     .at(40, 60)
 ///     .size(120, 80)
+///     .resizable()
+///     .min_size(80, 40)
 /// ```
 pub struct Draggable {
     spot: Spot,
@@ -70,6 +78,25 @@ struct Spot {
     w: u32,
     h: u32,
     axis: Axis,
+    resize: Option<Resize>,
+}
+
+/// How a resizable item may change size.
+#[derive(Clone, Copy)]
+struct Resize {
+    min: (u32, u32),
+    max: (u32, u32),
+    aspect: Option<(u32, u32)>,
+}
+
+impl Default for Resize {
+    fn default() -> Self {
+        Resize {
+            min: (8, 8),
+            max: (MAX_SURFACE, MAX_SURFACE),
+            aspect: None,
+        }
+    }
 }
 
 impl Draggable {
@@ -86,6 +113,7 @@ impl Draggable {
                 w: 160,
                 h: 80,
                 axis: Axis::Both,
+                resize: None,
             },
             node: Node::placed(node),
         }
@@ -116,6 +144,46 @@ impl Draggable {
         self.spot.axis = axis;
         self
     }
+
+    /// Lets people change the size of the item with the handle in its bottom right corner, or
+    /// with Shift and the arrow keys. It stays at least 8 pixels and inside the surface.
+    pub fn resizable(mut self) -> Self {
+        self.spot
+            .resize
+            .get_or_insert_with(Resize::default);
+        self
+    }
+
+    /// The smallest size a resize may give, in CSS pixels. Makes the item resizable.
+    pub fn min_size(mut self, width: u32, height: u32) -> Self {
+        let r = self
+            .spot
+            .resize
+            .get_or_insert_with(Resize::default);
+        r.min = (width.clamp(8, MAX_SURFACE), height.clamp(8, MAX_SURFACE));
+        self
+    }
+
+    /// The largest size a resize may give, in CSS pixels. Makes the item resizable.
+    pub fn max_size(mut self, width: u32, height: u32) -> Self {
+        let r = self
+            .spot
+            .resize
+            .get_or_insert_with(Resize::default);
+        r.max = (width.clamp(8, MAX_SURFACE), height.clamp(8, MAX_SURFACE));
+        self
+    }
+
+    /// Keeps width to height at `width : height` while resizing, such as `16, 9`; the height
+    /// follows the width. Makes the item resizable.
+    pub fn aspect(mut self, width: u32, height: u32) -> Self {
+        let r = self
+            .spot
+            .resize
+            .get_or_insert_with(Resize::default);
+        r.aspect = Some((width.clamp(1, 1_000), height.clamp(1, 1_000)));
+        self
+    }
 }
 
 /// Runs the move action `A`.
@@ -135,10 +203,12 @@ where
 /// An area of a fixed size where people move [`Draggable`] items freely.
 ///
 /// A mouse or pen drags an item after it moves 6 pixels, a touch after a short hold. A focused
-/// item moves with the arrow keys, one snap step at a time. With a single pointer, a click picks
-/// an item and a click on the surface puts it there. Every move stays inside the surface, on the
-/// snap grid and on the item's axis, in the browser and again on the server, which then runs the
-/// move action with a [`SurfaceMove`].
+/// item moves with the arrow keys, one snap step at a time, and a resizable one changes size with
+/// Shift and the arrow keys or its corner handle. With a single pointer, a click picks an item
+/// and a click on the surface puts it there; a click on the corner handle picks the size, and a
+/// click on the surface puts the corner there. Every move stays inside the surface, on the snap
+/// grid and on the item's axis, and every size inside the item's limits and aspect ratio, in the
+/// browser and again on the server, which then runs the move action with a [`SurfaceMove`].
 ///
 /// ```ignore
 /// #[action(permission = "floor.edit")]
@@ -214,8 +284,37 @@ impl Surface {
         v.clamp(0, max) as u32
     }
 
-    /// The place item `item` ends up at when the browser asks for `(x, y)`.
-    fn place(&self, item: &Spot, x: i64, y: i64) -> (u32, u32) {
+    /// `value` on the grid and inside `min..=max`.
+    fn fit_len(&self, value: i64, min: u32, max: u32) -> u32 {
+        let min = i64::from(min.min(max));
+        let max = i64::from(max);
+        let mut v = value.clamp(min, max);
+        if self.snap > 1 {
+            let step = i64::from(self.snap);
+            v = ((v + step / 2) / step) * step;
+        }
+        v.clamp(min, max) as u32
+    }
+
+    /// The size item `item` ends up at when the browser asks for `(w, h)`: its own size unless it
+    /// is resizable, else inside its limits and the surface, on the grid and at its aspect ratio.
+    fn size(&self, item: &Spot, w: i64, h: i64) -> (u32, u32) {
+        let Some(r) = item.resize else {
+            return (item.w.min(self.width), item.h.min(self.height));
+        };
+        let max = (r.max.0.min(self.width), r.max.1.min(self.height));
+        let w = self.fit_len(w, r.min.0, max.0);
+        let Some((aw, ah)) = r.aspect else {
+            return (w, self.fit_len(h, r.min.1, max.1));
+        };
+        let (aw, ah) = (u64::from(aw), u64::from(ah));
+        let h = ((u64::from(w) * ah + aw / 2) / aw).min(u64::from(max.1));
+        let w = ((h * aw + ah / 2) / ah).min(u64::from(w));
+        (w as u32, h as u32)
+    }
+
+    /// The place item `item` of size `w` by `h` ends up at when the browser asks for `(x, y)`.
+    fn place(&self, item: &Spot, (w, h): (u32, u32), x: i64, y: i64) -> (u32, u32) {
         let x = match item.axis {
             Axis::Y => i64::from(item.x),
             _ => x,
@@ -225,8 +324,8 @@ impl Surface {
             _ => y,
         };
         (
-            self.fit(x, self.width.saturating_sub(item.w)),
-            self.fit(y, self.height.saturating_sub(item.h)),
+            self.fit(x, self.width.saturating_sub(w)),
+            self.fit(y, self.height.saturating_sub(h)),
         )
     }
 }
@@ -243,6 +342,8 @@ struct MoveCall {
     id: String,
     x: i64,
     y: i64,
+    w: Option<i64>,
+    h: Option<i64>,
 }
 
 impl DataSource for Surface {
@@ -259,13 +360,26 @@ impl DataSource for Surface {
                 .items
                 .iter()
                 .find(|i| c.id.len() <= MAX_ID && i.id == c.id)?;
-            Some((item.id.clone(), self.place(item, c.x, c.y)))
+            let size = self.size(
+                item,
+                c.w.unwrap_or(i64::from(item.w)),
+                c.h.unwrap_or(i64::from(item.h)),
+            );
+            let (x, y) = self.place(item, size, c.x, c.y);
+            Some(SurfaceMove {
+                id: item.id.clone(),
+                x,
+                y,
+                w: size.0,
+                h: size.1,
+            })
         });
         let run = self.action.map(|(_, run)| run);
         Box::pin(async move {
-            let ((id, (x, y)), run) = found.zip(run).ok_or(Error::NotFound)?;
-            run(ctx, SurfaceMove { id, x, y }).await?;
-            Ok(json!({ "x": x, "y": y }))
+            let (m, run) = found.zip(run).ok_or(Error::NotFound)?;
+            let out = json!({ "x": m.x, "y": m.y, "w": m.w, "h": m.h });
+            run(ctx, m).await?;
+            Ok(out)
         })
     }
 }
@@ -275,7 +389,7 @@ impl Component for Surface {
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.surface.{key}")));
         let id = dom_id(r, "surface");
         out.push_str(&format!(
-            r#"<div class="z-surface-scroll"><div class="z-surface" role="group" aria-label="{}" aria-describedby="{id}-hint" data-zeyn-surface="{id}" data-snap="{}"{} data-text-moved="{}" data-text-picked="{}" data-text-refused="{}" style="--z-surface-w:{}px;--z-surface-h:{}px">"#,
+            r#"<div class="z-surface-scroll"><div class="z-surface" role="group" aria-label="{}" aria-describedby="{id}-hint" data-zeyn-surface="{id}" data-snap="{}"{} data-text-moved="{}" data-text-picked="{}" data-text-refused="{}" data-text-resized="{}" data-text-picked-size="{}" style="--z-surface-w:{}px;--z-surface-h:{}px">"#,
             r.text(&self.label),
             self.snap,
             if self.action.is_some() {
@@ -286,11 +400,22 @@ impl Component for Surface {
             t("moved"),
             t("picked"),
             t("refused"),
+            t("resized"),
+            t("picked_size"),
             self.width,
             self.height,
         ));
+        let resize_hint = if self
+            .items
+            .iter()
+            .any(|i| i.resize.is_some())
+        {
+            format!(" {}", t("hint_resize"))
+        } else {
+            String::new()
+        };
         out.push_str(&format!(
-            r#"<p class="z-sr-only" id="{id}-hint">{}</p>"#,
+            r#"<p class="z-sr-only" id="{id}-hint">{}{resize_hint}</p>"#,
             t("hint")
         ));
         for (i, item) in self.items.iter().enumerate() {
@@ -298,16 +423,29 @@ impl Component for Surface {
                 .label
                 .as_ref()
                 .map_or_else(|| escape(&item.id), |l| r.text(l));
-            let (x, y) = self.place(item, i64::from(item.x), i64::from(item.y));
+            let (w, h) = self.size(item, i64::from(item.w), i64::from(item.h));
+            let (x, y) = self.place(item, (w, h), i64::from(item.x), i64::from(item.y));
+            let limits = item
+                .resize
+                .map_or_else(String::new, |r| {
+                    let aspect = r
+                        .aspect
+                        .map_or_else(String::new, |(a, b)| format!(r#" data-aspect="{a},{b}""#));
+                    format!(
+                        r#" data-min="{},{}" data-max="{},{}"{aspect}"#,
+                        r.min.0, r.min.1, r.max.0, r.max.1
+                    )
+                });
             out.push_str(&format!(
-                r#"<div class="z-surface-item" tabindex="0" aria-roledescription="{}" aria-label="{label}" aria-describedby="{id}-hint" data-id="{}" data-axis="{}" style="left:{x}px;top:{y}px;width:{}px;height:{}px">"#,
+                r#"<div class="z-surface-item" tabindex="0" aria-roledescription="{}" aria-label="{label}" aria-describedby="{id}-hint" data-id="{}" data-axis="{}"{limits} style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">"#,
                 t("item"),
                 escape(&item.id),
                 item.axis.attr(),
-                item.w,
-                item.h,
             ));
             render_child(out, r, i, &self.nodes[i]);
+            if item.resize.is_some() {
+                out.push_str(r#"<span class="z-surface-resize" aria-hidden="true"></span>"#);
+            }
             out.push_str("</div>");
         }
         out.push_str("</div></div>");
@@ -323,7 +461,15 @@ impl Component for Surface {
                 .items
                 .iter()
                 .zip(&self.nodes)
-                .map(|(i, n)| json!({ "id": i.id, "x": i.x, "y": i.y, "node": n.schema() }))
+                .map(|(i, n)| json!({
+                    "id": i.id,
+                    "x": i.x,
+                    "y": i.y,
+                    "w": i.w,
+                    "h": i.h,
+                    "resizable": i.resize.is_some(),
+                    "node": n.schema(),
+                }))
                 .collect::<Vec<_>>(),
         })
     }
