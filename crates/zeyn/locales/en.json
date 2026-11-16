@@ -587,7 +587,7 @@
         "brand": "Note"
       },
       "upload": {
-        "drop": "Drop files here or choose them.",
+        "drop": "Drop files or folders here, paste them, or choose them.",
         "hint": "{types}, up to {max}.",
         "hint_many": "{types}, up to {max} each, at most {n} files.",
         "list": "Files",
@@ -599,7 +599,9 @@
         "cancel": "Cancel",
         "retry": "Retry",
         "remove": "Remove",
-        "remove_name": "Remove {name}"
+        "remove_name": "Remove {name}",
+        "waiting": "{name} is waiting to upload",
+        "skipped": "{n} files of a type this field does not take were skipped."
       },
       "kpi": {
         "up": "Up {pct}% from the previous period",

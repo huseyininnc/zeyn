@@ -112,10 +112,13 @@ A permission name lets the same users upload and download. To let readers open f
 
 The control is a native file input inside a drop zone. Each file uploads on its own with a progress bar, can be canceled while it runs, retried when it failed and removed when it is done. Images show a preview made from an object URL of the chosen file. Progress and results are announced in a polite live region. The showcase has a working example at `/uploads`; this documentation site has no signed in user, so it shows no live upload.
 
+A dropped folder adds the files inside it and its subfolders, read in pages of at most 100 entries until the folder is done; files of a type the field does not take are skipped and counted in the live region. Files pasted while the field has focus upload too. A file whose extension or type is not in `accept` is refused in the browser before any byte is sent, and the server checks the content again. At most three files of a field upload at the same time; the others wait in line with a busy progress bar.
+
 | Key | What it does |
 |---|---|
 | Tab | Moves to the file input, then to each file's download link and its Cancel, Retry or Remove button |
 | Enter or Space on the file input | Opens the system file picker (the keyboard path for drag and drop) |
+| Ctrl+V or Cmd+V on the file input | Uploads the files on the clipboard, such as a screenshot |
 | Enter or Space on Cancel, Retry, Remove | Runs it; after Cancel focus moves to Retry, after Remove to the next file or back to the input |
 
 What the server does for `POST /_zeyn/files/{store}`:
