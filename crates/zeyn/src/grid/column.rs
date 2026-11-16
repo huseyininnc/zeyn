@@ -349,6 +349,10 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.filter_builder()
     }
 
+    pub fn filter_chips(self) -> DataGrid<E> {
+        self.grid.filter_chips()
+    }
+
     pub fn page_sizes(self, sizes: &[u32]) -> DataGrid<E> {
         self.grid.page_sizes(sizes)
     }

@@ -580,6 +580,8 @@ pub struct DataGrid<E: Model> {
     batch: bool,
     /// Whether a "Filter" button opens the filter builder.
     builder: bool,
+    /// Whether the active filters show as chips above the grid.
+    chips: bool,
     /// Page sizes users may pick in the pager.
     page_sizes: Vec<u32>,
 }
@@ -838,6 +840,7 @@ impl<E: Model> DataGrid<E> {
             delete: None,
             batch: false,
             builder: false,
+            chips: false,
             page_sizes: Vec::new(),
         }
     }
@@ -1247,6 +1250,18 @@ impl<E: Model> DataGrid<E> {
     /// always.
     pub fn filter_builder(mut self) -> Self {
         self.builder = true;
+        self
+    }
+
+    /// Shows the active filters as chips above the grid: one per filtered column and one per
+    /// condition group of the filter builder, each with a remove button, and "Clear all" when
+    /// there are two or more. The chips follow the filter row, the filter builder, the saved
+    /// view and the `zeyn:filter` event; removing one reloads the grid and saves the view.
+    /// Pressing a chip opens the filter builder when the grid has one, otherwise it moves focus
+    /// to the column's filter. The chips run in a browser module of their own, so grids without
+    /// them load nothing more.
+    pub fn filter_chips(mut self) -> Self {
+        self.chips = true;
         self
     }
 
@@ -2173,8 +2188,10 @@ impl<E: Model> DataGrid<E> {
         let add = self.can_add(r);
         let batch = self.batch && self.can_edit(r);
         let panel = self.user_groups();
-        let builder = self.builder && self.columns.iter().any(|c| c.filter);
-        if self.search || add || batch || panel || builder {
+        let filters = self.columns.iter().any(|c| c.filter);
+        let builder = self.builder && filters;
+        let chips = self.chips && filters;
+        if self.search || add || batch || panel || builder || chips {
             let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
             out.push_str(r#"<div class="z-grid-tools">"#);
             if self.search {
@@ -2188,6 +2205,17 @@ impl<E: Model> DataGrid<E> {
                 out.push_str(&format!(
                     r#"<button type="button" class="z-button" data-zeyn-filter-builder data-testid="{scope}.grid.filter-builder" aria-haspopup="dialog"><span class="z-icon z-icon-filter" aria-hidden="true"></span>{}<span class="z-badge" data-zeyn-filter-count hidden></span></button>"#,
                     grid_text("filter_builder"),
+                ));
+            }
+            if chips {
+                out.push_str(&format!(
+                    r#"<div class="z-filter-chips" data-zeyn-filter-chips data-testid="{scope}.grid.filter-chips" role="group" aria-label="{}" data-text-remove="{}" data-text-clear="{}" data-text-group="{}" data-text-yes="{}" data-text-no="{}" hidden></div>"#,
+                    grid_text("active_filters"),
+                    grid_text("remove_filter"),
+                    grid_text("clear_all"),
+                    grid_text("filter_group"),
+                    r.text(&Text::key("zeyn.yes")),
+                    r.text(&Text::key("zeyn.no")),
                 ));
             }
             if panel {
@@ -3313,6 +3341,7 @@ impl<E: Model> Component for DataGrid<E> {
             "tree": self.tree.map(|m| m.name),
             "search": self.search,
             "filter_builder": self.builder,
+            "filter_chips": self.chips,
             "page_sizes": self.size_choices(),
             "groupable": self.columns.iter().filter(|c| c.group).map(|c| c.meta.name).collect::<Vec<_>>(),
             "add": self.add.as_ref().map(|a| a.meta),

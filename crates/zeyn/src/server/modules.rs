@@ -327,6 +327,12 @@ pub(crate) const MODULES: &[Module] = &[
         needs: &[],
     },
     Module {
+        name: "gridchips",
+        script: &["data-zeyn-filter-chips"],
+        style: &["z-filter-chips"],
+        needs: &[],
+    },
+    Module {
         name: "surface",
         script: &["data-zeyn-surface"],
         style: &["z-surface"],
@@ -342,7 +348,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 25] = [
+const STYLES: [&str; 26] = [
     "components",
     "catalog",
     "content",
@@ -367,6 +373,7 @@ const STYLES: [&str; 25] = [
     "lightbox",
     "feed",
     "document",
+    "gridchips",
     "surface",
 ];
 
@@ -532,7 +539,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 67] = [
+const FILES: [(&str, &str); 69] = [
     (
         "/_zeyn/display.css",
         include_str!("../../assets/display.css"),
@@ -677,6 +684,14 @@ const FILES: [(&str, &str); 67] = [
     (
         "/_zeyn/document.css",
         include_str!("../../assets/document.css"),
+    ),
+    (
+        "/_zeyn/gridchips.js",
+        include_str!("../../assets/gridchips.js"),
+    ),
+    (
+        "/_zeyn/gridchips.css",
+        include_str!("../../assets/gridchips.css"),
     ),
 ];
 

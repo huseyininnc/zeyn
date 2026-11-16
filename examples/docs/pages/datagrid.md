@@ -86,6 +86,7 @@ Numbers and money are right aligned with tabular digits. Whole numbers are group
   Delete button and key, and edits saved together. See the [DataGrid reference](grid.md).
 - `.groupable()`, `.summary(label, |t| ...)` on a column: users group by it from its menu or the group panel, and a value computed from the totals shows under it.
 - `.filter_builder()`: a "Filter" button that opens a dialog to build the filter conditions; the same list the filter row, saved views and AI agents use.
+- `.filter_chips()`: the active filters as chips above the grid, each with a remove button, in step with the filter row, the filter builder and saved views.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.
 
 ## Columns known at run time

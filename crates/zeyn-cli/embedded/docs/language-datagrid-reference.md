@@ -122,6 +122,15 @@ together, and a later one on the same column replaces an earlier one. Applying w
 the grid's filters, so the filter row, saved views, exports and an AI agent's `zeyn:filter` event
 share one list, and the server cleans it as above.
 
+`filter_chips()` shows the active filters as chips above the grid: one per filtered column, such
+as `Name: "acme"`, `Kind: Tool, Part` or `Price: 10 … 50`, and one per condition group of the
+builder, as `3 conditions`. Each chip has a remove button labelled "Remove filter" with the chip's
+text, and from two chips on a "Clear all" link follows them. Removing a chip reloads the grid from
+the first page, saves the view and keeps focus on the next chip. Pressing a chip's text opens the
+filter builder when the grid has one, otherwise it focuses that column's filter. The chips follow
+every change of the filters: the filter row, the builder, a saved view and the `zeyn:filter`
+event. They run in `gridchips.js` and `gridchips.css`, which only pages with such a grid load.
+
 Each group of conditions in the builder has a picker, "All conditions" or "Any condition", and
 "Add group" puts a group inside it, three levels deep. The query sends groups in
 `DataQuery::filter_groups` as `{ "any": true, "filters": [...], "groups": [...] }`, next to the flat
