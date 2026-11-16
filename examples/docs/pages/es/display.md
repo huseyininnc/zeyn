@@ -80,7 +80,7 @@ Los valores se formatean como las celdas de una tabla: dinero, fechas y choices 
 
 ## EmptyState y Skeleton
 
-`EmptyState::new(title).text(text)` llena un área vacía con un siguiente paso: `.link(label, screen, params)` va a otra página mediante un `LinkButton`, y `.opens(label, screen, params)` abre una pantalla de la aplicación como ventana. `Skeleton::lines(n)` es un marcador de posición mientras algo se carga.
+`EmptyState::new(title).text(text)` llena un área vacía con un siguiente paso: `.link(label, screen, params)` va a otra página mediante un `LinkButton`, y `.opens(label, screen, params)` abre una pantalla de la aplicación como ventana. `Skeleton::lines(n)` es un marcador de posición mientras algo se carga. Un esqueleto solo aparece tras 300 ms de espera, así las cargas rápidas nunca lo hacen parpadear, y una parte diferida que llega más tarde lo mantiene al menos 400 ms.
 
 ## LinkButton
 

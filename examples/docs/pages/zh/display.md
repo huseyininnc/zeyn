@@ -80,7 +80,7 @@ DescriptionList::of(&invoice)
 
 ## EmptyState 和 Skeleton
 
-`EmptyState::new(title).text(text)` 用下一步操作填充空白区域：`.link(label, screen, params)` 通过 `LinkButton` 前往另一个页面，`.opens(label, screen, params)` 则以窗口形式打开应用的一个 screen。`Skeleton::lines(n)` 是内容加载期间的占位。
+`EmptyState::new(title).text(text)` 用下一步操作填充空白区域：`.link(label, screen, params)` 通过 `LinkButton` 前往另一个页面，`.opens(label, screen, params)` 则以窗口形式打开应用的一个 screen。`Skeleton::lines(n)` 是内容加载期间的占位。骨架屏只在等待 300 ms 后才出现，因此快速加载时不会闪现；较晚到达的延迟部分会让它至少保留 400 ms。
 
 ## LinkButton
 
