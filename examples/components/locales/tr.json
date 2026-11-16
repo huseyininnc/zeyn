@@ -331,7 +331,8 @@
         "overview": "Örnek"
       },
       "form": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "settings": "Bir şey değişince kaydetme çubuğu görünen ayarlar formu"
       },
       "heading": {
         "overview": "Örnek",

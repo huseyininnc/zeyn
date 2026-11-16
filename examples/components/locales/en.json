@@ -331,7 +331,8 @@
         "overview": "Example"
       },
       "form": {
-        "overview": "Example"
+        "overview": "Example",
+        "settings": "A settings form whose save bar shows once something changes"
       },
       "heading": {
         "overview": "Example",

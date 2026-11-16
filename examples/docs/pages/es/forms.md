@@ -23,6 +23,7 @@ Deja el nombre vacío o escribe un correo incorrecto y pulsa *Send*: el navegado
 | `.field(M::f)` | Un campo en su propia línea |
 | `.row(\|r\| r.field(a).field(b))` | Campos uno al lado de otro; se apilan en pantallas estrechas |
 | `.section(title)` | Un grupo con título de los campos que siguen |
+| `.settings()` | Diseño de ajustes: etiqueta y ayuda junto a cada control, y una barra de guardado fija abajo en cuanto algo cambia |
 | `.step(title)` | Un paso de asistente; el formulario muestra un paso cada vez |
 | `.range(M::from, M::to)` | Dos fechas como un selector de rango |
 | `Form::auto(value)` | Todos los campos, en el orden de declaración |

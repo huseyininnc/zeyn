@@ -152,7 +152,12 @@ pub(crate) const MODULES: &[Module] = &[
         needs: &["palette"],
     },
     script("reveal", &["data-zeyn-reveal"]),
-    script("forms", &["data-zeyn-submit", "data-zeyn-transition"]),
+    Module {
+        name: "forms",
+        script: &["data-zeyn-submit", "data-zeyn-transition"],
+        style: &["z-form-settings"],
+        needs: &[],
+    },
     script("import", &["data-zeyn-import"]),
     Module {
         name: "catalog",
@@ -342,8 +347,9 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 25] = [
+const STYLES: [&str; 26] = [
     "components",
+    "forms",
     "catalog",
     "content",
     "display",
@@ -532,7 +538,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 67] = [
+const FILES: [(&str, &str); 68] = [
     (
         "/_zeyn/display.css",
         include_str!("../../assets/display.css"),
@@ -655,6 +661,7 @@ const FILES: [(&str, &str); 67] = [
     ("/_zeyn/palette.js", include_str!("../../assets/palette.js")),
     ("/_zeyn/reveal.js", include_str!("../../assets/reveal.js")),
     ("/_zeyn/forms.js", include_str!("../../assets/forms.js")),
+    ("/_zeyn/forms.css", include_str!("../../assets/forms.css")),
     ("/_zeyn/import.js", include_str!("../../assets/import.js")),
     (
         "/_zeyn/stories.css",

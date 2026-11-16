@@ -12,7 +12,8 @@
     },
     "draft": {
       "restored": "Daha önce kaydetmediğiniz girişler geri yüklendi.",
-      "discard": "Girişleri at"
+      "discard": "Girişleri at",
+      "unsaved": "Kaydedilmemiş değişiklikleriniz var."
     },
     "session": {
       "idle_title": "Hâlâ orada mısınız?",
