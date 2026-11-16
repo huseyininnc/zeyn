@@ -80,7 +80,7 @@ DescriptionList::of(&invoice)
 
 ## EmptyState と Skeleton
 
-`EmptyState::new(title).text(text)` は、空の領域を次のステップで埋めます。`.link(label, screen, params)` は `LinkButton` を通じて別のページへ移動し、`.opens(label, screen, params)` はアプリの画面をウィンドウとして開きます。`Skeleton::lines(n)` は、何かを読み込んでいる間のプレースホルダーです。
+`EmptyState::new(title).text(text)` は、空の領域を次のステップで埋めます。`.link(label, screen, params)` は `LinkButton` を通じて別のページへ移動し、`.opens(label, screen, params)` はアプリの画面をウィンドウとして開きます。`Skeleton::lines(n)` は、何かを読み込んでいる間のプレースホルダーです。 スケルトンは 300 ms 待ってから表示されるため、速い読み込みでちらつくことはありません。遅れて届く遅延部分は、表示したスケルトンを少なくとも 400 ms 保ちます。
 
 ## LinkButton
 

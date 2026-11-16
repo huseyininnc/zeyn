@@ -168,9 +168,18 @@
   .z-row:has(> .z-col > .z-node > .z-kpi) .z-kpi-trend { display: none; }
 }
 
+/* A donut that does not fit (fewer than 2 or more than 5 parts, or one part of 75% or more) is a
+   list of rows: name, a bar as wide as its share, value and percentage. */
+.z-chart-barlist { display: grid; gap: var(--z-s-2); margin: 0; padding: 0; list-style: none; }
+.z-chart-barlist li { display: grid; grid-template-columns: minmax(6rem, 1fr) 2fr auto; align-items: center; gap: var(--z-s-3); }
+.z-chart-barlist-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.z-chart-barlist-bar { height: 8px; width: var(--z-share); min-width: 2px; border-radius: 2px; background: var(--z-series); }
+.z-chart-barlist-value { color: var(--z-text-muted); font-variant-numeric: tabular-nums; text-align: end; }
+
 @media (forced-colors: active) {
   .z-chart-mark:focus-visible { outline-color: Highlight; }
   .z-chart-dot, .z-chart-gauge-value, .z-spark polyline, .z-bullet-bar { forced-color-adjust: none; fill: CanvasText; stroke: CanvasText; }
   .z-chart-gauge-value, .z-spark polyline { fill: none; }
   .z-chart-tip { border-color: CanvasText; }
+  .z-chart-barlist-bar { forced-color-adjust: none; background: CanvasText; }
 }

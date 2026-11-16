@@ -363,18 +363,59 @@ fn line_and_donut_charts_describe_themselves() {
     let donut = render(
         Chart::donut("Units")
             .labels(["A", "B"])
-            .series("Count", [30.0, 10.0]),
+            .series("Count", [30.0, 20.0]),
         "en",
     );
     assert!(
-        donut.contains(r#"aria-label="A: 30 (75%)""#)
-            && donut.contains(r#"aria-label="B: 10 (25%)""#)
+        donut.contains(r#"aria-label="A: 30 (60%)""#)
+            && donut.contains(r#"aria-label="B: 20 (40%)""#)
     );
     assert!(
-        donut.contains(r#">40</text>"#),
+        donut.contains(r#">50</text>"#),
         "the total sits in the middle"
     );
     assert!(donut.contains("Donut chart of 2 parts. Largest: A, 30."));
+}
+
+#[test]
+fn donuts_that_do_not_read_well_become_a_bar_list() {
+    let fits = render(
+        Chart::donut("Units")
+            .labels(["A", "B", "C"])
+            .series("Count", [50.0, 30.0, 20.0]),
+        "en",
+    );
+    assert!(fits.contains("z-chart-slice") && !fits.contains("z-chart-barlist"));
+    let dominant = render(
+        Chart::donut("Orders")
+            .labels(["Delivered", "<Lost>"])
+            .series("Count", [90.0, 10.0]),
+        "en",
+    );
+    assert!(
+        dominant.contains(r#"<ol class="z-chart-barlist""#) && !dominant.contains("z-chart-slice"),
+        "one part of 75% or more is a bar list: {dominant}"
+    );
+    assert!(dominant.contains(r#"style="--z-share:90.0%""#));
+    assert!(dominant.contains(">90 (90%)<") && dominant.contains("&lt;Lost&gt;"));
+    assert!(dominant.contains("<table"), "the data table stays");
+    let many = render(
+        Chart::donut("Units")
+            .labels(["A", "B", "C", "D", "E", "F"])
+            .series("Count", [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
+        "en",
+    );
+    assert!(many.contains("z-chart-barlist"), "six parts are a bar list");
+    let one = render(
+        Chart::donut("Units")
+            .labels(["A", "B"])
+            .series("Count", [5.0, 0.0]),
+        "en",
+    );
+    assert!(
+        one.contains("z-chart-barlist"),
+        "one part above zero is a bar list"
+    );
 }
 
 /// Every chart kind with its data, for the checks that apply to all of them.
@@ -426,7 +467,7 @@ fn every_kind() -> Vec<(&'static str, Chart)> {
             "donut",
             Chart::donut("Units")
                 .labels(["A", "B"])
-                .series("Count", [30.0, 10.0]),
+                .series("Count", [30.0, 20.0]),
         ),
         (
             "gauge",
@@ -616,8 +657,8 @@ fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
     assert!(components.contains(".z-chart-round { max-height: 18rem; }"));
     let mut donut = String::new();
     Chart::donut("Units")
-        .labels(["A"])
-        .series("N", [1.0])
+        .labels(["A", "B"])
+        .series("N", [1.0, 1.0])
         .render(&mut donut, &Render::english("s"));
     assert!(donut.contains(r#"<svg class="z-chart-svg z-chart-round""#));
     let mut bar = String::new();

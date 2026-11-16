@@ -80,7 +80,7 @@ DescriptionList::of(&invoice)
 
 ## EmptyState و Skeleton
 
-`EmptyState::new(title).text(text)` يملأ منطقة فارغة بخطوة تالية: يذهب `.link(label, screen, params)` إلى صفحة أخرى عبر `LinkButton`، ويفتح `.opens(label, screen, params)` شاشة من التطبيق كنافذة. و`Skeleton::lines(n)` عنصر نائب أثناء تحميل شيء ما.
+`EmptyState::new(title).text(text)` يملأ منطقة فارغة بخطوة تالية: يذهب `.link(label, screen, params)` إلى صفحة أخرى عبر `LinkButton`، ويفتح `.opens(label, screen, params)` شاشة من التطبيق كنافذة. و`Skeleton::lines(n)` عنصر نائب أثناء تحميل شيء ما. لا يظهر الهيكل إلا بعد 300 ms من الانتظار، فلا يومض أبدًا في التحميل السريع، والجزء المؤجل الذي يصل لاحقًا يبقيه 400 ms على الأقل.
 
 ## LinkButton
 

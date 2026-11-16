@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## Charts
 
-`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` and `funnel` draw SVG on the server. There is no chart library in the browser; a chart is part of the page HTML.
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` and `funnel` draw SVG on the server. There is no chart library in the browser; a chart is part of the page HTML. A donut needs 2 to 5 parts above zero with the largest under 75% of the whole; any other donut is drawn as a bar list (name, a bar as wide as its share, value and percentage) and a debug build logs a warning.
 
 ```rust
 Row::new()
