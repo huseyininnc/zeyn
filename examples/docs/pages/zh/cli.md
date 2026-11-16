@@ -118,7 +118,7 @@ zeyn check --json
 
 ## DevTools
 
-用 `cargo run`（或 `zeyn dev`）提供服务的调试构建会记录每个请求做了什么：运行的 screen 和 action、状态和耗时、screen 构建和渲染所用的时间、每条 SQL 语句及其耗时和受影响的行数，以及 action 返回的效果和主题。Alt+Shift+D 打开一个面板，列出最近 50 个请求；展开某个请求即可看到它的语句。`GET /_zeyn/devtools` 以 JSON 返回同样的列表。
+用 `cargo run`（或 `zeyn dev`）提供服务的调试构建会记录每个请求做了什么：运行的 screen 和 action、状态和耗时、screen 构建和渲染所用的时间、每条 SQL 语句及其耗时和受影响的行数，以及 action 返回的效果和主题。Alt+Shift+D 打开一个面板，列出最近 50 个请求；展开某个请求即可看到它的语句。`GET /_zeyn/devtools` 以 JSON 返回同样的列表，MCP 工具 `zeyn_devtools` 为智能体读取它。
 
 语句保存时不带参数，因此任何值都不会进入面板。发布构建中没有 DevTools：没有相关代码、路由，也不为它占用内存。自行提供 `App::router` 的应用或测试可以用 `zeyn::server::devtools(true)` 打开它。
 
@@ -135,4 +135,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP 服务器
 
-`zeyn mcp` 通过 stdio 使用 MCP 协议。它的工具有 `zeyn_docs`（按主题提供框架参考）、`zeyn_describe`（当前目录中应用的 feature、screen、路由和问题）、`zeyn_inspect`（某个 screen 的节点树，以及放置每个节点的 Rust 代码行）、`zeyn_check`（带 `fix: true` 时运行 `check --fix`）、`zeyn_test`、`zeyn_new_feature` 和 `zeyn_new_screen`。参见 [MCP 与 AI 智能体](mcp.md)。
+`zeyn mcp` 通过 stdio 使用 MCP 协议。它的工具有 `zeyn_docs`（按主题提供框架参考）、`zeyn_describe`（当前目录中应用的 feature、screen、路由和问题）、`zeyn_inspect`（某个 screen 的节点树，以及放置每个节点的 Rust 代码行）、`zeyn_devtools`（正在运行的调试构建的 DevTools 请求日志：screen、action、耗时、SQL 语句）、`zeyn_check`（带 `fix: true` 时运行 `check --fix`）、`zeyn_test`、`zeyn_new_feature` 和 `zeyn_new_screen`。参见 [MCP 与 AI 智能体](mcp.md)。

@@ -14,6 +14,7 @@ Zeyn दो तरफ़ के एजेंट के लिए बना ह�
 | `zeyn_docs` | विषय के अनुसार फ्रेमवर्क संदर्भ: `rules`, `language`, `protocol`; `search: "शब्द"` इस संस्करण के डॉक्स पेजों को क्रम देता है, `page: "/language/forms"` एक पेज Markdown में लौटाता है |
 | `zeyn_describe` | ऐप के feature, Screen, रूट, एक्सेस, API, समस्याएँ और छूटे अनुवाद |
 | `zeyn_inspect` | एक Screen का node ट्री: पाथ, कंपोनेंट का प्रकार और हर node को रखने वाला Rust `file:line:column` |
+| `zeyn_devtools` | debug mode में चल रहे ऐप का DevTools request log: सबसे नए request पहले, हर एक के साथ उसकी Screen, action, status, समय और SQL statements (text और समय, कोई value नहीं); `addr` और `limit` वैकल्पिक हैं |
 | `zeyn_check` | कंपाइल करता है और समस्याएँ बताता है; `fix: true` पहले नाम बदले गए API को फिर से लिखता है |
 | `zeyn_test` | `cargo test` चलाता है और आउटपुट का अंत लौटाता है |
 | `zeyn_new_feature` | feature फ़ोल्डर बनाता है और उसे पंजीकृत करता है |
