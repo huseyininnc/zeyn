@@ -243,7 +243,7 @@ async function stream(s, url, body) {
         break;
       }
       case 'navigate':
-        if (docked) go(e.url, e.filters ?? [], false);
+        if (docked) go(e, false);
         else later.push(e);
         break;
       case 'suggest':
@@ -287,20 +287,21 @@ async function stream(s, url, body) {
     s.controller = null;
     setBusy(s, false);
     s.log.scrollTop = s.log.scrollHeight;
-    for (const e of later) go(e.url, e.filters ?? [], true);
+    for (const e of later) go(e, true);
   }
 }
 
 /**
- * Opens a screen without a page load, then applies the model's filters to its grid. A chat that
- * lives in the screen itself goes away with it, so the conversation moves to the launcher's panel.
+ * Opens a screen without a page load, then applies the model's filters and filter groups to its
+ * grid. A chat that lives in the screen itself goes away with it, so the conversation moves to the
+ * launcher's panel.
  */
-function go(url, filters, reopen) {
+function go({ url, filters = [], filter_groups = [] }, reopen) {
   document.addEventListener(
     'zeyn:content',
     () =>
       setTimeout(() => {
-        if (filters.length) document.dispatchEvent(new CustomEvent('zeyn:filter', { detail: { filters } }));
+        if (filters.length || filter_groups.length) document.dispatchEvent(new CustomEvent('zeyn:filter', { detail: { filters, filter_groups } }));
         if (reopen && !document.querySelector('.z-main [data-zeyn-assistant]')) openDock?.(true, false);
       }, 0),
     { once: true },

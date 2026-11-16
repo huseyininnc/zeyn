@@ -105,7 +105,7 @@ pub trait ChatStore: Send + Sync + 'static {
 
 모델은 MCP 및 WebMCP와 같은 도구를 봅니다(`docs/runtime-protocol.md` 9절 참고). 도구는 매번 로그인한 사용자를 위해 만들어집니다. 사용자가 사용할 수 있는 그리드 검색, 폼 저장, API action에서 `ai = false`로 표시된 모든 것을 뺀 것이며, 설명은 `///` 문서 주석과 `ai = "..."` 안내에서 가져옵니다. 두 가지 내장 도구가 추가됩니다.
 
-- `navigate`: 사용자가 열 수 있는 경로 Screen을 페이지 로드 없이 열며(`zeyn:navigate`) 그 그리드를 필터링할 수 있습니다(`zeyn:filter`). 그러면 그리드는 `POST /_zeyn/grid`를 통해 불러오고, 서버는 평소의 검사를 적용합니다.
+- `navigate`: 사용자가 열 수 있는 경로 Screen을 페이지 로드 없이 열며(`zeyn:navigate`) 그 그리드를 필터링할 수 있습니다(`zeyn:filter`). 단순 필터와 OR 그룹(`filter_groups`, `DataQuery::filter_groups`와 같음)을 쓸 수 있습니다. 서버는 빈 필터를 버리고 `DataQuery::retain_filters`의 한도를 지킵니다. 그러면 그리드는 `POST /_zeyn/grid`를 통해 불러오고, 서버는 평소의 검사를 적용합니다.
 - `suggest`: 칩으로 표시되는 후속 프롬프트.
 
 모든 호출은 컨텍스트가 에이전트로 표시된 채 일반 action 경로를 거칩니다. Screen의 접근 권한, Feature의 가드, action의 권한, 인터셉터, 속도 제한, 시간 제한, 감사(모든 어시스턴트 호출은 `via_agent: true`로 기록됨), 마스킹이 적용됩니다.
@@ -150,7 +150,7 @@ pub trait ChatStore: Send + Sync + 'static {
 | `POST /_zeyn/assistant/stt` (오디오 본문) | `{ text }`. 서버 음성 텍스트 변환이 없으면 `404` |
 | `POST /_zeyn/assistant/tts` `{ text }` | 스트리밍 오디오. 서버 텍스트 음성 변환이 없으면 `404` |
 
-이벤트는 한 줄에 JSON 객체 하나입니다. `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters}`, `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`, `{t:"error",message}`, `{t:"done"}`.
+이벤트는 한 줄에 JSON 객체 하나입니다. `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters,filter_groups}`, `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`, `{t:"error",message}`, `{t:"done"}`.
 
 `assistant.js`와 `assistant.css`는 어시스턴트를 사용할 수 있는 사용자에게만 로드됩니다. 채팅 로그는 `role="log"` 라이브 리전이며(답변이 스트리밍되는 동안 `aria-busy`), Enter는 전송하고, Shift+Enter는 줄을 바꾸며, Escape는 측면 패널을 닫고 포커스를 런처로 돌려보내며, 확인 카드는 먼저 취소에 포커스를 둡니다.
 
