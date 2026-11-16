@@ -224,7 +224,7 @@ pub(crate) const MODULES: &[Module] = &[
         name: "kanban",
         script: &["data-zeyn-kanban"],
         style: &["z-kanban"],
-        needs: &["net"],
+        needs: &["drag", "net"],
     },
     Module {
         name: "calendar",
