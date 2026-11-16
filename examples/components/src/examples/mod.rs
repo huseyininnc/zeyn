@@ -102,6 +102,7 @@ pub mod stack;
 pub mod status_bar;
 pub mod stepper;
 pub mod story_ring;
+pub mod surface;
 pub mod table;
 pub mod tabs;
 pub mod theme_picker;

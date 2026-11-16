@@ -296,6 +296,7 @@ pub mod prelude {
         Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
+    pub use crate::ui::{Draggable, Surface, SurfaceMove};
     pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
     pub use crate::ui::{FieldSpec, FormSchema, LengthUnit, SchemaForm};
     #[cfg(feature = "server")]

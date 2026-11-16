@@ -82,6 +82,8 @@ Con `.mark_read(action)` y `.archive(action)` cada fila recibe una casilla y la 
 
 Después de una acción masiva la bandeja nombra su tema (`"notifications"`, `.topic(..)` para cambiarlo): la bandeja y todos los nodos que lo `.listens` se vuelven a dibujar en su sitio, y la campana vuelve a cargar su número. La campana cuenta con una acción que recibe `UnreadCount { limit }` y se detiene en el límite (100), una sola consulta acotada; por encima de 99 muestra `99+`, y el nombre del enlace dice el número a los lectores de pantalla. Carga el número con una petición cuando se muestra la página y otra vez cuando su tema lo nombra una bandeja, `ui.refresh("notifications")` o, con `.live()` y la característica `realtime`, `socket.notify(&ctx, "notifications")` en cualquier acción (declara el tema con `ZeynSocket::topic`). `inbox.js` (6,1 KB, 2,3 KB con gzip) e `inbox.css` (3,1 KB) se cargan solo con los componentes.
 
+Un usuario sin el permiso de la acción que cuenta no ve la campana: la barra superior la omite, así que la página no carga código de la bandeja y nunca pide un recuento que el servidor rechazaría.
+
 ## Kanban
 
 `Kanban::of(flow, cards, move_card)` muestra los registros de una acción como tarjetas en columnas, una por cada estado del enum `#[choice]` del flujo de trabajo, en su orden. Cada columna es una lista virtual sobre las tarjetas de su estado: la acción recibe un `DataQuery` limitado al estado, así que filtra en la base de datos, y las tarjetas se cargan en bloques de 50 (`KANBAN_BLOCK`) a medida que la columna se desplaza. La cabecera de la columna muestra el número de tarjetas y el límite WIP; una columna por encima de su límite se marca.

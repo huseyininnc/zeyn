@@ -82,6 +82,8 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 일괄 작업 후 받은 편지함은 자신의 토픽(`"notifications"`, `.topic(..)`으로 변경)을 알립니다. 받은 편지함과 그 토픽을 `.listens`하는 모든 노드가 제자리에서 다시 그려지고 종도 개수를 다시 불러옵니다. 종은 `UnreadCount { limit }`을 받아 한도(100)에서 멈추는 액션, 즉 한 번의 제한된 쿼리로 셉니다. 99를 넘으면 `99+`로 보여 주며 링크 이름이 스크린 리더에 개수를 알려 줍니다. 페이지가 보인 뒤 한 번의 요청으로 개수를 불러오고, 받은 편지함이나 `ui.refresh("notifications")`, 또는 `.live()`와 `realtime` 기능을 쓸 때 어떤 액션의 `socket.notify(&ctx, "notifications")`가 토픽을 알리면 다시 불러옵니다(토픽은 `ZeynSocket::topic`으로 선언). `inbox.js`(6.1 KB, gzip 2.3 KB)와 `inbox.css`(3.1 KB)는 이 컴포넌트와 함께일 때만 불러옵니다.
 
+개수 액션의 권한이 없는 사용자에게는 벨이 보이지 않습니다. 상단 바가 이를 빼므로 페이지는 받은편지함 코드를 불러오지 않고, 서버가 거부할 개수도 묻지 않습니다.
+
 ## Kanban
 
 `Kanban::of(flow, cards, move_card)`는 액션의 레코드를 열 안의 카드로 보여 주며, 워크플로의 `#[choice]` 열거형의 상태마다 열이 하나씩 열거형 순서대로 놓입니다. 각 열은 그 상태의 카드에 대한 가상 목록입니다. 액션은 상태로 범위가 정해진 `DataQuery`를 받으므로 데이터베이스에서 거르고, 카드는 열을 스크롤할 때 50개씩(`KANBAN_BLOCK`) 불러옵니다. 열 머리에는 카드 수와 WIP 한도가 보이며, 한도를 넘은 열은 표시됩니다.

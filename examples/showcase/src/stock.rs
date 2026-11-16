@@ -258,6 +258,7 @@ pub fn product_list() -> Screen {
                 .page_sizes(&[10, 50, 100])
                 .search()
                 .filter_builder()
+                .filter_chips()
                 .empty_filtered(
                     EmptyState::new(t!("stock.no_match")).text(t!("stock.no_match_help")),
                 )

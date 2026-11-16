@@ -161,6 +161,9 @@
       "page_size": "Rows per page",
       "filter_builder": "Filter",
       "builder_title": "Filter rows",
+      "active_filters": "Active filters",
+      "remove_filter": "Remove filter {label}",
+      "filter_group": "{n} conditions",
       "add_condition": "Add condition",
       "remove_condition": "Remove condition",
       "add_group": "Add group",
@@ -399,6 +402,16 @@
         "shown": "{panel} shown.",
         "empty": "No open panels. Open one from the panel options.",
         "resize": "Resize the {area} area"
+      },
+      "surface": {
+        "item": "movable item",
+        "hint": "Arrow keys move the item. Or click an item, then click a place on the surface to put it there.",
+        "moved": "{item} moved to {x}, {y}.",
+        "picked": "{item} picked. Click a place on the surface to put it there, or press Escape.",
+        "refused": "The move was not saved.",
+        "resized": "{item} resized to {w} by {h}.",
+        "picked_size": "Size of {item} picked. Click where its bottom right corner should go, or press Escape.",
+        "hint_resize": "Shift and the arrow keys change the size of an item with a corner handle. Or click the handle, then click where its corner should go."
       },
       "loading": "Loading…",
       "load_failed": "Could not load this part. Try again.",

@@ -114,6 +114,7 @@ pub fn user_grouping(_ctx: &Ctx) -> Node {
         .width(110)
         .count()
         .filter_builder()
+        .filter_chips()
         .column(Product::name)
         .flex(1)
         .filter()

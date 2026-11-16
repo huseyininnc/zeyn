@@ -46,6 +46,7 @@
       "split": "Bir tutamakla boyutlanan iki bölme.",
       "list_detail": "Bir liste ve seçili satırının ayrıntısı; geniş ekranda yan yana, telefonda tek tek.",
       "deferred": "Ekran göründükten sonra yüklenen bir parça; yavaş bir blok geri kalanı bekletmez.",
+      "surface": "Sınırlar içinde, bir ızgarada ve bir eksende serbestçe yerleştirilen öğeler.",
       "auto_grid": "Genişliğe sığdığı kadar sütun.",
       "heading": "h2 ile h6 arası bölüm başlıkları.",
       "paragraph": "Kaçışlanmış metin paragrafı; normal ya da sönük.",
@@ -254,6 +255,11 @@
       "alpha_index": {
         "overview": "Örnek"
       },
+      "surface": {
+        "overview": "Örnek",
+        "on_one_axis": "Tek eksende",
+        "resizable": "Boyutlandırılabilir, en boy oranıyla"
+      },
       "auto_grid": {
         "overview": "Örnek",
         "wide_columns": "Geniş sütunlar"
@@ -285,6 +291,7 @@
       "chart": {
         "overview": "Örnek",
         "donut": "Halka",
+        "bar_list": "Tek büyük parçalı halka çubuk listesine döner",
         "gauge": "Gösterge",
         "side_by_side": "Yan yana, genişliği dolduran"
       },
