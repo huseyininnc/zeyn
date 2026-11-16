@@ -443,7 +443,7 @@ enum Csrf {
 #[tokio::test]
 async fn admin_stylesheets_and_scripts_load_only_on_pages_that_use_them() {
     let router = app(Notes::seeded());
-    let (_, text) = get_as(&router, "/plain", "admin.read").await;
+    let (_, text) = get_as(&router, "/plain", "admin.read,notes.read").await;
     for name in ["diff.css", "code.css", "barcode.css", "topics.js"] {
         assert!(!text.contains(&format!("/_zeyn/{name}")), "{name}");
     }
@@ -511,6 +511,22 @@ async fn the_inbox_groups_by_day_marks_unread_and_escapes() {
         "no buttons without the write permission"
     );
     assert!(!reader.contains(r#"class="z-inbox-check""#), "{reader}");
+}
+
+#[tokio::test]
+async fn the_bell_is_left_out_for_users_who_cannot_count() {
+    let (status, page) = get_as(&app(Notes::seeded()), "/plain", "admin.read").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        !page.contains("data-zeyn-notify"),
+        "no bell without the count action's permission: {page}"
+    );
+    assert!(
+        !page.contains("/_zeyn/inbox.js"),
+        "and no inbox module for it"
+    );
+    let (_, page) = get_as(&app(Notes::seeded()), "/plain", "admin.read,notes.read").await;
+    assert!(page.contains(r#"data-zeyn-notify="notifications""#));
 }
 
 #[tokio::test]

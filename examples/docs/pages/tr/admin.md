@@ -82,6 +82,8 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 Bir toplu işlemden sonra gelen kutusu konusunu adlandırır (`"notifications"`, değiştirmek için `.topic(..)`): gelen kutusu ve onu `.listens` ile dinleyen her düğüm yerinde yeniden çizilir, zil de sayısını yeniden yükler. Zil, `UnreadCount { limit }` alan ve sınırda (100) duran bir eylemle sayar, yani tek ve sınırlı bir sorgu; 99'un üstünde `99+` gösterir ve bağlantının adı ekran okuyucular için sayıyı söyler. Sayıyı sayfa göründükten sonra tek bir istekle yükler; konusu bir gelen kutusu, `ui.refresh("notifications")` ya da `.live()` ve `realtime` özelliğiyle herhangi bir eylemdeki `socket.notify(&ctx, "notifications")` tarafından adlandırıldığında yeniden yükler (konuyu `ZeynSocket::topic` ile bildirin). `inbox.js` (6,1 KB, gzip ile 2,3 KB) ve `inbox.css` (3,1 KB) yalnızca bileşenlerle yüklenir.
 
+Sayma eyleminin iznine sahip olmayan kullanıcı zili görmez: üst çubuk onu dışarıda bırakır, böylece sayfa gelen kutusu kodunu yüklemez ve sunucunun reddedeceği bir sayıyı hiç istemez.
+
 ## Kanban
 
 `Kanban::of(flow, cards, move_card)` bir eylemin kayıtlarını, iş akışının `#[choice]` enum'unun her durumu için bir sütun olmak üzere, enum sırasıyla sütunlarda kartlar olarak gösterir. Her sütun, o durumdaki kartlar üzerinde sanal bir listedir: eylem duruma kapsamlanmış bir `DataQuery` alır, böylece süzme veritabanında yapılır ve kartlar sütun kaydıkça 50'lik bloklar (`KANBAN_BLOCK`) hâlinde yüklenir. Sütun başlığı kart sayısını ve WIP sınırını gösterir; sınırını aşan sütun işaretlenir.
