@@ -159,6 +159,7 @@ the same on memory data and in SQL:
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | each group in parentheses, its filters and groups joined by `OR` (`any`) or `AND` |
 
 `contains` on money and yes/no columns is ignored in SQL. Text sorts by the database collation
 (Oracle: `NLS_SORT`).

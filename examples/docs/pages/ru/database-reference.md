@@ -123,6 +123,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | каждая группа в скобках, её фильтры и группы соединены `OR` (`any`) или `AND` |
 
 `contains` для столбцов с деньгами и да/нет в SQL игнорируется. Текст сортируется по правилам сопоставления базы данных (Oracle: `NLS_SORT`).
 

@@ -124,6 +124,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`、`col IS NOT NULL` |
+| `filter_groups` | 每个组放在括号中,其筛选和子组用 `OR`(`any`)或 `AND` 连接 |
 
 对金额和是/否列使用 `contains` 时，在 SQL 中会被忽略。文本按数据库的排序规则排序（Oracle：`NLS_SORT`）。
 

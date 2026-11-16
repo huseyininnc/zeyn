@@ -123,6 +123,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`、`col IS NOT NULL` |
+| `filter_groups` | 各グループを括弧で囲み、そのフィルターとグループを `OR`(`any`)か `AND` で結ぶ |
 
 金額と、はい/いいえの列に対する `contains` は、SQL では無視されます。テキストはデータベースの照合順序（Oracle では `NLS_SORT`）で並べ替えられます。
 

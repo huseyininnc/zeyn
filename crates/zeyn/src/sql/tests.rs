@@ -201,6 +201,35 @@ fn unknown_fields_and_injection_attempts_never_reach_the_sql() {
 }
 
 #[test]
+fn filter_groups_write_or_and_and_in_parentheses() {
+    use crate::action::FilterGroup;
+    let q = DataQuery {
+        filters: vec![Filter::is("active", true)],
+        filter_groups: vec![
+            FilterGroup::any([
+                Filter::range("stock", Some("1"), Some("9")),
+                Filter::contains("price", "12"),
+                Filter::blank("note", true),
+            ])
+            .group(FilterGroup::all([
+                Filter::contains("code", "a"),
+                Filter::contains("nope", "x"),
+            ])),
+            FilterGroup::any([Filter::contains("price", "1")]),
+        ],
+        ..DataQuery::default()
+    };
+    let sql = rows(&q);
+    assert!(
+        sql.text.contains(
+            r#" WHERE "active" = $1 AND (("stock" >= $2 AND "stock" <= $3) OR ("note" IS NULL) OR ((LOWER("code") LIKE $4 ESCAPE '\'))) ORDER BY"#
+        ),
+        "{}",
+        sql.text
+    );
+}
+
+#[test]
 fn bad_table_names_are_refused() {
     struct Bad;
     let d: &dyn Dialect = &Postgres;

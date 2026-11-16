@@ -1874,6 +1874,19 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-fb-actions { display: flex; flex-wrap: wrap; gap: calc(var(--z-space) * 2); }
 
+.z-fb-head, .z-fb-adds { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--z-space) * 2); }
+
+.z-fb-head > select { width: auto; }
+
+.z-fb-list > .z-fb-group {
+  padding-inline-start: calc(var(--z-space) * 3);
+  border-inline-start: 2px solid var(--z-border-strong);
+}
+
+.z-fb-group .z-fb-list { margin-block: calc(var(--z-space) * 2); }
+
+.z-filter-builder > .z-fb-group { margin-block-end: calc(var(--z-space) * 3); }
+
 .z-fb-gap { flex: 1; }
 
 @media (max-width: 40rem) {

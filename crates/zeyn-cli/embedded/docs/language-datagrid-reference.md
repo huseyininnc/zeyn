@@ -122,6 +122,16 @@ together, and a later one on the same column replaces an earlier one. Applying w
 the grid's filters, so the filter row, saved views, exports and an AI agent's `zeyn:filter` event
 share one list, and the server cleans it as above.
 
+Each group of conditions in the builder has a picker, "All conditions" or "Any condition", and
+"Add group" puts a group inside it, three levels deep. The query sends groups in
+`DataQuery::filter_groups` as `{ "any": true, "filters": [...], "groups": [...] }`, next to the flat
+`filters`, which every row must still match. A group with `any` matches when one of its filters or
+groups matches, and without it when all of them do. Filters in the list and in groups count
+together against the cap of 32, groups nest at most four deep (`MAX_FILTER_DEPTH`), and the server
+cleans groups like the list: filters on columns without `filter()` go, and so do groups left
+empty. `DataQuery::apply` and the PostgreSQL and Oracle data layers read groups the same way, the
+grid's AI tool offers them, and saved views and exports keep them.
+
 Shift+click on a header adds that column to the sort keys. A number in the header shows the order.
 
 ## Columns: pin, resize, hide, move
@@ -417,7 +427,7 @@ parsing blocks of 200 rows with every column, which column virtualization does n
 `exportable()` (and optionally `export_permission(...)`, `export_limit(n)`) lets the toolbar's
 `Export::Csv` button download every matching row. The server pages through the grid's action and
 streams each page at once, in the user's layout and language. Formulas are defused. Up to 100,000
-rows by default.
+rows by default. While rows are selected (one by one, not "all matching"), CSV and Excel exports take only those rows, at most 1,000, still within the user's filters; the server looks them up by key.
 
 With the `xlsx` Cargo feature the toolbar's `Export::Xlsx` button downloads the same rows as an
 Excel workbook (`GET /_zeyn/grid/export?format=xlsx`). Cells keep their types: numbers, money as a

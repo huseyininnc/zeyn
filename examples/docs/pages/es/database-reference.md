@@ -158,6 +158,7 @@ igual con datos en memoria y en SQL:
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | cada grupo entre paréntesis, sus filtros y grupos unidos por `OR` (`any`) o `AND` |
 
 `contains` sobre columnas de dinero y de sí/no se ignora en SQL. El texto se ordena según la collation de la base de datos
 (Oracle: `NLS_SORT`).

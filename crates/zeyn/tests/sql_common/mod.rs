@@ -17,7 +17,7 @@ pub struct Raw {
 
 /// Rows the stream test reads.
 pub const STREAM_ROWS: u64 = 100_000;
-use zeyn::{Aggregate, AggregateRequest, Cursor, Filter, PageRequest, Sort, Value};
+use zeyn::{Aggregate, AggregateRequest, Cursor, Filter, FilterGroup, PageRequest, Sort, Value};
 
 #[choice]
 pub enum Kind {
@@ -369,6 +369,22 @@ pub async fn data_layer(url: &str, raw: &Raw) {
         query(vec![Filter::contains("day", "2026-03")], vec![], 0, 500),
     )
     .await;
+    let mut grouped = query(vec![Filter::is("active", true)], vec![], 0, 500);
+    grouped.filter_groups = vec![
+        FilterGroup::any([
+            Filter::range("price", None, Some("10")),
+            Filter::blank("note", true),
+        ])
+        .group(FilterGroup::all([
+            Filter::contains("name", "tea"),
+            Filter::range("qty", Some("1"), None),
+        ])),
+        FilterGroup::any([
+            Filter::any_of("kind", ["Food"]),
+            Filter::contains("code", "1"),
+        ]),
+    ];
+    same(&db, &all, grouped).await;
     same(
         &db,
         &all,

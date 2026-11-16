@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## Pruebas
 
-Las pruebas construyen el router y lo llaman en memoria:
+`zeyn::testing::TestApp` ejecuta la aplicación en memoria: el mismo router, las mismas comprobaciones y las mismas reglas de acceso que una aplicación servida, sin abrir un puerto. Cumple el papel de `TestBed` en Angular o del widget tester de Flutter: construye la aplicación, inicia sesión con un usuario, abre una pantalla, envía un formulario, pagina un grid o llama a una acción, y luego lee el estado, el HTML o el JSON. Envía el token CSRF por ti. `zeyn new` escribe `tests/app.rs` de esta forma.
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| Llamada | Hace |
+|---|---|
+| `TestApp::new(app)` | La aplicación con su propio inicio de sesión. Hace panic con los problemas que encuentra `App::check` |
+| `TestApp::signed_in(app, identity)` | Cada solicitud con la sesión de `identity`, para probar lo que permite cada permiso |
+| `.header(name, value)` | Una cabecera en cada solicitud, como `accept-language` |
+| `get(path)` | Una página, un archivo o un endpoint |
+| `submit(screen, params, node, values)` | Envía un formulario como lo hace el navegador: `200` con `effects()`, `422` con `errors` por campo, `403` sin el permiso |
+| `grid(screen, params, node, query)` | Una página de un grid, con un `DataQuery` en JSON: `rows` como HTML y `total` |
+| `api(feature, action, input)` | Llama a una acción publicada con `Feature::api` |
+| `send(request)` | Cualquier otra solicitud |
+
+Cada llamada devuelve un `TestResponse` con `status`, `headers`, `body`, `json()` y `effects()`.
+
+Una pantalla también funciona sin el servidor: un `#[screen]` sin argumentos tiene `run()`, `screen.html(&META)` la renderiza, `screen.schema(&META)` la describe y `App::check_page(&screen)` ejecuta las comprobaciones de la página. Prueba lo que el usuario puede hacer (un estado, un efecto, una fila del grid) en lugar del HTML exacto, y ejecuta `cargo test` después de cada cambio.

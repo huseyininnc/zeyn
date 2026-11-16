@@ -95,7 +95,7 @@ function saveView(grid, reset = false) {
   s.viewTimer = setTimeout(() => {
     const view = reset
       ? null
-      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), shape: grid.dataset.zeynShape, group_by: s.groups, page_size: own(grid, '[data-zeyn-page-size-pick]') ? s.size : undefined };
+      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), filter_groups: s.filterGroups, shape: grid.dataset.zeynShape, group_by: s.groups, page_size: own(grid, '[data-zeyn-page-size-pick]') ? s.size : undefined };
     if (grid.dataset.zeynViews === 'server') {
       post(BASE + '/_zeyn/grid/view', { ...address(grid), view }, { quiet: true });
       return;
@@ -189,6 +189,7 @@ function resetView(grid) {
   s.columns = null;
   s.sort = defaultSort(grid);
   s.filters = {};
+  s.filterGroups = [];
   s.groups = [];
   groupChips(grid);
   saveView(grid, true);

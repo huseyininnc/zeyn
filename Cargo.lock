@@ -7106,6 +7106,7 @@ dependencies = [
  "totp-rs",
  "tower",
  "tower-http",
+ "tower-service",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",

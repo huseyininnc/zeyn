@@ -199,7 +199,7 @@ Gruplanmış ve ağaç grid'leri (`<table role="treegrid">`) bir dalı yüklemek
 Runtime:
 
 - Tablo gövdesini, iç ara parçası `total * rowHeight` piksel yüksekliğinde olan bir kaydırma kapsayıcısına koyar; yükseklik 8.000.000 pikselle sınırlıdır. Sınırın üstünde kaydırma konumu satır indeksine oranla eşlenir (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), böylece 1.000.000 satırda da sona ulaşılır.
-- DOM'da yalnızca görünen satırları ve alt ile üstteki 20'şer satırı tutar; bunları `transform: translateY(...)` ile konumlandırır. Satırların yüksekliği sabittir; uzun metin üç noktayla kesilir.
+- DOM'da yalnızca görünen satırları ve alt ile üstteki 10'ar satırı tutar; bunları `transform: translateY(...)` ile konumlandırır. Satırların yüksekliği sabittir; uzun metin üç noktayla kesilir.
 - `data-zeyn-page-size` satırlık blokları `POST /_zeyn/grid` ile ve `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` kullanarak yükler; ilk çağrıdan sonra `with_total: false` olur. Önbellekte en fazla 20 blok ve en çok 100.000 hücre tutar (en az son kullanılan çıkar; 63 sütunlu bir grid için 7 blok, hiçbir zaman 3'ten az değil), `reload` için saklanan blokları aynı sınıra sayar ve onları ilk önce atar, kaydırma yönündeki sonraki bloğu önceden getirir ve görünümden çıkan bloklar için istekleri iptal eder (`AbortController`).
 - Bir blok yüklenirken görünen satırları asla temizlemez. Eksik satırlar, blokları gelene kadar `aria-busy="true"` olan bir yer tutucu satır gösterir; böylece ekran yanıp sönmez.
 - Sıralama ve filtre değişiklikleri önbelleği düşürür ve en üste kaydırır.

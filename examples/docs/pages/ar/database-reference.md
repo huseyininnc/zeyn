@@ -123,6 +123,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | كل مجموعة بين قوسين، ومرشحاتها ومجموعاتها مربوطة بـ `OR` (`any`) أو `AND` |
 
 يُتجاهل `contains` على أعمدة المال ونعم/لا في SQL. يُفرز النص بترتيب قاعدة البيانات (Oracle: `NLS_SORT`).
 

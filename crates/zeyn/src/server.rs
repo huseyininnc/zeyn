@@ -1214,6 +1214,11 @@ impl App {
         self
     }
 
+    /// The path prefix of API endpoints (see [`App::api_prefix`]).
+    pub(crate) fn api_path(&self) -> &str {
+        &self.api_prefix
+    }
+
     /// Shows a time zone picker in the menu so users can choose a zone by hand. Only under
     /// `TimePolicy::User`.
     pub fn time_zone_picker(mut self) -> Self {
