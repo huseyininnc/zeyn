@@ -26,6 +26,18 @@ Tree::of(sample_tree).label("Products by unit")
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` 允许移动项目。鼠标或触控笔可以把项目拖到另一行的上部或下部（放在它之前或之后），或拖到分支的中部（放进去），并有标记显示落点。获得焦点的项目上的“移动”按钮打开一个菜单（上移、下移、移出所在分支、移入上方的分支），这是单指针移动的方式，触摸屏也用它；Alt 加方向键立即移动。动作通过 `POST /_zeyn/data` 收到一个 `TreeMove`（`id`、`target`、`place`），并经过 CSRF、写入限制和它的权限检查。两个 id 都来自浏览器，所以动作要查找它们；`TreeMove::parent` 给出新的父项，并拒绝把项目移到自身或其下级（`Error::Conflict`，父项链长于 `MAX_TREE_DEPTH` 时也一样）。移动后树会重新加载变化的层级，并让焦点留在被移动的项目上。移动代码属于 `treedrag.js`，只随可拖动或可移动的树加载。
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## 图表
 
 `Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge` 和 `funnel` 在服务器上绘制 SVG。浏览器中没有图表库；图表是页面 HTML 的一部分。

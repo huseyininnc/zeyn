@@ -27,6 +27,95 @@ pub fn org() -> Screen {
     Screen::new("Org").body(Card::new().add(Tree::of(departments).label("Departments")))
 }
 
+/// Parents of the folders a movable tree test moves: `b` in `a`, `c` in `b`.
+static PARENTS: std::sync::Mutex<Vec<(&str, Option<&str>)>> = std::sync::Mutex::new(Vec::new());
+
+/// The parent of a test folder.
+fn parent_of(id: &str) -> Option<String> {
+    PARENTS
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|p| p.0 == id)
+        .and_then(|p| p.1)
+        .map(String::from)
+}
+
+#[action(permission = "org.write")]
+pub async fn move_folder(m: TreeMove) -> Result<()> {
+    let parent = m.parent(parent_of)?;
+    let mut all = PARENTS.lock().unwrap();
+    let parent = parent.and_then(|p| {
+        all.iter()
+            .find(|f| f.0 == p)
+            .map(|f| f.0)
+    });
+    let folder = all
+        .iter_mut()
+        .find(|f| f.0 == m.id)
+        .ok_or(Error::NotFound)?;
+    folder.1 = parent;
+    Ok(())
+}
+
+#[screen(route = "/folders", public)]
+pub fn folders() -> Screen {
+    Screen::new("Folders").body(
+        Card::new().add(
+            Tree::of(departments)
+                .label("Folders")
+                .movable(move_folder),
+        ),
+    )
+}
+
+#[tokio::test]
+async fn a_movable_tree_moves_through_its_action_and_refuses_cycles_on_the_server() {
+    *PARENTS.lock().unwrap() = vec![("a", None), ("b", Some("a")), ("c", Some("b"))];
+    let html = folders::run().html(&folders::META);
+    assert!(html.contains("data-zeyn-tree-move"));
+    assert!(html.contains("z-tree-move-keys"));
+    let call = |id: &str, target: &str, place: &str| serde_json::json!({ "id": id, "target": target, "place": place });
+    let write = "org.read,org.write";
+    let (status, _) = data_on("folders", false, write, call("c", "a", "after"), "move").await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "CSRF");
+    let (status, _) = data_on("folders", true, "org.read", call("c", "a", "after"), "move").await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the move action's permission"
+    );
+    let (status, _) = data_on("folders", true, write, call("a", "c", "inside"), "move").await;
+    assert_eq!(status, StatusCode::CONFLICT, "into its own descendant");
+    let (status, _) = data_on("folders", true, write, call("a", "b", "after"), "move").await;
+    assert_eq!(status, StatusCode::CONFLICT, "next to its own child");
+    let (status, _) = data_on("folders", true, write, call("a", "a", "inside"), "move").await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "into itself");
+    let (status, _) = data_on("folders", true, write, call("a", "b", "sideways"), "move").await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "an unknown place");
+    let long = "x".repeat(201);
+    let (status, _) = data_on("folders", true, write, call(&long, "a", "after"), "move").await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "an id that is too long");
+    assert_eq!(parent_of("a"), None);
+    let (status, body) = data_on("folders", true, write, call("c", "a", "after"), "move").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(parent_of("c"), None);
+    let (status, _) = data_on("folders", true, write, call("a", "c", "inside"), "move").await;
+    assert_eq!(status, StatusCode::OK, "c is no longer below a");
+    assert_eq!(parent_of("a").as_deref(), Some("c"));
+}
+
+#[test]
+fn tree_move_parent_stops_on_a_broken_chain() {
+    let looped = |id: &str| Some(if id == "p" { "q" } else { "p" }.to_string());
+    let m = TreeMove {
+        id: "x".into(),
+        target: "p".into(),
+        place: TreePlace::Inside,
+    };
+    assert!(m.parent(looped).is_err());
+}
+
 #[test]
 fn trees_render_an_empty_aria_tree_that_loads_its_top_level() {
     let html = org::run().html(&org::META);
@@ -44,6 +133,16 @@ fn trees_render_an_empty_aria_tree_that_loads_its_top_level() {
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 async fn data(perms: &str, input: serde_json::Value, key: &str) -> (StatusCode, serde_json::Value) {
+    data_on("org", true, perms, input, key).await
+}
+
+async fn data_on(
+    screen: &str,
+    csrf: bool,
+    perms: &str,
+    input: serde_json::Value,
+    key: &str,
+) -> (StatusCode, serde_json::Value) {
     let router = App::new("Test")
         .i18n(I18n::new("en"))
         .auth(|h: &HeaderMap| {
@@ -56,15 +155,19 @@ async fn data(perms: &str, input: serde_json::Value, key: &str) -> (StatusCode, 
                 .collect();
             Some(Identity::user("u").with_permissions(perms))
         })
-        .feature(Feature::new("org").screen(org))
+        .feature(
+            Feature::new("org")
+                .screen(org)
+                .screen(folders),
+        )
         .router()
         .unwrap();
-    let body = serde_json::json!({ "screen": "org", "node": "0.0", "key": key, "input": input });
+    let body = serde_json::json!({ "screen": screen, "node": "0.0", "key": key, "input": input });
     let req = Request::post("/_zeyn/data")
         .header("x-perms", perms)
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
-        .header("x-zeyn-csrf", TOKEN)
+        .header("x-zeyn-csrf", if csrf { TOKEN } else { "wrong" })
         .body(Body::from(body.to_string()))
         .unwrap();
     let res = router.oneshot(req).await.unwrap();
