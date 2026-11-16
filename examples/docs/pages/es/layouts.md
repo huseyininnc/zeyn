@@ -75,6 +75,8 @@ Cada sección es un elemento nativo de divulgación (`<details>` y `<summary>`),
 
 `Surface::new(label, width, height)` es un área de tamaño fijo donde las personas colocan elementos libremente, como las mesas de un plano de planta. `.item(Draggable::new(id, node).at(x, y).size(w, h))` añade un elemento, `.axis(Axis::X)` o `Axis::Y` lo mantiene en una línea y `.snap(step)` coloca cada posición en una cuadrícula. `.on_move(action)` guarda cada movimiento: la acción recibe un `SurfaceMove` con el id del elemento y sus nuevos `x` e `y`, después de que el servidor compruebe que el id pertenece a la superficie y mantenga la posición dentro de los límites, en la cuadrícula y en el eje.
 
+`.resizable()` da a un elemento un tirador en su esquina inferior derecha; `.min_size(w, h)`, `.max_size(w, h)` y `.aspect(w, h)` limitan el tamaño y también hacen el elemento redimensionable. La acción recibe entonces también los nuevos `w` y `h`, dentro de esos límites, de la superficie y de la cuadrícula. Con una relación de aspecto, la altura sigue al ancho.
+
 ```rust
 Surface::new(t!("floor.plan"), 800, 480)
     .snap(20)
@@ -86,9 +88,10 @@ Surface::new(t!("floor.plan"), 800, 480)
     )
 ```
 
-Un ratón o un lápiz arrastra un elemento; un toque lo arrastra tras una pulsación breve. Con un solo puntero, un clic elige un elemento y un clic en la superficie lo coloca allí.
+Un ratón o un lápiz arrastra un elemento; un toque lo arrastra tras una pulsación breve. Con un solo puntero, un clic elige un elemento y un clic en la superficie lo coloca allí. Un clic en el tirador de la esquina elige el tamaño, y un clic en la superficie pone la esquina allí.
 
 | Tecla | Qué hace |
 |---|---|
 | Flechas | Mueven el elemento enfocado un paso de la cuadrícula (10 píxeles sin cuadrícula) |
+| `Shift` + flechas | Cambia el tamaño de un elemento redimensionable un paso de la cuadrícula |
 | `Escape` | Suelta un elemento elegido o devuelve a su sitio un elemento arrastrado |

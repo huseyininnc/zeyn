@@ -257,7 +257,8 @@
       },
       "surface": {
         "overview": "Örnek",
-        "on_one_axis": "Tek eksende"
+        "on_one_axis": "Tek eksende",
+        "resizable": "Boyutlandırılabilir, en boy oranıyla"
       },
       "auto_grid": {
         "overview": "Örnek",

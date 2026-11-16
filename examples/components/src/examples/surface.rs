@@ -1,4 +1,4 @@
-//! Surface examples: items placed freely inside bounds, on a grid and on an axis.
+//! Surface examples: items placed freely inside bounds, on a grid and on an axis, and resized.
 
 use crate::{Entry, ex};
 use zeyn::prelude::*;
@@ -48,11 +48,34 @@ pub fn on_one_axis(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn resizable(_ctx: &Ctx) -> Node {
+    Surface::new("Dashboard", 560, 320)
+        .snap(20)
+        .item(
+            Draggable::new("notes", Paragraph::new("Notes"))
+                .label("Notes")
+                .at(20, 20)
+                .size(200, 120)
+                .resizable()
+                .min_size(120, 60),
+        )
+        .item(
+            Draggable::new("video", Paragraph::new("Video 16:9"))
+                .label("Video")
+                .at(260, 20)
+                .size(240, 135)
+                .min_size(160, 90)
+                .max_size(480, 270)
+                .aspect(16, 9),
+        )
+        .into()
+}
+
 /// What the catalog shows of `Surface`.
 pub const ENTRY: Entry = Entry {
     name: "Surface",
     docs: "components/layouts#surface",
     api: &["Surface", "Draggable"],
     overview: &[ex!(overview)],
-    examples: &[ex!(on_one_axis)],
+    examples: &[ex!(on_one_axis), ex!(resizable)],
 };

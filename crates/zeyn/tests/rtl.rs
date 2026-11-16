@@ -22,6 +22,12 @@ const VERTICAL_GLYPH: &str =
 /// Declarations that keep a physical side, each with its reason.
 const ALLOWED: &[Allowed] = &[
     Allowed {
+        file: "surface.css",
+        selector: ".z-surface-resize",
+        property: "right",
+        reason: "surface places and sizes are physical pixels from the top left in both directions, so the corner that grows the width is always the right one",
+    },
+    Allowed {
         file: "sortable.css",
         selector: ".z-sortable .z-sort-line",
         property: "left",

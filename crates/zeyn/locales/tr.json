@@ -408,7 +408,10 @@
         "hint": "Ok tuşları öğeyi taşır. Ya da bir öğeye tıklayın, sonra alanda koymak istediğiniz yere tıklayın.",
         "moved": "{item} {x}, {y} konumuna taşındı.",
         "picked": "{item} seçildi. Koymak için alanda bir yere tıklayın ya da Escape tuşuna basın.",
-        "refused": "Taşıma kaydedilmedi."
+        "refused": "Taşıma kaydedilmedi.",
+        "resized": "{item} boyutu {w} x {h} oldu.",
+        "picked_size": "{item} boyutu seçildi. Sağ alt köşenin gideceği yere tıklayın ya da Escape tuşuna basın.",
+        "hint_resize": "Shift ve ok tuşları köşe tutamacı olan bir öğenin boyutunu değiştirir. Ya da tutamaca tıklayın, sonra köşenin gideceği yere tıklayın."
       },
       "loading": "Yükleniyor…",
       "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
