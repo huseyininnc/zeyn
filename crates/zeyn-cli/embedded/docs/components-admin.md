@@ -82,6 +82,8 @@ With `.mark_read(action)` and `.archive(action)` every row gets a check box and 
 
 After a bulk action the inbox names its topic (`"notifications"`, `.topic(..)` to change it): the inbox and every node that `.listens` to it render again in place, and the bell loads its count again. The bell counts with an action that takes `UnreadCount { limit }` and stops at the limit (100), one bounded query; above 99 it shows `99+`, and the link's name says the count for screen readers. It loads the count with one request after the page shows and again when its topic is named by an inbox, by `ui.refresh("notifications")` or, with `.live()` and the `realtime` feature, by `socket.notify(&ctx, "notifications")` from any action (declare the topic with `ZeynSocket::topic`). `inbox.js` (6.1 KB, 2.3 KB gzip) and `inbox.css` (3.1 KB) load only with the components.
 
+A user without the permission of the count action gets no bell: the top bar leaves it out, so the page loads no inbox code and never asks for a count the server would refuse.
+
 ## Kanban
 
 `Kanban::of(flow, cards, move_card)` shows the records of an action as cards in columns, one for every state of the workflow's `#[choice]` enum, in its order. Each column is a virtual list over the cards in its state: the action gets a `DataQuery` scoped to the state, so it filters in the database, and the cards load in blocks of 50 (`KANBAN_BLOCK`) as the column scrolls. The column head shows the number of cards and the WIP limit; a column above its limit is marked.
