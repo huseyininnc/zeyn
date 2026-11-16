@@ -531,7 +531,8 @@
         "bell": "Notification bell"
       },
       "kanban": {
-        "overview": "Example"
+        "overview": "Example",
+        "ordered": "Cards in their own order inside each column"
       },
       "calendar": {
         "overview": "Example"
