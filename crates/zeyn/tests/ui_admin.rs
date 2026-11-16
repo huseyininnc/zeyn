@@ -761,7 +761,14 @@ async fn a_kanban_has_a_column_per_state_with_counts_wip_and_the_users_moves() {
         page.contains("data-zeyn-confirm"),
         "the confirm dialog comes along"
     );
-    for name in ["kanban.js", "kanban.css", "vlist.js", "components.js"] {
+    for name in [
+        "kanban.js",
+        "kanban.css",
+        "drag.js",
+        "net.js",
+        "vlist.js",
+        "components.js",
+    ] {
         assert!(page.contains(&format!("/_zeyn/{name}?v=")), "{name}");
     }
     let (_, admin) = get_as(
