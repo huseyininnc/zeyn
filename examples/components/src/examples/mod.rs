@@ -39,6 +39,7 @@ pub mod empty_state;
 pub mod external_link;
 pub mod facet_panel;
 pub mod feed;
+pub mod file_drop;
 pub mod flow_diagram;
 pub mod form;
 pub mod funnel;

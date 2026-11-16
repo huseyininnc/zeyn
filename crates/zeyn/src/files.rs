@@ -560,13 +560,31 @@ pub(crate) fn too_large(rules: &FileRules, locale: &str) -> Text {
     Text::key("zeyn.files.too_large").arg("max", human_size(rules.limit(), locale))
 }
 
+/// The name, label and requiredness of an upload control.
+pub(crate) struct UploadField<'a> {
+    pub label: &'a Text,
+    pub name: &'a str,
+    pub required: bool,
+}
+
+impl<'a> UploadField<'a> {
+    /// The upload control of a form field.
+    pub fn of(m: &'a crate::model::FieldMeta, label: &'a Text) -> Self {
+        UploadField {
+            label,
+            name: m.name,
+            required: m.is_required(),
+        }
+    }
+}
+
 /// Writes an upload control: a text input holding the field's JSON value (what the form
 /// submits), a native file input inside a drop zone, the list of files and a live region. The
 /// runtime (`files.js`) uploads chosen files and keeps the value in step.
 pub(crate) fn render_upload(
     out: &mut String,
     r: &crate::render::Render,
-    m: &crate::model::FieldMeta,
+    m: UploadField<'_>,
     id: &str,
     rules: &FileRules,
     many: bool,
@@ -623,17 +641,18 @@ pub(crate) fn render_upload(
         "remove_name": key("remove_name"),
         "waiting": key("waiting"),
         "skipped": key("skipped"),
+        "not_added": key("not_added"),
         "too_large": raw(&too_large(rules, r.locale)),
-        "too_many": raw(&Text::key("zeyn.files.too_many").arg("label", m.label_text()).arg("n", rules.files().to_string())),
+        "too_many": raw(&Text::key("zeyn.files.too_many").arg("label", m.label.clone()).arg("n", rules.files().to_string())),
         "type": raw(&Text::key("zeyn.files.type")),
         "aborted": raw(&Text::key("zeyn.files.aborted")),
     });
-    let required = if m.is_required() {
+    let required = if m.required {
         r#" aria-required="true""#
     } else {
         ""
     };
-    let star = if m.is_required() {
+    let star = if m.required {
         r#"<span class="z-required" aria-hidden="true">*</span>"#
     } else {
         ""
@@ -641,7 +660,7 @@ pub(crate) fn render_upload(
     let multiple = if many { " multiple" } else { "" };
     out.push_str(&format!(
         r#"<label for="{id}-pick" id="{id}-label">{label}{star}</label><div class="z-upload" data-zeyn-upload="{store}" data-multiple="{many}" data-max-bytes="{max}" data-max-files="{n}" data-texts="{texts}"><input type="text" hidden class="z-upload-value" id="{id}" name="{name}" data-testid="{scope}.field.{name}" value="{value}"><div class="z-upload-drop"><input type="file" class="z-upload-input" id="{id}-pick" accept="{accept}"{multiple}{required} aria-describedby="{id}-hint {id}-error"><p class="z-upload-hint" id="{id}-hint">{drop} {hint}</p></div><ul class="z-upload-list" aria-label="{list}">"#,
-        label = r.label(m),
+        label = r.text(m.label),
         store = escape(rules.store()),
         max = rules.limit(),
         n = if many { rules.files() } else { 1 },

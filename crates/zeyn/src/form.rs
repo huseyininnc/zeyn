@@ -1213,7 +1213,9 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
             return true;
         }
         if let Some((rules, many)) = form.files_of(m.name) {
-            crate::files::render_upload(out, r, m, slot.id, &rules, many, &current());
+            let label = m.label_text();
+            let field = crate::files::UploadField::of(m, &label);
+            crate::files::render_upload(out, r, field, slot.id, &rules, many, &current());
             return true;
         }
         if let Some((_, many)) = form.lookup_of(m.name) {
