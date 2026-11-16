@@ -61,6 +61,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `tour.js` | 페이지 둘러보기(`Tour`): 시작 버튼을 보여 주고 대화 상자를 페이지의 정류장마다 옮깁니다 |
 | `thread.js` 및 `thread.css`, `stream.js`, `composer.js` 및 `composer.css`, `typing.js` 및 `typing.css` | 메시지 스레드; 스레드와 어시스턴트가 함께 쓰는 스트리밍 Markdown과 JSON 줄; 채팅 composer; 입력 중 표시기 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 게시물 피드; 이미지와 동영상 라이트박스; 스토리 링과 그 행, 스크립트 필요 없음 |
+| `surface.js`, `surface.css` | 자유 배치 영역(`data-zeyn-surface`): 항목을 끌거나 화살표 키로 옮기거나 두 번 클릭해 골라 놓으며, 경계 안, 격자 위, 각 항목의 축 위에 머문다. 이동은 영역의 `move` 소스로 간다. `drag.js`와 `net.js`를 가져온다 |
 | `drag.js`, `net.js` | 공유 도우미로, 이를 가져오는 모듈과 함께 연결됨(아래). `drag.js`는 dock(`data-zeyn-dock`)과도 함께 오며, `pro.js`가 그 탭을 끈다 |
 
 두 도우미 모듈은 여러 모듈이 각자 복사했을 코드를 담습니다. `net.js`(`kanban.js`, `files.js`, `vlist.js`가 가져옴)는 `BASE`, `csrf()`, `parse(text)`, `post(path, body)`를 내보냅니다. `post`는 페이지의 출처에서 `x-zeyn-csrf` 헤더와 함께 JSON을 보내고 `{ ok, body }`를 돌려줍니다. `drag.js`(열 이동에 `grid.js`, 레일 드래그 스크롤에 `catalog.js`가 가져옴)는 앞으로 정렬 가능한 목록, 보드, 표면이 기반으로 삼을 드래그 코어입니다. `press(e, { threshold, longPress, tolerance, axis, onStart })`는 마우스나 펜이 6 px 움직이거나 터치가 5 px 안에서 250 ms 유지될 때 `pointerdown`을 드래그로 바꿉니다(스와이프는 계속 스크롤하고, 먼저 스크롤하면 누름이 취소됩니다). `capture(el, e, move, end)`는 포인터 캡처로 드래그를 따라가며 `move`를 애니메이션 프레임마다 최대 한 번, 놓을 때나 취소 또는 Escape 시 `end(event, cancelled)`를 호출합니다. `swallowClick()`은 놓은 뒤의 클릭을 취소합니다. `announce(text)`는 현지화된 텍스트를 페이지마다 하나인 polite 라이브 영역에서 최대 500 ms마다 한 번 읽습니다. `.z-drag-handle`(`zeyn.css`에 있음)은 드래그 핸들에서만 터치 패닝을 끕니다. 드래그하는 모든 컴포넌트는 키보드와 단일 포인터로 옮기는 방법(이동 메뉴, WCAG 2.5.7)도 제공합니다. 두 모듈 모두 HTML을 쓰지 않습니다.

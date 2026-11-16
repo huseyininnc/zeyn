@@ -46,6 +46,7 @@
       "split": "Two panes with a handle that resizes them.",
       "list_detail": "A list and the detail of its selected row, side by side or one at a time on phones.",
       "deferred": "A part that loads after the screen shows, so a slow block never delays the rest.",
+      "surface": "Items placed freely inside bounds, in steps and on an axis.",
       "auto_grid": "As many columns as fit the width.",
       "heading": "Section headings from h2 to h6.",
       "paragraph": "A paragraph of escaped text, normal or quiet.",
@@ -253,6 +254,10 @@
       },
       "alpha_index": {
         "overview": "Example"
+      },
+      "surface": {
+        "overview": "Example",
+        "on_one_axis": "On one axis"
       },
       "auto_grid": {
         "overview": "Example",
