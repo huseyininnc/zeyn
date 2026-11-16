@@ -251,6 +251,86 @@ impl Cond {
     }
 }
 
+/// A [`FilterGroup`] read once: each entry of `filters` holds the conditions of one filter, which
+/// all must hold.
+pub(crate) struct CondGroup {
+    pub(crate) any: bool,
+    pub(crate) filters: Vec<Vec<Cond>>,
+    pub(crate) groups: Vec<CondGroup>,
+}
+
+impl CondGroup {
+    /// Reads a group at `depth` within the caps of [`DataQuery::retain_filters`], taking its
+    /// filters from `left`. `None` when no condition in it can be read, so it filters nothing.
+    fn read(
+        g: &FilterGroup,
+        fields: &[crate::model::FieldMeta],
+        tz: TimeZone,
+        depth: usize,
+        left: &mut usize,
+    ) -> Option<CondGroup> {
+        if depth > MAX_FILTER_DEPTH {
+            return None;
+        }
+        let mut filters = Vec::new();
+        for f in &g.filters {
+            if *left == 0 {
+                break;
+            }
+            *left -= 1;
+            let mut conds = Vec::new();
+            Cond::read(f, fields, tz, &mut conds);
+            if !conds.is_empty() {
+                filters.push(conds);
+            }
+        }
+        let groups: Vec<CondGroup> = g
+            .groups
+            .iter()
+            .take(MAX_FILTERS)
+            .filter_map(|g| Self::read(g, fields, tz, depth + 1, left))
+            .collect();
+        (!filters.is_empty() || !groups.is_empty()).then_some(CondGroup {
+            any: g.any,
+            filters,
+            groups,
+        })
+    }
+
+    fn holds<M: Model>(&self, row: &M) -> bool {
+        let one = |conds: &Vec<Cond>| conds.iter().all(|c| c.holds(row));
+        if self.any {
+            self.filters.iter().any(one) || self.groups.iter().any(|g| g.holds(row))
+        } else {
+            self.filters.iter().all(one) && self.groups.iter().all(|g| g.holds(row))
+        }
+    }
+}
+
+impl DataQuery {
+    /// The conditions of the query, read once: the flat filters and the free text, which all
+    /// must hold, and the groups, each of which must hold too. At most [`MAX_FILTERS`] filters
+    /// are read, the flat ones first.
+    pub(crate) fn conditions(
+        &self,
+        fields: &[crate::model::FieldMeta],
+    ) -> (Vec<Cond>, Vec<CondGroup>) {
+        let mut conds = Vec::new();
+        for f in self.filters.iter().take(MAX_FILTERS) {
+            Cond::read(f, fields, self.time_zone, &mut conds);
+        }
+        conds.extend(Cond::search(&self.q, fields));
+        let mut left = MAX_FILTERS.saturating_sub(self.filters.len());
+        let groups = self
+            .filter_groups
+            .iter()
+            .take(MAX_FILTERS)
+            .filter_map(|g| CondGroup::read(g, fields, self.time_zone, 1, &mut left))
+            .collect();
+        (conds, groups)
+    }
+}
+
 /// Text used to filter a value: what the user sees, lower cased.
 fn filter_text(value: &Value) -> String {
     match value {
@@ -495,14 +575,10 @@ impl DataQuery {
                 .iter()
                 .position(|f| f.name == name)
         };
-        let mut conds = Vec::new();
-        for f in self.filters.iter().take(MAX_FILTERS) {
-            Cond::read(f, fields, self.time_zone, &mut conds);
-        }
-        conds.extend(Cond::search(&self.q, fields));
+        let (conds, groups) = self.conditions(fields);
         let rows: Vec<M> = rows
             .into_iter()
-            .filter(|row| conds.iter().all(|c| c.holds(row)))
+            .filter(|row| conds.iter().all(|c| c.holds(row)) && groups.iter().all(|g| g.holds(row)))
             .collect();
         let totals = self
             .aggregates

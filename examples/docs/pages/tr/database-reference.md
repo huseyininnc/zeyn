@@ -158,6 +158,7 @@ SQL'de aynı davranır:
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | her grup parantez içinde, süzgeçleri ve grupları `OR` (`any`) ya da `AND` ile bağlı |
 
 Para ve evet/hayır sütunlarında `contains` SQL'de yok sayılır. Metin veritabanı collation'ına göre
 sıralanır (Oracle: `NLS_SORT`).

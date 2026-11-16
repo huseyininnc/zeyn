@@ -97,6 +97,17 @@ la anterior. Al aplicar se escriben en los filtros de la cuadrícula, así que l
 las vistas guardadas, las exportaciones y el evento `zeyn:filter` de un agente de IA comparten una
 sola lista, que el servidor limpia como se explica arriba.
 
+Cada grupo de condiciones del generador tiene un selector, "Todas las condiciones" o "Cualquier
+condición", y "Añadir grupo" pone un grupo dentro de él, hasta tres niveles. La consulta envía los
+grupos en `DataQuery::filter_groups` como `{ "any": true, "filters": [...], "groups": [...] }`, junto a
+la lista plana `filters`, que cada fila debe seguir cumpliendo. Un grupo con `any` coincide cuando
+coincide uno de sus filtros o grupos, y sin él cuando coinciden todos. Los filtros de la lista y de
+los grupos cuentan juntos para el límite de 32, los grupos se anidan como mucho cuatro niveles
+(`MAX_FILTER_DEPTH`) y el servidor limpia los grupos como la lista: se quitan los filtros sobre
+columnas sin `filter()` y los grupos que quedan vacíos. `DataQuery::apply` y las capas de datos de
+PostgreSQL y Oracle leen los grupos de la misma forma, la herramienta de IA de la cuadrícula los
+ofrece y las vistas guardadas y las exportaciones los conservan.
+
 Shift+clic en un encabezado añade esa columna a las claves de orden. Un número en el encabezado muestra el orden.
 
 ## Columnas: fijar, redimensionar, ocultar, mover
@@ -397,7 +408,7 @@ el análisis de bloques de 200 filas con todas las columnas, algo que la virtual
 `exportable()` (y opcionalmente `export_permission(...)`, `export_limit(n)`) permite que el botón `Export::Csv`
 de la barra de herramientas descargue todas las filas coincidentes. El servidor pagina a través de la action del grid y
 transmite cada página de inmediato, con la disposición y el idioma del usuario. Las fórmulas se neutralizan. Hasta 100.000
-filas de forma predeterminada.
+filas de forma predeterminada. Mientras haya filas seleccionadas (una a una, no "todas las que coinciden"), las exportaciones CSV y Excel toman solo esas filas, como máximo 1.000, siempre dentro de los filtros del usuario; el servidor las busca por clave.
 
 Con la feature de Cargo `xlsx`, el botón `Export::Xlsx` de la barra de herramientas descarga las mismas filas como un
 libro de Excel (`GET /_zeyn/grid/export?format=xlsx`). Las celdas conservan sus tipos: números, dinero como

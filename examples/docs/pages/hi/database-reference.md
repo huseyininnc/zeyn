@@ -122,6 +122,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | हर समूह कोष्ठक में, उसके फ़िल्टर और समूह `OR` (`any`) या `AND` से जुड़े |
 
 मुद्रा और हाँ/नहीं कॉलम पर `contains` SQL में अनदेखा किया जाता है। टेक्स्ट डेटाबेस collation से क्रमबद्ध होता है (Oracle: `NLS_SORT`)।
 

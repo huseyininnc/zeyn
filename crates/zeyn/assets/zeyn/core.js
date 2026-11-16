@@ -18,7 +18,12 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const UNREACHABLE = 'The server could not be reached.';
 const V_CAP = 8_000_000;
-const V_OVERSCAN = 20;
+/**
+ * Rows a virtual grid keeps above and below the visible ones. Every scroll frame that moves the
+ * window styles and paints all kept rows again, so this stays small: ten rows cover the scroll of
+ * one frame and keep a 60 column grid under 16 ms a frame.
+ */
+const V_OVERSCAN = 10;
 const V_CACHE = 20;
 /** Most cells the parsed blocks of one virtual grid keep, fresh and stale together (8 blocks of 200 rows at 62 columns). */
 const V_CACHE_CELLS = 100_000;
