@@ -14,6 +14,7 @@ Zeyn은 두 가지 에이전트를 위해 만들어졌습니다. Zeyn 앱을 작
 | `zeyn_docs` | 주제별 프레임워크 레퍼런스: `rules`, `language`, `protocol`; `search: "단어"`는 이 버전의 문서 페이지에 순위를 매기고, `page: "/language/forms"`는 한 페이지를 Markdown으로 돌려줍니다 |
 | `zeyn_describe` | 앱의 Feature, Screen, 경로, 접근 권한, API, 문제, 누락된 번역 |
 | `zeyn_inspect` | 한 Screen의 노드 트리: 경로, 컴포넌트 유형, 각 노드를 배치한 Rust `file:line:column` |
+| `zeyn_devtools` | 디버그 모드로 실행 중인 앱의 DevTools 요청 로그: 최신 요청부터, 각 요청의 Screen, action, 상태, 시간, SQL 문(문장과 시간, 값 없음). `addr`와 `limit`는 선택 사항 |
 | `zeyn_check` | 컴파일하고 문제를 보고합니다. `fix: true`는 먼저 이름이 바뀐 API를 다시 씁니다 |
 | `zeyn_test` | `cargo test`를 실행하고 출력의 끝부분을 반환합니다 |
 | `zeyn_new_feature` | Feature 폴더를 만들고 등록합니다 |

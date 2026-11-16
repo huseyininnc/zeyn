@@ -116,7 +116,7 @@ zeyn check --json
 
 ## DevTools
 
-`cargo run` (या `zeyn dev`) से चलने वाला डिबग बिल्ड दर्ज करता है कि हर अनुरोध ने क्या किया: कौन सी Screen और Action चली, उसका स्टेटस और समय, Screen को बनने और रेंडर होने में कितना समय लगा, हर SQL स्टेटमेंट उसके समय और प्रभावित पंक्तियों के साथ, और Action ने कौन से इफ़ेक्ट और टॉपिक लौटाए। Alt+Shift+D पिछले 50 अनुरोधों वाला पैनल खोलता है; हर अनुरोध खुलकर अपने स्टेटमेंट दिखाता है। `GET /_zeyn/devtools` यही सूची JSON में लौटाता है।
+`cargo run` (या `zeyn dev`) से चलने वाला डिबग बिल्ड दर्ज करता है कि हर अनुरोध ने क्या किया: कौन सी Screen और Action चली, उसका स्टेटस और समय, Screen को बनने और रेंडर होने में कितना समय लगा, हर SQL स्टेटमेंट उसके समय और प्रभावित पंक्तियों के साथ, और Action ने कौन से इफ़ेक्ट और टॉपिक लौटाए। Alt+Shift+D पिछले 50 अनुरोधों वाला पैनल खोलता है; हर अनुरोध खुलकर अपने स्टेटमेंट दिखाता है। `GET /_zeyn/devtools` यही सूची JSON में लौटाता है, और MCP टूल `zeyn_devtools` इसे एजेंट के लिए पढ़ता है।
 
 स्टेटमेंट उनके आर्ग्युमेंट के बिना रखे जाते हैं, इसलिए कोई मान पैनल तक नहीं पहुँचता। रिलीज़ बिल्ड में DevTools नहीं होते: न कोड, न रूट, न उनके लिए मेमोरी। जो ऐप `App::router` खुद सर्व करता है, या कोई टेस्ट, उन्हें `zeyn::server::devtools(true)` से चालू करता है।
 
@@ -133,4 +133,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP सर्वर
 
-`zeyn mcp` stdio पर MCP बोलता है। इसके टूल हैं `zeyn_docs` (विषय के अनुसार फ्रेमवर्क संदर्भ), `zeyn_describe` (मौजूदा डायरेक्टरी के ऐप के feature, Screen, रूट और समस्याएँ), `zeyn_inspect` (किसी Screen का node ट्री, हर node को रखने वाली Rust पंक्ति के साथ), `zeyn_check` (`fix: true` के साथ यह `check --fix` चलाता है), `zeyn_test`, `zeyn_new_feature` और `zeyn_new_screen`। देखें [MCP और AI एजेंट](mcp.md)।
+`zeyn mcp` stdio पर MCP बोलता है। इसके टूल हैं `zeyn_docs` (विषय के अनुसार फ्रेमवर्क संदर्भ), `zeyn_describe` (मौजूदा डायरेक्टरी के ऐप के feature, Screen, रूट और समस्याएँ), `zeyn_inspect` (किसी Screen का node ट्री, हर node को रखने वाली Rust पंक्ति के साथ), `zeyn_devtools` (चल रहे debug build का DevTools request log: Screen, action, समय, SQL statements), `zeyn_check` (`fix: true` के साथ यह `check --fix` चलाता है), `zeyn_test`, `zeyn_new_feature` और `zeyn_new_screen`। देखें [MCP और AI एजेंट](mcp.md)।
