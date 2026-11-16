@@ -340,7 +340,7 @@ impl Component for Dock {
                 let p = &self.panels[*i];
                 let pid = escape(p.id);
                 out.push_str(&format!(
-                    r#"<button type="button" role="tab" class="z-dock-tab" id="{id}-tab-{pid}" aria-controls="{id}-panel-{pid}" aria-selected="{}" tabindex="{}" draggable="true" data-panel="{pid}" data-testid="{}.dock.{pid}">{}</button>"#,
+                    r#"<button type="button" role="tab" class="z-dock-tab" id="{id}-tab-{pid}" aria-controls="{id}-panel-{pid}" aria-selected="{}" tabindex="{}" data-panel="{pid}" data-testid="{}.dock.{pid}">{}</button>"#,
                     n == 0,
                     if n == 0 { 0 } else { -1 },
                     r.scope,

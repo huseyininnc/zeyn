@@ -627,36 +627,53 @@ document.addEventListener('zeyn:menu-check', (e) => {
   item.setAttribute('aria-checked', String(!tab.hidden));
 });
 
-document.addEventListener('dragstart', (e) => {
+/** The drag core (`drag.js`), imported with the first press on a dock tab. */
+let dragCore = null;
+
+/**
+ * Follows a pointer drag of `tab`, started by the drag core: the area under the pointer is
+ * outlined, and a release over another area of the same dock moves the panel there. Escape or a
+ * release outside every area leaves it where it was. The options menu of each area moves panels
+ * without dragging (WCAG 2.5.7).
+ */
+function dragDockTab(D, tab, start) {
+  const dock = tab.closest('.z-dock');
+  const from = tab.closest('.z-dock-area');
+  const noPan = (ev) => ev.cancelable && ev.preventDefault();
+  if (start.pointerType === 'touch') document.addEventListener('touchmove', noPan, { passive: false });
+  tab.dataset.dragging = '';
+  let over = null;
+  const mark = (area) => {
+    if (area === over) return;
+    over?.classList.remove('z-drop');
+    over = area;
+    over?.classList.add('z-drop');
+  };
+  D.capture(
+    tab,
+    start,
+    (ev) => {
+      const area = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.z-dock-area');
+      mark(area && area !== from && area.closest('.z-dock') === dock ? area : null);
+    },
+    (ev, cancelled) => {
+      document.removeEventListener('touchmove', noPan);
+      delete tab.dataset.dragging;
+      const target = over;
+      mark(null);
+      if (ev.type === 'pointerup') D.swallowClick();
+      if (!cancelled && target) moveDockPanel(dock, tab, target.dataset.area);
+    },
+  );
+}
+
+document.addEventListener('pointerdown', async (e) => {
   const tab = e.target instanceof Element ? e.target.closest('.z-dock-tab') : null;
-  if (!tab || !e.dataTransfer) return;
-  e.dataTransfer.setData('application/x-zeyn-dock', tab.id);
-  e.dataTransfer.effectAllowed = 'move';
+  if (!tab || e.button !== 0 || !e.isPrimary) return;
+  dragCore ??= import(new URL(`drag.js${new URL(import.meta.url).search}`, import.meta.url).href);
+  const D = await dragCore;
+  D.press(e, { onStart: (ev) => dragDockTab(D, tab, ev) });
 });
-
-document.addEventListener('dragover', (e) => {
-  const area = e.target instanceof Element ? e.target.closest('.z-dock-area') : null;
-  if (!area || !e.dataTransfer?.types.includes('application/x-zeyn-dock')) return;
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  for (const a of area.parentElement.querySelectorAll(':scope > .z-dock-area')) a.classList.toggle('z-drop', a === area);
-});
-
-document.addEventListener('dragleave', (e) => {
-  const area = e.target instanceof Element ? e.target.closest('.z-dock-area') : null;
-  if (area && !(e.relatedTarget instanceof Element && area.contains(e.relatedTarget))) area.classList.remove('z-drop');
-});
-
-document.addEventListener('drop', (e) => {
-  const area = e.target instanceof Element ? e.target.closest('.z-dock-area') : null;
-  const tab = document.getElementById(e.dataTransfer?.getData('application/x-zeyn-dock') ?? '');
-  document.querySelectorAll('.z-dock-area.z-drop').forEach((a) => a.classList.remove('z-drop'));
-  if (!area || !tab?.matches('.z-dock-tab') || tab.closest('.z-dock') !== area.closest('.z-dock')) return;
-  e.preventDefault();
-  moveDockPanel(area.closest('.z-dock'), tab, area.dataset.area);
-});
-
-document.addEventListener('dragend', () => document.querySelectorAll('.z-dock-area.z-drop').forEach((a) => a.classList.remove('z-drop')));
 
 document.addEventListener('zeyn:content', (e) => initDocks(e.detail instanceof Element ? e.detail : document));
 
