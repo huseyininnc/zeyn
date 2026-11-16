@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## चार्ट
 
-`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` और `funnel` सर्वर पर SVG बनाते हैं। ब्राउज़र में कोई चार्ट लाइब्रेरी नहीं है; चार्ट पृष्ठ के HTML का हिस्सा है।
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` और `funnel` सर्वर पर SVG बनाते हैं। ब्राउज़र में कोई चार्ट लाइब्रेरी नहीं है; चार्ट पृष्ठ के HTML का हिस्सा है। donut को शून्य से बड़े 2 से 5 भाग चाहिए और सबसे बड़ा भाग पूरे के 75% से कम होना चाहिए; बाकी हर donut बार सूची (नाम, अपने हिस्से जितना चौड़ा बार, मान और प्रतिशत) के रूप में बनता है और debug बिल्ड एक चेतावनी लॉग करता है।
 
 ```rust
 Row::new()

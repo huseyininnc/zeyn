@@ -290,6 +290,7 @@
       "chart": {
         "overview": "Örnek",
         "donut": "Halka",
+        "bar_list": "Tek büyük parçalı halka çubuk listesine döner",
         "gauge": "Gösterge",
         "side_by_side": "Yan yana, genişliği dolduran"
       },

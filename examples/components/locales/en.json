@@ -290,6 +290,7 @@
       "chart": {
         "overview": "Example",
         "donut": "Donut",
+        "bar_list": "A donut with one large part becomes a bar list",
         "gauge": "Gauge",
         "side_by_side": "Side by side, filling the width"
       },

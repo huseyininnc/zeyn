@@ -80,7 +80,7 @@ DescriptionList::of(&invoice)
 
 ## EmptyState и Skeleton
 
-`EmptyState::new(title).text(text)` заполняет пустую область следующим шагом: `.link(label, screen, params)` ведёт на другую страницу через `LinkButton`, а `.opens(label, screen, params)` открывает экран приложения как окно. `Skeleton::lines(n)` это заглушка, пока что-то загружается.
+`EmptyState::new(title).text(text)` заполняет пустую область следующим шагом: `.link(label, screen, params)` ведёт на другую страницу через `LinkButton`, а `.opens(label, screen, params)` открывает экран приложения как окно. `Skeleton::lines(n)` это заглушка, пока что-то загружается. Скелет появляется только после 300 ms ожидания, поэтому при быстрой загрузке он не мелькает, а отложенная часть, пришедшая позже, держит его не меньше 400 ms.
 
 ## LinkButton
 

@@ -40,7 +40,7 @@ Tree::of(folders).label("Folders").movable(move_folder)
 
 ## المخططات
 
-ترسم `Chart::bar` و`stacked_bar` و`line` و`area` و`combo` و`scatter` و`donut` و`gauge` و`funnel` رسوم SVG على الخادم. لا توجد مكتبة مخططات في المتصفح؛ فالمخطط جزء من HTML الصفحة.
+ترسم `Chart::bar` و`stacked_bar` و`line` و`area` و`combo` و`scatter` و`donut` و`gauge` و`funnel` رسوم SVG على الخادم. لا توجد مكتبة مخططات في المتصفح؛ فالمخطط جزء من HTML الصفحة. يحتاج الـ donut إلى 2 إلى 5 أجزاء أكبر من الصفر وأن يكون أكبرها أقل من 75% من الكل؛ وأي donut آخر يُرسم كقائمة أشرطة (الاسم، وشريط بعرض حصته، والقيمة والنسبة المئوية)، وتسجل نسخة debug تحذيرًا.
 
 ```rust
 Row::new()

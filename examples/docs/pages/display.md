@@ -80,7 +80,7 @@ Values are formatted like grid cells: money, dates and choices in the user's lan
 
 ## EmptyState and Skeleton
 
-`EmptyState::new(title).text(text)` fills an empty area with a next step: `.link(label, screen, params)` goes to another page through a `LinkButton`, and `.opens(label, screen, params)` opens a screen of the app as a window. `Skeleton::lines(n)` is a placeholder while something loads.
+`EmptyState::new(title).text(text)` fills an empty area with a next step: `.link(label, screen, params)` goes to another page through a `LinkButton`, and `.opens(label, screen, params)` opens a screen of the app as a window. `Skeleton::lines(n)` is a placeholder while something loads. A skeleton shows only after 300 ms of waiting, so fast loads never flash it, and a deferred part that comes later keeps it for at least 400 ms.
 
 ## LinkButton
 
