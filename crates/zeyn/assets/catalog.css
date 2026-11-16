@@ -409,7 +409,8 @@ a.z-poster-link:focus-visible {
 /* Windowed card grids (catalog.js): the list holds only the rows near the viewport, the others
    are padding, and a focused card out of view keeps its own cell out of the flow. Every card in
    the list is near the viewport, so content-visibility only costs there: measured at 4x CPU it
-   took a fast scroll from 19 down to 7 frames per second. */
+   took a fast scroll from 19 down to 7 frames per second. Rows just past the shown ones stay
+   hidden (`z-cards-far`): they keep their layout, so showing them again skips a new layout. */
 
 .z-cards-list[data-zeyn-window] {
   position: relative;
@@ -417,6 +418,8 @@ a.z-poster-link:focus-visible {
 }
 
 .z-cards-list[data-zeyn-window] > .z-poster { content-visibility: visible; }
+
+.z-cards-list[data-zeyn-window] > .z-cards-far { content-visibility: hidden; }
 
 .z-cards-list[data-zeyn-window] > .z-cards-kept {
   position: absolute;
