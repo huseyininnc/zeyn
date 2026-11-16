@@ -26,6 +26,18 @@ The tree follows the ARIA tree pattern: arrow keys move between items and open o
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` lets people move items. A mouse or pen drags an item onto the top or the bottom of another row (before or after it) or onto the middle of a branch (inside it), and a mark shows where it lands. The Move button on the focused item opens a menu (up, down, out of its branch, into the branch above), the single pointer way to move and the one touch uses; Alt with an arrow key moves at once. The action gets a `TreeMove` (`id`, `target`, `place`) through `POST /_zeyn/data` with CSRF, the write limit and its permission. Both ids come from the browser, so the action looks them up, and `TreeMove::parent` gives the new parent while it refuses a move into the item itself or below it (`Error::Conflict`, also for a chain of parents longer than `MAX_TREE_DEPTH`). After a move the tree loads the changed levels again and keeps the moved item focused. The move code is part of `treedrag.js` and loads only with a draggable or movable tree.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## Charts
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` and `funnel` draw SVG on the server. There is no chart library in the browser; a chart is part of the page HTML.

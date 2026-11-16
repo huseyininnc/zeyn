@@ -26,6 +26,18 @@ Tree::of(sample_tree).label("Products by unit")
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+يتيح `.movable(move_item)` نقل العناصر. تسحب الفأرة أو القلم عنصرًا إلى أعلى صف آخر أو أسفله (قبله أو بعده) أو إلى منتصف فرع (داخله)، وتُظهر علامة مكان استقراره. يفتح زر النقل في العنصر المُركَّز قائمة (لأعلى، لأسفل، خارج فرعه، داخل الفرع الذي فوقه)، وهي طريقة النقل بمؤشر واحد وتستخدمها شاشات اللمس أيضًا؛ وAlt مع مفتاح سهم ينقل فورًا. يتلقى الإجراء `TreeMove` (`id` و`target` و`place`) عبر `POST /_zeyn/data` مع CSRF وحد الكتابة وإذنه. يأتي المعرّفان من المتصفح، لذا يبحث الإجراء عنهما، ويعطي `TreeMove::parent` الأب الجديد ويرفض نقل العنصر إلى نفسه أو إلى ما تحته (`Error::Conflict`، وكذلك لسلسلة آباء أطول من `MAX_TREE_DEPTH`). بعد النقل تعيد الشجرة تحميل المستويات التي تغيّرت وتُبقي التركيز على العنصر المنقول. كود النقل جزء من `treedrag.js` ولا يُحمَّل إلا مع شجرة قابلة للسحب أو للنقل.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## المخططات
 
 ترسم `Chart::bar` و`stacked_bar` و`line` و`area` و`combo` و`scatter` و`donut` و`gauge` و`funnel` رسوم SVG على الخادم. لا توجد مكتبة مخططات في المتصفح؛ فالمخطط جزء من HTML الصفحة.

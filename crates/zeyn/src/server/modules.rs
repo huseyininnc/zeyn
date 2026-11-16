@@ -114,7 +114,12 @@ pub(crate) const MODULES: &[Module] = &[
     control("lines", &["data-zeyn-lines"]),
     control("steps", &["data-zeyn-steps"]),
     control("tree", &["data-zeyn-tree"]),
-    control("treedrag", &["data-zeyn-tree-drag"]),
+    Module {
+        name: "treedrag",
+        script: &["data-zeyn-tree-drag", "data-zeyn-tree-move"],
+        style: &["z-tree-movable"],
+        needs: &["components"],
+    },
     control("overlays", &["data-zeyn-tip", "z-popover-button"]),
     control("menubutton", &["z-menu-trigger", "z-split-button"]),
     script("busy", &["data-zeyn-busy"]),
@@ -520,7 +525,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 64] = [
+const FILES: [(&str, &str); 65] = [
     (
         "/_zeyn/display.css",
         include_str!("../../assets/display.css"),
@@ -620,6 +625,10 @@ const FILES: [(&str, &str); 64] = [
     (
         "/_zeyn/treedrag.js",
         include_str!("../../assets/treedrag.js"),
+    ),
+    (
+        "/_zeyn/treedrag.css",
+        include_str!("../../assets/treedrag.css"),
     ),
     (
         "/_zeyn/overlays.js",

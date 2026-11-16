@@ -26,6 +26,18 @@ El árbol sigue el patrón ARIA tree: las teclas de flecha se mueven entre eleme
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` permite mover elementos. Un ratón o un lápiz arrastran un elemento a la parte superior o inferior de otra fila (antes o después de ella) o al centro de una rama (dentro de ella), y una marca muestra dónde queda. El botón Mover del elemento enfocado abre un menú (arriba, abajo, fuera de su rama, dentro de la rama de arriba), la forma de mover con un solo puntero y la que usan las pantallas táctiles; Alt con una tecla de flecha mueve al instante. La acción recibe un `TreeMove` (`id`, `target`, `place`) por `POST /_zeyn/data` con CSRF, el límite de escritura y su permiso. Ambos ids vienen del navegador, así que la acción los busca, y `TreeMove::parent` da el nuevo padre y rechaza mover el elemento dentro de sí mismo o debajo de sí (`Error::Conflict`, también para una cadena de padres más larga que `MAX_TREE_DEPTH`). Tras un movimiento el árbol vuelve a cargar los niveles que cambiaron y mantiene el foco en el elemento movido. El código de mover forma parte de `treedrag.js` y se carga solo con un árbol arrastrable o movible.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## Gráficos
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` y `funnel` dibujan SVG en el servidor. No hay biblioteca de gráficos en el navegador; un gráfico es parte del HTML de la página.
