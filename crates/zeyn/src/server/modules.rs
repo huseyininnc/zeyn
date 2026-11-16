@@ -74,7 +74,7 @@ pub(crate) const MODULES: &[Module] = &[
         style: &[],
         needs: &["drag"],
     },
-    script("drag", &[]),
+    script("drag", &["data-zeyn-dock"]),
     script("net", &[]),
     script(
         "components",
