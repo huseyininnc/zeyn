@@ -53,6 +53,8 @@ struct Authenticator {
     key: EcdsaKeyPair,
     id: Vec<u8>,
     count: u32,
+    /// Keeps the signature counter at 0, as many synced passkeys do.
+    synced: bool,
 }
 
 impl Authenticator {
@@ -64,6 +66,7 @@ impl Authenticator {
                 .unwrap(),
             id: vec![7; 32],
             count: 0,
+            synced: false,
         }
     }
 
@@ -109,7 +112,9 @@ impl Authenticator {
     }
 
     fn assert(&mut self, options: &Json, origin: &str) -> Json {
-        self.count += 1;
+        if !self.synced {
+            self.count += 1;
+        }
         let mut auth = ring::digest::digest(
             &ring::digest::SHA256,
             options["rpId"]
@@ -408,5 +413,98 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
             stored[0].sign_count
         ),
         (1, Some("Laptop"), 1)
+    );
+}
+
+#[tokio::test]
+async fn a_passkey_answer_with_its_ceremony_cookie_signs_in_only_once() {
+    let a = Accounts::new(MemoryAccountStore::new(), Secret::new(KEY.into()))
+        .options(|o| {
+            o.hasher = PasswordHasher {
+                memory_kib: 256,
+                iterations: 1,
+                parallelism: 1,
+            }
+        })
+        .public_url(ORIGIN);
+    a.users()
+        .create(
+            User::new("sync@example.com").with_email("sync@example.com"),
+            Some("Secret-123"),
+        )
+        .await
+        .unwrap();
+    let router = App::new("T")
+        .accounts(a.clone())
+        .feature(accounts::feature())
+        .router()
+        .unwrap();
+    let login = post(
+        &router,
+        "/_zeyn/account/login?useCookies=true",
+        json!({ "email": "sync@example.com", "password": "Secret-123" }),
+        "",
+    )
+    .await;
+    let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
+    let mut device = Authenticator::new();
+    device.synced = true;
+    let options = post(
+        &router,
+        "/_zeyn/account/manage/passkeys/creationOptions",
+        json!({}),
+        &session,
+    )
+    .await;
+    let opts: Json = serde_json::from_str(&options.body).unwrap();
+    let ceremony = format!(
+        "zeyn_account_passkey={}",
+        options
+            .cookie("zeyn_account_passkey")
+            .unwrap()
+    );
+    let added = post(
+        &router,
+        "/_zeyn/account/manage/passkeys",
+        json!({ "credentialJson": device.register(&opts).to_string() }),
+        &format!("{session}; {ceremony}"),
+    )
+    .await;
+    assert_eq!(added.status, StatusCode::OK, "{}", added.body);
+
+    let request = post(
+        &router,
+        "/_zeyn/account/passkeys/requestOptions",
+        json!({}),
+        "",
+    )
+    .await;
+    let ropts: Json = serde_json::from_str(&request.body).unwrap();
+    let ceremony = format!(
+        "zeyn_account_passkey={}",
+        request
+            .cookie("zeyn_account_passkey")
+            .unwrap()
+    );
+    let assertion = json!({ "credentialJson": device.assert(&ropts, ORIGIN).to_string() });
+    let first = post(
+        &router,
+        "/_zeyn/account/passkeys/login?useSessionCookies=true",
+        assertion.clone(),
+        &ceremony,
+    )
+    .await;
+    assert_eq!(first.status, StatusCode::OK, "{}", first.body);
+    let replay = post(
+        &router,
+        "/_zeyn/account/passkeys/login?useSessionCookies=true",
+        assertion,
+        &ceremony,
+    )
+    .await;
+    assert_eq!(
+        replay.status,
+        StatusCode::BAD_REQUEST,
+        "a captured cookie and answer cannot be used again"
     );
 }

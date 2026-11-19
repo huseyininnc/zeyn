@@ -1064,7 +1064,9 @@ fn start_ceremony(accounts: &Accounts, op: &str, user: Option<String>) -> Result
     Ok(state.challenge)
 }
 
-fn take_ceremony(accounts: &Accounts, op: &str) -> Option<PasskeyState> {
+/// Opens the ceremony cookie of `op` once: its challenge is marked as used in the app's rate store
+/// until the ceremony would have expired, so a captured cookie and answer cannot be replayed.
+async fn take_ceremony(accounts: &Accounts, st: &AppState, op: &str) -> Option<PasskeyState> {
     let value = scope::cookie(CEREMONY)?;
     scope::set_cookie(CEREMONY, None, None);
     let s: PasskeyState = accounts
@@ -1072,7 +1074,15 @@ fn take_ceremony(accounts: &Accounts, op: &str) -> Option<PasskeyState> {
         .sealer
         .as_ref()?
         .open(CEREMONY, &value)?;
-    (s.op == op && s.expires > now_secs()).then_some(s)
+    if s.op != op || s.expires <= now_secs() {
+        return None;
+    }
+    let once = crate::RateLimit::per_user(1, accounts.settings().passkeys.timeout);
+    st.rate_store
+        .take(&format!("passkey:{}", s.challenge), &once)
+        .await
+        .ok()
+        .map(|()| s)
 }
 
 /// Options for signing in with a passkey; the browser offers the site's passkeys.
@@ -1115,8 +1125,9 @@ async fn passkey_sign_in(
     remember: bool,
 ) -> Result<(SignInResult, String)> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
-    let state =
-        take_ceremony(accounts, "get").ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
+    let state = take_ceremony(accounts, st, "get")
+        .await
+        .ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
     let credential: Json =
         serde_json::from_str(credential).map_err(|_| crate::accounts::denied("passkey_invalid"))?;
     let id = passkey::assertion_id(&credential)?;
@@ -1226,7 +1237,8 @@ async fn passkey_register(
     name: Option<String>,
 ) -> Result<crate::accounts::Passkey> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
-    let state = take_ceremony(accounts, "create")
+    let state = take_ceremony(accounts, st, "create")
+        .await
         .filter(|s| s.user.as_deref() == Some(user.id.as_str()))
         .ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
     let credential: Json =

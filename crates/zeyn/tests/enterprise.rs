@@ -636,6 +636,45 @@ async fn reveals_and_exports_count_against_the_write_limit() {
 }
 
 #[tokio::test]
+async fn reasons_socket_tickets_and_enrollment_count_against_the_write_limit() {
+    for path in [
+        "/_zeyn/reason",
+        "/_zeyn/socket/open",
+        "/_zeyn/auth/totp/enroll",
+    ] {
+        let identity = officer();
+        let router = App::new("Test")
+            .service(People::seeded())
+            .write_limit(zeyn::RateLimit::per_user(
+                1,
+                std::time::Duration::from_secs(60),
+            ))
+            .auth(move |h: &HeaderMap| {
+                h.contains_key("x-user")
+                    .then(|| identity.clone())
+            })
+            .feature(Feature::new("hr").screen(people))
+            .router()
+            .unwrap();
+        let body = serde_json::json!({ "screen": "people", "node": "0" });
+        assert_ne!(
+            send(&router, post(path, body.clone()))
+                .await
+                .status,
+            StatusCode::TOO_MANY_REQUESTS,
+            "{path}"
+        );
+        assert_eq!(
+            send(&router, post(path, body))
+                .await
+                .status,
+            StatusCode::TOO_MANY_REQUESTS,
+            "{path}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn head_requests_to_exports_count_against_the_write_limit() {
     let identity = officer();
     let router = App::new("Test")
@@ -1119,6 +1158,38 @@ async fn a_screen_that_asks_for_a_reason_shows_no_data_until_one_is_given() {
             .iter()
             .any(|r| r.model == "Case" && r.id.as_deref() == Some("2"))
     );
+}
+
+#[tokio::test]
+async fn a_reason_given_by_one_user_does_not_open_the_screen_for_another() {
+    let given = send(
+        &cases_app(case_reader(), MemoryAudit::default()),
+        post(
+            "/_zeyn/reason",
+            serde_json::json!({ "screen": "case_file", "reason": "Ward round" }),
+        ),
+    )
+    .await;
+    let pair = given
+        .headers
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let other = cases_app(
+        Identity::user("doctor").with_permissions(["cases.read"]),
+        MemoryAudit::default(),
+    );
+    let r = send(&other, with_cookie(get("/cases/open"), &pair)).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
+    assert!(!r.body.contains("Subject 1"));
+    let forged = "zeyn_reason=case_file.Ward%20round";
+    let r = send(&other, with_cookie(get("/cases/open"), forged)).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
 }
 
 #[tokio::test]
@@ -1911,6 +1982,40 @@ fn import_call(node: usize, csv: &str, commit: bool) -> Request<Body> {
         "/_zeyn/import",
         serde_json::json!({ "screen": "customer_import", "node": node, "csv": csv, "commit": commit }),
     )
+}
+
+/// Refuses every import, as an interceptor that blocks a suspended tenant would.
+struct NoImports;
+
+impl zeyn::Interceptor for NoImports {
+    fn before(&self, _ctx: &Ctx, call: &zeyn::Call) -> Result<()> {
+        match call.kind {
+            zeyn::CallKind::Import | zeyn::CallKind::ImportPreview => Err(Error::Forbidden),
+            _ => Ok(()),
+        }
+    }
+}
+
+#[tokio::test]
+async fn import_previews_run_through_the_interceptors() {
+    let identity = importer();
+    let router = App::new("T")
+        .service(Customers::seeded())
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .interceptor(NoImports)
+        .feature(Feature::new("crm").screen(customer_import))
+        .router()
+        .unwrap();
+    let csv = "name;credit
+Acme;10
+";
+    let preview = send(&router, import_call(0, csv, false)).await;
+    assert_eq!(preview.status, StatusCode::FORBIDDEN, "{}", preview.body);
+    let commit = send(&router, import_call(0, csv, true)).await;
+    assert_eq!(commit.status, StatusCode::FORBIDDEN, "{}", commit.body);
 }
 
 #[tokio::test]
