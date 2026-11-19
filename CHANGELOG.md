@@ -6,6 +6,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Changed
 
+- Idle machine reruns of the wide grid and card grid frame times are recorded in `docs/grid.md`; the column windowing threshold stays at 40.
 - Faster builds of apps and of the framework. The code of `Form<M>` that does not depend on the model type is compiled once instead of once for every model, and so is the AI tool schema of `DataGrid<E>`: the showcase binary has 19 percent less LLVM IR (886,195 to 716,911 lines, `Form` 139,865 to 30,123) and the framework with the showcase features 8 percent less. `zeyn` builds without line tables in the dev profile (`[profile.dev.package.zeyn] debug = false`); panic messages keep their file and line. One line rebuild of `zeyn` 13.3 to 12.0 s, of the showcase 28.7 to 25.9 s (Windows, 12 jobs). CONTRIBUTING.md has the profile and why the crate is not split.
 
 ## [0.0.11] - 2026-11-19
