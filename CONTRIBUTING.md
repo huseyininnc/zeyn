@@ -20,6 +20,10 @@ cargo clippy --workspace --all-targets -- -D warnings
 - `cargo test` does not rebuild a binary you then run by hand. Run `cargo build -p <example>` first.
 - Run an example to see a change: `cargo run -p zeyn-example-showcase` (http://127.0.0.1:3002), `cargo run -p zeyn-example-docs` (http://127.0.0.1:3008) or `cargo run -p zeyn-example-components` (http://127.0.0.1:3010).
 
+### Build time budget
+
+CI builds the workspace with `cargo build --workspace --timings` and fails when the build takes longer than the number of seconds in `ci/build-budget.txt` (`sh ci/check-build-budget.sh <seconds>` is the check). The job uploads the report as the artifact `cargo-timings`; open `cargo-timing.html` to see which crate took the time. A change that makes a crate much slower to compile should bring the build back under the budget, or raise the budget in the same change and say why in the commit. After the first CI runs on a new runner or toolchain, set the budget to the measured time plus 30 percent, so it catches a real slowdown and not noise.
+
 ## Branches and pull requests
 
 - Create your work branch from `dev`.
