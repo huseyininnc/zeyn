@@ -1,6 +1,6 @@
 # Deploy
 
-Images and configuration of the public sites: `Dockerfile` (targets `docs`, `showcase`,
+Images and configuration of the public sites: `Dockerfile` (targets `docs`, `admin`,
 `components`), `landing/` (zeynsoft.com), `docker-compose.yml` (every container, bound to
 `127.0.0.1`) and `nginx/` (the host's nginx in front of them, certificates from certbot).
 

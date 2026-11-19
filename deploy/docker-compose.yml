@@ -71,13 +71,13 @@ services:
     cpus: 1.0
     read_only: true
 
-  showcase:
-    image: docker.zeynsoft.com/zeyn/showcase:latest
-    container_name: zeyn-showcase
+  admin:
+    image: docker.zeynsoft.com/zeyn/admin:latest
+    container_name: zeyn-admin
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3002:3002"
-    mem_limit: 384m
+      - "127.0.0.1:3011:3011"
+    mem_limit: 128m
     cpus: 1.0
     read_only: true
     tmpfs:
