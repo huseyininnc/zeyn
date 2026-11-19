@@ -185,7 +185,9 @@ impl ImportCall {
 }
 
 /// Previews (`commit: false`) or imports a CSV or XLSX file through an import component. Both
-/// need the import action's permission; the file is read and validated again on commit.
+/// need the import action's permission and run through the interceptors with the app's time
+/// limit; the preview parses on a blocking thread, and the file is read and validated again on
+/// commit.
 async fn import(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -200,26 +202,44 @@ async fn import(
         let (_, entry, screen) = st
             .open(&ctx, &call.screen, call.params)
             .await?;
-        let source = screen
+        let action = screen
             .node(&call.node)
             .and_then(|n| n.import())
-            .ok_or(Failure::App(Error::NotFound))?;
-        let action = source.action();
+            .ok_or(Failure::App(Error::NotFound))?
+            .action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
         let file = file?;
-        if !call.commit {
-            return source
-                .preview(&ctx, &file)
-                .map_err(Failure::App);
-        }
-        let info = Call {
+        let mut info = Call {
             kind: CallKind::Import,
             screen: entry.meta.name,
             action: Some(action),
-            via_agent: false,
+            via_agent: ctx.via_agent(),
         };
+        if !call.commit {
+            info.kind = CallKind::ImportPreview;
+            let node = call.node;
+            let preview_ctx = ctx.clone();
+            let work = async move {
+                tokio::task::spawn_blocking(move || {
+                    screen
+                        .node(&node)
+                        .and_then(|n| n.import())
+                        .ok_or(Error::NotFound)?
+                        .preview(&preview_ctx, &file)
+                })
+                .await
+                .map_err(|e| Error::Internal(e.to_string()))?
+            };
+            return st
+                .intercept(&ctx, &info, || st.timed(work))
+                .await;
+        }
+        let source = screen
+            .node(&call.node)
+            .and_then(|n| n.import())
+            .ok_or(Failure::App(Error::NotFound))?;
         st.intercept(&ctx, &info, || st.timed(source.commit(ctx.clone(), file)))
             .await
     }

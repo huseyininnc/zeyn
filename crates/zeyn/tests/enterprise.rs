@@ -1984,6 +1984,40 @@ fn import_call(node: usize, csv: &str, commit: bool) -> Request<Body> {
     )
 }
 
+/// Refuses every import, as an interceptor that blocks a suspended tenant would.
+struct NoImports;
+
+impl zeyn::Interceptor for NoImports {
+    fn before(&self, _ctx: &Ctx, call: &zeyn::Call) -> Result<()> {
+        match call.kind {
+            zeyn::CallKind::Import | zeyn::CallKind::ImportPreview => Err(Error::Forbidden),
+            _ => Ok(()),
+        }
+    }
+}
+
+#[tokio::test]
+async fn import_previews_run_through_the_interceptors() {
+    let identity = importer();
+    let router = App::new("T")
+        .service(Customers::seeded())
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .interceptor(NoImports)
+        .feature(Feature::new("crm").screen(customer_import))
+        .router()
+        .unwrap();
+    let csv = "name;credit
+Acme;10
+";
+    let preview = send(&router, import_call(0, csv, false)).await;
+    assert_eq!(preview.status, StatusCode::FORBIDDEN, "{}", preview.body);
+    let commit = send(&router, import_call(0, csv, true)).await;
+    assert_eq!(commit.status, StatusCode::FORBIDDEN, "{}", commit.body);
+}
+
 #[tokio::test]
 async fn csv_rows_are_validated_with_the_model_rules_and_only_valid_rows_are_imported() {
     let store = Customers::seeded();

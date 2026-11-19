@@ -232,7 +232,9 @@ Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
   language types them (`1.234,56`, `05.12.2026`), the field rules and the model's own `validate`.
 - Import sends only the valid rows to the action; `.all_or_nothing()` imports nothing unless
   every row is valid. On import the server reads and validates the file again; nothing from the
-  preview is trusted. Both steps need the action's permission, and the import is audited.
+  preview is trusted. Both steps need the action's permission and run through the interceptors
+  with the app's time limit (the preview as `CallKind::ImportPreview`, which is not audited, and
+  parsed off the async workers); the import is audited.
 - `.max_rows(n)` limits rows (5000 by default, never more than 50000). The error report defuses
   spreadsheet formulas. Masked fields are shown masked in the preview.
 

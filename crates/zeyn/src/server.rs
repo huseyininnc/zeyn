@@ -372,6 +372,9 @@ pub enum CallKind {
     Reveal,
     /// Rows imported from a CSV file.
     Import,
+    /// A CSV or XLSX file read and checked for an import without saving anything. Interceptors
+    /// see it with the import action; `AuditLog` does not record it.
+    ImportPreview,
     /// A media file or a saved play position; `screen` holds the media source name.
     Media,
     /// A PDF document rendered from an action's data.
@@ -498,16 +501,17 @@ pub struct AuditLog<S: AuditSink>(pub S);
 impl<S: AuditSink> Interceptor for AuditLog<S> {
     fn after(&self, ctx: &Ctx, call: &Call, outcome: &CallOutcome) {
         let trail = ctx.trail();
-        let audited = call.via_agent
-            || call.kind == CallKind::Form
-            || call.kind == CallKind::Reveal
-            || call.kind == CallKind::Import
-            || call.kind == CallKind::Upload
-            || call.action.is_some_and(|a| a.audit)
-            || !trail.revealed.is_empty()
-            || !trail.reads.is_empty()
-            || trail.transition.is_some()
-            || trail.export.is_some();
+        let audited = call.kind != CallKind::ImportPreview
+            && (call.via_agent
+                || call.kind == CallKind::Form
+                || call.kind == CallKind::Reveal
+                || call.kind == CallKind::Import
+                || call.kind == CallKind::Upload
+                || call.action.is_some_and(|a| a.audit)
+                || !trail.revealed.is_empty()
+                || !trail.reads.is_empty()
+                || trail.transition.is_some()
+                || trail.export.is_some());
         if !audited {
             return;
         }
