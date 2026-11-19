@@ -19,7 +19,7 @@
 desktop = ["dep:zeyn-desktop"]
 
 [dependencies]
-zeyn-desktop = { version = "0.0.11", optional = true }
+zeyn-desktop = { version = "0.0.12", optional = true }
 ```
 
 Запускайте окно вместо `App::serve`:

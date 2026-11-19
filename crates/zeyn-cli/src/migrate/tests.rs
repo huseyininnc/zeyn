@@ -191,7 +191,7 @@ fn versions_compare_by_number_and_steps_run_in_order() {
         .map(|s| version(s.version).unwrap())
         .collect();
     assert!(versions.is_sorted(), "STEPS must be oldest first");
-    assert_eq!(latest(), "0.0.11");
+    assert_eq!(latest(), env!("CARGO_PKG_VERSION"));
 }
 
 #[test]
@@ -231,22 +231,22 @@ fn a_project_migrates_with_a_stable_report_and_a_dry_run_writes_nothing() {
         "{}",
         dry.diff
     );
-    assert!(
-        dry.diff
-            .contains("-zeyn = \"0.0.9\"\n+zeyn = \"0.0.11\"\n")
-    );
+    assert!(dry.diff.contains(&format!(
+        "-zeyn = \"0.0.9\"\n+zeyn = \"{}\"\n",
+        env!("CARGO_PKG_VERSION")
+    )));
 
     let report = run(&root, None, None, false).unwrap();
     assert_eq!(
         report.to_json(false),
         json!({
             "from": "0.0.9",
-            "to": "0.0.11",
+            "to": env!("CARGO_PKG_VERSION"),
             "dry_run": false,
             "steps": ["0.0.11"],
             "files": ["Cargo.toml", "src/main.rs"],
             "changes": [
-                { "file": "Cargo.toml", "line": 0, "step": "0.0.11", "change": "Zeyn dependencies -> 0.0.11" },
+                { "file": "Cargo.toml", "line": 0, "step": env!("CARGO_PKG_VERSION"), "change": format!("Zeyn dependencies -> {}", env!("CARGO_PKG_VERSION")) },
                 { "file": "src/main.rs", "line": 2, "step": "0.0.11", "change": "`.theme_picker(false)` -> `.no_theme_picker()`" }
             ],
             "todos": [
@@ -258,11 +258,11 @@ fn a_project_migrates_with_a_stable_report_and_a_dry_run_writes_nothing() {
     assert!(
         std::fs::read_to_string(root.join("Cargo.toml"))
             .unwrap()
-            .contains("zeyn = \"0.0.11\"")
+            .contains(&format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION")))
     );
     let again = run(&root, Some("0.0.9"), None, false).unwrap();
     assert!(again.files.is_empty(), "{:?}", again.changes);
-    assert!(run(&root, Some("0.0.11"), Some("0.0.9"), true).is_err());
+    assert!(run(&root, Some(env!("CARGO_PKG_VERSION")), Some("0.0.9"), true).is_err());
     std::fs::remove_dir_all(&root).ok();
 }
 
