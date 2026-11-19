@@ -373,6 +373,9 @@ pub enum CallKind {
     Reveal,
     /// Rows imported from a CSV file.
     Import,
+    /// A CSV or XLSX file read and checked for an import without saving anything. Interceptors
+    /// see it with the import action; `AuditLog` does not record it.
+    ImportPreview,
     /// A media file or a saved play position; `screen` holds the media source name.
     Media,
     /// A PDF document rendered from an action's data.
@@ -499,16 +502,17 @@ pub struct AuditLog<S: AuditSink>(pub S);
 impl<S: AuditSink> Interceptor for AuditLog<S> {
     fn after(&self, ctx: &Ctx, call: &Call, outcome: &CallOutcome) {
         let trail = ctx.trail();
-        let audited = call.via_agent
-            || call.kind == CallKind::Form
-            || call.kind == CallKind::Reveal
-            || call.kind == CallKind::Import
-            || call.kind == CallKind::Upload
-            || call.action.is_some_and(|a| a.audit)
-            || !trail.revealed.is_empty()
-            || !trail.reads.is_empty()
-            || trail.transition.is_some()
-            || trail.export.is_some();
+        let audited = call.kind != CallKind::ImportPreview
+            && (call.via_agent
+                || call.kind == CallKind::Form
+                || call.kind == CallKind::Reveal
+                || call.kind == CallKind::Import
+                || call.kind == CallKind::Upload
+                || call.action.is_some_and(|a| a.audit)
+                || !trail.revealed.is_empty()
+                || !trail.reads.is_empty()
+                || trail.transition.is_some()
+                || trail.export.is_some());
         if !audited {
             return;
         }
@@ -4357,7 +4361,15 @@ async fn page(
                 .await
         }
     };
-    let mut response = response;
+    let mut response = if open
+        || response
+            .headers()
+            .contains_key(header::CACHE_CONTROL)
+    {
+        response
+    } else {
+        private_page(response)
+    };
     if let Ok(lang) = HeaderValue::from_str(ctx.locale()) {
         response
             .headers_mut()
@@ -4417,7 +4429,8 @@ fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds:
     response
 }
 
-/// A cacheable screen opened with a session: never stored.
+/// A page or screen fragment of a request with a session (or of a screen that is not public):
+/// never stored, so records do not stay in the browser's disk cache after sign out.
 fn private_page(mut response: Response) -> Response {
     response.headers_mut().insert(
         header::CACHE_CONTROL,
@@ -4476,10 +4489,10 @@ async fn screen_fragment(
     }
     .await;
     st.after(&ctx, &call, started, &result);
-    match result {
+    private_page(match result {
         Ok(html) => Html(html).into_response(),
         Err(f) => st.error_response(&ctx, f),
-    }
+    })
 }
 
 async fn route_redirect(
