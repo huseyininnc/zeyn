@@ -1,5 +1,7 @@
 # GitHub Actions for the Zeyn repository: format, lint and test on every push to main or dev
 # and on pull requests. The desktop crate builds against WebKitGTK and GTK on Linux.
+# Jobs run in parallel. Only pushes to dev and main save the Rust cache; pull requests
+# restore it, so they never evict each other from the 10 GB cache quota.
 name: CI
 
 on:
@@ -19,20 +21,47 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
-  check:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: cargo fmt --all --check
+
+  clippy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
-      - run: rustup show
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all --check
+        with:
+          save-if: ${{ github.event_name == 'push' }}
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
-      - run: cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts
-      - run: cargo test -p zeyn-cli
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' }}
+      - uses: taiki-e/install-action@nextest
+      - run: cargo nextest run --workspace --no-fail-fast
+      - run: cargo test --workspace --doc
+
+  features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' }}
+      - uses: taiki-e/install-action@nextest
+      - run: cargo nextest run -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts --no-fail-fast
+      - run: cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts --doc
 
   deny:
     runs-on: ubuntu-latest
@@ -44,6 +73,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-audit --locked
+      - uses: taiki-e/install-action@cargo-audit
       - run: cargo audit
