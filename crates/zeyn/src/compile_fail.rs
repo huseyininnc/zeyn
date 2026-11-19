@@ -357,6 +357,51 @@
 //! #[screen(route = "/products", permission = "stock.product.read", confirm)]
 //! pub fn product_list() -> Screen { Screen::new("Products") }
 //! ```
+//!
+//! A generic action, and a screen that returns something that is not a screen:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[action(public)]
+//! pub async fn echo<T>(_id: i64) -> Result<()> { Ok(()) }
+//! ```
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[screen(public)]
+//! pub fn about() -> i64 { 1 }
+//! ```
+//!
+//! An entity with two `#[key]` fields (the error points at the second one):
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[entity(table = "pairs")]
+//! pub struct Pair {
+//!     #[key]
+//!     pub a: i64,
+//!     #[key]
+//!     pub b: i64,
+//! }
+//! ```
+//!
+//! `#[params]` on a function, and a `t!` argument the text does not use:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[params]
+//! pub fn order() {}
+//! ```
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! fn label() { let _ = t!("zeyn.yes", who = 1); }
+//! ```
 
 /// Rules of the data layer, tested when a database feature is on.
 #[cfg(any(feature = "postgres", feature = "oracle"))]
