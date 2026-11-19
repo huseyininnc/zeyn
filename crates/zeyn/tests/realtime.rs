@@ -400,6 +400,98 @@ async fn two_clients_edit_one_document_and_readers_cannot_write() {
     assert_eq!(closed, Some(CloseCode::Policy));
 }
 
+/// Lets only `ayse` open the document `diary`, and nobody change `minutes`.
+#[derive(Clone, Default)]
+struct OwnedDocs(MemoryDocStore);
+
+impl zeyn::realtime::DocStore for OwnedDocs {
+    fn load(&self, key: RoomKey) -> zeyn::BoxFuture<Result<Option<Vec<u8>>>> {
+        self.0.load(key)
+    }
+
+    fn save(&self, key: RoomKey, state: Vec<u8>) -> zeyn::BoxFuture<Result<()>> {
+        self.0.save(key, state)
+    }
+
+    fn allow(&self, ctx: &Ctx, key: &RoomKey, write: bool) -> zeyn::BoxFuture<Result<bool>> {
+        let ok = match key.doc.as_str() {
+            "diary" => ctx.identity().user.as_deref() == Some("ayse"),
+            "minutes" => !write,
+            _ => true,
+        };
+        Box::pin(async move { Ok(ok) })
+    }
+}
+
+#[tokio::test]
+async fn the_document_store_decides_who_opens_and_changes_each_document() {
+    let live =
+        ZeynSocket::new().documents("notes", "notes.read", "notes.write", OwnedDocs::default());
+    let router = App::new("Test")
+        .auth(|h: &HeaderMap| {
+            let user = h
+                .get("x-user")?
+                .to_str()
+                .ok()?
+                .to_string();
+            Some(Identity::user(user).with_permissions(["notes.read", "notes.write"]))
+        })
+        .feature(Feature::new("notes").screen(home))
+        .socket(live)
+        .router()
+        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
+    let here = format!("http://{addr}");
+    let mut owner = open(addr, &doc_path("diary"), "ayse", true, &here)
+        .await
+        .unwrap();
+    read(&Doc::new(), &next_binary(&mut owner).await);
+    assert_eq!(
+        status(
+            open(addr, &doc_path("diary"), "bora", true, &here)
+                .await
+                .unwrap_err()
+        ),
+        403,
+        "another user cannot join the open room by its id"
+    );
+    let mut reader = open(addr, &doc_path("minutes"), "bora", true, &here)
+        .await
+        .unwrap();
+    let late = Doc::new();
+    read(&late, &next_binary(&mut reader).await);
+    reader
+        .send(Message::Binary(edit(&late, "!").into()))
+        .await
+        .unwrap();
+    let closed = loop {
+        match tokio::time::timeout(Duration::from_secs(5), reader.next())
+            .await
+            .unwrap()
+        {
+            Some(Ok(Message::Close(frame))) => break frame.map(|f| f.code),
+            Some(Ok(_)) => continue,
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(
+        closed,
+        Some(CloseCode::Policy),
+        "a store that refuses writes makes a reader"
+    );
+}
+
 #[tokio::test]
 async fn idle_documents_are_persisted_and_evicted_and_come_back() {
     let limits = Limits {

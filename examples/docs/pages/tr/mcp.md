@@ -16,6 +16,7 @@ Bir ajanın çalıştığı proje kendi kurallarını ve araçlarını taşır:
 | `zeyn_inspect` | Bir screen'in node ağacı: yol, bileşen türü ve her node'u yerleştiren Rust `file:line:column` bilgisi |
 | `zeyn_devtools` | Debug modunda çalışan uygulamanın DevTools istek günlüğü: en yeni istekler önce, her biri screen, action, durum, süreler ve SQL cümleleriyle (metin ve süre, değer yok); `addr` ve `limit` isteğe bağlı |
 | `zeyn_check` | Derler ve sorunları bildirir; `fix: true` önce yeniden adlandırılmış API'leri yeniden yazar |
+| `zeyn_doctor` | Projenin nasıl derlendiğini okur: hedef klasör boyutu, bağlayıcı, dev profili, araç zinciri, Windows tarama dışlamaları; `fix: true` hızlı dev profilini ve bağlayıcıyı ekler (yalnızca `Cargo.toml` ve `.cargo/config.toml`) |
 | `zeyn_test` | `cargo test` çalıştırır ve çıktının sonunu döndürür |
 | `zeyn_new_feature` | Bir Feature klasörü oluşturur ve kaydeder |
 | `zeyn_new_screen` | Bir Feature'a ekran dosyası ekler ve kaydeder |

@@ -4,6 +4,7 @@ use crate::ctx::BoxFuture;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 /// What a rate limit counts by.
@@ -64,6 +65,14 @@ pub trait RateStore: Send + Sync + 'static {
         let _ = amount;
         self.take(key, limit)
     }
+
+    /// Gives back `amount` units taken earlier and not used, such as the part of an upload
+    /// reservation the file did not need. The allowance never grows past the limit. Stores that
+    /// keep the default give nothing back, which only makes the limit stricter.
+    fn refund(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<()> {
+        let _ = (key, limit, amount);
+        Box::pin(async {})
+    }
 }
 
 /// In memory token buckets with a cap on the number of keys, so a flood of addresses cannot
@@ -71,6 +80,7 @@ pub trait RateStore: Send + Sync + 'static {
 pub struct MemoryRateStore {
     buckets: Mutex<HashMap<String, (f64, Instant)>>,
     max_keys: usize,
+    evictions: AtomicUsize,
 }
 
 impl Default for MemoryRateStore {
@@ -78,6 +88,7 @@ impl Default for MemoryRateStore {
         MemoryRateStore {
             buckets: Mutex::new(HashMap::new()),
             max_keys: 100_000,
+            evictions: AtomicUsize::new(0),
         }
     }
 }
@@ -100,6 +111,12 @@ impl MemoryRateStore {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// How many times a full map was scanned to make room. Batched eviction keeps this far below
+    /// the number of inserts.
+    pub fn evictions(&self) -> usize {
+        self.evictions.load(Ordering::Relaxed)
+    }
 }
 
 impl RateStore for MemoryRateStore {
@@ -111,6 +128,14 @@ impl RateStore for MemoryRateStore {
     fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<Result<(), Duration>> {
         let charged = MemoryRateStore::charge(self, key, limit, amount);
         Box::pin(async move { charged })
+    }
+
+    fn refund(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<()> {
+        let _ = self.bucket(key, limit, |tokens| {
+            *tokens = (*tokens + f64::from(amount)).min(f64::from(limit.requests));
+            true
+        });
+        Box::pin(async {})
     }
 }
 
@@ -151,6 +176,8 @@ impl MemoryRateStore {
         };
         if !buckets.contains_key(key) {
             if buckets.len() >= self.max_keys {
+                self.evictions
+                    .fetch_add(1, Ordering::Relaxed);
                 evict(&mut buckets, self.max_keys, now, per_sec, capacity);
             }
             buckets.insert(key.to_string(), (capacity, now));

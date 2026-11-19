@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/zeyn", "crates/zeyn-macros", "crates/zeyn-cli", "crates/zeyn-desktop", "examples/big-grid", "examples/inventory", "examples/showcase", "examples/shared-domain", "examples/billing", "examples/crm", "examples/adisyon", "examples/docs", "examples/components", "crates/zeyn-island", "examples/showcase/shared", "examples/showcase/islands/counter", "examples/showcase/islands/diagram"]
+members = ["crates/zeyn", "crates/zeyn-macros", "crates/zeyn-cli", "crates/zeyn-desktop", "examples/big-grid", "examples/inventory", "examples/showcase", "examples/shared-domain", "examples/billing", "examples/crm", "examples/adisyon", "examples/docs", "examples/components", "examples/widget", "examples/admin", "crates/zeyn-island", "examples/showcase/shared", "examples/showcase/islands/counter", "examples/showcase/islands/diagram"]
 
 [workspace.package]
 version = "0.0.10"
@@ -10,3 +10,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/huseyininnc/zeyn"
 readme = "README.md"
 homepage = "https://zeynsoft.com"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 1

@@ -59,6 +59,7 @@ pub use menus::{
     MAX_MENU_CACHE, MAX_MENU_LABEL, MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL,
     MenuNode, MenuSource, Menus,
 };
+pub use modules::{MAX_EXTENSION_MODULES, Module};
 pub use theme::Theme;
 #[cfg(feature = "email")]
 mod mail;
@@ -372,6 +373,9 @@ pub enum CallKind {
     Reveal,
     /// Rows imported from a CSV file.
     Import,
+    /// A CSV or XLSX file read and checked for an import without saving anything. Interceptors
+    /// see it with the import action; `AuditLog` does not record it.
+    ImportPreview,
     /// A media file or a saved play position; `screen` holds the media source name.
     Media,
     /// A PDF document rendered from an action's data.
@@ -498,16 +502,17 @@ pub struct AuditLog<S: AuditSink>(pub S);
 impl<S: AuditSink> Interceptor for AuditLog<S> {
     fn after(&self, ctx: &Ctx, call: &Call, outcome: &CallOutcome) {
         let trail = ctx.trail();
-        let audited = call.via_agent
-            || call.kind == CallKind::Form
-            || call.kind == CallKind::Reveal
-            || call.kind == CallKind::Import
-            || call.kind == CallKind::Upload
-            || call.action.is_some_and(|a| a.audit)
-            || !trail.revealed.is_empty()
-            || !trail.reads.is_empty()
-            || trail.transition.is_some()
-            || trail.export.is_some();
+        let audited = call.kind != CallKind::ImportPreview
+            && (call.via_agent
+                || call.kind == CallKind::Form
+                || call.kind == CallKind::Reveal
+                || call.kind == CallKind::Import
+                || call.kind == CallKind::Upload
+                || call.action.is_some_and(|a| a.audit)
+                || !trail.revealed.is_empty()
+                || !trail.reads.is_empty()
+                || trail.transition.is_some()
+                || trail.export.is_some());
         if !audited {
             return;
         }
@@ -812,6 +817,7 @@ pub struct App {
     realtime: Option<realtime::Socket>,
     #[cfg(feature = "resumable")]
     resumable: crate::ResumableUploads,
+    modules: Vec<Module>,
 }
 
 impl App {
@@ -876,6 +882,7 @@ impl App {
             realtime: None,
             #[cfg(feature = "resumable")]
             resumable: crate::ResumableUploads::default(),
+            modules: Vec::new(),
         }
     }
 
@@ -1360,6 +1367,19 @@ impl App {
     /// Applies a plugin. Settings made after this line override the plugin's.
     pub fn plugin(self, plugin: impl Plugin) -> Self {
         plugin.install(self)
+    }
+
+    /// Registers the browser module of a component from another crate: its script, stylesheet,
+    /// markers and texts (see [`Module`]). Pages link it only when their HTML holds one of its
+    /// markers. Panics with the fix when the module breaks the naming rule or clashes with the
+    /// framework or a module registered before it, so a wrong module never starts.
+    #[track_caller]
+    pub fn module(mut self, module: Module) -> Self {
+        if let Err(problem) = module.check(&self.modules) {
+            panic!("{problem}");
+        }
+        self.modules.push(module);
+        self
     }
 
     /// Message catalogs and default language.
@@ -1976,6 +1996,13 @@ impl App {
             self.services
                 .insert(Menus::new(source, self.menu_per_user));
         }
+        for module in &self.modules {
+            for (locale, json) in module.catalogs() {
+                self.i18n
+                    .defaults(locale, json)
+                    .expect("catalogs are checked when the module is registered");
+            }
+        }
         let look = Arc::new(self.look());
         self.services
             .insert(theme::Looks(look.clone()));
@@ -2008,6 +2035,7 @@ impl App {
             island_csp: HeaderValue::from_str(&self.csp.header(true))
                 .unwrap_or(HeaderValue::from_static(islands::CSP)),
             csp: Arc::new(self.csp),
+            extensions: modules::Extensions::new(std::mem::take(&mut self.modules), JS),
             time: self.time,
             fixed_now: self.fixed_now,
             zone_picker: self.zone_picker,
@@ -2160,10 +2188,13 @@ impl App {
             router = router.route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }));
         }
         let router = seo::routes(router, &state);
-        let router = router
+        let runtime = state.extensions.runtime;
+        let router = state
+            .extensions
+            .routes(router)
             .route(
                 "/_zeyn/zeyn.js",
-                get(|| async { asset(modules::runtime(JS), "text/javascript; charset=utf-8") }),
+                get(move || async move { asset(runtime, "text/javascript; charset=utf-8") }),
             )
             .route(
                 "/_zeyn/grid.js",
@@ -2383,6 +2414,8 @@ struct AppState {
     #[cfg(feature = "islands")]
     island_csp: HeaderValue,
     csp: Arc<crate::csp::Csp>,
+    /// Browser modules of components from other crates (`App::module`).
+    extensions: modules::Extensions,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
@@ -3445,10 +3478,10 @@ impl AppState {
         let base = escape(&self.prefix);
         let mut used = modules::Used::default();
         for part in [&frame, &commands, &ai_launcher] {
-            used.scan(part);
+            used.scan(part, &self.extensions);
         }
         let mut components = String::with_capacity(2048);
-        used.head(&base, &mut components);
+        used.head(&base, &self.extensions, &mut components);
         components.push_str(&site_head);
         components.push_str(&ai_head);
         let native_menu = if self.native_menu {
@@ -4329,7 +4362,15 @@ async fn page(
                 .await
         }
     };
-    let mut response = response;
+    let mut response = if open
+        || response
+            .headers()
+            .contains_key(header::CACHE_CONTROL)
+    {
+        response
+    } else {
+        private_page(response)
+    };
     if let Ok(lang) = HeaderValue::from_str(ctx.locale()) {
         response
             .headers_mut()
@@ -4389,7 +4430,8 @@ fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds:
     response
 }
 
-/// A cacheable screen opened with a session: never stored.
+/// A page or screen fragment of a request with a session (or of a screen that is not public):
+/// never stored, so records do not stay in the browser's disk cache after sign out.
 fn private_page(mut response: Response) -> Response {
     response.headers_mut().insert(
         header::CACHE_CONTROL,
@@ -4448,10 +4490,10 @@ async fn screen_fragment(
     }
     .await;
     st.after(&ctx, &call, started, &result);
-    match result {
+    private_page(match result {
         Ok(html) => Html(html).into_response(),
         Err(f) => st.error_response(&ctx, f),
-    }
+    })
 }
 
 async fn route_redirect(

@@ -410,3 +410,75 @@ async fn a_kpi_skeleton_brings_the_chart_styles_that_size_it() {
     let (_, text_page) = get("/text-later").await;
     assert!(!links(&text_page).contains(&"charts.css".to_string()));
 }
+
+/// An extension module named `name` with one marker.
+fn extension(name: &'static str, marker: &'static str) -> zeyn::Module {
+    zeyn::Module::new(name)
+        .js("export {};")
+        .marker(marker)
+}
+
+#[test]
+fn an_extension_module_that_keeps_the_naming_rule_is_registered() {
+    let _ = App::new("Test")
+        .module(extension("rating", "data-zeyn-rating-stars"))
+        .module(extension("rating-x", "z-rating-x-box"));
+}
+
+#[test]
+#[should_panic(expected = "the framework has a module or file with this name")]
+fn an_extension_module_cannot_take_the_name_of_a_framework_module() {
+    let _ = App::new("Test").module(extension("grid", "data-zeyn-grid-x"));
+}
+
+#[test]
+#[should_panic(expected = "the framework has a module or file with this name")]
+fn an_extension_module_cannot_take_the_name_of_a_core_file() {
+    let _ = App::new("Test").module(extension("nav", "data-zeyn-nav-x"));
+}
+
+#[test]
+#[should_panic(expected = "lower case letters, digits and single hyphens")]
+fn an_extension_module_name_is_a_plain_lower_case_name() {
+    let _ = App::new("Test").module(extension("../x", "data-zeyn-x-y"));
+}
+
+#[test]
+#[should_panic(expected = "must be an attribute `data-zeyn-rating-...`")]
+fn an_extension_marker_carries_the_module_name() {
+    let _ = App::new("Test").module(extension("rating", "data-zeyn-stars"));
+}
+
+#[test]
+#[should_panic(expected = "belongs to a framework module")]
+fn an_extension_marker_cannot_be_a_marker_of_the_framework() {
+    let _ = App::new("Test").module(extension("filter", "data-zeyn-filter-date"));
+}
+
+#[test]
+#[should_panic(expected = "is registered twice")]
+fn an_extension_module_is_registered_once() {
+    let _ = App::new("Test")
+        .module(extension("rating", "data-zeyn-rating-a"))
+        .module(extension("rating", "data-zeyn-rating-b"));
+}
+
+#[test]
+#[should_panic(expected = "is already a marker of module `rating`")]
+fn two_extension_modules_never_share_a_marker() {
+    let _ = App::new("Test")
+        .module(extension("rating", "data-zeyn-rating-x-y"))
+        .module(extension("rating-x", "data-zeyn-rating-x-y"));
+}
+
+#[test]
+#[should_panic(expected = "has no marker")]
+fn an_extension_module_has_a_marker() {
+    let _ = App::new("Test").module(zeyn::Module::new("rating").css(".z-rating-a {}"));
+}
+
+#[test]
+#[should_panic(expected = "is not valid JSON")]
+fn the_texts_of_an_extension_module_are_checked_when_it_is_registered() {
+    let _ = App::new("Test").module(extension("rating", "z-rating-a").texts(&[("en", "{")]));
+}

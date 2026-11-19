@@ -451,6 +451,23 @@ impl I18n {
         Ok(self)
     }
 
+    /// Adds the texts of a component's catalog that no catalog has yet, without offering its
+    /// locale, so the app's own catalogs and the built in texts win.
+    pub(crate) fn defaults(&mut self, locale: &str, json: &str) -> Result<(), String> {
+        let value: serde_json::Value = serde_json::from_str(json)
+            .map_err(|e| format!("catalog `{locale}` is not valid JSON: {e}"))?;
+        let mut texts = HashMap::new();
+        flatten("", &value, &mut texts).map_err(|e| format!("catalog `{locale}`: {e}"))?;
+        let catalog = self
+            .catalogs
+            .entry(locale.to_string())
+            .or_default();
+        for (key, text) in texts {
+            catalog.entry(key).or_insert(text);
+        }
+        Ok(())
+    }
+
     fn merge(&mut self, locale: &str, json: &str, offered: bool) -> Result<(), String> {
         if offered {
             self.load_builtin(locale);

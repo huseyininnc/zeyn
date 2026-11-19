@@ -2,6 +2,7 @@
 
 mod desktop;
 mod dev;
+mod doctor;
 #[rustfmt::skip]
 mod doc_pages;
 mod generate;
@@ -121,6 +122,14 @@ const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/src/features/notes/screens.rs"),
     ),
     ("tests/app.rs", include_str!("../templates/tests/app.rs")),
+    (
+        ".cargo/config.toml",
+        include_str!("../templates/cargo-config.toml"),
+    ),
+    (
+        ".vscode/settings.json",
+        include_str!("../templates/vscode-settings.json"),
+    ),
     ("build.rs", include_str!("../templates/common/build.rs")),
 ];
 
@@ -217,6 +226,14 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
         "tests/lib.rs",
         include_str!("../templates/lib/tests/lib.rs"),
     ),
+    (
+        ".cargo/config.toml",
+        include_str!("../templates/cargo-config.toml"),
+    ),
+    (
+        ".vscode/settings.json",
+        include_str!("../templates/vscode-settings.json"),
+    ),
     ("build.rs", include_str!("../templates/common/build.rs")),
 ];
 
@@ -248,6 +265,13 @@ Usage:
                                           screens.rs or actions.rs files; every problem has a stable code;
                                           --fix first rewrites renamed Zeyn APIs in src, tests and examples;
                                           --json prints one JSON document with codes, reasons and fixes
+  zeyn doctor [--fix] [--json] [--target-limit-gb <n>]
+                                          read only report on build speed and disk use: target size
+                                          and largest folders, linker, dev profile, toolchain, stale
+                                          artifacts, rust-analyzer folder and on Windows Defender
+                                          exclusions or a Dev Drive; every finding has a one line fix
+                                          and a stable code, --json prints them, the exit code is 0;
+                                          --fix edits only Cargo.toml and .cargo/config.toml
   zeyn dev                                run the app, rebuild and restart on every change; the browser
                                           follows without a page reload
   zeyn build-desktop [--package <name>] [--features <list>]
@@ -305,6 +329,11 @@ fn main() -> ExitCode {
                 Err("the app has problems".into())
             }
         }),
+        ["doctor", rest @ ..] => run_doctor(
+            rest.contains(&"--fix"),
+            rest.contains(&"--json"),
+            flag(rest, "--target-limit-gb").and_then(|g| g.parse::<f64>().ok()),
+        ),
         ["dev"] => dev::run(Path::new(".")),
         ["build-desktop", rest @ ..] => desktop::build(
             Path::new("."),
@@ -343,6 +372,36 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// `zeyn doctor [--fix] [--json] [--target-limit-gb <n>]`.
+fn run_doctor(fix: bool, json: bool, limit_gb: Option<f64>) -> Result<(), String> {
+    let options = doctor_options(limit_gb);
+    let fixed = if fix {
+        doctor::fix(Path::new("."))?
+    } else {
+        String::new()
+    };
+    let findings = doctor::diagnose(Path::new("."), &options);
+    if json {
+        eprint!("{fixed}");
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&doctor::to_json(&findings)).unwrap_or_default()
+        );
+    } else {
+        print!("{fixed}{}", doctor::to_text(&findings));
+    }
+    Ok(())
+}
+
+/// Doctor options with the size limit in gigabytes when given.
+fn doctor_options(limit_gb: Option<f64>) -> doctor::Options {
+    let mut options = doctor::Options::default();
+    if let Some(gb) = limit_gb {
+        options.target_limit = (gb.max(0.0) * 1024.0 * 1024.0 * 1024.0) as u64;
+    }
+    options
 }
 
 /// `zeyn build-islands [--out <dir>] [<crate dir>...]`.
@@ -609,7 +668,7 @@ fn devtools(root: &Path, addr: Option<&str>, limit: u64) -> Result<String, Strin
         Some("200") => {}
         Some("404") => {
             return Err(format!(
-                "the app at {addr} has no DevTools: they exist only in debug builds served with `App::serve` (`cargo run`)"
+                "the app at {addr} shows no DevTools: they exist only in debug builds served with `App::serve` (`cargo run`), and only a signed in user with the `zeyn.devtools` permission reads them (`DevAuth` has it)"
             ));
         }
         _ => {
@@ -1026,6 +1085,15 @@ fn tools() -> Value {
             &[]
         ),
         tool(
+            "zeyn_doctor",
+            "Read only report on build speed and disk use of the project in the current directory: target folder size and largest folders, linker, dev profile debug info and dependency optimization, rustc and cargo against rust-version, stale artifacts, the rust-analyzer target folder, and on Windows Defender exclusions or a Dev Drive. Each finding has a code, a status and a one line fix. With fix: true, first add the fast dev profile to Cargo.toml and the rust-lld linker to .cargo/config.toml (only those two files).",
+            json!({
+                "fix": { "type": "boolean" },
+                "target_limit_gb": { "type": "number", "description": "report the target folder above this size (default 20)" }
+            }),
+            &[]
+        ),
+        tool(
             "zeyn_test",
             "Run cargo test and return the end of the output.",
             json!({}),
@@ -1189,6 +1257,19 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
         ),
         "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false))
             .and_then(|fixed| check(root).map(|r| fixed + &check_text(&r))),
+        "zeyn_doctor" => {
+            let fixed = if args["fix"].as_bool().unwrap_or(false) {
+                doctor::fix(root)?
+            } else {
+                String::new()
+            };
+            let options = doctor_options(args["target_limit_gb"].as_f64());
+            let findings = doctor::diagnose(root, &options);
+            Ok(format!(
+                "{fixed}{}",
+                serde_json::to_string_pretty(&doctor::to_json(&findings)).unwrap_or_default()
+            ))
+        }
         "zeyn_test" => {
             let out = Command::new("cargo")
                 .args(["test", "--quiet"])
@@ -1500,6 +1581,56 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         let lib = base.join("ci-lib");
         new_project_at(&lib, "ci-lib", None, true, false).unwrap();
         assert!(lib.join("Jenkinsfile").is_file() && !lib.join(".git").exists());
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// Every new project builds dependencies lean, links with `rust-lld` on Windows and keeps
+    /// rust-analyzer in its own target folder.
+    #[test]
+    fn new_projects_ship_the_fast_dev_profile_linker_and_analyzer_target() {
+        let base = std::env::temp_dir().join(format!("zeyn-fast-{}", std::process::id()));
+        std::fs::remove_dir_all(&base).ok();
+        std::fs::create_dir_all(&base).unwrap();
+        for (name, lib) in [("fast-app", false), ("fast-lib", true)] {
+            let root = base.join(name);
+            new_project_at(&root, name, None, lib, false).unwrap();
+            let manifest = read(&root, "Cargo.toml");
+            assert!(
+                manifest.contains(
+                    "[profile.dev]
+debug = \"line-tables-only\""
+                ) && manifest.contains(
+                    "[profile.dev.package.\"*\"]
+debug = false
+opt-level = 1"
+                ),
+                "{name}: {manifest}"
+            );
+            let cargo = read(&root, ".cargo/config.toml");
+            assert!(
+                cargo.contains("x86_64-pc-windows-msvc") && cargo.contains("rust-lld.exe"),
+                "{name}: {cargo}"
+            );
+            let editor = read(&root, ".vscode/settings.json");
+            let editor: serde_json::Value = serde_json::from_str(&editor).unwrap();
+            assert_eq!(editor["rust-analyzer.cargo.targetDir"], true, "{name}");
+        }
+        if std::env::var("ZEYN_TEST_NEW_BUILD").is_ok() {
+            let zeyn = format!("{}/../zeyn", env!("CARGO_MANIFEST_DIR"));
+            let root = base.join("built");
+            new_project_at(&root, "built", Some(&zeyn), false, false).unwrap();
+            let out = Command::new("cargo")
+                .args(["check", "--quiet"])
+                .current_dir(&root)
+                .env("CARGO_TARGET_DIR", base.join("target"))
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
         std::fs::remove_dir_all(&base).ok();
     }
 
