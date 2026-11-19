@@ -232,10 +232,10 @@ pub use server::realtime;
 #[cfg(feature = "server")]
 pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
-    CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MAX_MENU_CACHE, MAX_MENU_LABEL,
-    MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL, Mcp, MemoryAudit, MenuNode, MenuSource,
-    Menus, Plugin, Prefetch, PublicFile, READY_CACHE, StaticCredentials, StderrAudit,
-    SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
+    CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MAX_EXTENSION_MODULES,
+    MAX_MENU_CACHE, MAX_MENU_LABEL, MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL, Mcp,
+    MemoryAudit, MenuNode, MenuSource, Menus, Module, Plugin, Prefetch, PublicFile, READY_CACHE,
+    StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
 pub use site::{
     BottomNavItem, CenterOnPhone, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell,

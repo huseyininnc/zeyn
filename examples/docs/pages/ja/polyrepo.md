@@ -100,3 +100,34 @@ acme-domain = { path = "../acme-domain" }
 1. `Cargo.toml` の `version` を更新します。
 2. `cargo semver-checks` がインストールされていれば実行します。呼び出し側を壊す公開 API の変更を報告します。ライブラリが 1.0 未満の間は、破壊的変更には新しいマイナーバージョンが必要です。
 3. コミットし、`v<version>` のタグを付け、タグをプッシュします。タグと `Cargo.toml` が一致しない場合、CI ジョブ `tag-matches-version` が失敗します。
+
+## コンポーネント crate
+
+crate は、独自のスクリプト、スタイルシート、テキストを持つコンポーネントを提供できます。`zeyn-<name>` という crate はブラウザーモジュール `<name>` を登録し、そのクラスは `z-<name>-`、属性は `data-zeyn-<name>-`、テキストのキーは `<name>.` で始まります。`examples/widget` はテスト付きの完全な例です。
+
+```rust
+use zeyn::{App, Module, Plugin};
+
+pub struct RatingPlugin;
+
+impl Plugin for RatingPlugin {
+    fn install(self, app: App) -> App {
+        app.module(
+            Module::new("rating")
+                .js(include_str!("../assets/rating.js"))
+                .css(include_str!("../assets/rating.css"))
+                .marker("data-zeyn-rating-stars")
+                .texts(&[("en", include_str!("../assets/en.json"))]),
+        )
+    }
+}
+```
+
+アプリは `.plugin(RatingPlugin)` を追加します。ページは HTML にマーカーがあるときだけ `/_zeyn/ext/rating.js` と `/_zeyn/ext/rating.css` をリンクし、そのようなコンテンツが後から届いたときは `zeyn.js` がそれらを読み込みます。ファイルの URL にはビルドが含まれるので、ブラウザーは次のビルドまで保持します。インラインにはならないので、Content Security Policy は厳格なままです。スクリプトは後から届くコンテンツのために `zeyn:content` を受け取る ES モジュールで、スタイルシートは色とサイズをテーマ変数 (`var(--z-text)`、`var(--z-space)`) から取ります。アプリ自身のカタログはモジュールのテキストより優先されます。
+
+モジュールが命名規則に反するとき、フレームワークのモジュールやマーカー、または別のモジュールと衝突するとき、あるいは有効な JSON でないカタログを持つとき、`App::module` は起動時にアプリを止め、メッセージに修正方法を書きます。テストでは `TestResponse::links` がページのヘッドがリンクするものを一覧にします。
+
+| Zeyn | コンポーネント crate |
+|---|---|
+| 0.0.10 より後のリリース | `App::module`, `Module`, `TestResponse::links` |
+| 0.0.10 以前 | HTML のみ。独自のスクリプトやスタイルはなし |

@@ -72,6 +72,42 @@ impl TestResponse {
         serde_json::from_str(&self.body).unwrap_or(Json::Null)
     }
 
+    /// The scripts and stylesheets the page head links under `/_zeyn/`, such as `zeyn.js`,
+    /// `charts.css` or, for a module registered with `App::module`, `ext/rating.js`. A component
+    /// crate asserts with it that a page with its component links its module and a page without
+    /// it does not.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    /// use zeyn::testing::TestApp;
+    ///
+    /// #[screen(route = "/hello", public)]
+    /// pub fn hello() -> Screen {
+    ///     Screen::new("Hello").body(Paragraph::new("Hi"))
+    /// }
+    ///
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
+    /// let app = TestApp::new(App::new("Test").feature(Feature::new("hello").screen(hello)));
+    /// let links = app.get("/hello").await.links();
+    /// assert!(links.iter().any(|l| l == "zeyn.js"));
+    /// assert!(!links.iter().any(|l| l == "charts.js"));
+    /// # });
+    /// ```
+    pub fn links(&self) -> Vec<String> {
+        let head = self
+            .body
+            .split("</head>")
+            .next()
+            .unwrap_or_default();
+        head.split("/_zeyn/")
+            .skip(1)
+            .filter_map(|s| {
+                let name = s.split(['?', '"']).next()?;
+                (name.ends_with(".js") || name.ends_with(".css")).then(|| name.to_string())
+            })
+            .collect()
+    }
+
     /// The kinds of the effects a form or an action returned, in order, such as
     /// `["toast", "refresh"]`.
     pub fn effects(&self) -> Vec<String> {

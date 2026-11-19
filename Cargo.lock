@@ -7306,6 +7306,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeyn-example-widget"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "tokio",
+ "zeyn",
+]
+
+[[package]]
 name = "zeyn-island"
 version = "0.0.10"
 dependencies = [

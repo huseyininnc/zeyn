@@ -1,0 +1,10 @@
+{
+  "demo": {
+    "title": "Widget",
+    "menu": "Demo",
+    "home": "Start",
+    "favorite": "Favorite",
+    "intro": "This page holds no toggle, so it does not link the widget module. Open Favorite from the menu.",
+    "label": "Mark as favorite"
+  }
+}
