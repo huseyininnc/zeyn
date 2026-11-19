@@ -1,1 +1,11 @@
-600
+# Budgets of the CI build job, read by ci/check-build-budget.sh.
+# build_seconds: cargo build --workspace after clippy, rust-cache warm (CI runs of dev: 40, 129, 164 s).
+# rebuild_seconds: cargo build -p zeyn after touching crates/zeyn/src/lib.rs (one line change).
+# target_megabytes: size of target/ after the build (du -sm target), clippy artifacts included.
+# A measurement fails the job when it is above its value plus tolerance_percent.
+# rebuild_seconds and target_megabytes were measured on a Windows machine with CARGO_INCREMENTAL=0
+# and 6 jobs; the CI step summary prints the Linux numbers, so adjust them to a CI run plus 30 percent.
+build_seconds=164
+rebuild_seconds=21
+target_megabytes=2875
+tolerance_percent=30
