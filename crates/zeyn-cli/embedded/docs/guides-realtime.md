@@ -76,8 +76,15 @@ Persistence goes through a trait:
 pub trait DocStore: Send + Sync + 'static {
     fn load(&self, key: RoomKey) -> BoxFuture<Result<Option<Vec<u8>>>>;
     fn save(&self, key: RoomKey, state: Vec<u8>) -> BoxFuture<Result<()>>;
+    fn allow(&self, ctx: &Ctx, key: &RoomKey, write: bool) -> BoxFuture<Result<bool>> { /* true */ }
 }
 ```
+
+The kind's `read` and `write` permissions cover every document of the kind. When documents belong
+to people or records, implement `allow`: it runs on every join, also while the room is already
+open for others, first with `write` false (`false` refuses the join with `403`) and then, for
+users with the kind's `write` permission, with `write` true (`false` makes the user a reader whose
+changes close the socket). The default allows everything the permissions allow.
 
 `load` runs when a room opens (an error refuses the connection with `503`, which is also how a
 store limits which documents exist). `save` receives the whole document as one update and runs

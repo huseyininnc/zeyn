@@ -176,7 +176,10 @@ pub(super) async fn check_quota(
 }
 
 /// Checks access and quota, then reads, checks and stores a whole file from `body` inside the
-/// interceptors. Plain uploads and finished resumable uploads both end here.
+/// interceptors. Plain uploads and finished resumable uploads both end here. The declared size
+/// (the store's limit without one) is taken from the quota before the body is read, so uploads
+/// running at the same time see each other; what the file did not use, or all of it when the
+/// upload fails, is given back.
 pub(super) async fn store_body(
     st: &AppState,
     ctx: &Ctx,
@@ -195,19 +198,34 @@ pub(super) async fn store_body(
     let scanner = feature.file_scanner().cloned();
     let quota = quota(ctx, &entry);
     check_quota(st, &quota).await?;
-    let file = st
+    let reserved = u32::try_from(
+        declared
+            .unwrap_or(u64::MAX)
+            .min(entry.rules.limit()),
+    )
+    .unwrap_or(u32::MAX);
+    if let Some((key, limit)) = &quota {
+        let _ = st
+            .rate_store
+            .charge(key, limit, reserved)
+            .await;
+    }
+    let result = st
         .intercept(ctx, &call, || {
             receive(ctx, entry, scanner, name, declared, body)
         })
-        .await?;
+        .await;
     if let Some((key, limit)) = &quota {
-        let used = u32::try_from(file.size).unwrap_or(u32::MAX);
-        let _ = st
-            .rate_store
-            .charge(key, limit, used)
-            .await;
+        let used = result
+            .as_ref()
+            .map_or(0, |f| u32::try_from(f.size).unwrap_or(u32::MAX));
+        if reserved > used {
+            st.rate_store
+                .refund(key, limit, reserved - used)
+                .await;
+        }
     }
-    Ok(file)
+    result
 }
 
 /// Reads the body, checks it and stores it. See the module documentation.

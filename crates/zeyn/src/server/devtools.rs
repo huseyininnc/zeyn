@@ -2,7 +2,8 @@
 //! screen and action ran, how long the screen took to build and to render, each SQL statement
 //! with its time, and the effects and topics the action returned. The last [`KEEP`] requests are
 //! served as JSON at `GET /_zeyn/devtools`, and Alt+Shift+D opens a panel that lists them
-//! (`assets/devtools.js`).
+//! (`assets/devtools.js`). Only a signed in user with the [`PERMISSION`] permission reads the
+//! list, and only the requests that user made.
 //!
 //! The whole module exists only under `cfg(debug_assertions)`, so release builds carry no code,
 //! no route and no memory for it. It records SQL text without its arguments, names of screens,
@@ -21,6 +22,10 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+/// Permission that lets a signed in user read their own requests at `GET /_zeyn/devtools`.
+/// `DevAuth` grants it with every other permission.
+pub(crate) const PERMISSION: &str = "zeyn.devtools";
 
 /// How many requests the log keeps; older ones drop out.
 pub(crate) const KEEP: usize = 50;
@@ -72,6 +77,7 @@ struct Query {
 /// What one request did.
 #[derive(Default)]
 pub(crate) struct Trace {
+    user: Option<String>,
     kind: Option<String>,
     screen: Option<&'static str>,
     action: Option<&'static str>,
@@ -93,6 +99,11 @@ fn with(f: impl FnOnce(&mut Trace)) {
             f(&mut t);
         }
     });
+}
+
+/// Records the user the request was made by, so the list shows each user only their own.
+pub(crate) fn user(user: Option<&str>) {
+    with(|t| t.user = user.map(str::to_string));
 }
 
 /// Records the call the request made: its kind, screen, action and outcome.
@@ -189,6 +200,7 @@ pub(crate) async fn layer(req: Request, next: Next) -> Response {
         return response;
     };
     let line = json!({
+        "user": t.user,
         "at": crate::time::DateTime::now().to_string(),
         "method": method,
         "path": path,
@@ -216,15 +228,29 @@ pub(crate) async fn layer(req: Request, next: Next) -> Response {
     response
 }
 
-/// `GET /_zeyn/devtools`: the recorded requests, newest first. Not found while the DevTools
-/// are off.
-async fn list() -> Response {
-    if !on() {
+/// `GET /_zeyn/devtools`: the caller's own recorded requests, newest first. Not found while the
+/// DevTools are off, and for callers who are not signed in or lack [`PERMISSION`].
+async fn list(
+    axum::extract::State(st): axum::extract::State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    let ctx = st.ctx(&headers);
+    let identity = ctx.identity();
+    let Some(user) = identity
+        .user
+        .as_deref()
+        .filter(|_| on() && identity.can(&crate::action::Access::Permission(PERMISSION)))
+    else {
         return axum::http::StatusCode::NOT_FOUND.into_response();
-    }
+    };
     let log: Vec<Json> = LOG
         .lock()
-        .map(|l| l.iter().cloned().collect())
+        .map(|l| {
+            l.iter()
+                .filter(|line| line["user"] == user)
+                .cloned()
+                .collect()
+        })
         .unwrap_or_default();
     (
         [(axum::http::header::CACHE_CONTROL, "no-store")],
