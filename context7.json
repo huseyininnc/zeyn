@@ -31,6 +31,7 @@
     "Run `zeyn check` and `cargo test` after every change."
   ],
   "previousVersions": [
+    { "tag": "v0.0.11", "title": "0.0.11" },
     { "tag": "v0.0.10", "title": "0.0.10" },
     { "tag": "v0.0.9", "title": "0.0.9" }
   ]

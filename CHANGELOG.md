@@ -4,6 +4,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.0.11] - 2026-11-19
+
 ### Added
 
 - A design note for a browser playground (`docs/playground.md`): compiling in throwaway containers on a separate sandbox host, compiling to wasm32 and an interpreted screen language compared with measured numbers, the abuse cases, limits, cache, cost and the separate preview origin. `tools/playground` is a local prototype of the recommended option: an editor page, a preview origin with a strict CSP, a validator for the screen body and a Docker runner that calls `rustc` against prebuilt `zeyn` libraries (about 0.2 s to compile an edit warm, 0.7 s per request, 100 MB memory peak).
@@ -348,7 +350,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Navigation without page reloads.
 - MIT and Apache-2.0 licenses.
 
-[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.10...HEAD
+[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.11...HEAD
+[0.0.11]: https://github.com/huseyininnc/zeyn/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/huseyininnc/zeyn/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/huseyininnc/zeyn/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/huseyininnc/zeyn/compare/v0.0.7...v0.0.8
