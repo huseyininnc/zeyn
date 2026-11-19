@@ -46,7 +46,7 @@ Windows Defender scans every file the compiler writes, which slows a build a lot
 
 ### Build time budget
 
-CI builds the workspace with `cargo build --workspace --timings` and fails when the build takes longer than the number of seconds in `ci/build-budget.txt` (`sh ci/check-build-budget.sh <seconds>` is the check). The job uploads the report as the artifact `cargo-timings`; open `cargo-timing.html` to see which crate took the time. A change that makes a crate much slower to compile should bring the build back under the budget, or raise the budget in the same change and say why in the commit. After the first CI runs on a new runner or toolchain, set the budget to the measured time plus 30 percent, so it catches a real slowdown and not noise.
+CI builds the workspace with `cargo build --workspace --timings`, then touches `crates/zeyn/src/lib.rs` and rebuilds `zeyn` (the cost of a one line change), measures the size of `target/`, and fails when one of the three is over its budget in `ci/build-budget.txt` by more than `tolerance_percent` (`sh ci/check-build-budget.sh <build seconds> <rebuild seconds> <target megabytes>` is the check). The job uploads the report as the artifact `cargo-timings`; open `cargo-timing.html` to see which crate took the time. A change that makes a crate much slower to compile, or the target folder much larger, should bring the numbers back under the budget, or raise the budget in the same change and say why in the commit; a change that costs compile time states the before and after numbers in its commit. After the first CI runs on a new runner or toolchain, set the budgets to the measured numbers (the step summary prints them); the tolerance of 30 percent keeps noise from failing the job.
 
 ### Browser tests
 

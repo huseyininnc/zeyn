@@ -114,6 +114,10 @@ Performance and a small memory footprint are the most important rule.
   a page links a module it does not use.
 - When you add something that costs memory, binary size or time, measure it before and after and
   say the numbers in the commit or the report.
+- A change that costs compile time (a new dependency, heavy macro output, a large new module) states the
+  numbers in its commit: the workspace build time, the one line rebuild of `crates/zeyn` and the size of
+  `target/`, before and after, measured as `.github/workflows/ci.yml` does. CI fails over the budgets
+  in `ci/build-budget.txt`; raise one only in the change that needs it and say why.
 
 ### No component reloads the page
 Navigation, effects, language and theme changes go through `nav.js`: `zeyn:navigate`,

@@ -105,6 +105,8 @@ acme-domain = { path = "../acme-domain" }
 
 一个 crate 可以提供带有自己的脚本、样式表和文本的组件。名为 `zeyn-<name>` 的 crate 注册浏览器模块 `<name>`；它的类以 `z-<name>-` 开头，属性以 `data-zeyn-<name>-` 开头，文本键以 `<name>.` 开头。`examples/widget` 是一个带测试的完整示例。
 
+`zeyn new <name> --component` 会写出一个新的:crate `zeyn-<name>`,含示例组件、它的插件、脚本和样式表、英文和土耳其文文本、示例应用和测试。
+
 ```rust
 use zeyn::{App, Module, Plugin};
 
@@ -129,5 +131,5 @@ impl Plugin for RatingPlugin {
 
 | Zeyn | 组件 crate |
 |---|---|
-| 0.0.10 之后的版本 | `App::module`, `Module`, `TestResponse::links` |
+| 0.0.10 之后的版本 | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
 | 0.0.10 及更早 | 仅 HTML；没有自己的脚本或样式 |

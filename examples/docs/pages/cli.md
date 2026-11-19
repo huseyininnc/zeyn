@@ -8,6 +8,7 @@ The `zeyn` command creates projects, adds features, checks an app and runs an MC
 |---|---|
 | `zeyn new <name>` | Creates an app with the standard feature structure |
 | `zeyn new <name> --lib` | Creates a library of models, features and texts shared by several apps |
+| `zeyn new <name> --component` | Creates a component crate `zeyn-<name>` with a browser script, a stylesheet, texts, an example app and tests |
 | `zeyn g feature <name>` | Adds `src/features/<name>` with `models`, `services`, `actions` and `screens` and a working list screen |
 | `zeyn g screen <feature> <name>` | Adds `screens/<name>.rs` to a feature, registers it and adds its title to every locale file |
 | `zeyn routes` | Lists features, screens, routes, APIs and access |
@@ -68,6 +69,23 @@ cargo run
 - A local git repository on branch `main`, when git is installed (Windows, macOS or Linux) and the folder is not already inside a repository. Nothing is committed, so the first commit carries your own name and email. `--no-git` skips it.
 
 See [Project structure](structure.md) for each folder.
+
+## A new component crate
+
+`zeyn new <name> --component` writes the crate `zeyn-<name>` (a leading `zeyn-` in the name is accepted; the name is lower case letters, digits and single hyphens, at most 32 characters). It is the extension model of [Shared libraries](polyrepo.md), ready to change:
+
+- `src/lib.rs`: a sample component (a toggle button), its `Plugin` that registers the browser module with `App::module`, and the `CATALOGS` constant.
+- `assets/<name>.js` and `assets/<name>.css`: the module. The classes start with `z-<name>-` and the marker attribute with `data-zeyn-<name>-`; the stylesheet uses theme tokens only, so both themes work.
+- `assets/en.json` and `assets/tr.json`: the texts, under the key `<name>`.
+- `examples/demo`: an app with a start page that holds no component and a page that holds one. Run it with `cargo run --example demo`.
+- `tests/<name>.rs`: the page with the component links the module, the page without it never references it, the runtime lists the module for content that arrives later, the files are served with the build in the URL, and the app can reword the texts.
+- The same project files as a library: CI for GitHub, GitLab and Jenkins, lint and format rules, `AGENTS.md` and `CLAUDE.md`.
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## Generators
 

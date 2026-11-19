@@ -8,6 +8,7 @@
 |---|---|
 | `zeyn new <name>` | Standart Feature yapısıyla bir uygulama oluşturur |
 | `zeyn new <name> --lib` | Birkaç uygulamanın paylaştığı model, Feature ve metin kütüphanesi oluşturur |
+| `zeyn new <name> --component` | Tarayıcı betiği, stil dosyası, metinler, örnek uygulama ve testleri olan `zeyn-<name>` bileşen crate’ini oluşturur |
 | `zeyn g feature <name>` | `models`, `services`, `actions` ve `screens` klasörleri ve çalışan bir liste screen'iyle `src/features/<name>` ekler |
 | `zeyn g screen <feature> <name>` | Bir feature'a `screens/<name>.rs` ekler, kaydeder ve başlığını her dil dosyasına ekler |
 | `zeyn routes` | Feature'ları, screen'leri, rotaları, API'leri ve erişimi listeler |
@@ -66,6 +67,23 @@ cargo run
 - Git kuruluysa (Windows, macOS ya da Linux) ve klasör zaten bir deponun içinde değilse `main` dalında yerel bir git deposu. Hiçbir şey commit edilmez, bu yüzden ilk commit kendi adınızı ve e-postanızı taşır. `--no-git` bunu atlar.
 
 Her klasör için [Project structure](structure.md) sayfasına bakın.
+
+## Yeni bir bileşen crate’i
+
+`zeyn new <name> --component`, `zeyn-<name>` crate’ini yazar (addaki baştaki `zeyn-` kabul edilir; ad küçük harf, rakam ve tek tire içerir, en çok 32 karakterdir). [Paylaşılan kütüphaneler](polyrepo.md) sayfasındaki genişletme modelidir, değiştirmeye hazır:
+
+- `src/lib.rs`: örnek bir bileşen (açma kapama düğmesi), tarayıcı modülünü `App::module` ile kaydeden `Plugin` ve `CATALOGS` sabiti.
+- `assets/<name>.js` ve `assets/<name>.css`: modül. Sınıflar `z-<name>-`, işaret özniteliği `data-zeyn-<name>-` ile başlar; stil dosyası yalnızca tema değişkenlerini kullanır, bu yüzden açık ve koyu tema çalışır.
+- `assets/en.json` ve `assets/tr.json`: metinler, `<name>` anahtarı altında.
+- `examples/demo`: bileşeni olmayan bir başlangıç sayfası ve bir bileşeni olan bir sayfası bulunan uygulama. `cargo run --example demo` ile çalıştırın.
+- `tests/<name>.rs`: bileşenli sayfa modülü bağlar, bileşensiz sayfa ona hiç başvurmaz, çalışma zamanı sonradan gelen içerik için modülü listeler, dosyalar adreste derleme ile sunulur ve uygulama metinleri yeniden yazabilir.
+- Kütüphaneyle aynı proje dosyaları: GitHub, GitLab ve Jenkins için CI, lint ve biçim kuralları, `AGENTS.md` ve `CLAUDE.md`.
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## Üreticiler
 

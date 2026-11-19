@@ -105,6 +105,8 @@ acme-domain = { path = "../acme-domain" }
 
 crate는 자체 스크립트, 스타일시트, 텍스트를 가진 컴포넌트를 제공할 수 있습니다. `zeyn-<name>` crate는 브라우저 모듈 `<name>`을 등록하며, 클래스는 `z-<name>-`, 속성은 `data-zeyn-<name>-`, 텍스트 키는 `<name>.`으로 시작합니다. `examples/widget`은 테스트까지 갖춘 완전한 예제입니다.
 
+`zeyn new <name> --component`는 새 크레이트를 작성합니다. 예제 컴포넌트, 그 플러그인, 스크립트와 스타일시트, 영어와 터키어 텍스트, 예제 앱, 테스트를 갖춘 `zeyn-<name>`입니다.
+
 ```rust
 use zeyn::{App, Module, Plugin};
 
@@ -129,5 +131,5 @@ impl Plugin for RatingPlugin {
 
 | Zeyn | 컴포넌트 crate |
 |---|---|
-| 0.0.10 이후 릴리스 | `App::module`, `Module`, `TestResponse::links` |
+| 0.0.10 이후 릴리스 | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
 | 0.0.10 이전 | HTML만; 자체 스크립트나 스타일 없음 |

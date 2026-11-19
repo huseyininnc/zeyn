@@ -130,6 +130,9 @@ A crate can ship components with a script, a stylesheet and texts of their own. 
 attributes with `data-zeyn-<name>-` and its text keys with `<name>.`. `examples/widget` is a
 complete one, with tests.
 
+`zeyn new <name> --component` writes a new one: the crate `zeyn-<name>` with a sample component, its
+plugin, the script and stylesheet, texts in English and Turkish, an example app and tests.
+
 ```rust
 use zeyn::{App, Module, Plugin};
 
@@ -162,5 +165,5 @@ catalog that is not valid JSON. In tests, `TestResponse::links` lists what a pag
 
 | Zeyn | Component crates |
 |---|---|
-| Releases after 0.0.10 | `App::module`, `Module`, `TestResponse::links` |
+| Releases after 0.0.10 | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
 | 0.0.10 and earlier | HTML only; no browser code or styles of their own |

@@ -8,6 +8,7 @@
 |---|---|
 | `zeyn new <name>` | 创建带有标准 feature 结构的应用 |
 | `zeyn new <name> --lib` | 创建由多个应用共享的 model、feature 和文本库 |
+| `zeyn new <name> --component` | 创建组件 crate `zeyn-<name>`，含浏览器脚本、样式表、文本、示例应用和测试 |
 | `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 `models`、`services`、`actions` 和 `screens` 文件夹以及一个可用的列表 screen |
 | `zeyn g screen <feature> <name>` | 向 feature 添加 `screens/<name>.rs`，注册它，并把标题加入每个语言文件 |
 | `zeyn routes` | 列出 feature、screen、路由、API 和访问权限 |
@@ -68,6 +69,23 @@ cargo run
 - 当安装了 git（Windows、macOS 或 Linux）且该文件夹尚不在某个仓库内时，会创建一个位于 `main` 分支的本地 git 仓库。不会提交任何内容，因此第一次提交会带上你自己的姓名和邮箱。`--no-git` 会跳过这一步。
 
 各个文件夹的说明参见[项目结构](structure.md)。
+
+## 新的组件 crate
+
+`zeyn new <name> --component` 会写出 crate `zeyn-<name>`(名称开头的 `zeyn-` 会被接受;名称由小写字母、数字和单个连字符组成,最多 32 个字符)。它就是[共享库](polyrepo.md)中的扩展模型,可直接修改:
+
+- `src/lib.rs`:一个示例组件(开关按钮)、通过 `App::module` 注册浏览器模块的 `Plugin`,以及常量 `CATALOGS`。
+- `assets/<name>.js` 和 `assets/<name>.css`:模块。类名以 `z-<name>-` 开头,标记属性以 `data-zeyn-<name>-` 开头;样式表只使用主题令牌,因此浅色和深色主题都能正常工作。
+- `assets/en.json` 和 `assets/tr.json`:文本,位于键 `<name>` 之下。
+- `examples/demo`:一个应用,起始页不含组件,另一页含有组件。用 `cargo run --example demo` 运行。
+- `tests/<name>.rs`:含组件的页面会链接该模块,不含组件的页面从不引用它,运行时会为稍后到达的内容列出该模块,文件在 URL 中带构建标识提供,应用可以改写文本。
+- 与库相同的项目文件:GitHub、GitLab 和 Jenkins 的 CI、lint 与格式规则、`AGENTS.md` 和 `CLAUDE.md`。
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## 生成器
 

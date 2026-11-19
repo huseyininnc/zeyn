@@ -35,9 +35,19 @@ jobs:
         run: |
           start=$(date +%s)
           cargo build --workspace --timings
-          elapsed=$(( $(date +%s) - start ))
-          echo "Workspace build: ${elapsed} s" >> "$GITHUB_STEP_SUMMARY"
-          sh ci/check-build-budget.sh "$elapsed"
+          build=$(( $(date +%s) - start ))
+          cargo build -p zeyn
+          touch crates/zeyn/src/lib.rs
+          start=$(date +%s)
+          cargo build -p zeyn
+          rebuild=$(( $(date +%s) - start ))
+          target=$(du -sm target | cut -f1)
+          {
+            echo "Workspace build: ${build} s"
+            echo "One line rebuild of zeyn: ${rebuild} s"
+            echo "Target folder: ${target} MB"
+          } >> "$GITHUB_STEP_SUMMARY"
+          sh ci/check-build-budget.sh "$build" "$rebuild" "$target"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -8,6 +8,7 @@
 |---|---|
 | `zeyn new <name>` | 標準の Feature 構成でアプリを作成します |
 | `zeyn new <name> --lib` | 複数のアプリで共有するモデル、Feature、テキストのライブラリを作成します |
+| `zeyn new <name> --component` | ブラウザスクリプト、スタイルシート、テキスト、サンプルアプリ、テストを備えたコンポーネントクレート `zeyn-<name>` を作成する |
 | `zeyn g feature <name>` | `models`、`services`、`actions`、`screens` フォルダーと動作する一覧画面を備えた `src/features/<name>` を追加します |
 | `zeyn g screen <feature> <name>` | feature に `screens/<name>.rs` を追加して登録し、タイトルをすべてのロケールファイルに追加します |
 | `zeyn routes` | Feature、画面、ルート、API、アクセス権を一覧表示します |
@@ -66,6 +67,23 @@ cargo run
 - git がインストールされていて（Windows、macOS、Linux）、フォルダがすでにリポジトリ内にない場合は、ブランチ `main` のローカル git リポジトリ。何もコミットされないため、最初のコミットにはご自身の名前とメールアドレスが入ります。`--no-git` を付けると作成しません。
 
 各フォルダについては [プロジェクト構造](structure.md) を参照してください。
+
+## 新しいコンポーネントクレート
+
+`zeyn new <name> --component` はクレート `zeyn-<name>` を書き出します(名前の先頭の `zeyn-` は受け付けます。名前は小文字、数字、単独のハイフンで、最大32文字)。[共有ライブラリ](polyrepo.md)の拡張モデルをそのまま変更できる形にしたものです。
+
+- `src/lib.rs`: サンプルのコンポーネント(トグルボタン)、`App::module` でブラウザモジュールを登録するその `Plugin`、定数 `CATALOGS`。
+- `assets/<name>.js` と `assets/<name>.css`: モジュール。クラスは `z-<name>-` で、マーカー属性は `data-zeyn-<name>-` で始まります。スタイルシートはテーマトークンだけを使うので、ライトとダークの両方のテーマで動きます。
+- `assets/en.json` と `assets/tr.json`: テキスト。キーは `<name>` の下にあります。
+- `examples/demo`: コンポーネントのないスタートページと、コンポーネントのあるページを持つアプリ。`cargo run --example demo` で実行します。
+- `tests/<name>.rs`: コンポーネントのあるページはモジュールをリンクし、ないページは決して参照しません。ランタイムは後から届くコンテンツ用にモジュールを一覧し、ファイルはURLにビルドを含めて配信され、アプリはテキストの文言を変更できます。
+- ライブラリと同じプロジェクトファイル: GitHub、GitLab、Jenkins 用の CI、lint とフォーマットの規則、`AGENTS.md` と `CLAUDE.md`。
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## ジェネレーター
 

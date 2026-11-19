@@ -1,0 +1,10 @@
+{
+  "demo": {
+    "title": "{{title}} örneği",
+    "menu": "Örnek",
+    "home": "Başlangıç",
+    "page": "{{title}}",
+    "intro": "Bu sayfada bileşen yok, bu yüzden tarayıcı modülü bağlanmaz. Menüden {{title}} sayfasını açın.",
+    "label": "Bana bas"
+  }
+}

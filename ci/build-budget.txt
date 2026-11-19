@@ -1,1 +1,12 @@
-600
+# Budgets of the CI build job, read by ci/check-build-budget.sh.
+# build_seconds: cargo build --workspace after clippy, rust-cache warm (CI runs of dev: 40, 129, 164 s).
+# rebuild_seconds: cargo build -p zeyn after touching crates/zeyn/src/lib.rs (one line change).
+# target_megabytes: size of target/ after the build (du -sm target), clippy artifacts included.
+# A measurement fails the job when it is above its value plus tolerance_percent.
+# rebuild_seconds and target_megabytes come from the CI run of ZEYN-306 (Linux runner, warm cache:
+# build 45 s, rebuild 15 s, target 3457 MB). build_seconds stays at the slowest dev run, so a cold
+# cache after a Cargo.lock change still passes.
+build_seconds=164
+rebuild_seconds=15
+target_megabytes=3457
+tolerance_percent=30

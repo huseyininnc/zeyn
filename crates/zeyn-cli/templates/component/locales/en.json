@@ -1,0 +1,10 @@
+{
+  "demo": {
+    "title": "{{title}} demo",
+    "menu": "Demo",
+    "home": "Start",
+    "page": "{{title}}",
+    "intro": "This page holds no component, so it does not link the browser module. Open {{title}} from the menu.",
+    "label": "Press me"
+  }
+}
