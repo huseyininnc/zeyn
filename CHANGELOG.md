@@ -81,6 +81,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Uploads take their declared size (the store's limit without one) from the quota before the body is read and give back what the file did not use or, when the upload fails, all of it (`RateStore::refund`), so uploads sent at the same time can no longer pass the quota together.
 - The access reason cookie of `#[screen(reason)]` is bound to the user and tenant who gave the reason and carries its own expiry, so another user of the same browser is asked again.
 - Import previews run through the interceptors (`CallKind::ImportPreview`, not audited) with the app's time limit and parse the file on a blocking thread; imports and previews pass `via_agent` on. Before, an interceptor that refused a user did not stop previews.
+- A passkey challenge is accepted once: its use is marked in the app's rate store until the ceremony would expire, so a captured ceremony cookie and answer cannot be replayed with a passkey whose counter stays 0.
 
 ## [0.0.10] - 2026-11-10
 
