@@ -7184,7 +7184,9 @@ version = "0.0.10"
 dependencies = [
  "ed25519-dalek",
  "getrandom 0.2.17",
+ "proc-macro2",
  "serde_json",
+ "syn 2.0.119",
  "zeyn",
 ]
 

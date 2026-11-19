@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 mod license;
+mod migrate;
 
 const TEMPLATES: &[(&str, &str)] = &[
     ("Cargo.toml", include_str!("../templates/Cargo.toml.tmpl")),
@@ -265,6 +266,13 @@ Usage:
                                           screens.rs or actions.rs files; every problem has a stable code;
                                           --fix first rewrites renamed Zeyn APIs in src, tests and examples;
                                           --json prints one JSON document with codes, reasons and fixes
+  zeyn migrate [--from <ver>] [--to <ver>] [--dry-run] [--json]
+                                          move the app to a newer Zeyn version: runs every step
+                                          between the version in Cargo.lock (or --from) and --to in
+                                          order (renames, changed calls, moved paths), keeps the
+                                          formatting, moves the Zeyn dependency and reports each
+                                          change with file:line and what needs a person;
+                                          --dry-run writes nothing and prints a unified diff
   zeyn doctor [--fix] [--json] [--target-limit-gb <n>]
                                           read only report on build speed and disk use: target size
                                           and largest folders, linker, dev profile, toolchain, stale
@@ -329,6 +337,7 @@ fn main() -> ExitCode {
                 Err("the app has problems".into())
             }
         }),
+        ["migrate", rest @ ..] => run_migrate(rest),
         ["doctor", rest @ ..] => run_doctor(
             rest.contains(&"--fix"),
             rest.contains(&"--json"),
@@ -371,6 +380,30 @@ fn main() -> ExitCode {
             eprintln!("error: {e}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// `zeyn migrate [--from <ver>] [--to <ver>] [--dry-run] [--json]`. Fails only when a file
+/// could not be read, written or parsed; TODOs for a person are part of a successful run.
+fn run_migrate(rest: &[&str]) -> Result<(), String> {
+    let dry_run = rest.contains(&"--dry-run");
+    let report = migrate::run(
+        Path::new("."),
+        flag(rest, "--from"),
+        flag(rest, "--to"),
+        dry_run,
+    )?;
+    if rest.contains(&"--json") {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report.to_json(dry_run)).unwrap_or_default()
+        );
+    } else {
+        print!("{}", report.to_text(dry_run));
+    }
+    match report.errors.len() {
+        0 => Ok(()),
+        n => Err(format!("{n} files could not be migrated")),
     }
 }
 
@@ -730,21 +763,6 @@ fn routes_table(d: &Value) -> String {
     out
 }
 
-/// Zeyn names that changed, old to new. `zeyn check --fix` rewrites them. A name with `::`
-/// (`Icon::Delete`) is renamed only where it is written with that path.
-const RENAMES: &[(&str, &str)] = &[
-    ("GridQuery", "DataQuery"),
-    ("GridMode", "DataMode"),
-    ("GridColumn", "DataGridColumn"),
-    ("Grid", "DataGrid"),
-    ("MAX_EMBED_CONSENT", "MAX_PREF_LIFETIME"),
-    ("Icon::Delete", "Icon::Trash"),
-    ("Icon::Chart", "Icon::ChartBar"),
-    ("Realtime", "ZeynSocket"),
-    ("HubStats", "SocketStats"),
-    ("Hub", "Socket"),
-];
-
 /// Runs [`fix_renames`] when asked and describes what changed.
 fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
     if !fix {
@@ -757,7 +775,8 @@ fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
         .collect())
 }
 
-/// Rewrites renamed Zeyn names in the `.rs` files under `src`, `tests` and `examples`.
+/// Rewrites renamed Zeyn names in the `.rs` files under `src`, `tests` and `examples`, with the
+/// renames of every `zeyn migrate` step.
 fn fix_renames(root: &Path) -> Result<Vec<(PathBuf, usize)>, String> {
     let mut files = Vec::new();
     for dir in ["src", "tests", "examples"] {
@@ -767,8 +786,10 @@ fn fix_renames(root: &Path) -> Result<Vec<(PathBuf, usize)>, String> {
     for path in files {
         let text =
             std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let (fixed, n) = rename_idents(&text, RENAMES);
+        let edits = migrate::rename_edits(&text, &migrate::renames());
+        let n = edits.len();
         if n > 0 {
+            let fixed = migrate::apply(&text, edits);
             std::fs::write(&path, fixed).map_err(|e| format!("{}: {e}", path.display()))?;
             changed.push((path, n));
         }
@@ -796,94 +817,6 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
             out.push(path);
         }
     }
-}
-
-/// Replaces whole identifiers outside string and char literals. Comments are rewritten too, so
-/// doc examples follow. Returns the text and how many identifiers changed.
-fn rename_idents(text: &str, renames: &[(&str, &str)]) -> (String, usize) {
-    let chars: Vec<char> = text.chars().collect();
-    let mut out = String::with_capacity(text.len());
-    let mut count = 0;
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        if c == '"'
-            || (c == 'r' && matches!(chars.get(i + 1), Some('"' | '#')) && !ident_before(&chars, i))
-        {
-            let end = string_end(&chars, i);
-            out.extend(&chars[i..end]);
-            i = end;
-        } else if c == '\'' && chars.get(i + 2) == Some(&'\'') {
-            out.extend(&chars[i..i + 3]);
-            i += 3;
-        } else if c.is_alphabetic() || c == '_' {
-            let start = i;
-            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
-                i += 1;
-            }
-            let word: String = chars[start..i].iter().collect();
-            if chars.get(i) == Some(&':') && chars.get(i + 1) == Some(&':') {
-                let mut j = i + 2;
-                while j < chars.len() && (chars[j].is_alphanumeric() || chars[j] == '_') {
-                    j += 1;
-                }
-                let path: String = chars[start..j].iter().collect();
-                if let Some((_, new)) = renames
-                    .iter()
-                    .find(|(old, _)| *old == path)
-                {
-                    out.push_str(new);
-                    count += 1;
-                    i = j;
-                    continue;
-                }
-            }
-            match renames
-                .iter()
-                .find(|(old, _)| *old == word)
-            {
-                Some((_, new)) => {
-                    out.push_str(new);
-                    count += 1;
-                }
-                None => out.push_str(&word),
-            }
-        } else {
-            out.push(c);
-            i += 1;
-        }
-    }
-    (out, count)
-}
-
-fn ident_before(chars: &[char], i: usize) -> bool {
-    i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_')
-}
-
-/// End (exclusive) of the string literal starting at `i`: `"..."` with escapes, or `r#"..."#`.
-fn string_end(chars: &[char], i: usize) -> usize {
-    let mut j = i;
-    let mut hashes = 0;
-    let raw = chars[j] == 'r';
-    if raw {
-        j += 1;
-        while chars.get(j) == Some(&'#') {
-            hashes += 1;
-            j += 1;
-        }
-        if chars.get(j) != Some(&'"') {
-            return i + 1;
-        }
-    }
-    j += 1;
-    while j < chars.len() {
-        match chars[j] {
-            '\\' if !raw => j += 2,
-            '"' if (1..=hashes).all(|h| chars.get(j + h) == Some(&'#')) => return j + 1 + hashes,
-            _ => j += 1,
-        }
-    }
-    chars.len()
 }
 
 /// Code of the problem reported when the app does not compile. App problems use `Z01xx` to
@@ -1085,6 +1018,16 @@ fn tools() -> Value {
             &[]
         ),
         tool(
+            "zeyn_migrate",
+            "Move the app in the current directory to a newer Zeyn version: run every migration step between its Zeyn version (Cargo.lock, or `from`) and `to` in order (renamed names, changed method calls, moved paths), keeping formatting, and move the Zeyn dependency. Returns each change with file:line and the places a person has to look at, with the reason. With dry_run: true nothing is written and a unified diff is returned.",
+            json!({
+                "from": { "type": "string", "description": "the Zeyn version the app is on, such as 0.0.9" },
+                "to": { "type": "string", "description": "the version to move to (default: the newest step)" },
+                "dry_run": { "type": "boolean" }
+            }),
+            &[]
+        ),
+        tool(
             "zeyn_doctor",
             "Read only report on build speed and disk use of the project in the current directory: target folder size and largest folders, linker, dev profile debug info and dependency optimization, rustc and cargo against rust-version, stale artifacts, the rust-analyzer target folder, and on Windows Defender exclusions or a Dev Drive. Each finding has a code, a status and a one line fix. With fix: true, first add the fast dev profile to Cargo.toml and the rust-lld linker to .cargo/config.toml (only those two files).",
             json!({
@@ -1257,6 +1200,13 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
         ),
         "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false))
             .and_then(|fixed| check(root).map(|r| fixed + &check_text(&r))),
+        "zeyn_migrate" => {
+            let dry_run = args["dry_run"]
+                .as_bool()
+                .unwrap_or(false);
+            migrate::run(root, args["from"].as_str(), args["to"].as_str(), dry_run)
+                .map(|r| r.to_text(dry_run))
+        }
         "zeyn_doctor" => {
             let fixed = if args["fix"].as_bool().unwrap_or(false) {
                 doctor::fix(root)?
@@ -1503,40 +1453,6 @@ mod tests {
         let rules =
             super::call_tool("zeyn_docs", &serde_json::json!({ "topic": "rules" })).unwrap();
         assert!(!rules.is_empty());
-    }
-
-    #[test]
-    fn renames_identifiers_but_not_strings_or_longer_names() {
-        let src = r##"use zeyn::{Grid, GridQuery};
-/// `Grid::of(find)` shows rows.
-fn list(q: GridQuery) -> Grid<P> { Grid::of(find).mode(GridMode::Server).title("Grid") }
-struct MyGrid; impl GridSource for MyGrid {}
-const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
-        let (out, n) = super::rename_idents(src, super::RENAMES);
-        assert_eq!(n, 7, "{out}");
-        assert!(out.contains("use zeyn::{DataGrid, DataQuery};"));
-        assert!(out.contains("/// `DataGrid::of(find)` shows rows."));
-        assert!(out.contains(
-            "fn list(q: DataQuery) -> DataGrid<P> { DataGrid::of(find).mode(DataMode::Server).title(\"Grid\") }"
-        ));
-        assert!(out.contains("struct MyGrid; impl GridSource for MyGrid {}"));
-        assert!(out.contains(r##"r#"Grid "quoted" Grid"#"##));
-        assert_eq!(
-            super::rename_idents(&out, super::RENAMES).1,
-            0,
-            "a second run changes nothing"
-        );
-    }
-
-    #[test]
-    fn renames_qualified_names_only_with_their_path() {
-        let src = "m.group(\"Reports\", Icon::Chart).icon(Icon::Delete); Method::Delete; Icon::ChartBar; let Chart = 1;";
-        let (out, n) = super::rename_idents(src, super::RENAMES);
-        assert_eq!(n, 2, "{out}");
-        assert_eq!(
-            out,
-            "m.group(\"Reports\", Icon::ChartBar).icon(Icon::Trash); Method::Delete; Icon::ChartBar; let Chart = 1;"
-        );
     }
 
     use super::*;
