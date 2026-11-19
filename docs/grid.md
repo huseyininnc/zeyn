@@ -468,8 +468,40 @@ number.
 Frames stay over 16 ms when scrolling down at 4x. Turning off box shadows, sticky pinned cells,
 transitions or cell borders in the page changed the mean frame by less than 1 ms (about 25 ms in
 every case), and `contain: layout paint style` on rows gained about 0.8 ms. Paint is therefore not
-dominated by one of these, and the windowed grid has no cheap style change left; the rest of the
-cost is parsing and inserting blocks of rows.
+dominated by one of these, and the windowed grid has no cheap style change left.
+
+A performance trace of the same scroll (40 columns, 4x, 60 px per frame) shows where the frame
+goes: per frame about 3.5 ms script, 2.8 ms style, 3.7 ms layout, 3.4 ms prepaint, 4.8 ms paint,
+3.1 ms layerize and 0.5 ms commit. HTML parsing is not on the list: a block of 200 rows is parsed
+once every 107 frames (one task of 30 to 43 ms, the longest frame of a run), so smaller blocks,
+cloning a template instead of parsing, or inserting off frame (`requestIdleCallback`,
+`scheduler.yield`) only move the slowest frame and leave p50 and p95 as they were.
+`content-visibility` does not apply, since table rows cannot take containment. The cost is the
+rendering of a window move: the frame restyles, lays out and paints every kept row again, and it
+costs nearly the same for one new row as for ten (scrolling 32 px per frame gave the same 20.8 ms
+p50 as 60 px; 1 px per frame, where the window rarely moves, gave 6.9 ms).
+
+So the window of rows now moves less often. It stays where it is while ten rows (`V_OVERSCAN`)
+remain on both sides of the visible ones, and when it moves it takes four more rows ahead in the
+scroll direction (`V_LEAD`). Most frames then only move the rows `tbody`, and the frames that move
+the window add a few rows more. Same machine and method, three runs, 4x, down at 60 px per frame:
+
+| Columns | Before (p50 / p95) | After (p50 / p95) | After, mean fps |
+|---|---|---|---|
+| 40, windowed | 20.8 ms / 27.8 to 41.6 ms | 7.0 ms / 27.8 to 34.6 ms | 75 to 84 |
+| 62, windowed | 20.9 to 27.8 ms / 34.8 to 41.6 ms | 7.0 ms / 27.8 to 34.7 ms | 74 to 82 |
+
+The trace of the 62 column run after the change: the 117 frames that leave the window in place
+take 3.3 ms of main thread work, the 39 that move it 32.7 ms (4.2 script, 4.2 style, 6.7 layout,
+4.7 prepaint, 7.5 paint, 4.8 layerize). At 30 px per frame on 62 columns the p95 went from 34.7 to
+41.7 ms to 27.7 to 27.9 ms. A larger lead was tried and left out: 10 to 30 rows made the frames
+that move the window longer than the frames it saved (p95 34.7 to 48.5 ms), and 40 rows brought p95
+to 14 ms at 60 px per frame only by making one frame in twenty take 70 to 146 ms. A spacer row
+above the rows instead of `translateY`, so kept rows do not move inside the `tbody`, saved about
+1.5 ms of paint a frame but counted every window move as a layout shift (CLS 3.5), and was left
+out. On the 40 column grid p95 stays at the 27.8 ms of the earlier table in two runs of three:
+the frames that still move the window cost the same as before, so the p95 frame is one of them;
+there are fewer of them, which shows in p50 and fps.
 
 ## Export
 
