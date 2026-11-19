@@ -20,6 +20,28 @@ cargo clippy --workspace --all-targets -- -D warnings
 - `cargo test` does not rebuild a binary you then run by hand. Run `cargo build -p <example>` first.
 - Run an example to see a change: `cargo run -p zeyn-example-showcase` (http://127.0.0.1:3002), `cargo run -p zeyn-example-docs` (http://127.0.0.1:3008) or `cargo run -p zeyn-example-components` (http://127.0.0.1:3010).
 
+### Build speed and disk use
+
+The workspace `Cargo.toml` builds dependencies with `opt-level = 1` and no debug info, and workspace crates with line tables only: backtraces show file and line, a debugger shows no local variables. Set `CARGO_PROFILE_DEV_DEBUG=full` for a debugging session. On Windows `.cargo/config.toml` links with `rust-lld`, which ships with the toolchain.
+
+Cargo never deletes old artifacts, so `target` only grows: every toolchain, feature set and branch adds its own copies. `scripts/sweep-target.sh` removes the directory when it is over a size limit (20 GB by default) or was built by another toolchain than the one in `rust-toolchain.toml`. Run it once a day while nothing builds, from Git Bash on Windows:
+
+```
+sh scripts/sweep-target.sh          20 GB limit, ./target or $CARGO_TARGET_DIR
+sh scripts/sweep-target.sh 10 D:/zeyn-target
+```
+
+Several builds on one target directory wait for each other's lock, and several builds on separate directories at once can run out of memory and page file. When agents or terminals build in parallel, give each its own target directory and keep one build queue per directory. Lower the number of compiler jobs per build with `CARGO_BUILD_JOBS` (for example half the cores) when two builds run at the same time.
+
+Windows Defender scans every file the compiler writes, which slows a build a lot. Two changes, both need an administrator, so make them yourself:
+
+1. Exclude the build folders from real time scanning. In an administrator PowerShell:
+   ```
+   Add-MpPreference -ExclusionPath "$env:USERPROFILE\.cargo", "$env:USERPROFILE\.rustup", "C:\path\to\zeyn\target"
+   ```
+   Files in these folders are no longer scanned, so exclude only build output and the toolchain.
+2. Or create a Dev Drive (Settings, System, Storage, Advanced storage settings, Disks and volumes, Create Dev Drive; at least 50 GB). Defender scans a Dev Drive in performance mode. Point the build there for your user: `setx CARGO_TARGET_DIR D:\zeyn-target`, and open a new terminal.
+
 ## Branches and pull requests
 
 - Create your work branch from `dev`.
