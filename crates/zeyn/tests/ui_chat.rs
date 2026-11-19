@@ -284,6 +284,17 @@ async fn the_thread_module_loads_only_on_pages_with_a_thread() {
     assert!(js.contains("export function writer") && !js.contains("innerHTML"));
 }
 
+/// A feed holds only articles (ARIA), so an empty thread is a region with its empty text; the
+/// runtime makes it a feed when the first message arrives.
+#[tokio::test]
+async fn an_empty_thread_is_a_region_until_it_has_messages() {
+    let (status, page) = get_as(&app(Chat::default()), "/room", ALL).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains(r#"<div class="z-thread-view" role="region""#));
+    assert!(!page.contains(r#"role="feed""#));
+    assert!(page.contains(r#"<p class="z-thread-empty">"#));
+}
+
 #[tokio::test]
 async fn bubbles_group_by_sender_and_day_and_escape_text_and_names() {
     let (status, page) = get_as(&app(Chat::seeded()), "/room", ALL).await;

@@ -1,0 +1,17 @@
+- main:
+  - region "ActionButton":
+    - heading "ActionButton" [level=1]
+    - paragraph: A button that runs an action.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#actionbutton
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ActionButton
+    - tablist "ActionButton sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - button "Count products"
+      - group: Show code
+      - button "Copy"
+      - status

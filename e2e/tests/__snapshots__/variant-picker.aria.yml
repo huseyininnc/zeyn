@@ -1,0 +1,37 @@
+- main:
+  - region "VariantPicker":
+    - heading "VariantPicker" [level=1]
+    - paragraph: Color swatches and size chips that change the price, photo and stock in place.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/commerce#variant-picker
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=VariantPicker
+    - tablist "VariantPicker sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - img "Linen shirt in sand"
+      - group "Color Sand":
+        - text: ""
+        - radio "Sand" [checked]
+        - text: ""
+        - radio "Navy"
+        - text: Navy
+        - radio "Sage"
+        - text: Sage
+      - group "Size M":
+        - text: ""
+        - radio "S"
+        - text: ""
+        - radio "M" [checked]
+        - text: ""
+        - radio "L"
+        - text: L
+        - radio "XL"
+        - text: XL
+      - text: /₺\d+\.\d+/
+      - paragraph: /\d+ in stock/
+      - group: Show code
+      - button "Copy"
+      - status

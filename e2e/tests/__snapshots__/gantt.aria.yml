@@ -1,0 +1,45 @@
+- main:
+  - region "Gantt":
+    - heading "Gantt" [level=1]
+    - paragraph: Tasks as bars over a span of days.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/data#gantt
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Gantt
+    - tablist "Gantt sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - group "Launch plan":
+        - table "Launch plan":
+          - caption: Launch plan
+          - rowgroup:
+            - row "Task Starts Ends":
+              - columnheader "Task"
+              - columnheader "Starts"
+              - columnheader "Ends"
+          - rowgroup:
+            - row /Research , \d+% done \d+\/\d+\/\d+ \d+\/\d+\/\d+/:
+              - rowheader /Research , \d+% done/
+              - cell /\d+\/\d+\/\d+/
+              - cell /\d+\/\d+\/\d+/
+            - row /Design , \d+% done \d+\/7\/\d+ \d+\/\d+\/\d+/:
+              - rowheader /Design , \d+% done/
+              - cell /\d+\/7\/\d+/
+              - cell /\d+\/\d+\/\d+/
+            - row /Build , \d+% done \d+\/\d+\/\d+ \d+\/\d+\/\d+/:
+              - rowheader /Build , \d+% done/
+              - cell /\d+\/\d+\/\d+/
+              - cell /\d+\/\d+\/\d+/
+            - row /Test \d+\/7\/\d+ \d+\/\d+\/\d+/:
+              - rowheader "Test"
+              - cell /\d+\/7\/\d+/
+              - cell /\d+\/\d+\/\d+/
+            - row /Launch \d+\/\d+\/\d+ \d+\/\d+\/\d+/:
+              - rowheader "Launch"
+              - cell /\d+\/\d+\/\d+/
+              - cell /\d+\/\d+\/\d+/
+      - group: Show code
+      - button "Copy"
+      - status

@@ -1,0 +1,17 @@
+- main:
+  - region "Busy":
+    - heading "Busy" [level=1]
+    - paragraph: An overlay while a slow action runs.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#tooltip-popover-and-busy-overlay
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Busy
+    - tablist "Busy sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - button "Count slowly"
+      - group: Show code
+      - button "Copy"
+      - status

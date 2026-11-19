@@ -1,0 +1,22 @@
+- main:
+  - region "RangeSlider":
+    - heading "RangeSlider" [level=1]
+    - paragraph: Two handles over one track for price and date ranges.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/commerce#range-slider
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=RangeSlider
+    - tablist "RangeSlider sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - group "Price":
+        - text: ""
+        - slider "Price, from": "0"
+        - slider "Price, to": /\d+/
+      - paragraph: /\d+ of \d+ products in this range/
+      - group: Show code
+      - button "Copy"
+      - status

@@ -381,12 +381,14 @@ function initSelects(root) {
     const native = wrap.querySelector('select');
     if (!native) return;
     wrap.dataset.ready = '';
+    const label = native.labels?.[0];
+    if (label && !label.id) label.id = `${native.id}-label`;
     const combo = make('div', 'z-select-button', {
       role: 'combobox',
       tabindex: native.disabled ? '-1' : '0',
       'aria-haspopup': 'listbox',
       'aria-expanded': 'false',
-      'aria-labelledby': `${native.id}-label`,
+      'aria-labelledby': label?.id || `${native.id}-label`,
       'data-testid': `${native.dataset.testid ?? ''}.combobox`,
     });
     for (const a of ['aria-describedby', 'aria-required', 'aria-invalid']) if (native.hasAttribute(a)) combo.setAttribute(a, native.getAttribute(a));

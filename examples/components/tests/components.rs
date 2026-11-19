@@ -167,6 +167,56 @@ fn the_api_tables_come_from_the_framework_source() {
     );
 }
 
+/// Browsers ask for compressed pages; the head tags still have to reach them.
+#[tokio::test]
+async fn a_browser_asking_for_gzip_still_gets_the_catalog_head() {
+    let res = ROUTER
+        .clone()
+        .oneshot(
+            Request::get("/ui/tabs")
+                .header(header::ACCEPT_ENCODING, "gzip, br")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        !res.headers()
+            .contains_key(header::CONTENT_ENCODING)
+    );
+    let body = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    assert!(String::from_utf8_lossy(&body).contains(site::HEAD));
+}
+
+/// The browser tests in `e2e/` read the catalog pages from `e2e/components.json`. When a component
+/// is added or moved, this test writes the new list and fails once, so the change is committed.
+#[test]
+fn the_browser_tests_list_every_catalog_page() {
+    let mut groups = serde_json::Map::new();
+    for c in COMPONENTS {
+        groups
+            .entry(c.category)
+            .or_insert_with(|| serde_json::json!([]))
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({ "slug": c.slug, "route": c.route }));
+    }
+    let expected = serde_json::to_string_pretty(&groups).unwrap() + "\n";
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../e2e/components.json");
+    let found = std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .replace("\r\n", "\n");
+    if found != expected {
+        std::fs::write(path, &expected).unwrap();
+        panic!("e2e/components.json was out of date and has been rewritten; commit it");
+    }
+}
+
 #[test]
 fn every_text_exists_in_english_and_turkish() {
     for file in [

@@ -1,0 +1,59 @@
+- main:
+  - region "Rail":
+    - heading "Rail" [level=1]
+    - paragraph: A row of cards that scrolls sideways.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/catalog#rail
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Rail
+    - tablist "Rail sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - region "New arrivals":
+        - heading "New arrivals" [level=2]
+        - button "Scroll back" [disabled]
+        - button "Scroll forward"
+        - list:
+          - listitem:
+            - link /Field notes \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/1
+          - listitem:
+            - link /Garden trowel \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/2
+          - listitem:
+            - link /Fern \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/3
+          - listitem:
+            - link /City atlas \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/4
+          - listitem:
+            - link /Hand saw \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/5
+          - listitem:
+            - link /Olive tree \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/6
+          - listitem:
+            - link /Cookbook \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/7
+          - listitem:
+            - link /Tape measure \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/8
+          - listitem:
+            - link /Cactus \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/9
+          - listitem:
+            - link /Poetry \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/10
+          - listitem:
+            - link /Pliers \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/11
+          - listitem:
+            - link /Bamboo \d+ ₺\d+\.\d+/:
+              - /url: /ui/image-card/product/12
+        - status
+      - group: Show code
+      - button "Copy"
+      - status

@@ -445,6 +445,12 @@
   color: var(--z-text-muted);
 }
 
+.z-link-external {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 24px;
+}
+
 .z-link-external-icon {
   margin-inline-start: 0.15em;
   font-size: 0.85em;

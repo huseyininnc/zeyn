@@ -1,0 +1,26 @@
+- main:
+  - region "ReviewSummary":
+    - heading "ReviewSummary" [level=1]
+    - paragraph: The average rating, the number of reviews and a bar for each star from 5 to 1.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/commerce#reviews-and-ratings
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ReviewSummary
+    - tablist "ReviewSummary sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - region "Reviews":
+        - img "4.5 out of 5 stars": ★★★★★
+        - text: /\d+,\d+ reviews/
+        - list:
+          - listitem: /5 stars \d+%/
+          - listitem: /4 stars \d+%/
+          - listitem: 3 stars 5%
+          - listitem: 2 stars 2%
+          - listitem: 1 stars 3%
+      - group: Show code
+      - button "Copy"
+      - status

@@ -1,0 +1,19 @@
+- main:
+  - region "CopyButton":
+    - heading "CopyButton" [level=1]
+    - paragraph: Copies a text to the clipboard.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#copybutton
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=CopyButton
+    - tablist "CopyButton sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - code: 1Z999AA10123456784
+      - button "Copy"
+      - group: Show code
+      - button "Copy"
+      - status

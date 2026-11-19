@@ -1,0 +1,18 @@
+- main:
+  - region "Paragraph":
+    - heading "Paragraph" [level=1]
+    - paragraph: A paragraph of escaped text, normal or quiet.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#paragraph
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Paragraph
+    - tablist "Paragraph sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - paragraph: Every order ships within two working days.
+      - paragraph: Prices include tax.
+      - group: Show code
+      - button "Copy"
+      - status
