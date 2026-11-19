@@ -82,6 +82,8 @@ Değerler grid hücreleri gibi biçimlenir: para, tarih ve seçimler kullanıcı
 
 `EmptyState::new(title).text(text)` boş bir alanı sonraki adımla doldurur: `.link(label, screen, params)` bir `LinkButton` ile başka bir sayfaya gider, `.opens(label, screen, params)` ise uygulamanın bir screen'ini pencere olarak açar. `Skeleton::lines(n)`, bir şey yüklenirken kullanılan yer tutucudur. Bir iskelet yalnızca 300 ms beklemeden sonra görünür, böylece hızlı yüklemelerde hiç yanıp sönmez; daha geç gelen ertelenmiş bir parça onu en az 400 ms tutar.
 
+`Skeleton::kpi()`, `Skeleton::grid(rows)`, `Skeleton::list(items)` ve `Skeleton::chart()`, bir KPI kutusunun, bir DataGrid'in, bir List'in ve bir çubuk, çizgi ya da alan grafiğinin biçimini ve boyutunu alır, böylece içerik geldiğinde sayfa kaymaz. `Deferred::new(part).skeleton(Skeleton::chart())` ertelenmiş bir parça yüklenirken bunlardan birini gösterir. Tablo iskeleti satırları kadar uzundur, en fazla bir tablonun yüksekliğine kadar; tablonun üstündeki araç çubuğu buna dahil değildir. Çubuklar yavaşça yanıp söner ve kullanıcı azaltılmış hareket istediğinde durağan kalır.
+
 ## LinkButton
 
 Bir yere gitmek bağlantıdır; bir şey yapmak düğmedir. `LinkButton::new(label, screen, params)`, screen'in kanonik yoluna (örneğin `/products/42`) giden, düğme gibi görünen gerçek bir `<a href>` öğesidir; bu yüzden orta tık, "yeni sekmede aç" ve arama motorları onu olduğu gibi bir bağlantı olarak ele alır. `nav.js` üzerinden sayfa yenilemeden açılır ve Enter onu izler. Görünüm, `.primary()` ana eylemin dolu görünümünü istemedikçe ikincildir. Screen'in bir rotası olmalıdır, yoksa kod derlenmez. `EmptyState::link` ve `Hero::link` bunu kullanır.

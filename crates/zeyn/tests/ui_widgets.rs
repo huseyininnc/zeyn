@@ -119,6 +119,62 @@ fn display_components_render_accessible_escaped_markup() {
             && out.matches("z-skeleton-line").count() == 2
     );
     out.clear();
+    Skeleton::kpi().render(&mut out, &r);
+    assert!(
+        out.starts_with(r#"<div class="z-skeleton z-skeleton-kpi" aria-busy="true"><span class="z-sr-only">Yükleniyor…</span>"#)
+            && out.contains("z-skeleton-value")
+            && out.contains("z-skeleton-trend"),
+        "{out}"
+    );
+    out.clear();
+    Skeleton::grid(4).render(&mut out, &r);
+    assert!(out.contains(r#"class="z-skeleton z-skeleton-grid""#));
+    assert_eq!(
+        out.matches(r#"<div class="z-skeleton-row">"#)
+            .count(),
+        4
+    );
+    assert_eq!(out.matches("z-skeleton-head").count(), 1);
+    out.clear();
+    Skeleton::list(3).render(&mut out, &r);
+    assert!(out.contains(r#"class="z-skeleton z-skeleton-list""#));
+    assert_eq!(
+        out.matches(r#"<div class="z-skeleton-item">"#)
+            .count(),
+        3
+    );
+    out.clear();
+    Skeleton::chart().render(&mut out, &r);
+    assert!(
+        out.contains(r#"class="z-skeleton z-skeleton-chart""#) && out.contains("z-skeleton-plot")
+    );
+    assert!(
+        !out.contains("aria-hidden=\"false\"")
+            && out
+                .matches(r#"aria-hidden="true""#)
+                .count()
+                == 3,
+        "every bar is hidden from screen readers"
+    );
+    out.clear();
+    Skeleton::grid(200).render(&mut out, &r);
+    assert_eq!(
+        out.matches(r#"<div class="z-skeleton-row">"#)
+            .count(),
+        50,
+        "rows are capped"
+    );
+    out.clear();
+    zeyn::ui::Deferred::new(Badge::new("Later"))
+        .skeleton(Skeleton::kpi())
+        .render(&mut out, &r);
+    assert!(
+        out.starts_with(r#"<div class="z-deferred z-kpi-deferred" data-zeyn-defer="0""#)
+            && out.contains("z-skeleton-kpi")
+            && !out.contains("Later"),
+        "{out}"
+    );
+    out.clear();
     Badge::new("Paid")
         .tone(Tone::Success)
         .render(&mut out, &r);

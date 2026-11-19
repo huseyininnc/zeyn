@@ -636,14 +636,17 @@ fn kpi_money_shows_the_currency_in_the_users_locale() {
 #[test]
 fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
     let css = include_str!("../assets/charts.css");
-    assert!(css.contains(".z-col > .z-node:has(> .z-kpi) { height: 100%; }"));
-    assert!(css.contains(".z-autogrid > .z-node:has(> .z-kpi)"));
+    let kpi = ":is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)";
+    assert!(css.contains(&format!(
+        ".z-col > .z-node:has(> {kpi}) {{ height: 100%; }}"
+    )));
+    assert!(css.contains(&format!(".z-autogrid > .z-node:has(> {kpi})")));
     assert!(css.contains("align-items: stretch"));
     assert!(css.contains("margin-top: auto; padding-top: var(--z-s-2)"));
     for basis in [
         "calc((100% - 3 * var(--z-gap)) / 4 - 0.1px)",
         "calc((100% - var(--z-gap)) / 2 - 0.1px)",
-        ".z-kpi-trend { display: none; }",
+        ":is(.z-kpi-trend, .z-skeleton-kpi > .z-skeleton-trend) { display: none; }",
     ] {
         assert!(css.contains(basis), "{basis}");
     }

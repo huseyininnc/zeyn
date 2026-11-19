@@ -189,7 +189,7 @@ pub(crate) const MODULES: &[Module] = &[
     Module {
         name: "charts",
         script: &["data-zeyn-chart"],
-        style: &["z-chart", "z-spark", "z-kpi", "z-bullet"],
+        style: &["z-chart", "z-spark", "z-kpi", "z-skeleton-kpi", "z-bullet"],
         needs: &[],
     },
     script("share", &["data-zeyn-share", "data-zeyn-copy"]),

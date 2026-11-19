@@ -82,6 +82,8 @@ Values are formatted like grid cells: money, dates and choices in the user's lan
 
 `EmptyState::new(title).text(text)` fills an empty area with a next step: `.link(label, screen, params)` goes to another page through a `LinkButton`, and `.opens(label, screen, params)` opens a screen of the app as a window. `Skeleton::lines(n)` is a placeholder while something loads. A skeleton shows only after 300 ms of waiting, so fast loads never flash it, and a deferred part that comes later keeps it for at least 400 ms.
 
+`Skeleton::kpi()`, `Skeleton::grid(rows)`, `Skeleton::list(items)` and `Skeleton::chart()` take the shape and the size of a KPI tile, a DataGrid, a List and a bar, line or area chart, so the content replaces them without moving the page. `Deferred::new(part).skeleton(Skeleton::chart())` shows one while a deferred part loads. A grid skeleton is as tall as its rows, up to the height of a grid; a toolbar above the grid is not part of it. The bars pulse slowly and stay still when the user asks for reduced motion.
+
 ## LinkButton
 
 Going somewhere is a link; doing something is a button. `LinkButton::new(label, screen, params)` is a real `<a href>` to the screen's canonical path (such as `/products/42`) that looks like a button, so middle click, "open in new tab" and search engines treat it as the link it is. It opens through `nav.js` without a page reload, and Enter follows it. The look is secondary unless `.primary()` asks for the filled look of the main action. The screen must have a route, or the code does not compile. `EmptyState::link` and `Hero::link` use it.
