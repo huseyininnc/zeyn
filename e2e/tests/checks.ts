@@ -22,7 +22,7 @@ function isKnown(slug: string, check: string): boolean {
 }
 
 /** Pages whose text follows today's date or the clock, so their tree has no snapshot. */
-const dated = new Set(['calendar', 'week_schedule', 'feed', 'message_thread', 'composer', 'inbox', 'timeline']);
+const dated = new Set(['calendar', 'week_schedule', 'feed', 'message_thread', 'composer', 'inbox', 'timeline', 'gantt', 'heatmap']);
 
 /** Widgets with one tab stop and arrow keys inside (W3C APG), and the key that moves focus. */
 const composites: [string, string][] = [
