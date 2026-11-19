@@ -1262,7 +1262,11 @@
       "refused": "Dosya güvenlik denetiminden geçmedi.",
       "aborted": "Yükleme dosyanın tamamı gelmeden durdu. Yeniden deneyin.",
       "empty": "Dosya boş.",
-      "store_full": "Bu dosya için yer kalmadı."
+      "store_full": "Bu dosya için yer kalmadı.",
+      "open": "Bitmemiş yüklemeniz çok fazla. Birini bitirin ya da iptal edin, sonra yeniden deneyin.",
+      "offset": "Yükleme sunucuyla aynı noktada değil. Sunucunun kaldığı yerden sürer.",
+      "busy": "Bu yükleme hâlâ veri alıyor. Biraz sonra yeniden deneyin.",
+      "length": "Yükleme dosyanın boyutunu bildirmedi."
     }
   },
   "AccountLogin": {

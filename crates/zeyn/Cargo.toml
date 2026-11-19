@@ -44,6 +44,9 @@ email = ["server", "dep:lettre"]
 # passwords, purpose tokens, sealed session cookies, two factor, passkeys and a default UI.
 # Off unless an app asks for it. See docs/accounts.md.
 accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
+# Resumable uploads: a tus 1.0 subset (creation, HEAD, PATCH, expiration, termination) under
+# `/_zeyn/uploads/`, used by the upload field and FileDrop. See examples/docs/pages/forms.md.
+resumable = ["server", "dep:base64"]
 # The `ui::Markdown` component: safe Markdown to HTML, with no dependencies.
 markdown = []
 # Framework texts (`zeyn.*`) in more languages. English and Turkish are always built in; each
@@ -121,6 +124,10 @@ flate2 = "1.1"
 [[test]]
 name = "assistant"
 required-features = ["assistant"]
+
+[[test]]
+name = "resumable"
+required-features = ["resumable"]
 
 [[test]]
 name = "oidc"

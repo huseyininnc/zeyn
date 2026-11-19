@@ -135,7 +135,42 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 `FileRules::quota(bytes, window)`는 한 사용자가 창(window)마다 저장소에 업로드할 수 있는 양을 제한하며 앱의 rate store로 셉니다. 한도를 넘긴 업로드는 그대로 저장되고 다음 업로드가 `429`를 받습니다. `DiskStore`는 한 시간보다 오래된 `.part` 파일(충돌로 멈춘 업로드)을 한 시간에 최대 한 번 지웁니다. `ZipGuard`는 ZIP 기반 업로드(ZIP, Word, Excel, PowerPoint)를 위한 스캐너로, 중앙 디렉터리가 10,000개를 넘는 항목, 합계 1 GiB 초과 또는 파일 크기의 200배 초과를 선언하는 아카이브와 ZIP64 아카이브를 거부합니다. 받아들인 아카이브를 푸는 코드도 이 한도에서 멈춰야 합니다.
 
-예산: 256 MiB 업로드는 서버 힙을 약 0.4 MiB 늘립니다(`tests/files_memory.rs`). 컨트롤은 DOM 노드 10개에 파일당 5개를 렌더링하며, `files.js`는 원본 17 KB(gzip 6 KB), `files.css`는 원본 3 KB(gzip 1 KB)를 추가합니다.
+예산: 256 MiB 업로드는 서버 힙을 약 0.4 MiB 늘립니다(`tests/files_memory.rs`). 컨트롤은 DOM 노드 10개에 파일당 5개를 렌더링하며, `files.js`는 원본 21 KB(gzip 7 KB), `files.css`는 원본 3 KB(gzip 1 KB)를 추가합니다.
+
+### 이어 올리기
+
+Cargo 기능 `resumable`을 켜면 업로드 필드와 `FileDrop`은 tus 1.0 프로토콜의 일부로 파일을 보냅니다. 그래서 네트워크가 끊긴 업로드는 처음부터 다시 시작하지 않고 멈춘 곳에서 이어집니다. 컨트롤은 바꿀 필요가 없습니다.
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+`resumable_uploads`를 부르지 않으면 끝나지 않은 업로드는 시스템 임시 폴더에 저장되고, 마지막 바이트 이후 24시간 동안 보관되며, 사용자당 최대 5개, 전체 최대 1000개까지 열어 둘 수 있습니다.
+
+| 요청 | 응답 |
+|---|---|
+| `Upload-Length`와 `Upload-Metadata: filename <base64>`가 있는 `POST /_zeyn/uploads/{store}` | `Location`, `Upload-Offset: 0`, `Upload-Expires`가 있는 `201`; 저장소 한도를 넘으면 `413`, 빈 파일은 `422`, 할당량이나 열린 업로드 한도를 넘으면 `429` |
+| 해당 위치에 `HEAD` | `Upload-Offset`과 `Upload-Length`가 있는 `200` |
+| `Content-Type: application/offset+octet-stream`과 `Upload-Offset`이 있는 `PATCH` | 새 `Upload-Offset`이 있는 `204`; 오프셋이 서버와 다르면 `409`, 같은 업로드의 다른 `PATCH`가 아직 실행 중이면 `423`, 선언보다 많은 바이트는 `413` |
+| 마지막 바이트를 가져오는 `PATCH` | 일반 업로드처럼 `{id, name, size, type}`가 있는 `200` |
+| 해당 위치에 `DELETE` | `204`; 업로드와 그 바이트가 삭제됩니다 |
+
+모든 요청에는 `Tus-Resumable: 1.0.0`(없으면 `412`), 저장소의 쓰기 권한, 기능의 가드가 필요하고, `POST`, `PATCH`, `DELETE`에는 CSRF 헤더도 필요합니다. 업로드는 그것을 만든 사용자와 테넌트만 찾을 수 있으며, 다른 사람은 `404`를 받습니다. 업로드 생성은 일반 업로드처럼 쓰기 한도에 포함되지만, 그 `PATCH`는 선언한 길이보다 많이 실을 수 없으므로 포함되지 않습니다. 브라우저는 파일을 흔한 리버스 프록시의 기본 본문 한도인 1 MiB 단위 `PATCH`로 보내므로, 연결이 끊겨도 다시 보내는 양은 최대 그만큼입니다.
+
+바이트는 도착하는 대로 업로드 폴더의 `{id}.part`에 기록되므로, 연결이 끊기기 전에 서버에 도착한 바이트는 보존되고 `HEAD`가 이를 알려 줍니다. 마지막 바이트가 도착하면 파일은 `POST /_zeyn/files/{store}`와 같은 단계를 거칩니다. 내용으로 찾은 형식, 크기 한도, 할당량, 저장소, 스캐너, 인터셉터(`CallKind::Upload`)입니다. 그다음 부분 파일이 삭제되며, 검사가 파일을 거부할 때도 마찬가지입니다. 만료 시간 동안 새 바이트가 없는 업로드는 다음에 조회되거나 다음 업로드가 만들어질 때 삭제되고, 재시작으로 남은 부분 파일은 만료 시간마다 한 번 정리됩니다.
+
+브라우저에서 실패한 요청(네트워크 끊김, `409`, `423`, `429`, 서버 오류)은 브라우저가 다시 온라인이 된 뒤 1, 2, 4, 8초, 그다음 15초마다 연속 최대 12번 다시 시도됩니다. 각 시도는 먼저 오프셋을 묻고 나머지만 보냅니다. 취소는 요청을 멈추고 서버의 업로드를 삭제합니다. 최종 실패 뒤의 다시 시도는 서버가 아직 가지고 있으면 같은 업로드를 이어 갑니다.
+
+tus 1.0과의 차이: creation, expiration, termination 확장만 있고, `OPTIONS` 탐색, 체크섬, 지연 길이, 연결은 없습니다. 또한 마지막 `PATCH`는 `204` 대신 저장된 파일과 함께 `200`을 응답하므로 필드는 추가 요청 없이 파일 id를 얻습니다. 열린 업로드는 그것을 만든 프로세스만 알기 때문에, 인스턴스가 여러 개인 로드 밸런서 뒤에서는 `/_zeyn/uploads/` 경로에 고정 세션(sticky session)이 필요합니다.
 
 ## File drop
 
