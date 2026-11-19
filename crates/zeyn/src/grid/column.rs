@@ -11,8 +11,9 @@ pub struct DataGridColumn<E: Model, T> {
 }
 
 impl<E: Model, T> DataGridColumn<E, T> {
-    fn last(&mut self) -> &mut Column<E> {
+    fn last(&mut self) -> &mut Column {
         self.grid
+            .body
             .columns
             .last_mut()
             .expect("DataGridColumn always has a column")
@@ -167,7 +168,11 @@ impl<E: Model, T> DataGridColumn<E, T> {
         T: 'static,
     {
         let field = self.field;
-        self.last().cell = Some(Box::new(move |row, r| renderer.render(field.get(row), r)));
+        self.last().cell = Some(Box::new(move |row, r| {
+            row.downcast_ref::<E>()
+                .map(|row| renderer.render(field.get(row), r))
+                .unwrap_or_default()
+        }));
         self
     }
 
@@ -236,6 +241,9 @@ impl<E: Model, T> DataGridColumn<E, T> {
         let field = self.field;
         let kind = field.meta().kind;
         self.last().cell = Some(Box::new(move |row, r| {
+            let Some(row) = row.downcast_ref::<E>() else {
+                return String::new();
+            };
             format!(
                 r#"<button type="button" class="z-link" tabindex="-1" data-zeyn-effect="{}">{}</button>"#,
                 attr(&effect(row)),
