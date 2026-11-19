@@ -19,6 +19,8 @@ path = "src/main.rs"
 serde_json = "1"
 ed25519-dalek = { version = "3", default-features = false, features = ["zeroize"] }
 getrandom = "0.2"
+proc-macro2 = { version = "1", default-features = false, features = ["span-locations"] }
+syn = { version = "2", default-features = false, features = ["full", "parsing", "visit"] }
 
 [dev-dependencies]
 zeyn = { path = "../zeyn", default-features = false, features = ["signed-licenses"] }

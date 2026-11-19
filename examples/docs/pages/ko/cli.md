@@ -118,6 +118,17 @@ zeyn check --json
 
 `zeyn check`는 앱의 소스도 읽고 파일과 줄을 붙여 다음을 경고합니다. `W0106`은 `src` 없는 `<script>`나 `onclick=` 같은 인라인 이벤트 핸들러를 담은 문자열(CSP가 둘 다 막습니다), `W0107`은 `escape(..)`, `r.text(..)`, `r.value(..)` 없이 HTML을 쓰는 직접 작성한 컴포넌트, `W0108`은 범위를 제한하는 쿼리 없이 `Vec` 전체를 반환하는 action, `W0109`는 `.trusted()`로 표시한 `DocumentViewer`입니다. `permission`이나 `public`이 빠지면 경고할 필요도 없이 컴파일되지 않습니다.
 
+## 새 Zeyn 버전으로 옮기기
+
+`zeyn migrate`는 앱을 더 새로운 Zeyn 버전으로 옮깁니다(`ng update`처럼). 앱이 쓰는 Zeyn 버전을 `Cargo.lock`(또는 `Cargo.toml`)에서 읽고, 그 버전과 대상 버전 사이의 모든 마이그레이션 단계를 순서대로 실행하며, `Cargo.toml`의 Zeyn 의존성을 대상 버전으로 옮기고, 한 일을 출력합니다. 각 변경은 파일과 줄과 함께, 사람이 살펴봐야 할 곳은 이유와 함께 보여 줍니다.
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+단계는 이름과 메서드를 바꾸고(`Hub`를 `Socket`으로, `.realtime(live)`를 `.socket(live)`로), 호출의 모양을 바꾸며(`.sort_by(Order::date, true)`를 `.sort_by_desc(Order::date)`로), `use` 경로를 옮기고, 안전하게 다시 쓸 수 없는 것을 알려 줍니다. 리터럴이 아닌 `bool` 플래그나 제거된 주소로 가는 로그아웃 링크가 그 예입니다. 바꾸는 토큰만 편집하므로 서식과 주석은 그대로 남고, 두 번째 실행은 아무것도 바꾸지 않습니다. `--dry-run`은 아무것도 쓰지 않고 unified diff를 출력하며, `--json`은 보고서를 `changes`, `todos`, `errors`가 있는 하나의 JSON 문서로 출력합니다. 파일을 읽거나 파싱하거나 쓸 수 없을 때가 아니면 종료 코드는 0입니다. `zeyn check --fix`는 모든 단계의 이름 변경을 적용합니다. MCP 도구 `zeyn_migrate`는 에이전트를 위해 같은 일을 합니다.
+
 ## 빌드 속도와 디스크 사용량
 
 `zeyn doctor`는 프로젝트가 어떻게 빌드되는지 읽고 느리거나 커지는 원인을 보고합니다. target 폴더의 크기와 가장 큰 폴더, 링커, dev 프로필(디버그 정보와 의존성 최적화), `rust-version`과 비교한 rustc와 cargo, 이전 툴체인이 남긴 산출물, rust-analyzer의 target 폴더, 그리고 Windows에서는 target 폴더와 `~/.cargo`가 Defender 검사 밖에 있는지(제외 항목 또는 Dev Drive, Windows가 읽기를 허용하지 않으면 그렇다고 알려 줍니다)를 다룹니다. 각 항목에는 안정된 코드와 한 줄짜리 해결 방법이 있습니다. `--json`은 이를 하나의 문서로 출력하고, `--target-limit-gb`는 큰 것으로 볼 크기를 정하며(기본 20), 종료 코드는 항상 0입니다. `zeyn doctor --fix`는 빠른 dev 프로필을 `Cargo.toml`에, `rust-lld` 링커를 `.cargo/config.toml`에 추가하고 다른 것은 바꾸지 않으며, 두 번째 실행은 아무것도 바꾸지 않습니다. MCP 도구 `zeyn_doctor`는 에이전트를 위해 같은 일을 합니다.

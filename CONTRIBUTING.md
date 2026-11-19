@@ -63,6 +63,7 @@ The sections of [AGENTS.md](AGENTS.md) under "The rules" are not style preferenc
 - **Security.** Every action and screen declares access. Every `POST` endpoint calls `check_csrf`. User data in HTML goes through `render::escape`. The CSP stays strict. Secrets never go in code, logs or tests.
 - **Accessibility and UI.** WCAG 2.2 AA, both themes, colors from theme tokens, every user facing text in the locale files in English and Turkish.
 - **Code.** Everything in English. No inline `//` comments, use `///` and `//!` doc comments on items. `rustfmt.toml` sets `chain_width = 40`; do not raise it. Generated macro code uses `::zeyn::` paths. Follow the existing patterns instead of adding a second way to do something.
+- **Breaking changes.** A breaking change to a public API adds a `zeyn migrate` step in the same pull request (`crates/zeyn-cli/src/migrate/`, one module per version): a rename, a new call shape or a moved path, or a review pattern with the reason when an automatic rewrite is not safe.
 - **Tests.** New logic gets a test in the matching file under `crates/zeyn/tests/`. A security fix gets a regression test that fails without the fix.
 - **Browser check.** Browser behavior is checked in a real browser (the showcase or the docs app) with no console errors.
 

@@ -340,6 +340,7 @@ What to remember:
 | Mistake | Instead |
 |---|---|
 | `Grid`, `GridQuery`, `GridMode` | `DataGrid`, `DataQuery`, `DataMode` (`zeyn check --fix` rewrites old names) |
+| Fixing an upgrade to a new Zeyn version by hand | `zeyn migrate --dry-run`, then `zeyn migrate` (or the `zeyn_migrate` MCP tool); then handle what it lists for a person |
 | A literal string in the UI | `t!("key")` with the key in every `locales/*.json` |
 | `f64` for prices | `Money` |
 | `DateTime` for a birthday or a due day | `Date` |
