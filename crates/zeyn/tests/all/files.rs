@@ -1003,3 +1003,232 @@ async fn readers_download_but_only_writers_upload() {
     let (status, _, _) = send(&router, download(&id, "crm.files.read")).await;
     assert_eq!(status, StatusCode::OK);
 }
+
+/// What the ticket form saved.
+#[derive(Clone, Default)]
+pub struct SavedTickets(Arc<Mutex<Vec<Ticket>>>);
+
+impl Service for SavedTickets {}
+
+#[action(permission = "crm.files")]
+pub async fn save_ticket(ticket: Valid<Ticket>, saved: SavedTickets) -> Result<()> {
+    saved
+        .0
+        .lock()
+        .unwrap()
+        .push(ticket.into_inner());
+    Ok(())
+}
+
+/// Id of a file another user attached to the ticket before; editing the ticket keeps it.
+const KEPT: &str = "0000000000000000000000000000000a";
+
+#[screen(route = "/ticket", permission = "crm.files")]
+pub fn edit_ticket() -> Screen {
+    let mut t = ticket();
+    t.attachments = vec![File {
+        id: KEPT.into(),
+        name: "old.png".into(),
+        size: 50,
+        content_type: "image/png".into(),
+    }];
+    Screen::new("Ticket").body(
+        Form::of(t)
+            .field(Ticket::title)
+            .file(Ticket::contract, DOCS)
+            .file(Ticket::attachments, DOCS)
+            .submit("Save", save_ticket),
+    )
+}
+
+fn ticket_app(store: MemoryStore, saved: SavedTickets) -> Router {
+    App::new("Test")
+        .i18n(I18n::new("en"))
+        .service(saved)
+        .auth(|h: &HeaderMap| {
+            let user = h
+                .get("x-user")?
+                .to_str()
+                .ok()?
+                .to_string();
+            Some(Identity::user(user).with_permissions(["crm.files"]))
+        })
+        .feature(
+            Feature::new("crm")
+                .files(DOCS, "crm.files", store)
+                .screen(edit_ticket),
+        )
+        .router()
+        .unwrap()
+}
+
+async fn upload_as(router: &Router, user: &str) -> String {
+    let (status, _, body) = send(
+        router,
+        Request::post("/_zeyn/files/docs")
+            .header("x-user", user)
+            .header("x-zeyn-csrf", TOKEN)
+            .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+            .header("x-zeyn-file-name", "a.png")
+            .body(png(100).into())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    json(&body)["id"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+async fn save_as(router: &Router, user: &str, contract: &str, attachments: &[&str]) -> StatusCode {
+    let attachments: Vec<_> = attachments
+        .iter()
+        .map(|id| file_json(id, "a.png"))
+        .collect();
+    let call = serde_json::json!({
+        "screen": "edit_ticket",
+        "node": 0,
+        "values": {
+            "title": "Printer",
+            "contract": if contract.is_empty() {
+                String::new()
+            } else {
+                file_json(contract, "c.png").to_string()
+            },
+            "attachments": serde_json::Value::Array(attachments).to_string(),
+        },
+    });
+    let req = Request::post("/_zeyn/form")
+        .header("x-user", user)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-zeyn-csrf", TOKEN)
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+        .body(Body::from(call.to_string()))
+        .unwrap();
+    send(router, req).await.0
+}
+
+#[tokio::test]
+async fn a_form_refuses_file_ids_another_user_or_tenant_uploaded() {
+    let store = MemoryStore::default();
+    let saved = SavedTickets::default();
+    let router = ticket_app(store.clone(), saved.clone());
+    let foreign = |id: &str, tenant: Option<&str>, owner: &str| FileMeta {
+        id: id.into(),
+        name: "x.png".into(),
+        content_type: "image/png".into(),
+        size: 0,
+        tenant: tenant.map(String::from),
+        owner: Some(owner.into()),
+        created: 0,
+    };
+    store
+        .put(
+            foreign(KEPT, None, "bob"),
+            FileChunks::from_parts(vec![png(50)]),
+        )
+        .await
+        .unwrap();
+    let other_tenant = "0000000000000000000000000000000b";
+    store
+        .put(
+            foreign(other_tenant, Some("acme"), "ada"),
+            FileChunks::from_parts(vec![png(50)]),
+        )
+        .await
+        .unwrap();
+    let bobs = upload_as(&router, "bob").await;
+    let adas = upload_as(&router, "ada").await;
+
+    for (contract, attachments) in [
+        (bobs.as_str(), vec![KEPT]),
+        ("", vec![KEPT, bobs.as_str()]),
+        (other_tenant, vec![KEPT]),
+        ("", vec![other_tenant]),
+        ("ffffffffffffffffffffffffffffffff", vec![]),
+    ] {
+        let status = save_as(&router, "ada", contract, &attachments).await;
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{contract} {attachments:?}"
+        );
+    }
+    assert!(
+        saved.0.lock().unwrap().is_empty(),
+        "nothing is saved with a file of someone else"
+    );
+
+    let status = save_as(&router, "ada", &adas, &[KEPT, adas.as_str()]).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "own uploads and files the record already holds are fine"
+    );
+    let status = save_as(&router, "bob", "", &[&bobs]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(saved.0.lock().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn a_refused_upload_leaves_no_file_in_either_store() {
+    let dir = std::env::temp_dir().join(format!("zeyn-files-refused-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let disk = zeyn::DiskStore::new(&dir);
+    let memory = MemoryStore::default();
+    for router in [
+        app(disk.clone(), Scanner::default(), MemoryAudit::default()),
+        app(memory.clone(), Scanner::default(), MemoryAudit::default()),
+    ] {
+        let big = png(64 * 1024 + 1);
+        let chunks: Vec<Result<Bytes, std::io::Error>> = big
+            .chunks(10_000)
+            .map(|c| Ok(Bytes::copy_from_slice(c)))
+            .collect();
+        let cases: [(&str, Body, StatusCode); 4] = [
+            (
+                "big.png",
+                Body::from_stream(futures_util::stream::iter(chunks)),
+                StatusCode::PAYLOAD_TOO_LARGE,
+            ),
+            (
+                "a.png",
+                Body::from(b"%PDF-1.7\n".to_vec()),
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            ),
+            (
+                "a.zip",
+                Body::from(b"PK\x03\x04rest".to_vec()),
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            ),
+            (
+                "virus.png",
+                Body::from(png(900)),
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+        ];
+        for (name, body, expected) in cases {
+            let (status, _, _) = send(
+                &router,
+                upload(name, "crm.files")
+                    .body(body)
+                    .unwrap(),
+            )
+            .await;
+            assert_eq!(status, expected, "{name}");
+        }
+    }
+    assert!(memory.ids().is_empty());
+    let left: Vec<_> = std::fs::read_dir(&dir)
+        .map(|d| {
+            d.map(|e| e.unwrap().file_name())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    assert!(
+        left.is_empty(),
+        "no .part, .bin or .json file is left: {left:?}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

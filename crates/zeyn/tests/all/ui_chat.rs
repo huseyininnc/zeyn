@@ -577,6 +577,35 @@ fn file(id: &str) -> serde_json::Value {
     json!({ "id": id, "name": "a.png", "size": 10, "type": "image/png" })
 }
 
+/// Uploads a PNG into the chat store as the test user and answers its id.
+async fn uploaded(router: &axum::Router) -> String {
+    let png: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0";
+    let res = router
+        .clone()
+        .oneshot(
+            Request::post("/_zeyn/files/chat")
+                .header("x-perms", ALL)
+                .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                .header("x-zeyn-csrf", TOKEN)
+                .header("x-zeyn-file-name", "a.png")
+                .body(Body::from(png))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
 #[tokio::test]
 async fn the_composer_renders_its_limits_and_keys_and_loads_only_where_used() {
     let router = app(Chat::seeded());
@@ -612,8 +641,9 @@ async fn the_composer_renders_its_limits_and_keys_and_loads_only_where_used() {
 async fn sending_needs_csrf_the_permission_and_a_message_that_fits() {
     let sent = Sent::default();
     let router = app_sent(Chat::seeded(), sent.clone(), 1000);
+    let id = uploaded(&router).await;
     let ok = send_call(
-        json!({ "text": "  hi <b>  ", "mentions": [3, 3, 1], "attachments": [file("0123456789abcdef0123456789abcdef")] }),
+        json!({ "text": "  hi <b>  ", "mentions": [3, 3, 1], "attachments": [file(&id)] }),
     );
     let (status, _) = post(&router, "/_zeyn/data", ALL, Csrf::Missing, ok.clone()).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
@@ -639,6 +669,7 @@ async fn sending_needs_csrf_the_permission_and_a_message_that_fits() {
         json!({ "text": "   " }),
         json!({ "text": "x".repeat(21) }),
         json!({ "text": "hi", "attachments": [file("../../etc/passwd")] }),
+        json!({ "text": "hi", "attachments": [file("0123456789abcdef0123456789abcdef")] }),
         json!({ "text": "hi", "attachments": (0..11).map(|_| file("0123456789abcdef0123456789abcdef")).collect::<Vec<_>>() }),
         json!({ "text": "hi", "mentions": (0..21).collect::<Vec<i64>>() }),
         json!({ "text": "hi", "conversation": "b" }),

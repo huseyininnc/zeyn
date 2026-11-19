@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Security
+
+- Form submits, `FileDrop` upload actions and `Composer` sends accept only file ids the same user uploaded into the store in the same tenant. Before, any id of the server's shape passed, so a user who learned the id of another user's or tenant's file could attach it to a record of their own and download it from there. Files a record already held stay on edit; an anonymous request can name only uploads made without a signed in user.
+
 ### Fixed
 
 - The line editor no longer makes the page scroll sideways on a narrow touch screen: its screen reader only text sat outside the scroll box of the table and reached past the viewport.

@@ -52,7 +52,8 @@ impl SendKey {
 
 /// What the send action of a [`Composer`] gets. `conversation` comes from the component, never
 /// from the browser. The text is trimmed, 1 to `max_chars` characters (or empty when files are
-/// attached); the files passed the upload checks of their store, at most its `max_files`, and
+/// attached); the files passed the upload checks of their store and were uploaded by the same
+/// user in the same tenant, at most its `max_files`, and
 /// `mentions` are ids the user picked from the mention search, at most
 /// [`MAX_MESSAGE_MENTIONS`]. All of it is untrusted: the action checks the user takes part in the
 /// conversation and may name the people mentioned.
@@ -96,8 +97,15 @@ where
 
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
         let checked = self.check(input);
+        let store = self.files.map_or("", |r| r.store());
         Box::pin(async move {
             let send = checked?;
+            let ids = send
+                .attachments
+                .iter()
+                .map(|f| f.id.clone())
+                .collect();
+            crate::files::check_owned(&ctx, store, ids).await?;
             A::call(ctx, send).await??;
             Ok(json!({ "ok": true }))
         })

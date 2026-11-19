@@ -489,7 +489,8 @@ impl<M: Model> Form<M> {
     /// cancel and retry, previews for images. Files go to the store registered with the same
     /// `rules` on the feature ([`Feature::files`](crate::Feature::files)), which checks size,
     /// type and permission again on the server. A `Vec<File>` field takes up to
-    /// `rules.files()` files.
+    /// `rules.files()` files. On submit, a file the record did not hold before must have been
+    /// uploaded into that store by the same user in the same tenant; any other id is refused.
     ///
     /// ```ignore
     /// Form::of(ticket).file(Ticket::attachments, ATTACHMENTS)
@@ -904,6 +905,26 @@ type PairCheck = (
     Option<crate::ctx::BoxFuture<Result<Json>>>,
 );
 
+/// New files of an upload field to check on submit: the error to show, the store and the ids.
+type FileCheck = (FieldError, &'static str, Vec<String>);
+
+/// Refuses a submit that names a file the user did not upload, see
+/// [`check_owned`](crate::files::check_owned).
+async fn check_files(ctx: &Ctx, checks: Vec<FileCheck>) -> Result<()> {
+    let mut errors = ValidationErrors::default();
+    for (error, store, ids) in checks {
+        if crate::files::check_owned(ctx, store, ids)
+            .await
+            .is_err()
+        {
+            errors.errors.push(error);
+        }
+    }
+    errors
+        .into_result()
+        .map_err(Error::Validation)
+}
+
 /// Refuses a submit whose dependent lookups hold an id their lookup does not return for the
 /// submitted parent, such as a city of another country.
 async fn check_pairs(pairs: Vec<PairCheck>) -> Result<()> {
@@ -1008,9 +1029,17 @@ where
                 .pair_checks(&**saved, &values, &ctx),
             Err(_) => Vec::new(),
         };
+        let files = match &valid {
+            Ok(saved) => self
+                .form
+                .body
+                .file_checks(&**saved, &self.form.model),
+            Err(_) => Vec::new(),
+        };
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;
+            check_files(&ctx, files).await?;
             check_pairs(pairs).await?;
             let output = A::call(ctx, valid).await?;
             if let Some(error) = output.failure() {
@@ -1777,6 +1806,40 @@ impl FormBody {
             }
         }
         Ok((object, errors))
+    }
+
+    /// The file ids of each upload field that `saved` holds and `loaded` did not, with the
+    /// field, its store and the error shown when the store refuses one. Files the record held
+    /// before stay as they are, whoever uploaded them.
+    fn file_checks(&self, saved: &dyn FormModel, loaded: &dyn FormModel) -> Vec<FileCheck> {
+        if self.files.is_empty() {
+            return Vec::new();
+        }
+        let (saved_json, loaded_json) = (saved.form_json(), loaded.form_json());
+        let mut out = Vec::new();
+        for (name, rules, _) in &self.files {
+            let before = crate::files::file_ids(loaded_json.get(*name));
+            let ids: Vec<String> = crate::files::file_ids(saved_json.get(*name))
+                .into_iter()
+                .filter(|id| !before.contains(id))
+                .collect();
+            let Some(meta) = saved
+                .form_fields()
+                .iter()
+                .find(|m| m.name == *name)
+            else {
+                continue;
+            };
+            if !ids.is_empty() {
+                let error = FieldError {
+                    field: meta.name,
+                    rule: Rule::Custom,
+                    message: Text::key("zeyn.files.not_found").arg("label", meta.label_text()),
+                };
+                out.push((error, rules.store(), ids));
+            }
+        }
+        out
     }
 
     /// Starts the checks of the dependent lookups of a read form: for each one with a value, the

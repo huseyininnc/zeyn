@@ -1990,6 +1990,14 @@ impl App {
             .then(|| Arc::from(self.i18n.default_locale()));
         self.services
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
+        let stores = self
+            .features
+            .iter()
+            .flat_map(|f| f.file_stores())
+            .map(|e| (e.rules.store(), e.store.clone()))
+            .collect();
+        self.services
+            .insert(crate::files::FileStores(Arc::new(stores)));
         self.services
             .insert(self.client_prefs.clone());
         if let Some(source) = self.menu_source.take() {

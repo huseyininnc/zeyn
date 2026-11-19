@@ -31,7 +31,8 @@ where
 /// focus. They upload with a progress bar, at most three at a time, and can be canceled, retried
 /// and removed, like the upload field of a form. The file picker is the keyboard and single
 /// pointer path. The store must be registered with `Feature::files`, which checks the upload
-/// permission; the action checks its own.
+/// permission; the action checks its own. The action runs only for a file the same user
+/// uploaded into the store in the same tenant.
 ///
 /// ```ignore
 /// #[action(permission = "docs.add")]
@@ -112,8 +113,10 @@ impl DataSource for FileDrop {
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
         let file = self.check(input);
         let run = self.action.map(|(_, run)| run);
+        let store = self.rules.store();
         Box::pin(async move {
             let (file, run) = file.zip(run).ok_or(Error::NotFound)?;
+            crate::files::check_owned(&ctx, store, vec![file.id.clone()]).await?;
             run(ctx, file).await?;
             Ok(json!({ "ok": true }))
         })
