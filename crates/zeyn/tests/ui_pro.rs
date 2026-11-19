@@ -124,6 +124,20 @@ pub fn designer() -> Screen {
         )
 }
 
+#[screen(route = "/shape-settings", permission = "orders.read")]
+pub fn shape_settings() -> Screen {
+    Screen::new("Shape settings").body(
+        Form::of(Shape {
+            name: "A".into(),
+            width: 5,
+        })
+        .settings()
+        .section("General")
+        .field(Shape::name)
+        .submit("Save", save_shape),
+    )
+}
+
 fn denied(_: &Ctx) -> GuardResult {
     GuardResult::Deny("No".into())
 }
@@ -177,6 +191,7 @@ fn app_with(counter: Counter, views: bool) -> Router {
             .screen(orders)
             .screen(order_form)
             .screen(designer)
+            .screen(shape_settings)
             .screen(work)
             .command(new_order())
             .command(archive())
@@ -570,6 +585,24 @@ async fn menubar_follows_the_apg_pattern_and_leaves_out_commands_the_user_may_no
     assert!(
         html.contains(r#"tabindex="-1">Admin</button>"#),
         "only the first top item is a tab stop"
+    );
+}
+
+#[tokio::test]
+async fn settings_forms_mark_themselves_and_link_their_stylesheet_only_where_used() {
+    let router = app(Counter::default());
+    let (_, html) = send(&router, get("/shape-settings", "orders.read")).await;
+    assert!(
+        html.contains(r#"<form class="z-form z-form-settings" data-testid="shape_settings.form""#),
+        "{html}"
+    );
+    assert!(html.contains(r#"<div class="z-form-actions"><span class="z-form-unsaved">You have unsaved changes.</span><button type="submit""#));
+    assert!(html.contains("/_zeyn/forms.css"));
+    let (_, plain) = send(&router, get("/designer", "orders.read")).await;
+    assert!(!plain.contains("z-form-unsaved"));
+    assert!(
+        !plain.contains("/_zeyn/forms.css"),
+        "other forms do not load the settings stylesheet"
     );
 }
 
