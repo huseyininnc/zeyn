@@ -41,8 +41,9 @@ const TUS: &str = "1.0.0";
 pub(super) struct Uploads {
     settings: ResumableUploads,
     open: Mutex<HashMap<String, Arc<Open>>>,
-    /// When the folder was last swept for parts nobody knows, in milliseconds since 1970.
+    /// When the folder was last swept for parts nobody knows, in [`Uploads::now_ms`].
     swept: AtomicU64,
+    start: tokio::time::Instant,
 }
 
 /// One unfinished upload.
@@ -53,7 +54,7 @@ struct Open {
     name: String,
     length: u64,
     offset: AtomicU64,
-    /// Milliseconds since 1970 of the last bytes, or of the creation.
+    /// [`Uploads::now_ms`] of the last bytes, or of the creation.
     touched: AtomicU64,
     /// A `PATCH` is writing.
     busy: AtomicBool,
@@ -76,7 +77,9 @@ impl Drop for Writing<'_> {
     }
 }
 
-fn now_ms() -> u64 {
+/// Milliseconds since 1970, for `Upload-Expires` only; expiry itself runs on the monotonic
+/// clock of [`Uploads::now_ms`], so a wall clock that jumps expires nothing.
+fn wall_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u64)
@@ -88,7 +91,13 @@ impl Uploads {
             settings,
             open: Mutex::new(HashMap::new()),
             swept: AtomicU64::new(0),
+            start: tokio::time::Instant::now(),
         }
+    }
+
+    /// Milliseconds since the app started, on the monotonic clock of the runtime.
+    fn now_ms(&self) -> u64 {
+        self.start.elapsed().as_millis() as u64
     }
 
     fn part(&self, id: &str) -> PathBuf {
@@ -109,7 +118,7 @@ impl Uploads {
     /// Drops expired uploads and their parts. At most once per expiry time it also removes
     /// parts the map does not know, left by a restart.
     async fn sweep(&self) {
-        let now = now_ms();
+        let now = self.now_ms();
         let gone: Vec<PathBuf> = match self.open.lock() {
             Ok(mut open) => {
                 let ids: Vec<String> = open
@@ -170,7 +179,7 @@ impl Uploads {
         {
             return Err(missing());
         }
-        if self.expired(&found, now_ms()) {
+        if self.expired(&found, self.now_ms()) {
             open.remove(id);
             found.gone.store(true, Ordering::SeqCst);
             let _ = std::fs::remove_file(self.part(id));
@@ -286,7 +295,11 @@ fn answer(mut r: Response, extra: &[(&'static str, String)]) -> Response {
 fn expires_header(st: &AppState, open: &Open) -> (&'static str, String) {
     (
         "upload-expires",
-        http_date(open.touched.load(Ordering::SeqCst) + st.uploads.expires_ms()),
+        http_date(
+            wall_ms()
+                + (open.touched.load(Ordering::SeqCst) + st.uploads.expires_ms())
+                    .saturating_sub(st.uploads.now_ms()),
+        ),
     )
 }
 
@@ -332,7 +345,7 @@ async fn create(
             name: file_name(&headers),
             length,
             offset: AtomicU64::new(0),
-            touched: AtomicU64::new(now_ms()),
+            touched: AtomicU64::new(uploads.now_ms()),
             busy: AtomicBool::new(false),
             gone: AtomicBool::new(false),
         });
@@ -532,9 +545,6 @@ async fn write(
             target
                 .offset
                 .fetch_add(chunk.len() as u64, Ordering::SeqCst);
-            target
-                .touched
-                .store(now_ms(), Ordering::SeqCst);
         }
         file.sync_data()
     });
@@ -556,6 +566,8 @@ async fn write(
                 if tx.send(chunk).await.is_err() {
                     break;
                 }
+                open.touched
+                    .store(st.uploads.now_ms(), Ordering::SeqCst);
             }
             Ok(None) => break,
             Err(f) => {

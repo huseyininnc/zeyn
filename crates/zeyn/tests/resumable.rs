@@ -197,18 +197,26 @@ async fn an_upload_resumes_from_the_server_offset_and_ends_in_the_store() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-#[tokio::test]
+/// Runs on a paused clock: expiry uses the runtime's monotonic time, so the test steps over it
+/// instead of racing it on a slow machine.
+#[tokio::test(start_paused = true)]
 async fn expired_uploads_are_removed_with_their_parts() {
     let dir = folder("expiry");
     let router = app(
-        ResumableUploads::new(&dir).expires(Duration::from_millis(300)),
+        ResumableUploads::new(&dir).expires(Duration::from_secs(3600)),
         MemoryStore::default(),
     );
     let (_, first) = create(&router, "ada", 1000).await;
     let (_, second) = create(&router, "ada", 1000).await;
     patch(&router, &first, "ada", 0, Body::from(png(100))).await;
     assert_eq!(parts(&dir), 2);
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::advance(Duration::from_secs(3599)).await;
+    assert_eq!(
+        offset(&router, &second, "ada").await.1,
+        "0",
+        "still open before the expiry"
+    );
+    tokio::time::advance(Duration::from_secs(2)).await;
     assert_eq!(
         offset(&router, &first, "ada").await.0,
         StatusCode::NOT_FOUND
