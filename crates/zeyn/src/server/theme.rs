@@ -880,7 +880,7 @@ fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
     (x.max(y) + 0.05) / (x.min(y) + 0.05)
 }
 
-/// Key of the saved theme in the app's view store.
+/// Key of the saved look (theme and density) in the app's view store.
 fn store_key(ctx: &Ctx) -> String {
     format!(
         "{}:~theme",
@@ -892,51 +892,166 @@ fn store_key(ctx: &Ctx) -> String {
 
 const STORE_PREFIX: &str = "theme:";
 
-/// On a full page load without a `zeyn_theme` cookie, the signed in user's theme from the view
-/// store, with the cookie to set so later pages do not ask again.
-pub(super) async fn remember(
-    st: &AppState,
-    ctx: Ctx,
-    headers: &HeaderMap,
-) -> (Ctx, Option<String>) {
-    if !st.look.picker || cookie(headers, "zeyn_theme").is_some() {
-        return (ctx, None);
+const DENSITY_PREFIX: &str = "density:";
+
+/// The density a request names: `compact` or `comfortable`, `None` for anything else.
+fn density_value(name: &str) -> Option<&'static str> {
+    match name {
+        "compact" => Some("compact"),
+        "comfortable" => Some("comfortable"),
+        _ => None,
+    }
+}
+
+/// Cookie value that marks a look the store does not hold. No theme can have this name and no
+/// density this value, so every reader ignores it and renders the default.
+const NOTHING_SAVED: &str = "_";
+
+/// On a full page load that lacks the `zeyn_theme` or the `zeyn_density` cookie, the signed in
+/// user's saved look from the view store (one read for both), with the cookies to set so later
+/// pages do not ask again. When the store holds no value for a missing cookie, that cookie is set
+/// to [`NOTHING_SAVED`] for a day, so later pages skip the store until it is read again. Pages
+/// that carry both cookies never touch the store.
+pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (Ctx, Vec<String>) {
+    let want_theme = st.look.picker && cookie(headers, "zeyn_theme").is_none();
+    let want_density = cookie(headers, "zeyn_density").is_none();
+    if !want_theme && !want_density {
+        return (ctx, Vec::new());
     }
     let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) else {
-        return (ctx, None);
+        return (ctx, Vec::new());
     };
     let saved = match st
         .timed(store.load(&user, &store_key(&ctx)))
         .await
     {
-        Ok(v) => v,
+        Ok(v) => v.unwrap_or_default(),
         Err(_) => {
-            eprintln!("warning: the view store failed to load a theme; using the default");
-            return (ctx, None);
+            eprintln!("warning: the view store failed to load the look; using the default");
+            return (ctx, Vec::new());
         }
     };
-    let name = saved.and_then(|v| {
-        v.columns.into_iter().find_map(|c| {
-            c.field
-                .strip_prefix(STORE_PREFIX)
-                .map(str::to_string)
-        })
-    });
-    match name.and_then(|n| st.look.allowed(&n)) {
-        Some(theme) => {
-            let c = theme_cookie(st, &theme);
-            (ctx.with_theme(theme), Some(c))
+    let saved_as = |prefix: &str| {
+        saved
+            .columns
+            .iter()
+            .find_map(|c| c.field.strip_prefix(prefix))
+            .map(str::to_string)
+    };
+    let mut ctx = ctx;
+    let mut cookies = Vec::new();
+    if want_theme {
+        match saved_as(STORE_PREFIX).and_then(|n| st.look.allowed(&n)) {
+            Some(theme) => {
+                cookies.push(look_cookie(st, "zeyn_theme", &theme, YEAR));
+                ctx = ctx.with_theme(theme);
+            }
+            None => cookies.push(look_cookie(st, "zeyn_theme", NOTHING_SAVED, DAY)),
         }
-        None => (ctx, None),
     }
+    if want_density {
+        match saved_as(DENSITY_PREFIX)
+            .as_deref()
+            .and_then(density_value)
+        {
+            Some(density) => {
+                cookies.push(density_cookie(st, density));
+                if density == "compact" {
+                    ctx = ctx.with_compact();
+                }
+            }
+            None => cookies.push(look_cookie(st, "zeyn_density", NOTHING_SAVED, DAY)),
+        }
+    }
+    (ctx, cookies)
+}
+
+const YEAR: u32 = 31_536_000;
+
+const DAY: u32 = 86_400;
+
+/// A look cookie: `zeyn_theme` or `zeyn_density` with its value and lifetime in seconds.
+fn look_cookie(st: &AppState, name: &str, value: &str, max_age: u32) -> String {
+    let secure = if st.secure_cookies { "; Secure" } else { "" };
+    format!(
+        "{name}={value}; Path={}; Max-Age={max_age}; SameSite=Lax{secure}",
+        st.cookie_path()
+    )
 }
 
 fn theme_cookie(st: &AppState, name: &str) -> String {
-    let secure = if st.secure_cookies { "; Secure" } else { "" };
-    format!(
-        "zeyn_theme={name}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
-        st.cookie_path()
-    )
+    look_cookie(st, "zeyn_theme", name, YEAR)
+}
+
+fn density_cookie(st: &AppState, value: &str) -> String {
+    look_cookie(st, "zeyn_density", value, YEAR)
+}
+
+/// Saves a signed in user's look in the view store: the theme and density given, the other one
+/// from the request's cookie or, without that cookie, from what the store holds, so a change to
+/// one never drops the other. Without a store or a user nothing is saved and the cookie alone
+/// keeps the choice.
+async fn save_look(
+    st: &AppState,
+    ctx: &Ctx,
+    headers: &HeaderMap,
+    theme: Option<&str>,
+    density: Option<&str>,
+) {
+    let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) else {
+        return;
+    };
+    let theme = theme.map(str::to_string).or_else(|| {
+        cookie(headers, "zeyn_theme")
+            .and_then(|n| st.look.allowed(n))
+            .map(|t| t.to_string())
+    });
+    let density = density.or_else(|| cookie(headers, "zeyn_density").and_then(density_value));
+    let (theme, density) = if theme.is_none() || density.is_none() {
+        let held = st
+            .timed(store.load(&user, &store_key(ctx)))
+            .await
+            .ok()
+            .flatten()
+            .map(|v| v.columns)
+            .unwrap_or_default();
+        let held_as = |prefix: &str| {
+            held.iter()
+                .find_map(|c| c.field.strip_prefix(prefix))
+                .map(str::to_string)
+        };
+        (
+            theme.or_else(|| held_as(STORE_PREFIX)),
+            density.or_else(|| {
+                held_as(DENSITY_PREFIX)
+                    .as_deref()
+                    .and_then(density_value)
+            }),
+        )
+    } else {
+        (theme, density)
+    };
+    let field = |f: String| ColumnView {
+        field: f,
+        width: None,
+        pin: None,
+    };
+    let columns = theme
+        .map(|t| field(format!("{STORE_PREFIX}{t}")))
+        .into_iter()
+        .chain(density.map(|d| field(format!("{DENSITY_PREFIX}{d}"))))
+        .collect();
+    let view = DataGridView {
+        columns,
+        ..DataGridView::default()
+    };
+    if st
+        .timed(store.save(&user, &store_key(ctx), Some(view)))
+        .await
+        .is_err()
+    {
+        eprintln!("warning: the view store failed to save the look; the cookies still keep it");
+    }
 }
 
 #[derive(Deserialize)]
@@ -963,23 +1078,7 @@ async fn set_theme(
     else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    if let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) {
-        let view = DataGridView {
-            columns: vec![ColumnView {
-                field: format!("{STORE_PREFIX}{theme}"),
-                width: None,
-                pin: None,
-            }],
-            ..DataGridView::default()
-        };
-        if st
-            .timed(store.save(&user, &store_key(&ctx), Some(view)))
-            .await
-            .is_err()
-        {
-            eprintln!("warning: the view store failed to save a theme; the cookie still keeps it");
-        }
-    }
+    save_look(&st, &ctx, &headers, Some(&*theme), None).await;
     with_cookie(
         StatusCode::NO_CONTENT.into_response(),
         Some(theme_cookie(&st, &theme)),
@@ -993,7 +1092,8 @@ struct DensityCall {
 
 /// `POST /_zeyn/density {"density": "compact"}`: stores the density in the `zeyn_density` cookie
 /// (`comfortable` or `compact`), which the server renders on `<html>` and from which it picks the
-/// row height of virtual grids. `404` for any other value.
+/// row height of virtual grids, and, for a signed in user in an app with a view store, in the
+/// store next to the theme, so it follows the user to other devices. `404` for any other value.
 async fn set_density(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -1003,18 +1103,13 @@ async fn set_density(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let value = match call.density.as_str() {
-        "compact" => "compact",
-        "comfortable" => "comfortable",
-        _ => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+    let Some(value) = density_value(&call.density) else {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    let secure = if st.secure_cookies { "; Secure" } else { "" };
+    save_look(&st, &ctx, &headers, None, Some(value)).await;
     with_cookie(
         StatusCode::NO_CONTENT.into_response(),
-        Some(format!(
-            "zeyn_density={value}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
-            st.cookie_path()
-        )),
+        Some(density_cookie(&st, value)),
     )
 }
 
