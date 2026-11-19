@@ -14,6 +14,7 @@
 | `zeyn check` | कंपाइल करता है और संरचनात्मक समस्याएँ तथा छूटे हुए अनुवाद बताता है |
 | `zeyn check --fix` | `src`, `tests` और `examples` में नाम बदले गए Zeyn API को फिर से लिखता है, फिर जाँचता है |
 | `zeyn check --json` | रिपोर्ट को स्थिर कोड, कारण और समाधान के साथ JSON में छापता है |
+| `zeyn doctor` | प्रोजेक्ट के बिल्ड होने का तरीका पढ़ता है और बताता है कि क्या उसे धीमा या बड़ा बनाता है, हर निष्कर्ष के लिए एक पंक्ति का समाधान देता है |
 | `zeyn mcp` | AI एजेंट के लिए stdio पर MCP सर्वर चलाता है |
 
 इसे crates.io से इंस्टॉल करें:
@@ -54,6 +55,7 @@ cargo run
 
   `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)` नहीं।
 - `build.rs` और `Cargo.toml` में `[package.metadata.zeyn]` के नीचे `max_file_lines = 300`: `src/` की किसी फ़ाइल में इससे ज़्यादा भरी हुई पंक्तियाँ हों तो `cargo build` रुक जाता है; clippy `too_many_lines` (60, `clippy.toml` में) फ़ंक्शनों के लिए यही करता है। [Project structure](structure.md) देखें।
+- `Cargo.toml` में `[profile.dev]`, `.cargo/config.toml` और `.vscode/settings.json`: तेज़ बिल्ड चक्र। निर्भरताएँ `opt-level = 1` के साथ और डीबग जानकारी के बिना बनती हैं, आपका अपना कोड केवल लाइन तालिकाएँ रखता है (बैकट्रेस में फ़ाइल और लाइन दिखती है; स्थानीय चरों के साथ डीबग करने के लिए `CARGO_PROFILE_DEV_DEBUG=full` सेट करें), Windows `rust-lld` से लिंक करता है, और rust-analyzer अपना अलग target फ़ोल्डर इस्तेमाल करता है ताकि वह `cargo build` का इंतज़ार न करे।
 - `Dockerfile` और `.dockerignore`: छोटी कंटेनर इमेज।
 - आम CI सर्वरों के लिए पाइपलाइन, सभी वही जाँचें चलाती हैं (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) और ऐसे टैग `vX.Y.Z` को अस्वीकार करती हैं जो `Cargo.toml` से मेल न खाए:
   - GitHub Actions के लिए `.github/workflows/ci.yml`, साथ में `.github/dependabot.yml` (साप्ताहिक Cargo और action अपडेट) और पुल रिक्वेस्ट चेकलिस्ट;
@@ -114,6 +116,10 @@ zeyn check --json
 
 `zeyn check` ऐप के स्रोत को भी पढ़ता है और फ़ाइल व पंक्ति के साथ इन पर चेतावनी देता है: `W0106` ऐसी स्ट्रिंग जिसमें `src` के बिना `<script>` या `onclick=` जैसा इनलाइन इवेंट हैंडलर हो (CSP दोनों को रोकता है), `W0107` हाथ से लिखा कंपोनेंट जो `escape(..)`, `r.text(..)` या `r.value(..)` के बिना HTML लिखता है, `W0108` ऐसा action जो उसे सीमित करने वाली क्वेरी के बिना पूरा `Vec` लौटाता है, और `W0109` `.trusted()` चिह्नित `DocumentViewer`। गायब `permission` या `public` के लिए चेतावनी की ज़रूरत नहीं: वह कंपाइल ही नहीं होता।
 
+## बिल्ड की गति और डिस्क का उपयोग
+
+`zeyn doctor` प्रोजेक्ट के बिल्ड होने का तरीका पढ़ता है और बताता है कि क्या उसे धीमा या बड़ा बनाता है: target फ़ोल्डर का आकार और उसके सबसे बड़े फ़ोल्डर, लिंकर, dev प्रोफ़ाइल (डीबग जानकारी और निर्भरताओं का ऑप्टिमाइज़ेशन), `rust-version` के मुकाबले rustc और cargo, पुराने टूलचेन के छोड़े आर्टिफ़ैक्ट, rust-analyzer का target फ़ोल्डर और Windows पर यह कि target फ़ोल्डर और `~/.cargo` Defender स्कैन से बाहर हैं या नहीं (अपवाद या Dev Drive; Windows पढ़ने न दे तो यह वही कहता है)। हर निष्कर्ष का एक स्थिर कोड और एक पंक्ति का समाधान होता है। `--json` उन्हें एक दस्तावेज़ के रूप में छापता है, `--target-limit-gb` तय करता है कि कितना आकार बड़ा माना जाए (डिफ़ॉल्ट 20), और एग्ज़िट कोड हमेशा 0 होता है। `zeyn doctor --fix` तेज़ dev प्रोफ़ाइल `Cargo.toml` में और `rust-lld` लिंकर `.cargo/config.toml` में जोड़ता है और कुछ और नहीं बदलता; दूसरी बार चलाने पर कुछ नहीं बदलता। MCP टूल `zeyn_doctor` एजेंट के लिए यही करता है।
+
 ## DevTools
 
 `cargo run` (या `zeyn dev`) से चलने वाला डिबग बिल्ड दर्ज करता है कि हर अनुरोध ने क्या किया: कौन सी Screen और Action चली, उसका स्टेटस और समय, Screen को बनने और रेंडर होने में कितना समय लगा, हर SQL स्टेटमेंट उसके समय और प्रभावित पंक्तियों के साथ, और Action ने कौन से इफ़ेक्ट और टॉपिक लौटाए। Alt+Shift+D पिछले 50 अनुरोधों वाला पैनल खोलता है; हर अनुरोध खुलकर अपने स्टेटमेंट दिखाता है। `GET /_zeyn/devtools` यही सूची JSON में लौटाता है, और MCP टूल `zeyn_devtools` इसे एजेंट के लिए पढ़ता है।
@@ -133,4 +139,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP सर्वर
 
-`zeyn mcp` stdio पर MCP बोलता है। इसके टूल हैं `zeyn_docs` (विषय के अनुसार फ्रेमवर्क संदर्भ), `zeyn_describe` (मौजूदा डायरेक्टरी के ऐप के feature, Screen, रूट और समस्याएँ), `zeyn_inspect` (किसी Screen का node ट्री, हर node को रखने वाली Rust पंक्ति के साथ), `zeyn_devtools` (चल रहे debug build का DevTools request log: Screen, action, समय, SQL statements), `zeyn_check` (`fix: true` के साथ यह `check --fix` चलाता है), `zeyn_test`, `zeyn_new_feature` और `zeyn_new_screen`। देखें [MCP और AI एजेंट](mcp.md)।
+`zeyn mcp` stdio पर MCP बोलता है। इसके टूल हैं `zeyn_docs` (विषय के अनुसार फ्रेमवर्क संदर्भ), `zeyn_describe` (मौजूदा डायरेक्टरी के ऐप के feature, Screen, रूट और समस्याएँ), `zeyn_inspect` (किसी Screen का node ट्री, हर node को रखने वाली Rust पंक्ति के साथ), `zeyn_devtools` (चल रहे debug build का DevTools request log: Screen, action, समय, SQL statements), `zeyn_check` (`fix: true` के साथ यह `check --fix` चलाता है), `zeyn_doctor`, `zeyn_test`, `zeyn_new_feature` और `zeyn_new_screen`। देखें [MCP और AI एजेंट](mcp.md)।
