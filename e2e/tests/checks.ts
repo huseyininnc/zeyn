@@ -227,11 +227,34 @@ async function smallTargets(page: Page): Promise<string[]> {
   }, targets);
 }
 
-/** Whether the page scrolls sideways as a whole (grids and canvases scroll in their own box). */
-async function pageScrollsSideways(page: Page): Promise<boolean> {
-  return page.evaluate(
-    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-  );
+/**
+ * Whether the page scrolls sideways as a whole (grids and canvases scroll in their own box).
+ * When it does, the findings name the outermost elements that reach past the viewport, so a CI
+ * failure says where to look.
+ */
+async function sidewaysOverflow(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const root = document.documentElement;
+    if (root.scrollWidth <= root.clientWidth + 1) return [];
+    const width = root.clientWidth;
+    const out: string[] = [`page ${root.scrollWidth}px wide in ${width}px`];
+    for (const el of Array.from(document.body.querySelectorAll<HTMLElement>('*'))) {
+      const r = el.getBoundingClientRect();
+      if (r.right <= width + 1 && r.left >= -1) continue;
+      let clipped = false;
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        if (getComputedStyle(a).overflowX !== 'visible') {
+          clipped = true;
+          break;
+        }
+      }
+      if (clipped) continue;
+      const cls = typeof el.className === 'string' && el.className ? '.' + el.className.split(' ').join('.') : '';
+      out.push(`${el.tagName.toLowerCase()}${cls} ${Math.round(r.left)}..${Math.round(r.right)}`);
+      if (out.length > 6) break;
+    }
+    return out;
+  });
 }
 
 /** Fails the check with its findings unless the page and check are listed as known. */
@@ -263,11 +286,11 @@ export function componentGroup(category: string) {
         }
         if (project === 'rtl') {
           expect(await page.evaluate(() => document.dir)).toBe('rtl');
-          report(slug, 'rtl-overflow', (await pageScrollsSideways(page)) ? ['page scrolls sideways'] : []);
+          report(slug, 'rtl-overflow', await sidewaysOverflow(page));
         }
         if (project === 'touch') {
           report(slug, 'targets', await smallTargets(page));
-          report(slug, 'reflow', (await pageScrollsSideways(page)) ? ['page scrolls sideways'] : []);
+          report(slug, 'reflow', await sidewaysOverflow(page));
         }
         report(slug, 'console', errors);
       });
