@@ -129,6 +129,8 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 4. 运行 Feature 的 `FileScanner`；被拒绝的文件，或扫描器失败时，文件会被删除，并返回 `422`；
 5. 返回 `201` 和 `{id, name, size, type}`。id 是服务器生成的 128 位随机数；文件名会被清除路径和控制字符。
 
+启用 `image` 功能后，`FileRules::clean_images()` 会在存储保存文件后增加一步：PNG、JPEG 和 WebP 上传会被解码并以相同格式重新编码，因此 EXIF（含 GPS）、XMP、ICC 配置文件、文本块以及藏在图像数据之后的字节都不会留在服务器上。EXIF 方向会先应用到像素上；JPEG 以质量 90 写出，PNG 和 WebP 为无损。解码在单边 `MAX_IMAGE_SIDE`（12,000）像素和 `MAX_IMAGE_MEMORY`（256 MiB）处停止；无法解码的图像会被删除，响应为 `422`。两个上限都会在解码任何像素之前按图像头中的尺寸检查，因此声称是巨大图像的小文件会在不占用那部分内存的情况下被拒绝；动画图像只保留第一帧。清理后的文件以新的 id 替换原文件，随后扫描器检查清理后的文件。没有该功能时这个方法不存在，因此存储不会在没有清理时误以为已经清理。
+
 下载（`GET /_zeyn/files/{store}/{id}`）会检查 id 的形态、权限、guard 和租户，并通过媒体服务（参见 `docs/media.md`）处理：范围请求、实体标签和 `nosniff`。只有位图图片、音频和视频以内联方式提供；其余一律以 `application/octet-stream` 和 `Content-Disposition: attachment` 发送，附带带引号的 ASCII 名称和 UTF-8 名称，并带有 `Content-Security-Policy: sandbox`。
 
 `DiskStore` 在一个文件夹中保存 `{id}.bin` 和 `{id}.json`，并先把上传内容写到 `{id}.part`。`MemoryStore` 把文件保存在内存中并设有字节上限，用于测试和演示。表单值只是引用文件的名称：必须确认文件存在的保存 action 应调用 `store.meta(id)`，showcase 就是这样做的。
