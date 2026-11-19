@@ -17,6 +17,7 @@ The project an agent works in carries its own rules and tools:
 | `zeyn_devtools` | The DevTools request log of the app running in debug mode: newest requests first, each with its screen, action, status, times and SQL statements (text and time, no values); `addr` and `limit` are optional |
 | `zeyn_check` | Compiles and reports problems; `fix: true` first rewrites renamed APIs |
 | `zeyn_doctor` | Reads how the project builds: target size, linker, dev profile, toolchain, Windows scan exclusions; `fix: true` adds the fast dev profile and linker (only `Cargo.toml` and `.cargo/config.toml`) |
+| `zeyn_migrate` | Moves the app to a newer Zeyn version step by step (renames, changed calls, moved paths), keeping formatting; returns each change with file and line and what needs a person; `dry_run: true` returns a diff and writes nothing |
 | `zeyn_test` | Runs `cargo test` and returns the end of the output |
 | `zeyn_new_feature` | Creates a feature folder and registers it |
 | `zeyn_new_screen` | Adds a screen file to a feature and registers it |

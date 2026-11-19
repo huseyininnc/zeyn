@@ -153,6 +153,9 @@ missing. Never call `location.reload()` or `location.assign()` for in-app naviga
   for an AI agent to act on (`#[diagnostic::on_unimplemented]` where it fits).
 - Keep the existing structure and patterns; do not add a second way to do something that already
   has one.
+- A breaking change to a public API adds a `zeyn migrate` step in the same change: a rename, a
+  call shape or a moved path in `crates/zeyn-cli/src/migrate/` (one module per version), or a
+  review pattern with the reason when no rewrite is safe, with a fixture test.
 - Public prose (README, docs, UI text) uses no em dashes or en dashes, and stays neutral: it
   describes the framework, not who might buy it.
 

@@ -17,6 +17,7 @@ Zeyn は 2 つの側面のエージェントを想定して作られています
 | `zeyn_devtools` | デバッグモードで動くアプリの DevTools リクエストログ: 新しいリクエストから順に、画面、アクション、ステータス、時間、SQL 文（文と時間のみ、値は含まない）。`addr` と `limit` は省略可能 |
 | `zeyn_check` | コンパイルして問題を報告します。`fix: true` を付けると、先に名前が変わった API を書き換えます |
 | `zeyn_doctor` | プロジェクトのビルド方法を読み取ります: target のサイズ、リンカー、dev プロファイル、ツールチェーン、Windows のスキャン除外。`fix: true` は高速な dev プロファイルとリンカーを追加します（`Cargo.toml` と `.cargo/config.toml` のみ） |
+| `zeyn_migrate` | アプリを段階的に新しい Zeyn バージョンへ移行します（名前変更、呼び出しの変更、パスの移動）。書式は保たれます。各変更をファイルと行とともに、人が確認すべき箇所とともに返します。`dry_run: true` は diff を返し、何も書き込みません |
 | `zeyn_test` | `cargo test` を実行し、出力の末尾を返します |
 | `zeyn_new_feature` | Feature のフォルダを作成して登録します |
 | `zeyn_new_screen` | Feature に画面ファイルを追加して登録します |
