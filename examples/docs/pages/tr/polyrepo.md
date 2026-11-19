@@ -105,6 +105,8 @@ Değişiklik bittiğinde bunu kaldırın, kütüphaneyi etiketleyin ve uygulamad
 
 Bir crate, kendi betiği, stil dosyası ve metinleri olan bileşenler sunabilir. `zeyn-<name>` adlı bir crate `<name>` tarayıcı modülünü kaydeder; sınıfları `z-<name>-`, öznitelikleri `data-zeyn-<name>-`, metin anahtarları `<name>.` ile başlar. `examples/widget` testleriyle birlikte eksiksiz bir örnektir.
 
+`zeyn new <name> --component` yenisini yazar: örnek bir bileşen, eklentisi, betik ve stil dosyası, İngilizce ve Türkçe metinler, bir örnek uygulama ve testleri olan `zeyn-<name>` crate’i.
+
 ```rust
 use zeyn::{App, Module, Plugin};
 
@@ -129,5 +131,5 @@ Uygulama `.plugin(RatingPlugin)` ekler. Bir sayfa `/_zeyn/ext/rating.js` ve `/_z
 
 | Zeyn | Bileşen crate'leri |
 |---|---|
-| 0.0.10'dan sonraki sürümler | `App::module`, `Module`, `TestResponse::links` |
+| 0.0.10'dan sonraki sürümler | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
 | 0.0.10 ve öncesi | Yalnızca HTML; kendi betikleri ya da stilleri yok |

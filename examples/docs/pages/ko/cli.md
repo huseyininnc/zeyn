@@ -8,6 +8,7 @@
 |---|---|
 | `zeyn new <name>` | 표준 Feature 구조의 앱을 만듭니다 |
 | `zeyn new <name> --lib` | 여러 앱이 공유하는 모델, Feature, 텍스트 라이브러리를 만듭니다 |
+| `zeyn new <name> --component` | 브라우저 스크립트, 스타일시트, 텍스트, 예제 앱, 테스트를 갖춘 컴포넌트 크레이트 `zeyn-<name>`을 만듭니다 |
 | `zeyn g feature <name>` | `models`, `services`, `actions`, `screens` 폴더와 동작하는 목록 Screen이 있는 `src/features/<name>`을 추가합니다 |
 | `zeyn g screen <feature> <name>` | feature에 `screens/<name>.rs`를 추가하고 등록한 뒤 제목을 모든 로케일 파일에 추가합니다 |
 | `zeyn routes` | Feature, Screen, 경로, API, 접근 권한을 나열합니다 |
@@ -68,6 +69,23 @@ cargo run
 - git이 설치되어 있고(Windows, macOS, Linux) 폴더가 이미 저장소 안에 있지 않으면 `main` 브랜치의 로컬 git 저장소를 만듭니다. 아무것도 커밋하지 않으므로 첫 커밋에는 사용자 본인의 이름과 이메일이 들어갑니다. `--no-git`을 쓰면 건너뜁니다.
 
 각 폴더에 대해서는 [프로젝트 구조](structure.md)를 참고하십시오.
+
+## 새 컴포넌트 크레이트
+
+`zeyn new <name> --component`는 크레이트 `zeyn-<name>`을 작성합니다(이름 앞의 `zeyn-`은 받아들입니다. 이름은 소문자, 숫자, 단일 하이픈이며 최대 32자입니다). [공유 라이브러리](polyrepo.md)의 확장 모델을 바로 고쳐 쓸 수 있게 만든 것입니다.
+
+- `src/lib.rs`: 예제 컴포넌트(토글 버튼), `App::module`로 브라우저 모듈을 등록하는 `Plugin`, 상수 `CATALOGS`.
+- `assets/<name>.js`와 `assets/<name>.css`: 모듈입니다. 클래스는 `z-<name>-`로, 마커 속성은 `data-zeyn-<name>-`로 시작하며, 스타일시트는 테마 토큰만 사용하므로 두 테마가 모두 동작합니다.
+- `assets/en.json`과 `assets/tr.json`: 텍스트이며 키는 `<name>` 아래에 있습니다.
+- `examples/demo`: 컴포넌트가 없는 시작 페이지와 컴포넌트가 있는 페이지를 가진 앱입니다. `cargo run --example demo`로 실행합니다.
+- `tests/<name>.rs`: 컴포넌트가 있는 페이지는 모듈을 연결하고, 없는 페이지는 절대 참조하지 않습니다. 런타임은 나중에 도착하는 콘텐츠를 위해 모듈을 나열하고, 파일은 URL에 빌드를 담아 제공되며, 앱은 텍스트 문구를 바꿀 수 있습니다.
+- 라이브러리와 같은 프로젝트 파일: GitHub, GitLab, Jenkins용 CI, 린트와 포맷 규칙, `AGENTS.md`와 `CLAUDE.md`.
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## 생성기
 

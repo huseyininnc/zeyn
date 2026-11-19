@@ -105,6 +105,8 @@ acme-domain = { path = "../acme-domain" }
 
 يمكن لحزمة (crate) أن تقدّم مكوّنات لها سكربت وملف أنماط ونصوص خاصة بها. تسجّل الحزمة `zeyn-<name>` وحدة المتصفح `<name>`؛ تبدأ أصنافها بـ `z-<name>-` وسماتها بـ `data-zeyn-<name>-` ومفاتيح نصوصها بـ `<name>.`. المثال `examples/widget` حزمة كاملة مع اختباراتها.
 
+يكتب `zeyn new <name> --component` واحدًا جديدًا: الـ crate ‏`zeyn-<name>` مع مكوّن نموذجي وPlugin الخاص به والسكربت وملف الأنماط ونصوص بالإنجليزية والتركية وتطبيق مثال واختبارات.
+
 ```rust
 use zeyn::{App, Module, Plugin};
 
@@ -129,5 +131,5 @@ impl Plugin for RatingPlugin {
 
 | Zeyn | حزم المكوّنات |
 |---|---|
-| الإصدارات بعد 0.0.10 | `App::module`, `Module`, `TestResponse::links` |
+| الإصدارات بعد 0.0.10 | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
 | 0.0.10 وما قبله | HTML فقط؛ بلا سكربتات أو أنماط خاصة |

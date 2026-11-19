@@ -8,6 +8,7 @@ El comando `zeyn` crea proyectos, añade features, comprueba una aplicación y e
 |---|---|
 | `zeyn new <name>` | Crea una aplicación con la estructura estándar de features |
 | `zeyn new <name> --lib` | Crea una biblioteca de modelos, features y textos compartida por varias aplicaciones |
+| `zeyn new <name> --component` | Crea un crate de componente `zeyn-<name>` con un script de navegador, una hoja de estilos, textos, una app de ejemplo y pruebas |
 | `zeyn g feature <name>` | Añade `src/features/<name>` con `models`, `services`, `actions` y `screens` y una pantalla de lista que funciona |
 | `zeyn g screen <feature> <name>` | Añade `screens/<name>.rs` a una feature, lo registra y añade su título a cada archivo de idioma |
 | `zeyn routes` | Lista features, pantallas, rutas, APIs y accesos |
@@ -68,6 +69,23 @@ cargo run
 - Un repositorio git local en la rama `main`, cuando git está instalado (Windows, macOS o Linux) y la carpeta no está ya dentro de un repositorio. No se confirma nada, así que el primer commit lleva tu propio nombre y correo. `--no-git` lo omite.
 
 Consulta [Estructura del proyecto](structure.md) para ver cada carpeta.
+
+## Un crate de componente nuevo
+
+`zeyn new <name> --component` escribe el crate `zeyn-<name>` (se acepta un `zeyn-` inicial en el nombre; el nombre son minúsculas, dígitos y guiones simples, como máximo 32 caracteres). Es el modelo de extensión de [Bibliotecas compartidas](polyrepo.md), listo para modificar:
+
+- `src/lib.rs`: un componente de ejemplo (un botón de alternancia), su `Plugin` que registra el módulo del navegador con `App::module` y la constante `CATALOGS`.
+- `assets/<name>.js` y `assets/<name>.css`: el módulo. Las clases empiezan por `z-<name>-` y el atributo marcador por `data-zeyn-<name>-`; la hoja de estilos usa solo tokens del tema, así que funcionan los dos temas.
+- `assets/en.json` y `assets/tr.json`: los textos, bajo la clave `<name>`.
+- `examples/demo`: una app con una página de inicio sin componente y una página que lo contiene. Se ejecuta con `cargo run --example demo`.
+- `tests/<name>.rs`: la página con el componente enlaza el módulo, la página sin él nunca lo referencia, el runtime lista el módulo para el contenido que llega después, los archivos se sirven con la compilación en la URL y la app puede cambiar la redacción de los textos.
+- Los mismos archivos de proyecto que una biblioteca: CI para GitHub, GitLab y Jenkins, reglas de lint y formato, `AGENTS.md` y `CLAUDE.md`.
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## Generadores
 

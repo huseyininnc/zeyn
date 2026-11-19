@@ -127,6 +127,8 @@ Elimínalo, etiqueta la biblioteca y sube la etiqueta en la app cuando el cambio
 
 Un crate puede ofrecer componentes con su propio script, hoja de estilos y textos. Un crate `zeyn-<name>` registra el módulo de navegador `<name>`; sus clases empiezan por `z-<name>-`, sus atributos por `data-zeyn-<name>-` y sus claves de texto por `<name>.`. `examples/widget` es un ejemplo completo, con pruebas.
 
+`zeyn new <name> --component` escribe uno nuevo: el crate `zeyn-<name>` con un componente de ejemplo, su plugin, el script y la hoja de estilos, textos en inglés y turco, una app de ejemplo y pruebas.
+
 ```rust
 use zeyn::{App, Module, Plugin};
 
@@ -151,5 +153,5 @@ La aplicación añade `.plugin(RatingPlugin)`. Una página enlaza `/_zeyn/ext/ra
 
 | Zeyn | Crates de componentes |
 |---|---|
-| Versiones posteriores a 0.0.10 | `App::module`, `Module`, `TestResponse::links` |
+| Versiones posteriores a 0.0.10 | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
 | 0.0.10 y anteriores | Solo HTML; sin scripts ni estilos propios |

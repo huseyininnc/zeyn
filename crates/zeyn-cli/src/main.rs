@@ -133,12 +133,8 @@ const TEMPLATES: &[(&str, &str)] = &[
     ("build.rs", include_str!("../templates/common/build.rs")),
 ];
 
-const LIB_TEMPLATES: &[(&str, &str)] = &[
-    (
-        "Cargo.toml",
-        include_str!("../templates/lib/Cargo.toml.tmpl"),
-    ),
-    ("AGENTS.md", include_str!("../templates/lib/AGENTS.md.tmpl")),
+/// Files every library and component crate gets, next to its own.
+const CRATE_COMMON: &[(&str, &str)] = &[
     ("CLAUDE.md", include_str!("../templates/CLAUDE.md.tmpl")),
     (
         ".gitignore",
@@ -190,6 +186,24 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
     ("clippy.toml", include_str!("../templates/clippy.toml")),
     ("deny.toml", include_str!("../templates/deny.toml")),
     (
+        ".cargo/config.toml",
+        include_str!("../templates/cargo-config.toml"),
+    ),
+    (
+        ".vscode/settings.json",
+        include_str!("../templates/vscode-settings.json"),
+    ),
+    ("build.rs", include_str!("../templates/common/build.rs")),
+];
+
+/// The files of a shared library.
+const LIB_TEMPLATES: &[(&str, &str)] = &[
+    (
+        "Cargo.toml",
+        include_str!("../templates/lib/Cargo.toml.tmpl"),
+    ),
+    ("AGENTS.md", include_str!("../templates/lib/AGENTS.md.tmpl")),
+    (
         "locales/en.json",
         include_str!("../templates/lib/locales/en.json"),
     ),
@@ -226,15 +240,55 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
         "tests/lib.rs",
         include_str!("../templates/lib/tests/lib.rs"),
     ),
+];
+
+/// The files of a component crate (`zeyn new <name> --component`). `{{component}}` in a path is the
+/// component name.
+const COMPONENT_TEMPLATES: &[(&str, &str)] = &[
     (
-        ".cargo/config.toml",
-        include_str!("../templates/cargo-config.toml"),
+        "Cargo.toml",
+        include_str!("../templates/component/Cargo.toml.tmpl"),
     ),
     (
-        ".vscode/settings.json",
-        include_str!("../templates/vscode-settings.json"),
+        "AGENTS.md",
+        include_str!("../templates/component/AGENTS.md.tmpl"),
     ),
-    ("build.rs", include_str!("../templates/common/build.rs")),
+    (
+        "src/lib.rs",
+        include_str!("../templates/component/src/lib.rs"),
+    ),
+    (
+        "assets/{{component}}.js",
+        include_str!("../templates/component/assets/{{component}}.js"),
+    ),
+    (
+        "assets/{{component}}.css",
+        include_str!("../templates/component/assets/{{component}}.css"),
+    ),
+    (
+        "assets/en.json",
+        include_str!("../templates/component/assets/en.json"),
+    ),
+    (
+        "assets/tr.json",
+        include_str!("../templates/component/assets/tr.json"),
+    ),
+    (
+        "examples/demo/main.rs",
+        include_str!("../templates/component/examples/demo/main.rs"),
+    ),
+    (
+        "locales/en.json",
+        include_str!("../templates/component/locales/en.json"),
+    ),
+    (
+        "locales/tr.json",
+        include_str!("../templates/component/locales/tr.json"),
+    ),
+    (
+        "tests/{{component}}.rs",
+        include_str!("../templates/component/tests/{{component}}.rs"),
+    ),
 ];
 
 const DOCS: &[(&str, &str)] = &[
@@ -252,6 +306,10 @@ Usage:
                                           local git repository on branch main when git is installed
   zeyn new <name> --lib [--zeyn-path <path>] [--no-git]
                                           the same for a shared library (models, features, texts)
+  zeyn new <name> --component [--zeyn-path <path>] [--no-git]
+                                          a component crate zeyn-<name>: a component with a browser
+                                          script, a stylesheet using theme tokens, en and tr texts,
+                                          a Plugin, an example app and tests (see docs/polyrepo.md)
   zeyn g feature <name>                   add src/features/<name> with models/, services/, actions/ and
                                           screens/ and a working list screen; delete a folder the
                                           feature does not need, with its mod line
@@ -296,6 +354,12 @@ fn main() -> ExitCode {
         .map(String::as_str)
         .collect();
     let result = match words.as_slice() {
+        ["new", "--component", name, rest @ ..] => {
+            new_component(name, flag(rest, "--zeyn-path"), !rest.contains(&"--no-git"))
+        }
+        ["new", name, rest @ ..] if rest.contains(&"--component") => {
+            new_component(name, flag(rest, "--zeyn-path"), !rest.contains(&"--no-git"))
+        }
         ["new", name, rest @ ..] => new_project(
             name,
             flag(rest, "--zeyn-path"),
@@ -472,6 +536,114 @@ fn title_of(name: &str) -> String {
         .join(" ")
 }
 
+/// The `zeyn = ..` line of a new project's `Cargo.toml`: a path dependency for `--zeyn-path`,
+/// else the version of this CLI.
+fn zeyn_dependency(zeyn_path: Option<&str>) -> Result<String, String> {
+    match zeyn_path {
+        Some(p) => {
+            let abs = std::fs::canonicalize(p).map_err(|e| format!("--zeyn-path {p}: {e}"))?;
+            let shown = abs
+                .to_string_lossy()
+                .trim_start_matches(r"\\?\")
+                .replace('\\', "/");
+            Ok(format!("zeyn = {{ path = \"{shown}\" }}"))
+        }
+        None => Ok(format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION"))),
+    }
+}
+
+/// Writes every template of `sets` under `root`, replacing each placeholder of `replacements`
+/// in both the path and the text.
+fn write_templates(
+    root: &Path,
+    sets: &[&[(&str, &str)]],
+    replacements: &[(&str, &str)],
+) -> Result<(), String> {
+    let fill = |text: &str| {
+        replacements
+            .iter()
+            .fold(text.to_string(), |t, (from, to)| t.replace(from, to))
+    };
+    for (path, body) in sets.iter().flat_map(|s| s.iter()) {
+        let target = root.join(fill(path));
+        if let Some(dir) = target.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&target, fill(body)).map_err(|e| format!("{}: {e}", target.display()))?;
+    }
+    Ok(())
+}
+
+/// The Rust type name of a component name: `star-rating` gives `StarRating`.
+fn type_of(component: &str) -> String {
+    title_of(component).replace(' ', "")
+}
+
+/// Checks a component name and returns it without a leading `zeyn-`. The module rule of
+/// `App::module` applies: lower case letters, digits and single hyphens, at most 32 characters.
+fn component_name(given: &str) -> Result<String, String> {
+    let name = given
+        .strip_prefix("zeyn-")
+        .unwrap_or(given);
+    let ok = name.len() <= 32
+        && name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase())
+        && !name.ends_with('-')
+        && !name.contains("--")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if ok {
+        Ok(name.to_string())
+    } else {
+        Err(format!(
+            "`{given}` is not a valid component name; use lower case letters, digits and single `-`, starting with a letter, at most 32 characters (the crate becomes `zeyn-<name>`)"
+        ))
+    }
+}
+
+/// Writes the component crate `zeyn-<component>` into `root`.
+fn new_component_at(
+    root: &Path,
+    given: &str,
+    zeyn_path: Option<&str>,
+    git: bool,
+) -> Result<(), String> {
+    let component = component_name(given)?;
+    let package = format!("zeyn-{component}");
+    if root.exists() {
+        return Err(format!("`{package}` already exists"));
+    }
+    let dep = zeyn_dependency(zeyn_path)?;
+    let crate_name = package.replace('-', "_");
+    let title = title_of(&component);
+    let kind = type_of(&component);
+    let replacements = [
+        ("{{component}}", component.as_str()),
+        ("{{type}}", kind.as_str()),
+        ("{{name}}", package.as_str()),
+        ("{{crate}}", crate_name.as_str()),
+        ("{{title}}", title.as_str()),
+        ("{{zeyn_dep}}", dep.as_str()),
+        ("{{component_index}}", component_index()),
+    ];
+    write_templates(root, &[CRATE_COMMON, COMPONENT_TEMPLATES], &replacements)?;
+    if git {
+        println!("{}", git_init(root));
+    }
+    println!(
+        "Created component crate {package}/\n\n  cd {package}\n  cargo test\n  cargo run --example demo\n\nAdd it to an app with `.plugin({kind}Plugin)`; the module `{component}` loads only on pages that hold a `{kind}`."
+    );
+    Ok(())
+}
+
+fn new_component(name: &str, zeyn_path: Option<&str>, git: bool) -> Result<(), String> {
+    let dir = format!("zeyn-{}", component_name(name)?);
+    new_component_at(&PathBuf::from(dir), name, zeyn_path, git)
+}
+
 fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool, git: bool) -> Result<(), String> {
     new_project_at(&PathBuf::from(name), name, zeyn_path, lib, git)
 }
@@ -499,33 +671,22 @@ fn new_project_at(
     if root.exists() {
         return Err(format!("`{name}` already exists"));
     }
-    let dep = match zeyn_path {
-        Some(p) => {
-            let abs = std::fs::canonicalize(p).map_err(|e| format!("--zeyn-path {p}: {e}"))?;
-            let shown = abs
-                .to_string_lossy()
-                .trim_start_matches(r"\\?\")
-                .replace('\\', "/");
-            format!("zeyn = {{ path = \"{shown}\" }}")
-        }
-        None => format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION")),
-    };
+    let dep = zeyn_dependency(zeyn_path)?;
     let title = title_of(name);
     let crate_name = name.replace('-', "_");
-    let templates = if lib { LIB_TEMPLATES } else { TEMPLATES };
-    for (path, body) in templates {
-        let target = root.join(path);
-        if let Some(dir) = target.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        }
-        let text = body
-            .replace("{{name}}", name)
-            .replace("{{crate}}", &crate_name)
-            .replace("{{title}}", &title)
-            .replace("{{zeyn_dep}}", &dep)
-            .replace("{{component_index}}", component_index());
-        std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
-    }
+    let sets: &[&[(&str, &str)]] = if lib {
+        &[CRATE_COMMON, LIB_TEMPLATES]
+    } else {
+        &[TEMPLATES]
+    };
+    let replacements = [
+        ("{{name}}", name),
+        ("{{crate}}", crate_name.as_str()),
+        ("{{title}}", title.as_str()),
+        ("{{zeyn_dep}}", dep.as_str()),
+        ("{{component_index}}", component_index()),
+    ];
+    write_templates(root, sets, &replacements)?;
     if git {
         println!("{}", git_init(root));
     }
@@ -1632,6 +1793,106 @@ opt-level = 1"
             );
         }
         std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// `zeyn new <name> --component` writes a crate that follows the extension model: a module
+    /// with a script and stylesheet on theme tokens, en and tr texts, a plugin, an example app and
+    /// tests. With `ZEYN_TEST_NEW_BUILD` set it also runs the crate's own tests.
+    #[test]
+    fn new_components_follow_the_extension_model() {
+        let base = std::env::temp_dir().join(format!("zeyn-comp-{}", std::process::id()));
+        std::fs::remove_dir_all(&base).ok();
+        std::fs::create_dir_all(&base).unwrap();
+        let zeyn = format!("{}/../zeyn", env!("CARGO_MANIFEST_DIR"));
+        let root = base.join("zeyn-star-rating");
+        new_component_at(&root, "star-rating", Some(&zeyn), false).unwrap();
+        for file in [
+            "Cargo.toml",
+            "AGENTS.md",
+            "src/lib.rs",
+            "assets/star-rating.js",
+            "assets/star-rating.css",
+            "assets/en.json",
+            "assets/tr.json",
+            "examples/demo/main.rs",
+            "tests/star-rating.rs",
+            "Jenkinsfile",
+            ".github/workflows/ci.yml",
+        ] {
+            assert!(root.join(file).is_file(), "{file}");
+        }
+        assert!(read(&root, "Cargo.toml").contains("name = \"zeyn-star-rating\""));
+        let lib = read(&root, "src/lib.rs");
+        assert!(lib.contains("pub struct StarRatingPlugin;"), "{lib}");
+        assert!(
+            lib.contains(".marker(\"data-zeyn-star-rating-toggle\")"),
+            "{lib}"
+        );
+        let css = read(&root, "assets/star-rating.css");
+        assert!(css.contains(".z-star-rating-toggle") && css.contains("var(--z-text)"));
+        assert!(
+            !css.contains('#') && !css.contains("rgb"),
+            "colors come from theme tokens only: {css}"
+        );
+        for file in ["assets/en.json", "assets/tr.json"] {
+            let json: Value = serde_json::from_str(&read(&root, file)).unwrap();
+            assert!(json["star-rating"]["on"].is_string(), "{file}");
+        }
+        for entry in walk(&root) {
+            let text = std::fs::read_to_string(&entry).unwrap_or_default();
+            for name in [
+                "component",
+                "type",
+                "name",
+                "crate",
+                "title",
+                "zeyn_dep",
+                "component_index",
+            ] {
+                assert!(
+                    !text.contains(&format!("{{{{{name}}}}}")),
+                    "{}: unfilled placeholder {name}",
+                    entry.display()
+                );
+            }
+        }
+        for bad in ["Rating", "reserved--x", "-x", "x-", "9x", &"a".repeat(33)] {
+            assert!(component_name(bad).is_err(), "{bad}");
+        }
+        assert_eq!(component_name("zeyn-rating").unwrap(), "rating");
+        assert!(new_component_at(&root, "star-rating", None, false).is_err());
+        if std::env::var("ZEYN_TEST_NEW_BUILD").is_ok() {
+            let out = Command::new("cargo")
+                .args(["test", "--quiet", "--all-targets"])
+                .current_dir(&root)
+                .env("CARGO_TARGET_DIR", base.join("target"))
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// Every file under `dir`.
+    fn walk(dir: &Path) -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        for entry in std::fs::read_dir(dir)
+            .unwrap()
+            .flatten()
+        {
+            let path = entry.path();
+            if path.is_dir() {
+                out.extend(walk(&path));
+            } else {
+                out.push(path);
+            }
+        }
+        out
     }
 
     /// A project from the app template in a fresh temp folder.

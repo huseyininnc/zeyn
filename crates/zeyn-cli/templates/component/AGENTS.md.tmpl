@@ -1,0 +1,34 @@
+# {{title}} component
+
+A Zeyn component crate: one component with a browser script, a stylesheet and texts of its own,
+shipped the way the framework ships its own components. `zeyn mcp` serves the framework rules as
+the `zeyn_docs` topic `rules`, and `.claude/skills/zeyn/SKILL.md` has the language in short.
+Extra rules for a component crate:
+
+1. The crate is `{{name}}`, its browser module is `{{component}}`. Classes start with
+   `z-{{component}}-`, attributes with `data-zeyn-{{component}}-` and text keys with
+   `{{component}}.`. `App::module` stops the app at startup when a name breaks this.
+2. A page links the module only when its HTML holds a marker (`module()` in `src/lib.rs`), and
+   `zeyn.js` loads it when such content arrives later. `tests/{{component}}.rs` checks that a
+   page without the component never references the module; keep that test passing.
+3. The stylesheet takes colors and sizes from theme tokens (`var(--z-text)`, `var(--z-space)`)
+   and never from literal colors, so the light and the dark theme both work. Keep focus visible
+   and the component usable with the keyboard (W3C APG pattern for the widget).
+4. The script is an ES module without inline handlers; the Content Security Policy stays strict.
+   Content that arrives later reaches it through the `zeyn:content` event, or through one
+   listener on the document.
+5. Every user facing text goes into `assets/*.json` (the component) or `locales/*.json` (the example), with the same keys in each locale
+   file (`cargo test` checks the component). An app can reword any text in its own catalogs.
+6. The component works in an app of the same Zeyn version only. Release by tagging
+   (`git tag v0.2.0 && git push --tags`) and raise the minor version for a breaking change.
+7. A source file holds at most 300 non blank lines (`build.rs`) and a function at most 60 lines
+   (clippy `too_many_lines`).
+
+Run the example with `cargo run --example demo` (http://127.0.0.1:3011): the start page holds no
+component and links no module, the second page holds one.
+
+## Framework index
+
+Everything below comes from `use zeyn::prelude::*;`.
+
+{{component_index}}

@@ -1,0 +1,44 @@
+[package]
+name = "{{name}}"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[package.metadata.zeyn]
+# Most non blank lines a file in src/ may have; build.rs stops the build above it.
+max_file_lines = 300
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+{{zeyn_dep}}
+serde_json = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+print_stdout = "warn"
+unwrap_used = "warn"
+clone_on_ref_ptr = "warn"
+large_futures = "warn"
+needless_collect = "warn"
+redundant_clone = "warn"
+too_many_lines = "deny"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 1
