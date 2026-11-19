@@ -70,7 +70,7 @@ If you change `skills/zeyn/SKILL.md`, copy it into `crates/zeyn-cli/embedded/` t
 
 ## Documentation and translations
 
-The docs are Zeyn pages under `examples/docs/pages/` plus guides in `docs/`. Read the table in [AGENTS.md](AGENTS.md) to find the page for your area. When code and docs disagree, fix the wrong one in the same change.
+The docs are Zeyn pages under `examples/docs/pages/` plus guides in `docs/`. How macro errors point at the wrong token, and how that was measured, is in [docs/ide.md](docs/ide.md). Read the table in [AGENTS.md](AGENTS.md) to find the page for your area. When code and docs disagree, fix the wrong one in the same change.
 
 English is the source. The docs are also translated into Turkish, Chinese, Russian, Spanish, Korean, Japanese, Hindi and Arabic. When you change an English page, update its translations if you can. A page whose translation is out of date is shown in English with a note, so a missing translation does not block your change.
 

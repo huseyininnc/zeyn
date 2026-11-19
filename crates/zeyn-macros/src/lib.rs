@@ -66,8 +66,8 @@ fn check_permission(lit: &LitStr) -> syn::Result<()> {
 /// Returns the type of the first argument (input or params) and the return type.
 fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
     if !f.sig.generics.params.is_empty() {
-        return Err(syn::Error::new(
-            f.sig.generics.span(),
+        return Err(syn::Error::new_spanned(
+            &f.sig.generics,
             format!("{kind}s cannot be generic"),
         ));
     }
@@ -78,8 +78,8 @@ fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
             quote!(#ty)
         }
         Some(FnArg::Receiver(r)) => {
-            return Err(syn::Error::new(
-                r.span(),
+            return Err(syn::Error::new_spanned(
+                r,
                 format!("{kind}s cannot take `self`"),
             ));
         }
@@ -229,8 +229,8 @@ fn injected_call(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts, Ts)> {
         }
         let ty = &pt.ty;
         if matches!(**ty, Type::Reference(_)) {
-            return Err(syn::Error::new(
-                ty.span(),
+            return Err(syn::Error::new_spanned(
+                ty,
                 format!(
                     "injected {kind} arguments must be owned types\n  = help: take `Ctx` or the service by value; they are cheap to clone"
                 ),
@@ -247,7 +247,15 @@ fn injected_call(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts, Ts)> {
     } else {
         quote!()
     };
-    let call = quote!({ #ignore Self::run(#(#args),*) #await_ });
+    let at = match &f.sig.output {
+        ReturnType::Type(_, ty) => ty.span(),
+        ReturnType::Default => proc_macro2::Span::call_site(),
+    };
+    let call = if f.sig.inputs.is_empty() {
+        quote_spanned!(at=> { #ignore Self::run() #await_ })
+    } else {
+        quote_spanned!(at=> Self::run(#(#args),*) #await_)
+    };
     let deps = quote!(::std::vec::Vec::<::core::option::Option<::zeyn::Dep>>::from([#(#deps),*]).into_iter().flatten().collect());
     Ok((quote!(#(#binds)*), call, deps))
 }
@@ -261,6 +269,24 @@ fn or_error(result: syn::Result<Ts>, original: Ts) -> TokenStream {
             quote!(#err #original).into()
         }
     }
+}
+
+/// Takes the helper attributes of models off an item that is emitted unchanged after an error,
+/// so a mistake in one attribute does not add a `cannot find attribute` error for every other.
+fn strip_model_helpers(s: &ItemStruct) -> Ts {
+    let mut s = s.clone();
+    s.attrs
+        .retain(|a| !a.path().is_ident("sensitive"));
+    if let Fields::Named(named) = &mut s.fields {
+        for field in &mut named.named {
+            field.attrs.retain(|a| {
+                !["key", "readonly", "version", "label", "mask", "rule"]
+                    .iter()
+                    .any(|name| a.path().is_ident(name))
+            });
+        }
+    }
+    quote!(#s)
 }
 
 /// Defines a server side action. Access must be declared.
@@ -645,9 +671,17 @@ pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
     let ident = match &item {
         Item::Struct(s) => &s.ident,
         Item::Enum(e) => &e.ident,
-        other => {
+        Item::Fn(f) => {
             return syn::Error::new(
-                other.span(),
+                f.sig.ident.span(),
+                "`#[params]` can only be used on a struct or an enum",
+            )
+            .to_compile_error()
+            .into();
+        }
+        other => {
+            return syn::Error::new_spanned(
+                other,
                 "`#[params]` can only be used on a struct or an enum",
             )
             .to_compile_error()
@@ -683,7 +717,12 @@ pub fn choice(attr: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
     let e = syn::parse_macro_input!(item as ItemEnum);
-    let original = quote!(#e);
+    let mut stripped = e.clone();
+    for v in &mut stripped.variants {
+        v.attrs
+            .retain(|a| !a.path().is_ident("label") && !a.path().is_ident("default"));
+    }
+    let original = quote!(#stripped);
     or_error(expand_choice(e), original)
 }
 
@@ -704,8 +743,8 @@ fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
     let mut arms = Vec::new();
     for (i, v) in e.variants.iter_mut().enumerate() {
         if !matches!(v.fields, Fields::Unit) {
-            return Err(syn::Error::new(
-                v.span(),
+            return Err(syn::Error::new_spanned(
+                &v.fields,
                 "choice variants cannot have fields",
             ));
         }
@@ -837,7 +876,7 @@ fn without_digit_groups(expr: syn::Expr) -> syn::Expr {
 #[proc_macro_attribute]
 pub fn model(attr: TokenStream, item: TokenStream) -> TokenStream {
     let s = syn::parse_macro_input!(item as ItemStruct);
-    let original = quote!(#s);
+    let original = strip_model_helpers(&s);
     let result = parse_model_args(attr, false).and_then(|args| expand_model(s, args, false));
     or_error(result, original)
 }
@@ -858,7 +897,7 @@ pub fn model(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn entity(attr: TokenStream, item: TokenStream) -> TokenStream {
     let s = syn::parse_macro_input!(item as ItemStruct);
-    let original = quote!(#s);
+    let original = strip_model_helpers(&s);
     let result = parse_model_args(attr, true).and_then(|args| expand_model(s, args, true));
     or_error(result, original)
 }
@@ -897,8 +936,8 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         .retain(|a| !a.path().is_ident("sensitive"));
     let sensitive = args.sensitive || s.attrs.len() != before;
     if !s.generics.params.is_empty() {
-        return Err(syn::Error::new(
-            s.generics.span(),
+        return Err(syn::Error::new_spanned(
+            &s.generics,
             format!("{kind}s cannot be generic"),
         ));
     }
@@ -917,6 +956,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
     let mut value_arms = Vec::new();
     let mut checks = Vec::new();
     let mut keys = 0usize;
+    let mut second_key: Option<Ident> = None;
     let mut generate_id = false;
 
     for (idx, field) in named.named.iter_mut().enumerate() {
@@ -1076,6 +1116,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
 
         if is_key {
             keys += 1;
+            if keys == 2 {
+                second_key = Some(fname.clone());
+            }
             if let Type::Path(p) = &ty
                 && p.qself.is_none()
                 && p.path.is_ident(&id_name)
@@ -1133,7 +1176,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         })?;
         if keys != 1 {
             return Err(syn::Error::new(
-                name.span(),
+                second_key
+                    .as_ref()
+                    .map_or_else(|| name.span(), Ident::span),
                 format!("entity `{name}` needs exactly one `#[key]` field, found {keys}"),
             ));
         }
@@ -1393,7 +1438,10 @@ fn public_tokens() -> Result<Ts, String> {
 pub fn t(input: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(input as TArgs);
     expand_t(args)
-        .unwrap_or_else(|e| e.to_compile_error())
+        .unwrap_or_else(|e| {
+            let err = e.to_compile_error();
+            quote!({ #err ::core::unreachable!() })
+        })
         .into()
 }
 
@@ -1570,8 +1618,13 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
             ));
         }
         if let Some(extra) = given.difference(&wanted).next() {
+            let at = t
+                .args
+                .iter()
+                .find(|(n, _)| n == extra)
+                .map_or(span, |(n, _)| n.span());
             return Err(syn::Error::new(
-                span,
+                at,
                 format!("t!: argument `{extra}` is not used by `{key}` in locales/{file}"),
             ));
         }
