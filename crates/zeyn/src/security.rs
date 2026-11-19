@@ -65,6 +65,14 @@ pub trait RateStore: Send + Sync + 'static {
         let _ = amount;
         self.take(key, limit)
     }
+
+    /// Gives back `amount` units taken earlier and not used, such as the part of an upload
+    /// reservation the file did not need. The allowance never grows past the limit. Stores that
+    /// keep the default give nothing back, which only makes the limit stricter.
+    fn refund(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<()> {
+        let _ = (key, limit, amount);
+        Box::pin(async {})
+    }
 }
 
 /// In memory token buckets with a cap on the number of keys, so a flood of addresses cannot
@@ -120,6 +128,14 @@ impl RateStore for MemoryRateStore {
     fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<Result<(), Duration>> {
         let charged = MemoryRateStore::charge(self, key, limit, amount);
         Box::pin(async move { charged })
+    }
+
+    fn refund(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<()> {
+        let _ = self.bucket(key, limit, |tokens| {
+            *tokens = (*tokens + f64::from(amount)).min(f64::from(limit.requests));
+            true
+        });
+        Box::pin(async {})
     }
 }
 

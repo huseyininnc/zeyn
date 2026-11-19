@@ -10,9 +10,14 @@ pub(super) const DEFAULT_CSP: &str = "default-src 'self'; script-src 'self'; sty
 /// Framework endpoints whose `POST` changes data or runs an action. They count against the
 /// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
 /// action or costs money goes here. Published API actions and the assistant are matched by prefix,
-/// and file uploads (`POST /_zeyn/files/{store}`) by `files::is_upload`.
-const WRITE_PATHS: [&str; 20] = [
+/// and file uploads (`POST /_zeyn/files/{store}`) by `files::is_upload`. Grid reads (`/_zeyn/grid`)
+/// and search are reads under the general limit; socket frames (`/_zeyn/socket/send`) have the
+/// per connection frame limit.
+const WRITE_PATHS: [&str; 23] = [
     "/_zeyn/form",
+    "/_zeyn/reason",
+    "/_zeyn/socket/open",
+    "/_zeyn/auth/totp/enroll",
     "/_zeyn/reveal",
     "/_zeyn/data",
     "/_zeyn/node",
@@ -161,6 +166,12 @@ pub(super) async fn remember_identity(
             .as_ref()
             .and_then(|a| a.authenticate(req.headers())),
     };
+    #[cfg(debug_assertions)]
+    devtools::user(
+        identity
+            .as_ref()
+            .and_then(|i| i.user.as_deref()),
+    );
     IDENTITY
         .scope(identity, next.run(req))
         .await

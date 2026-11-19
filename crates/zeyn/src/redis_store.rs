@@ -40,6 +40,13 @@ redis.call('PEXPIRE', KEYS[1], ARGV[3])
 return wait
 ";
 
+/// Gives `ARGV[2]` units back to a bucket that still exists, never past the capacity `ARGV[1]`.
+const REFUND: &str = r"
+local t = redis.call('HGET', KEYS[1], 't')
+if t then redis.call('HSET', KEYS[1], 't', tostring(math.min(tonumber(ARGV[1]), tonumber(t) + tonumber(ARGV[2])))) end
+return 0
+";
+
 /// How long calls skip Redis after it failed, so an outage costs one timeout per five seconds
 /// and not one per request.
 const RETRY_AFTER_MS: u64 = 5_000;
@@ -200,6 +207,26 @@ impl RateStore for RedisStore {
             match store.health(result) {
                 Some(0) | None => Ok(()),
                 Some(wait) => Err(Duration::from_millis(wait)),
+            }
+        })
+    }
+
+    fn refund(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<()> {
+        let store = self.clone();
+        let key = format!("{}rate:{key}", self.0.prefix);
+        let capacity = limit.requests;
+        Box::pin(async move {
+            if store.resting() {
+                return;
+            }
+            if let Ok(mut con) = store.connection().await {
+                let done = redis::Script::new(REFUND)
+                    .key(key)
+                    .arg(capacity)
+                    .arg(amount)
+                    .invoke_async::<u64>(&mut con)
+                    .await;
+                let _ = store.health(done);
             }
         })
     }

@@ -374,6 +374,21 @@ async fn a_request_with_a_session_never_gets_public_cache_headers() {
     );
 }
 
+#[tokio::test]
+async fn signed_in_pages_without_cache_and_screen_fragments_are_never_stored() {
+    let router = router();
+    let page = send(&router, member("/desk")).await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert_eq!(page.header(header::CACHE_CONTROL), "private, no-store");
+    let open = send(&router, member("/news")).await;
+    assert_eq!(open.header(header::CACHE_CONTROL), "private, no-store");
+    let fragment = send(&router, member("/_zeyn/screen/desk")).await;
+    assert_eq!(fragment.status, StatusCode::OK);
+    assert_eq!(fragment.header(header::CACHE_CONTROL), "private, no-store");
+    let visitor_news = send(&router, visitor("/news")).await;
+    assert_eq!(visitor_news.header(header::CACHE_CONTROL), "");
+}
+
 /// A kind of visit and the request it sends.
 type Case = (&'static str, fn(&str) -> Request<Body>);
 

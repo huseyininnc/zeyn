@@ -38,7 +38,8 @@ A request with a matching `If-None-Match` gets `304 Not Modified` without a body
 in-app navigation are cached the same way, with their own tag.
 
 A request with a session never gets public cache headers: the page is sent with
-`Cache-Control: private, no-store`. `cache` on a screen that is not `public` does not compile.
+`Cache-Control: private, no-store`, as is every page and screen fragment of a screen that is not
+public, so records do not stay in the browser's disk cache after sign out. `cache` on a screen that is not `public` does not compile.
 
 The screen is still built and rendered for every request that reaches the server; the tag saves the
 transfer, and a cache in front of the app saves the request. Keep cached screens free of anything
