@@ -23,6 +23,7 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.field(M::f)` | 한 줄에 필드 하나 |
 | `.row(\|r\| r.field(a).field(b))` | 필드를 나란히 배치합니다. 좁은 화면에서는 쌓입니다 |
 | `.section(title)` | 이후 필드들의 제목 있는 그룹 |
+| `.settings()` | 설정 레이아웃: 각 컨트롤 옆에 레이블과 도움말, 무언가 바뀌면 아래에 고정되는 저장 바 |
 | `.step(title)` | 마법사 단계. 폼은 한 번에 한 단계를 보여 줍니다 |
 | `.range(M::from, M::to)` | 두 날짜를 하나의 범위 피커로 |
 | `Form::auto(value)` | 선언 순서대로 모든 필드 |

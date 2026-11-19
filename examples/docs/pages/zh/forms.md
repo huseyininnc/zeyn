@@ -23,6 +23,7 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.field(M::f)` | 单独一行的一个字段 |
 | `.row(\|r\| r.field(a).field(b))` | 并排的字段；在窄屏幕上会堆叠 |
 | `.section(title)` | 其后各字段的带标题分组 |
+| `.settings()` | 设置布局:每个控件旁边是标签和帮助,一旦有改动,保存栏就固定在底部 |
 | `.step(title)` | 向导的一个步骤；表单一次显示一个步骤 |
 | `.range(M::from, M::to)` | 两个日期合为一个范围选择器 |
 | `Form::auto(value)` | 所有字段，按声明顺序 |

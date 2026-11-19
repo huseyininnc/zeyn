@@ -12,7 +12,8 @@
     },
     "draft": {
       "restored": "Your unsaved entries from before were restored.",
-      "discard": "Discard them"
+      "discard": "Discard them",
+      "unsaved": "You have unsaved changes."
     },
     "session": {
       "idle_title": "Are you still there?",

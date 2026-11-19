@@ -23,6 +23,7 @@ Adı boş bırakın ya da yanlış bir e-posta yazıp *Send* düğmesine basın:
 | `.field(M::f)` | Kendi satırında tek bir alan |
 | `.row(\|r\| r.field(a).field(b))` | Yan yana alanlar; dar ekranlarda üst üste dizilirler |
 | `.section(title)` | Kendisinden sonraki alanların başlıklı bir grubu |
+| `.settings()` | Ayarlar yerleşimi: her denetimin yanında etiket ve yardım, bir şey değişince altta sabit duran kaydetme çubuğu |
 | `.step(title)` | Bir sihirbaz adımı; form bir seferde tek adım gösterir |
 | `.range(M::from, M::to)` | Tek bir aralık seçici olarak iki tarih |
 | `Form::auto(value)` | Her alan, tanım sırasıyla |

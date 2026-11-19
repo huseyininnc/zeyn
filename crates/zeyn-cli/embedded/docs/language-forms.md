@@ -23,6 +23,7 @@ Leave the name empty or type a wrong email and press *Send*: the browser shows t
 | `.field(M::f)` | One field on its own line |
 | `.row(\|r\| r.field(a).field(b))` | Fields side by side; they stack on narrow screens |
 | `.section(title)` | A titled group of the fields after it |
+| `.settings()` | Settings layout: label and help beside each control, and a save bar that sticks to the bottom once something changes |
 | `.step(title)` | A wizard step; the form shows one step at a time |
 | `.range(M::from, M::to)` | Two dates as one range picker |
 | `Form::auto(value)` | Every field, in declaration order |
