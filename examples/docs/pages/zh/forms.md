@@ -136,7 +136,42 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 `FileRules::quota(bytes, window)` 限制单个用户在每个时间窗口内向某个存储上传的量，并通过应用的 rate store 计数；超过限额的那次上传仍会保存，下一次上传返回 `429`。`DiskStore` 最多每小时一次删除超过一小时的 `.part` 文件（因崩溃而中断的上传）。`ZipGuard` 是针对基于 ZIP 的上传（ZIP、Word、Excel、PowerPoint）的扫描器：它会拒绝中央目录声明超过 10,000 个条目、总计超过 1 GiB 或超过文件大小 200 倍的归档，以及 ZIP64 归档；解压已接受归档的代码仍须在这些限制处停止。
 
-预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 17 KB 原始大小和 6 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。
+预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 21 KB 原始大小和 7 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。
+
+### 可续传上传
+
+启用 Cargo 特性 `resumable` 后，上传字段和 `FileDrop` 通过 tus 1.0 协议的一个子集发送文件，因此断网的上传会从中断处继续，而不是从头开始。控件本身无需改动：
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+不调用 `resumable_uploads` 时，未完成的上传存放在系统临时文件夹中，在最后一次收到字节后保留 24 小时，每个用户最多 5 个、总共最多 1000 个处于打开状态。
+
+| 请求 | 响应 |
+|---|---|
+| 带 `Upload-Length` 和 `Upload-Metadata: filename <base64>` 的 `POST /_zeyn/uploads/{store}` | `201`，带 `Location`、`Upload-Offset: 0` 和 `Upload-Expires`；超过存储上限为 `413`，空文件为 `422`，超过配额或打开上传上限为 `429` |
+| 对该位置 `HEAD` | `200`，带 `Upload-Offset` 和 `Upload-Length` |
+| 带 `Content-Type: application/offset+octet-stream` 和 `Upload-Offset` 的 `PATCH` | `204`，带新的 `Upload-Offset`；偏移量与服务器不一致时为 `409`，同一上传的另一个 `PATCH` 仍在进行时为 `423`，字节超过声明长度时为 `413` |
+| 带来最后一个字节的 `PATCH` | `200`，带 `{id, name, size, type}`，与普通上传相同 |
+| 对该位置 `DELETE` | `204`；上传及其字节被删除 |
+
+每个请求都需要 `Tus-Resumable: 1.0.0`（否则为 `412`）、存储的写入权限和特性的守卫；`POST`、`PATCH` 和 `DELETE` 还需要 CSRF 头。只有创建上传的用户和租户能找到它；其他人得到 `404`。创建上传与普通上传一样计入写入限制；它的 `PATCH` 不计入，因为它们不能携带超过声明长度的数据。浏览器以每个 1 MiB 的 `PATCH` 发送文件，这是常见反向代理的默认请求体上限，因此连接断开最多只需重发这么多。
+
+字节一到达就写入上传文件夹中的 `{id}.part`，因此连接断开前已到达服务器的字节会被保留，`HEAD` 会报告它们。最后一个字节到达后，文件经过与 `POST /_zeyn/files/{store}` 相同的步骤：根据内容识别的类型、大小上限、配额、存储、扫描器和拦截器（`CallKind::Upload`）。之后删除分块文件，检查拒绝文件时也会删除。在过期时间内没有新字节的上传，会在下次被查询或下一个上传创建时删除；重启遗留的分块文件每个过期周期清理一次。
+
+在浏览器中，失败的请求（断网、`409`、`423`、`429` 或服务器错误）会在浏览器恢复在线后，按 1、2、4、8 秒然后每 15 秒重试，连续最多 12 次；每次尝试都先询问偏移量，只发送剩余部分。取消会停止请求并删除服务器上的上传。最终失败后点击重试，只要服务器仍保留该上传，就会继续同一上传。
+
+与 tus 1.0 的差异：只有 creation、expiration 和 termination 扩展；没有 `OPTIONS` 发现、校验和、延迟长度和拼接；最后一个 `PATCH` 返回带已存储文件的 `200` 而不是 `204`，这样字段无需再发请求即可得到文件 id。打开的上传只有创建它的进程知道，因此在有多个实例的负载均衡器后面，`/_zeyn/uploads/` 路径需要粘性会话（sticky sessions）。
 
 ## File drop
 
