@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Fixed
+
+- The line editor no longer makes the page scroll sideways on a narrow touch screen: its screen reader only text sat outside the scroll box of the table and reached past the viewport.
+
 ### Changed
 
 - Virtual grids move their window of rows less often while scrolling: it stays while ten rows remain on both sides of the visible ones and then takes four more ahead. Scrolling down at 4x CPU throttling, 60 px per frame, the median frame went from 20.8 to 7.0 ms on the 40 and 62 column grids and p95 from 34.8 to 41.6 ms to 27.8 to 34.7 ms on 62 columns; the trace breakdown is in `docs/grid.md`. `grid.js` grows by 329 bytes gzipped.
