@@ -1,0 +1,100 @@
+- main:
+  - region "AlphaIndex":
+    - heading "AlphaIndex" [level=1]
+    - paragraph: A letter bar from the user's alphabet.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#alphaindex
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=AlphaIndex
+    - tablist "AlphaIndex sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - navigation "Browse by letter":
+        - list:
+          - listitem:
+            - link "A":
+              - /url: /?params=%7B%22q%22%3A%22A%22%7D
+          - listitem:
+            - link "B":
+              - /url: /?params=%7B%22q%22%3A%22B%22%7D
+          - listitem:
+            - link "C":
+              - /url: /?params=%7B%22q%22%3A%22C%22%7D
+          - listitem:
+            - link "D":
+              - /url: /?params=%7B%22q%22%3A%22D%22%7D
+          - listitem:
+            - link "E":
+              - /url: /?params=%7B%22q%22%3A%22E%22%7D
+          - listitem:
+            - link "F":
+              - /url: /?params=%7B%22q%22%3A%22F%22%7D
+          - listitem:
+            - link "G":
+              - /url: /?params=%7B%22q%22%3A%22G%22%7D
+          - listitem:
+            - link "H":
+              - /url: /?params=%7B%22q%22%3A%22H%22%7D
+          - listitem:
+            - link "I":
+              - /url: /?params=%7B%22q%22%3A%22I%22%7D
+          - listitem:
+            - link "J":
+              - /url: /?params=%7B%22q%22%3A%22J%22%7D
+          - listitem:
+            - link "K":
+              - /url: /?params=%7B%22q%22%3A%22K%22%7D
+          - listitem:
+            - link "L":
+              - /url: /?params=%7B%22q%22%3A%22L%22%7D
+          - listitem:
+            - link "M":
+              - /url: /?params=%7B%22q%22%3A%22M%22%7D
+          - listitem:
+            - link "N":
+              - /url: /?params=%7B%22q%22%3A%22N%22%7D
+          - listitem:
+            - link "O":
+              - /url: /?params=%7B%22q%22%3A%22O%22%7D
+          - listitem:
+            - link "P":
+              - /url: /?params=%7B%22q%22%3A%22P%22%7D
+          - listitem:
+            - link "Q":
+              - /url: /?params=%7B%22q%22%3A%22Q%22%7D
+          - listitem:
+            - link "R":
+              - /url: /?params=%7B%22q%22%3A%22R%22%7D
+          - listitem:
+            - link "S":
+              - /url: /?params=%7B%22q%22%3A%22S%22%7D
+          - listitem:
+            - link "T":
+              - /url: /?params=%7B%22q%22%3A%22T%22%7D
+          - listitem:
+            - link "U":
+              - /url: /?params=%7B%22q%22%3A%22U%22%7D
+          - listitem:
+            - link "V":
+              - /url: /?params=%7B%22q%22%3A%22V%22%7D
+          - listitem:
+            - link "W":
+              - /url: /?params=%7B%22q%22%3A%22W%22%7D
+          - listitem:
+            - link "X":
+              - /url: /?params=%7B%22q%22%3A%22X%22%7D
+          - listitem:
+            - link "Y":
+              - /url: /?params=%7B%22q%22%3A%22Y%22%7D
+          - listitem:
+            - link "Z":
+              - /url: /?params=%7B%22q%22%3A%22Z%22%7D
+          - listitem:
+            - link "Other characters":
+              - /url: /?params=%7B%22q%22%3A%22%23%22%7D
+              - text: "#"
+      - group: Show code
+      - button "Copy"
+      - status

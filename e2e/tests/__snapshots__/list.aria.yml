@@ -1,0 +1,45 @@
+- main:
+  - region "List":
+    - heading "List" [level=1]
+    - paragraph: Rows with an image, a title and meta text.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#list
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=List
+    - tablist "List sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - region "Team":
+        - heading "Team" [level=2]
+        - list:
+          - listitem:
+            - link "Ada Lovelace Analyst London":
+              - /url: /ui/avatar
+          - listitem:
+            - link "Alan Turing Researcher Manchester":
+              - /url: /ui/avatar
+          - listitem:
+            - link "Grace Hopper Engineer New York":
+              - /url: /ui/avatar
+          - listitem:
+            - link "İlknur Şahin Designer İzmir":
+              - /url: /ui/avatar
+          - listitem:
+            - link "Hedy Lamarr Inventor Vienna":
+              - /url: /ui/avatar
+          - listitem:
+            - link "Katherine Johnson Mathematician Hampton":
+              - /url: /ui/avatar
+          - listitem:
+            - link "Ömer Çelik Developer Ankara":
+              - /url: /ui/avatar
+          - listitem:
+            - link "Margaret Hamilton Engineer Boston":
+              - /url: /ui/avatar
+        - status: 8 items shown
+      - group: Show code
+      - button "Copy"
+      - status

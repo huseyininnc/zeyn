@@ -1,0 +1,56 @@
+- main:
+  - region "ComparisonTable":
+    - heading "ComparisonTable" [level=1]
+    - paragraph: Plans side by side with a row for each feature.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/data#comparisontable
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ComparisonTable
+    - tablist "ComparisonTable sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - group "Plans":
+        - table "Plans":
+          - caption: Plans
+          - rowgroup:
+            - row "Free Team Business":
+              - cell
+              - columnheader "Free"
+              - columnheader "Team"
+              - columnheader "Business"
+          - rowgroup:
+            - row /Users 3 \d+ \d+/:
+              - rowheader "Users"
+              - cell "3"
+              - cell /\d+/
+              - cell /\d+/
+            - row /Storage 5 GB \d+ GB 1 TB/:
+              - rowheader "Storage"
+              - cell "5 GB"
+              - cell /\d+ GB/
+              - cell "1 TB"
+            - row "Exports Included Included Included":
+              - rowheader "Exports"
+              - cell "Included"
+              - cell "Included"
+              - cell "Included"
+            - row "Audit log Not included Included Included":
+              - rowheader "Audit log"
+              - cell "Not included"
+              - cell "Included"
+              - cell "Included"
+            - row "Single sign on Not included Not included Included":
+              - rowheader "Single sign on"
+              - cell "Not included"
+              - cell "Not included"
+              - cell "Included"
+            - row "Support Not included Email Phone and email":
+              - rowheader "Support"
+              - cell "Not included"
+              - cell "Email"
+              - cell "Phone and email"
+      - group: Show code
+      - button "Copy"
+      - status

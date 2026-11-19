@@ -1,0 +1,31 @@
+- main:
+  - region "Date pickers":
+    - heading "Date pickers" [level=1]
+    - paragraph: Date, time and range pickers.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/controls
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=DateOptions
+    - tablist "Date pickers sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - text: Day
+      - textbox "Day": /\d+\/\d+\/\d+/
+      - button "Choose date"
+      - paragraph: "/Format: \\d+\\/\\d+\\/\\d+\\. You can also type: today, \\+3d\\./"
+      - text: Arrives
+      - textbox "Arrives": /\d+:\d+ AM/
+      - button "Choose time"
+      - paragraph: "/Format: 2:\\d+ PM\\. You can also type: now, \\d+\\./"
+      - text: Stay from
+      - textbox "Stay from"
+      - text: Stay to
+      - textbox "Stay to"
+      - button "Choose date"
+      - paragraph: "/Format: \\d+\\/\\d+\\/\\d+\\. You can also type: today, \\+3d\\./"
+      - button "Book"
+      - group: Show code
+      - button "Copy"
+      - status

@@ -1,0 +1,17 @@
+- main:
+  - region "ClearPrefs":
+    - heading "ClearPrefs" [level=1]
+    - paragraph: A button that removes the choices this browser keeps for the app.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#clearprefs
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ClearPrefs
+    - tablist "ClearPrefs sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - button "Forget my choices in this browser"
+      - group: Show code
+      - button "Copy"
+      - status

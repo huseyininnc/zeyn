@@ -1,0 +1,582 @@
+{
+  "diff_view": {
+    "js": 69684,
+    "css": 50244,
+    "fcp": 1000
+  },
+  "code_view": {
+    "js": 70747,
+    "css": 50506,
+    "fcp": 1000
+  },
+  "code_editor": {
+    "js": 78004,
+    "css": 50989,
+    "fcp": 1000
+  },
+  "barcode": {
+    "js": 69684,
+    "css": 50071,
+    "fcp": 1000
+  },
+  "inbox": {
+    "js": 75866,
+    "css": 50547,
+    "fcp": 1000
+  },
+  "kanban": {
+    "js": 78730,
+    "css": 50842,
+    "fcp": 1000
+  },
+  "calendar": {
+    "js": 76939,
+    "css": 50765,
+    "fcp": 1000
+  },
+  "chart": {
+    "js": 73899,
+    "css": 51606,
+    "fcp": 1000
+  },
+  "kpi": {
+    "js": 69684,
+    "css": 51606,
+    "fcp": 1000
+  },
+  "heatmap": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "funnel": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "activity_rings": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "gantt": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "org_chart": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "flow_diagram": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "message_thread": {
+    "js": 76598,
+    "css": 50824,
+    "fcp": 1000
+  },
+  "composer": {
+    "js": 91610,
+    "css": 52544,
+    "fcp": 1000
+  },
+  "typing_indicator": {
+    "js": 81252,
+    "css": 51698,
+    "fcp": 1000
+  },
+  "data_grid": {
+    "js": 102814,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "table": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "comparison_table": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "card_grid": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "image_card": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "rail": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "list": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "search_box": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "topics": {
+    "js": 111817,
+    "css": 51606,
+    "fcp": 1000
+  },
+  "tree": {
+    "js": 72366,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "document_viewer": {
+    "js": 74388,
+    "css": 50730,
+    "fcp": 1000
+  },
+  "week_schedule": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "alert": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "progress": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "progress_ring": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "meter": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "indicator": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "tour": {
+    "js": 71284,
+    "css": 55916,
+    "fcp": 1000
+  },
+  "skeleton": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "empty_state": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "popover": {
+    "js": 71925,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "busy": {
+    "js": 72863,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "toast": {
+    "js": 71966,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "clear_prefs": {
+    "js": 72146,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "reactions": {
+    "js": 71063,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "form": {
+    "js": 76300,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "controls": {
+    "js": 71966,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "date_pickers": {
+    "js": 81919,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "lookup": {
+    "js": 77510,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "line_editor": {
+    "js": 74264,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "masked_inputs": {
+    "js": 76300,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "rating": {
+    "js": 71966,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "color_input": {
+    "js": 74261,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "length_input": {
+    "js": 74341,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "action_button": {
+    "js": 71966,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "file_drop": {
+    "js": 77580,
+    "css": 50419,
+    "fcp": 1000
+  },
+  "stack": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "row": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "card": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "panel": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "tabs": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "split": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "accordion": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "list_detail": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "deferred": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "auto_grid": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "surface": {
+    "js": 73561,
+    "css": 50102,
+    "fcp": 1000
+  },
+  "screen_header": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "image": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "image_compare": {
+    "js": 70288,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "embed": {
+    "js": 78733,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "hero": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "breadcrumb": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "link_button": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "prev_next": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "pagination": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "toc": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "alpha_index": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "chips": {
+    "js": 70554,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "menu_button": {
+    "js": 73737,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "menu_bar": {
+    "js": 77692,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "side_menu": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "external_link": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "share": {
+    "js": 70747,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "copy_button": {
+    "js": 70747,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "toolbox": {
+    "js": 77692,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "property_inspector": {
+    "js": 92176,
+    "css": 50989,
+    "fcp": 1000
+  },
+  "status_bar": {
+    "js": 77692,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "app_header": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "theme_picker": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "price": {
+    "js": 69684,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "range_slider": {
+    "js": 75673,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "quantity_stepper": {
+    "js": 71490,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "variant_picker": {
+    "js": 73602,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "product_gallery": {
+    "js": 81227,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "facet_panel": {
+    "js": 75673,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "review_summary": {
+    "js": 69684,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "countdown": {
+    "js": 71096,
+    "css": 53105,
+    "fcp": 1000
+  },
+  "story_ring": {
+    "js": 69684,
+    "css": 50448,
+    "fcp": 1000
+  },
+  "lightbox": {
+    "js": 83148,
+    "css": 50901,
+    "fcp": 1000
+  },
+  "feed": {
+    "js": 94591,
+    "css": 52088,
+    "fcp": 1000
+  },
+  "heading": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "paragraph": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "meta_line": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "badge": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "avatar": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "avatar_group": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "icon": {
+    "js": 77692,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "description_list": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "timeline": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "markdown": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "spoiler": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  },
+  "quote": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "highlight": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "kbd": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "divider": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "stepper": {
+    "js": 69684,
+    "css": 53883,
+    "fcp": 1000
+  },
+  "relative_time": {
+    "js": 69684,
+    "css": 49573,
+    "fcp": 1000
+  }
+}

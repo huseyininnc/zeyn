@@ -1,0 +1,25 @@
+- main:
+  - region "Breadcrumb":
+    - heading "Breadcrumb" [level=1]
+    - paragraph: The trail of links to the current page.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#breadcrumb
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Breadcrumb
+    - tablist "Breadcrumb sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - navigation "Breadcrumb":
+        - list:
+          - listitem:
+            - link "Components":
+              - /url: /?params=%7B%22q%22%3A%22%22%7D
+          - listitem:
+            - link "Navigation":
+              - /url: /ui/breadcrumb
+          - listitem: Breadcrumb
+      - group: Show code
+      - button "Copy"
+      - status

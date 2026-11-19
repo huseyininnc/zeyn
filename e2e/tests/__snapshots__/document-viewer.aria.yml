@@ -1,0 +1,106 @@
+- main:
+  - region "DocumentViewer":
+    - heading "DocumentViewer" [level=1]
+    - paragraph: A paged report preview whose pages are fetched as they come into view.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#documentviewer
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=DocumentViewer
+    - tablist "DocumentViewer sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - region "Sales by order":
+        - group "Document tools":
+          - button "Previous page" [disabled]
+          - text: Page
+          - textbox "Page": "1"
+          - text: /of \d+/
+          - button "Next page"
+          - button "Zoom out"
+          - text: Zoom
+          - combobox "Zoom":
+            - option "Fit width" [selected]
+            - option "Fit page"
+            - option /\d+%/
+            - option /\d+%/
+            - option /\d+%/
+            - option /\d+%/
+            - option /\d+%/
+            - option /\d+%/
+            - option /\d+%/
+            - option /\d+%/
+          - button "Zoom in"
+        - search:
+          - text: Search the document
+          - searchbox "Search the document"
+          - list
+        - navigation "Outline":
+          - list:
+            - listitem:
+              - button "Part 1"
+              - list:
+                - listitem:
+                  - button "Orders from page 1"
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+            - listitem:
+              - button "Part 2"
+              - list:
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+            - listitem:
+              - button "Part 3"
+              - list:
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+            - listitem:
+              - button "Part 4"
+              - list:
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+            - listitem:
+              - button "Part 5"
+              - list:
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+                - listitem:
+                  - button /Orders from page \d+/
+        - region "Pages":
+          - group "Page 1":
+            - img: "/Sales by order Quarterly report Order Region Amount #\\d+ West \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ Page 1 of \\d+/"
+          - group "Page 2":
+            - img: "/Sales by order Quarterly report Order Region Amount #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ Central \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ East \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ North \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ West \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ #\\d+ South \\d+\\.\\d+ Page 2 of \\d+/"
+        - paragraph: Page Up and Page Down move by page, Home and End go to the first and last page, plus and minus zoom.
+        - status: /Page 1 of \d+/
+      - group: Show code
+      - button "Copy"
+      - status

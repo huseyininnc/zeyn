@@ -1,0 +1,20 @@
+- main:
+  - region "EmptyState":
+    - heading "EmptyState" [level=1]
+    - paragraph: What a list shows when it has nothing.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#emptystate-and-skeleton
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=EmptyState
+    - tablist "EmptyState sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - paragraph: No orders yet
+      - paragraph: Orders you place show up here.
+      - link "Browse the list component":
+        - /url: /ui/list
+      - group: Show code
+      - button "Copy"
+      - status

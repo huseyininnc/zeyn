@@ -1522,7 +1522,7 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-col-menu:hover { background: var(--z-hover); color: var(--z-text); }
 
-@media (hover: none) { .z-col-menu { opacity: 1; } }
+@media (hover: none) { .z-col-menu { opacity: 1; width: 24px; height: 24px; } }
 
 .z-resize {
   position: absolute;

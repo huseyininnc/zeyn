@@ -1,0 +1,38 @@
+- main:
+  - region "Chart":
+    - heading "Chart" [level=1]
+    - paragraph: Bar, donut, combo and gauge charts.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/data
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Chart
+    - tablist "Chart sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - figure "Sales":
+        - text: ""
+        - list:
+          - listitem: /\d+/
+          - listitem: /\d+/
+        - 'group /Sales Bar chart of 2 series over 6 categories\. Highest: Jun, \d+, \d+\./':
+          - paragraph: "/Bar chart of 2 series over 6 categories\\. Highest: Jun, \\d+, \\d+\\./"
+          - img:
+            - 'img /Jan, \d+: \d+/'
+            - 'img /Jan, \d+: \d+/'
+            - 'img /Feb, \d+: \d+/'
+            - 'img /Feb, \d+: \d+/'
+            - 'img /Mar, \d+: \d+/'
+            - 'img /Mar, \d+: \d+/'
+            - 'img /Apr, \d+: \d+/'
+            - 'img /Apr, \d+: \d+/'
+            - 'img /May, \d+: \d+/'
+            - 'img /May, \d+: \d+/'
+            - 'img /Jun, \d+: \d+/'
+            - 'img /Jun, \d+: \d+/'
+        - group: Show data
+      - group: Show code
+      - button "Copy"
+      - status

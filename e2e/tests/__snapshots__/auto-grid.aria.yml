@@ -1,0 +1,29 @@
+- main:
+  - region "AutoGrid":
+    - heading "AutoGrid" [level=1]
+    - paragraph: As many columns as fit the width.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#autogrid
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=AutoGrid
+    - tablist "AutoGrid sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - article "Orders":
+        - heading "Orders" [level=3]
+      - article "Stock":
+        - heading "Stock" [level=3]
+      - article "People":
+        - heading "People" [level=3]
+      - article "Invoices":
+        - heading "Invoices" [level=3]
+      - article "Reports":
+        - heading "Reports" [level=3]
+      - article "Settings":
+        - heading "Settings" [level=3]
+      - group: Show code
+      - button "Copy"
+      - status
