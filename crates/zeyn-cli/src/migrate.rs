@@ -54,6 +54,9 @@ pub enum Change {
     /// A moved item, full old path to full new path (`zeyn::rank::ReorderRequest` to
     /// `zeyn::ReorderRequest`), in `use` items and in paths written out in code.
     Use(&'static str, &'static str),
+    /// A struct literal of this type that has no `..base` gets `..Default::default()`, for a
+    /// struct that gained fields and a `Default`.
+    DefaultRest(&'static str),
     /// A pattern that needs a person, with the reason shown in the report.
     Review(Pattern, &'static str),
 }
@@ -444,6 +447,40 @@ impl Finder<'_> {
         self.todos.push(Todo { at, reason });
     }
 
+    /// Adds `..Default::default()` as the last item of a struct literal, on its own line when
+    /// the literal spans lines.
+    fn default_rest(&mut self, expr: &syn::ExprStruct, name: &str) {
+        let close = self
+            .range(expr.brace_token.span.close())
+            .start;
+        let open = self
+            .range(expr.brace_token.span.open())
+            .end;
+        let before = self.text[..close].trim_end();
+        let at = before.len();
+        let multiline = self.text[at..close].contains('\n');
+        let comma = before.ends_with(',') || at == open;
+        let line = before.rfind('\n').map_or(0, |i| i + 1);
+        let indent: String = before[line..]
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .collect();
+        let lead = if comma { "" } else { "," };
+        let text = if multiline && at > open {
+            format!("{lead}\n{indent}..Default::default()")
+        } else if at == close {
+            format!("{lead} ..Default::default() ")
+        } else {
+            format!("{lead} ..Default::default()")
+        };
+        self.edits.push(Edit {
+            start: at,
+            end: at,
+            text,
+            note: format!("`{name}` literal gets `..Default::default()`"),
+        });
+    }
+
     /// Replaces the call from its dot to its closing parenthesis with `template`, its
     /// arguments filled in. An empty template also takes the white space before the dot.
     fn reshape(&mut self, call: &syn::ExprMethodCall, args: &[String], template: &str) {
@@ -688,6 +725,19 @@ impl<'ast> Visit<'ast> for Finder<'_> {
     }
 
     fn visit_expr_struct(&mut self, expr: &'ast syn::ExprStruct) {
+        for change in self.changes {
+            if let Change::DefaultRest(name) = change
+                && expr.rest.is_none()
+                && expr.qself.is_none()
+                && expr
+                    .path
+                    .segments
+                    .last()
+                    .is_some_and(|s| s.ident == name)
+            {
+                self.default_rest(expr, name);
+            }
+        }
         for change in self.changes {
             if let Change::Review(Pattern::Struct(name), reason) = change
                 && expr

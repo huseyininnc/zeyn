@@ -296,3 +296,17 @@ fn a_new_project_parses_and_is_already_current() {
     }
     std::fs::remove_dir_all(&base).ok();
 }
+
+#[test]
+fn job_structs_get_default_rest_and_job_stores_are_flagged() {
+    let (notes, todos) = check("jobs", &[step("0.0.11")]);
+    assert_eq!(notes.len(), 6, "{notes:#?}");
+    assert!(notes[0].contains("`NewJob` literal gets `..Default::default()`"));
+    let lines: Vec<&str> = todos
+        .iter()
+        .map(|t| t.split(':').next().unwrap())
+        .collect();
+    assert_eq!(lines, ["1", "49", "53"], "{todos:#?}");
+    assert!(todos[1].contains("add_trigger"));
+    assert!(todos[2].contains("migrate_job_tables"));
+}
