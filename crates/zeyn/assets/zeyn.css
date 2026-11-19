@@ -751,7 +751,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 @media (max-width: 640px) {
   .z-topbar-search { width: 32px; padding: 0; justify-content: center; }
   .z-topbar-search > kbd { display: none; }
-  .z-topbar-search > span {
+  .z-topbar-search > span:not(.z-icon) {
     position: absolute;
     width: 1px;
     height: 1px;
