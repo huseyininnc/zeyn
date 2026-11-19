@@ -4140,7 +4140,7 @@ async fn page(
     name: &'static str,
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
-    let (ctx, theme_cookie) = theme::remember(&st, ctx, &headers).await;
+    let (ctx, look_cookies) = theme::remember(&st, ctx, &headers).await;
     let meta = st
         .screens
         .get(name)
@@ -4313,7 +4313,9 @@ async fn page(
             .headers_mut()
             .insert(header::CONTENT_LANGUAGE, lang);
     }
-    with_cookie(with_cookie(response, set), theme_cookie)
+    look_cookies
+        .into_iter()
+        .fold(with_cookie(response, set), |r, c| with_cookie(r, Some(c)))
 }
 
 /// Strong ETag over the parts of a rendered body; `kind` keeps full pages and partial screens

@@ -33,7 +33,10 @@ async function csrf() {
   return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
-/** Screen name, params and node of an element, as the server expects them. */
+/**
+ * Screen name, params and node of an element, as the server expects them. The node is its path
+ * as a string (`"2.0.1"`), so forms deep in a screen keep drafts of their own.
+ */
 function address(el) {
   const screen = el.closest('[data-zeyn-screen]');
   let params = null;
@@ -43,7 +46,7 @@ function address(el) {
     params = null;
   }
   const node = el.closest('[data-zeyn-node]');
-  return { screen: screen?.dataset.zeynScreen ?? null, params, node: node ? Number(node.dataset.zeynNode) : null };
+  return { screen: screen?.dataset.zeynScreen ?? null, params, node: node?.dataset.zeynNode ?? null };
 }
 
 /**
