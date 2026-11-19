@@ -59,6 +59,7 @@ pub use menus::{
     MAX_MENU_CACHE, MAX_MENU_LABEL, MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL,
     MenuNode, MenuSource, Menus,
 };
+pub use modules::{MAX_EXTENSION_MODULES, Module};
 pub use theme::Theme;
 #[cfg(feature = "email")]
 mod mail;
@@ -816,6 +817,7 @@ pub struct App {
     realtime: Option<realtime::Socket>,
     #[cfg(feature = "resumable")]
     resumable: crate::ResumableUploads,
+    modules: Vec<Module>,
 }
 
 impl App {
@@ -880,6 +882,7 @@ impl App {
             realtime: None,
             #[cfg(feature = "resumable")]
             resumable: crate::ResumableUploads::default(),
+            modules: Vec::new(),
         }
     }
 
@@ -1364,6 +1367,19 @@ impl App {
     /// Applies a plugin. Settings made after this line override the plugin's.
     pub fn plugin(self, plugin: impl Plugin) -> Self {
         plugin.install(self)
+    }
+
+    /// Registers the browser module of a component from another crate: its script, stylesheet,
+    /// markers and texts (see [`Module`]). Pages link it only when their HTML holds one of its
+    /// markers. Panics with the fix when the module breaks the naming rule or clashes with the
+    /// framework or a module registered before it, so a wrong module never starts.
+    #[track_caller]
+    pub fn module(mut self, module: Module) -> Self {
+        if let Err(problem) = module.check(&self.modules) {
+            panic!("{problem}");
+        }
+        self.modules.push(module);
+        self
     }
 
     /// Message catalogs and default language.
@@ -1979,6 +1995,13 @@ impl App {
             self.services
                 .insert(Menus::new(source, self.menu_per_user));
         }
+        for module in &self.modules {
+            for (locale, json) in module.catalogs() {
+                self.i18n
+                    .defaults(locale, json)
+                    .expect("catalogs are checked when the module is registered");
+            }
+        }
         let look = Arc::new(self.look());
         self.services
             .insert(theme::Looks(look.clone()));
@@ -2011,6 +2034,7 @@ impl App {
             island_csp: HeaderValue::from_str(&self.csp.header(true))
                 .unwrap_or(HeaderValue::from_static(islands::CSP)),
             csp: Arc::new(self.csp),
+            extensions: modules::Extensions::new(std::mem::take(&mut self.modules), JS),
             time: self.time,
             fixed_now: self.fixed_now,
             zone_picker: self.zone_picker,
@@ -2163,10 +2187,13 @@ impl App {
             router = router.route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }));
         }
         let router = seo::routes(router, &state);
-        let router = router
+        let runtime = state.extensions.runtime;
+        let router = state
+            .extensions
+            .routes(router)
             .route(
                 "/_zeyn/zeyn.js",
-                get(|| async { asset(modules::runtime(JS), "text/javascript; charset=utf-8") }),
+                get(move || async move { asset(runtime, "text/javascript; charset=utf-8") }),
             )
             .route(
                 "/_zeyn/grid.js",
@@ -2386,6 +2413,8 @@ struct AppState {
     #[cfg(feature = "islands")]
     island_csp: HeaderValue,
     csp: Arc<crate::csp::Csp>,
+    /// Browser modules of components from other crates (`App::module`).
+    extensions: modules::Extensions,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
@@ -3448,10 +3477,10 @@ impl AppState {
         let base = escape(&self.prefix);
         let mut used = modules::Used::default();
         for part in [&frame, &commands, &ai_launcher] {
-            used.scan(part);
+            used.scan(part, &self.extensions);
         }
         let mut components = String::with_capacity(2048);
-        used.head(&base, &mut components);
+        used.head(&base, &self.extensions, &mut components);
         components.push_str(&site_head);
         components.push_str(&ai_head);
         let native_menu = if self.native_menu {

@@ -64,6 +64,7 @@ fn is_public_asset(path: &str) -> bool {
         || charts::ASSETS.contains(&path)
         || site::ASSETS.contains(&path)
         || modules::ASSETS.contains(&path)
+        || path.starts_with("/_zeyn/ext/")
         || is_assistant_asset(path)
         || is_island_asset(path)
 }
