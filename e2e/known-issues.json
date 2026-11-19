@@ -1,3 +1,4 @@
 {
-  "kanban:reflow": "On a 412 px phone the document grows to about 1040 px wide although the board scrolls inside its own box; the cause is not found yet (follow up)."
+  "kanban:reflow": "On a 412 px phone the document grows to about 1040 px wide although the board scrolls inside its own box; the cause is not found yet (follow up).",
+  "line_editor:reflow": "On Linux Chromium (CI) at 412 px with touch the line editor page scrolls sideways; not seen on Windows. Follow up ZEYN-311."
 }
