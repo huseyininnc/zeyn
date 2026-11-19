@@ -1,4 +1,4 @@
-# GitHub Actions for the Zeyn repository: format, lint and test on every push to main or dev
+# GitHub Actions for the Zeyn repository: format, lint, feature builds and tests run side by side
 # and on pull requests. The desktop crate builds against WebKitGTK and GTK on Linux.
 name: CI
 
@@ -21,16 +21,19 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
-  check:
+  # Three jobs run side by side and `check` gathers them, so the branch rules need one name.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - run: sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install -y libwebkit2gtk-4.1-dev libgtk-3-dev
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lint
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: sh ci/clippy-features.sh
       - name: Build the workspace with timings
         run: |
           start=$(date +%s)
@@ -55,9 +58,43 @@ jobs:
           path: target/cargo-timings/cargo-timing.html
           if-no-files-found: ignore
           retention-days: 14
-      - run: cargo test --workspace
-      - run: cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts,image,resumable,metronome-ops
+
+  features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: features
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
+      - run: sh ci/clippy-features.sh
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
+      # One compile of zeyn for the whole workspace: the examples already turn most features on,
+      # so the feature list is added here instead of building zeyn a second time.
+      - run: cargo test --workspace --features zeyn/assistant,zeyn/oidc,zeyn/totp,zeyn/islands,zeyn/realtime,zeyn/socket-client,zeyn/redis,zeyn/xlsx,zeyn/email,zeyn/accounts,zeyn/image,zeyn/resumable,zeyn/metronome-ops
       - run: cargo test -p zeyn-cli
+
+  check:
+    if: always()
+    needs: [lint, features, test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "lint: ${{ needs.lint.result }}, features: ${{ needs.features.result }}, test: ${{ needs.test.result }}"
+          test "${{ needs.lint.result }}" = success
+          test "${{ needs.features.result }}" = success
+          test "${{ needs.test.result }}" = success
 
   deny:
     runs-on: ubuntu-latest
@@ -70,6 +107,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: audit
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
       - run: cargo install cargo-audit --locked
       - run: cargo audit
 
@@ -79,6 +119,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
       - run: cargo build -p zeyn-example-components
       - uses: actions/setup-node@v6
         with:
