@@ -336,3 +336,21 @@ jobs.enqueue("send_invoice", "42").await?;
 - При хранилище запланированный и запущенный вручную запуск одной и той же задачи могут пересечься;
   задачи, которые не должны выполняться дважды одновременно, должны защищаться сами (например,
   блокировкой строки).
+
+### Metronome
+
+Возможность `metronome` добавляет к этим заданиям расписания по настенным часам; полное руководство в `docs/metronome.md`.
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- `Trigger` ставит в очередь запуски зарегистрированного задания: cron с секундами в диалекте Quartz, часовой пояс IANA с определённым поведением при переходах на летнее время, полезная нагрузка, приоритет, тайм-аут и политика пропуска (`RunOnce`, `RunAll { max }`, `Skip`). Календари исключают даты, дни недели, ежегодные даты и интервалы времени.
+- Серверы с общим хранилищем ставят каждый такт в очередь ровно один раз. `pause`, `resume` и `run_now` работают на всех серверах.
+- Каждая завершённая попытка становится строкой истории (без нагрузки и текста ошибки), её читают через `jobs.history`, `GET /_zeyn/jobs/runs` и экран `/ops/jobs` (`zeyn.jobs.read`, `zeyn.jobs.run`, `zeyn.jobs.admin`).

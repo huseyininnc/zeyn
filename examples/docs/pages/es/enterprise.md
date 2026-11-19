@@ -308,3 +308,21 @@ jobs.enqueue("send_invoice", "42").await?;
   `NUMBER(19)`.
 - Con un almacén, una ejecución programada y una ejecución disparada del mismo job pueden solaparse; los jobs que no
   deben ejecutarse dos veces a la vez deben protegerse a sí mismos (con un bloqueo de fila, por ejemplo).
+
+### Metronome
+
+La característica `metronome` añade horarios de reloj de pared sobre estas tareas; la guía completa está en `docs/metronome.md`.
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- Un `Trigger` encola ejecuciones de una tarea registrada: cron con segundos en el dialecto de Quartz, una zona horaria IANA con un comportamiento definido en los saltos y repeticiones del horario de verano, una carga, una prioridad, un tiempo límite y una política de fallos (`RunOnce`, `RunAll { max }`, `Skip`). Los calendarios excluyen fechas, días de la semana, fechas anuales y franjas horarias.
+- Los servidores que comparten un almacén encolan cada instante una sola vez. `pause`, `resume` y `run_now` funcionan entre servidores.
+- Cada intento terminado es una fila de historial (nunca la carga ni el texto del error), que se lee con `jobs.history`, en `GET /_zeyn/jobs/runs` y en la pantalla `/ops/jobs` (`zeyn.jobs.read`, `zeyn.jobs.run`, `zeyn.jobs.admin`).

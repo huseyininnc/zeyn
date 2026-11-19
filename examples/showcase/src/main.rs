@@ -13,6 +13,8 @@ mod inputs;
 mod islands;
 mod live;
 mod media;
+#[cfg(feature = "metronome")]
+mod ops;
 mod overview;
 mod people;
 mod pro;
@@ -162,6 +164,10 @@ async fn main() -> std::io::Result<()> {
     #[cfg(feature = "pdf")]
     {
         app = app.service(pdf);
+    }
+    #[cfg(feature = "metronome")]
+    {
+        app = ops::schedules(app);
     }
     if let Some(a) = assistant {
         app = app.assistant(a);

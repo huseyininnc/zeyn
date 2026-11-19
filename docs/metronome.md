@@ -1,20 +1,20 @@
 # Metronome: a scheduler on top of Zeyn jobs
 
-Status: design proposal for review. Nothing in this document is implemented yet; implementation
-starts after the owner approves it.
+Status: implemented behind the Cargo feature `metronome`. This page is the guide; the sections
+on prior art and the reasons for each choice are kept from the design review, and "Not built
+yet" lists what the design proposed that is still open.
 
-Metronome is a working name. Two other names were considered:
+Metronome is the name the owner chose over Clockwork and Chronos:
 
-- **Clockwork**: clear, but it is used by several Rust and Ruby scheduling crates and gems, which
-  makes search and crate names crowded.
+- **Clockwork**: clear, but used by several Rust and Ruby scheduling crates and gems, which makes
+  search and crate names crowded.
 - **Chronos**: well known, but taken by Mesos Chronos, a Java scheduler and many crates. It also
   suggests a time library rather than a scheduler.
 - **Metronome**: a steady beat, short, and free as a module name inside `zeyn`. It does not need
   its own crate name because it ships as a feature of `zeyn`.
 
-The owner picks the final name. The code below uses `metronome` for the feature and module and
-`Trigger`, `Calendar` and `Misfire` for the types, so a rename touches one feature name and one
-module path.
+The feature is `metronome`, the module `zeyn::metronome`, and the main types `Trigger`,
+`Calendar`, `Misfire` and `Cron`.
 
 ## Where we start
 
@@ -103,12 +103,10 @@ What we leave out:
 - A second scheduling thread per job or a timer per trigger. One loop computes the next due time
   for all triggers.
 
-## Proposed API
-
-### Registering triggers
+## Registering triggers
 
 ```rust
-use zeyn::metronome::{Calendar, Cron, Misfire, Overlap, Trigger};
+use zeyn::metronome::{Calendar, Misfire, Retention, Trigger, Weekday};
 
 App::new("Billing")
     .job_store(SqlJobStore::new(db.clone()))
@@ -129,89 +127,92 @@ App::new("Billing")
     )
     .trigger(
         "close_day",
-        Trigger::cron("0 0 12 L * *")
+        Trigger::cron("0 0 12 L * ?")
             .id("month_end")
             .payload("month")
             .priority(10)
             .misfire(Misfire::RunAll { max: 3 }),
     )
     .chain("close_day", "send_reports")
+    .job_history(Retention::days(30).max_rows(100_000))
+    .feature(zeyn::metronome::ops())
 ```
 
-- `Trigger::cron(expr)` takes six fields (seconds first) or seven (with year), in the Quartz
-  dialect: `*`, lists, ranges, steps, `?`, `L` (last day), `W` (nearest weekday) and `#` (nth
-  weekday of the month). Five field expressions are rejected with a message that says to add the
-  seconds field, so there is one dialect.
-- `Trigger::every(d)` keeps today's interval behavior and is what `Schedule::every` becomes
-  internally. `Trigger::once(at)` runs one time.
-- `.time_zone(name)` takes an IANA name. The default is the app's time zone setting
-  (`docs/operations.md`), and UTC when none is set. Names are checked at startup against the
-  bundled tz database of `jiff`, which `zeyn` already depends on, so no new crate is needed.
-- `.id(name)` names the trigger (1 to 64 bytes, `[a-z0-9_-]`). Without it the id is `cron:<n>`
-  in registration order, which is stable as long as the code is.
-- `.payload(text)` is passed to `queued_job` functions, at most `MAX_JOB_PAYLOAD`.
-- `.priority(i16)`: higher first, default 0. Priority orders due runs within one claim; it never
-  starves: a run waiting longer than `PRIORITY_AGING` (five minutes) is treated as top priority.
-- `.timeout(d)`: the run's future is dropped when the time is up and the try fails with the error
-  code `timeout`. The default is no timeout, as today. A timeout longer than the lease keeps the
-  heartbeat going, as a normal run does.
-- `.overlap(Overlap::Skip | Overlap::QueueOne | Overlap::Allow)`: what a tick does while the
-  previous run of the same trigger still runs. The default is `QueueOne`, which matches today's
-  "a job triggered while it runs runs once more afterwards".
-- `.chain(a, b)`: after a run of `a` succeeds, `b` is queued with the payload of `a`'s run. Chains
-  are checked at startup: both jobs must exist and the chain graph has no cycle. A chain of at
-  most `MAX_CHAIN` (8) jobs keeps a mistake from spinning.
-- `App::trigger` and `App::calendar` fail at startup (not at the first tick) on a bad cron string,
-  an unknown time zone, an unknown calendar or job, or a duplicate trigger id. Each message names
-  the trigger and says what to change, written for an AI agent to act on.
+- `Trigger::cron(expr)` takes six fields (seconds first) or seven (with the year), in the Quartz
+  dialect: `*`, lists, ranges (`22-2` wraps), steps, `?`, `L` and `L-3` (last day, three days
+  before it), `15W` and `LW` (nearest weekday), `6L` (last Friday) and `MON#1` (first Monday).
+  Weekdays are names or `1` to `7` with `1` for Sunday, as in Quartz; `0` is refused with a
+  message that says so. One of the two day fields must be `*` or `?`. Five field expressions are
+  refused with a message that shows the six field form, so there is one dialect. `Cron::parse`
+  and `Cron::next_after` are public for tools and tests.
+- `Trigger::every(d)` runs every interval (at least a second), the first time one interval after
+  the trigger is first stored; `Trigger::once(at)` runs one time. `Schedule::every` keeps working
+  as before and is not a trigger.
+- `.time_zone(name)` takes an IANA name or a fixed offset. It is UTC unless set. Names are checked
+  against the tz database that `jiff` bundles, which `zeyn` already depends on.
+- `.id(name)` names the trigger (1 to 64 of `a-z`, `0-9`, `_`, `-`). Without one it is `cron:<n>`
+  in registration order for that job, stable as long as the code is.
+- `.payload(text)` goes to `queued_job` functions, at most `MAX_JOB_PAYLOAD` (4000 bytes).
+- `.priority(i16)`: higher first, 0 unless set. A run waiting longer than `PRIORITY_AGING` (five
+  minutes) is claimed as the highest priority, so none starves.
+- `.timeout(d)`: the try is dropped when the time is up and fails with the error code `timeout`;
+  the job's retries apply. No limit unless set.
+- `App::chain(a, b)`: after a run of `a` succeeds, `b` is queued with the payload of `a`'s run
+  (trigger `chain`, started by `job:a`). A failed or timed out run starts nothing.
+- `App::trigger`, `App::calendar` and `App::chain` are checked when the app starts: a bad
+  expression, an unknown time zone, job or calendar, a duplicate trigger id, a trigger that never
+  runs, a chain cycle or a chain longer than `MAX_CHAIN` (8) stop `App::check` and `serve` with
+  problem `Z0508`, which names the trigger and says what to change. At most `MAX_TRIGGERS`
+  (1,000) triggers per app.
+- A running job reads `ctx.scheduled_at()` (the tick, UTC) and `ctx.trigger_id()` (the trigger
+  id, `manual` or `chain`), so a daily report run late still reports the right day.
+
+The compiler refuses a bare string where a trigger belongs, `Misfire::RunAll` without its cap
+and a timeout that is not a `Duration`; the `compile_fail` doctests on `Trigger` keep that so.
 
 ### Daylight saving time
 
 Cron fields describe wall clock time in the trigger's time zone. When the clock changes:
 
-- **Gap** (spring forward, 03:00 to 04:00 does not exist): a tick in the gap runs once, at the
-  first instant after the gap (04:00). It is not skipped: a daily job at 03:30 still runs that
+- **Gap** (spring forward, 02:00 to 03:00 does not exist): a tick in the gap runs once, at the
+  first instant after the gap (03:00). It is not skipped: a daily job at 02:30 still runs that
   day. This is what Quartz.NET and most operators expect.
 - **Fold** (fall back, 02:00 to 03:00 happens twice): a tick in the fold runs once, at its first
-  occurrence (the earlier UTC instant). Second and minute patterns that match many times an hour
-  (`*/10 * * * * *`) run in both passes, because they mean "every ten seconds" rather than "at
-  this wall clock time". The rule: a field written as `*` or a step in the hour field follows the
-  real clock; a fixed hour follows the wall clock once.
-- Every computed tick is stored as a UTC instant (Unix milliseconds), so servers in different
-  zones agree.
-- The tests cover Europe/Istanbul (no DST since 2016), Europe/Berlin, America/New_York,
-  Australia/Lord_Howe (a 30 minute shift) and a zone with a date line change.
+  occurrence (the earlier UTC instant). When the hour field is `*` or a step, the expression
+  follows the real clock instead and matches in both passes: an hourly `0 0 */1 * * *` runs every
+  hour of real time through the fold.
+- Every tick is stored as a UTC instant (Unix milliseconds), so servers in different zones agree.
+- The tests cover Europe/Berlin, America/New_York, Australia/Lord_Howe (a 30 minute shift),
+  Pacific/Apia (the day Samoa skipped in 2011) and Europe/Istanbul (no DST since 2016).
 
 ### Calendars
 
-A calendar is an exclusion rule. A tick that falls in an excluded range is not run and does not
-count as a misfire.
+A calendar is an exclusion rule. A tick in an excluded day or range is not run and does not count
+as a misfire.
 
-- `Calendar::days([...])`: whole dates, in the trigger's time zone.
+- `Calendar::days([...])`: whole dates, read in the trigger's time zone, at most
+  `MAX_CALENDAR_DAYS` (3,660), kept as a sorted list of day numbers.
 - `.weekly_off([...])`: days of the week.
-- `.ranges([(start_time, end_time)])`: daily time ranges, such as a maintenance window.
 - `.annual([(month, day)])`: dates that repeat every year.
-- `.and(other)`: the union of two calendars.
-- `Calendar::from_store(name)`: dates kept in the database table `zeyn_job_calendars`, so
-  holidays can be maintained from a screen without a deploy. The scheduler reloads them when the
-  table's version changes (one `SELECT max(version)` per minute), and holds at most
-  `MAX_CALENDAR_DAYS` (3660, ten years of days) per calendar.
+- `.ranges([(start, end)])`: daily time ranges such as `("23:30", "00:30")`; an end before the
+  start crosses midnight.
+- `.and(other)`: what either calendar excludes.
 
 ### Misfire policies
 
-A tick is misfired when it is found more than `MISFIRE_THRESHOLD` (default 60 seconds,
-`.misfire_threshold(d)` per app) after its time: the servers were down, paused or saturated.
+A tick is misfired when it is found more than `MISFIRE_THRESHOLD` (60 seconds,
+`Jobs::set_misfire_threshold`) after its time: the servers were down, paused or saturated.
 
-- `Misfire::RunOnce` (default): one run for all missed ticks, now; then the schedule moves on.
+- `Misfire::RunOnce` (default): one run now for all missed ticks, scheduled for the latest one;
+  then the schedule moves on.
 - `Misfire::RunAll { max }`: one run per missed tick, oldest first, at most `max` (capped at
-  `MAX_CATCH_UP`, 100). Each run gets its scheduled time, so a daily report run late still
-  reports the right day. Missed ticks past `max` are recorded as one `skipped` history row with
-  the count.
-- `Misfire::Skip`: no run for missed ticks; the next run is the next future tick. One `skipped`
-  history row records the count.
+  `MAX_CATCH_UP`, 100), each with its own scheduled time. The rest are recorded as one `skipped`
+  history row whose `attempt` holds the count.
+- `Misfire::Skip`: no run for missed ticks; one `skipped` history row records the count.
 
-The run's context gets `ctx.scheduled_at()` (the tick, in UTC) and `ctx.trigger_id()`, so a job
-does not need to guess which day it is working for.
+A pass looks at no more than `MAX_MISFIRE_SCAN` (10,000) ticks of one trigger; a trigger further
+behind (a schedule of every second after a long downtime) jumps to its next future tick, and the
+skipped count stops at that number. Nothing grows with the length of a downtime.
 
 ### Pause, resume and run now
 
@@ -219,299 +220,166 @@ does not need to guess which day it is working for.
 jobs.pause("close_day").await?;
 jobs.pause_trigger("close_day", "month_end").await?;
 jobs.resume("close_day", Resume::Skip).await?;
-jobs.run_now("close_day", "2026-11-14").await?;
+jobs.resume_trigger("close_day", "month_end", Resume::Misfire).await?;
+jobs.run_now(&ctx, "close_day", "2026-11-14").await?;
 ```
 
 - Pause state is kept in the store, so it holds across restarts and servers. A paused job keeps
-  its queued runs but no worker claims them; a paused trigger queues no new ticks.
-- `Resume::Skip` moves the trigger to its next future tick; `Resume::Misfire` applies the
-  trigger's misfire policy to the paused time. The operator chooses on the screen.
-- `run_now(job, payload)` is `enqueue` with the trigger id `manual` and the identity of the caller
-  recorded in history. It runs even when the job is paused only if the caller passes
-  `RunNow::EvenIfPaused`.
+  its queued runs, but no worker claims them and its triggers queue nothing; a paused trigger
+  queues nothing. Other servers see a pause within `TRIGGER_REFRESH` (30 seconds).
+- `Resume::Skip` moves the triggers to their next future tick; `Resume::Misfire` applies each
+  trigger's misfire policy to the paused time.
+- `run_now(ctx, job, payload)` queues a run with the trigger id `manual` and records the caller
+  in history as `started_by`. The run still runs as `job:<name>` with no permissions, so "run
+  now" cannot raise privileges. A paused job answers `Error::Conflict`; resume it first.
 
-### Status types
+### Status
 
-`JobStatus` gains `paused`, `next_run` (UTC), `triggers: Vec<TriggerStatus>` and the last three
-outcomes. `TriggerStatus` holds the id, the expression in its source text, the time zone, the next
-three ticks (for the screen) and the pause flag. These are plain values, cheap to clone, built
-from the store on request rather than kept in memory.
+`JobStatus` gains `paused` and `triggers`: each `TriggerStatus` has the id, the expression in its
+source text, the time zone, the calendar, the pause flag and the next three ticks.
+`Jobs::triggers(job)`, `Jobs::is_paused(job)` and `Jobs::history(job, offset, limit)` read them in
+code. These are plain values built on request, not kept in memory.
 
 ## How a tick becomes a run
 
-1. One scheduler loop per server (inside the existing job worker task, no new thread) keeps, for
-   each trigger, only its next tick: one `i64` per trigger.
+1. One scheduler loop per server (a task next to the job worker) keeps, for each trigger, only its
+   next tick: one `i64`.
 2. Every `JOB_POLL` it takes the triggers whose next tick is due, applies calendars and the
-   misfire policy, and inserts runs with `tick_key = trigger_id || ':' || tick_ms`.
-3. The `tick_key` column has a unique index. When two servers insert the same tick, one insert
-   wins; the other gets a unique violation, which the store treats as "already queued" and
-   ignores. That is the whole cross server guarantee: at most one run per trigger time, with no
-   lock table and no leader election.
-4. The trigger's next tick is stored in `zeyn_job_triggers.next_ms` with a compare and set
-   (`UPDATE ... SET next_ms = ? WHERE id = ? AND next_ms = ?`), so a server that was behind does
-   not move it backwards.
-5. Workers claim runs as today, now ordered by `priority DESC, run_at` on PostgreSQL. Oracle
-   cannot order a locking select; there the claim takes the highest priority band first
-   (`WHERE priority >= ?` with the highest due priority read without a lock), which keeps the
-   ordering correct between bands and unordered inside one band, as it is today.
+   misfire policy, and asks the store to `fire`: in one transaction, move the trigger's
+   `next_ms` from the value it read to the next one with a compare and set
+   (`UPDATE ... SET next_ms = ? WHERE job = ? AND id = ? AND next_ms = ?`) and insert the runs.
+3. When two servers fire the same tick, one update wins; the other changes no row, inserts
+   nothing and takes the stored next tick. That is the whole cross server guarantee: exactly one
+   run per trigger time, with no lock table and no leader election. Each run also carries
+   `tick_key` (`job:trigger:tick_ms`) under a unique index as a second guard.
+4. Workers claim runs as before. PostgreSQL orders the claim by
+   `CASE WHEN run_at < aging THEN 32767 ELSE priority END DESC, run_at`. Oracle cannot order a
+   locking select; there the claim reads the highest due rank without a lock and then takes that
+   band first (`AND rank >= ?`), which keeps the order between bands and leaves it open inside
+   one, as before.
+5. `Jobs::run_due()` runs one pass by hand; tests drive it with a `FakeClock`
+   (`Jobs::set_clock`), which moves only when the test says so.
 
-Without a store (`MemoryJobStore`), the same code runs in one process, and the unique tick key is
-a `HashSet` entry that is removed when the run finishes, capped like the store.
+`MemoryJobStore` implements the same methods under its lock, so the same code runs in one
+process, and two schedulers on one memory store get the same guarantee.
 
 ## Store and SQL schema
 
-### Trait changes
+`JobStore` gains `add_trigger`, `triggers`, `fire`, `move_trigger`, `set_paused`, `paused_jobs`,
+`history` and `prune_history`. They have default implementations that return an error, so a
+custom store still compiles; `MemoryJobStore` and `SqlJobStore` implement them all. `NewJob` and
+`ClaimedJob` gain `trigger_id`, `scheduled_ms`, `timeout_ms` and `started_by` (and `NewJob` the
+`tick_key` and `priority`, `ClaimedJob` the `started_ms`); both implement `Default`.
 
-`JobStore` gains methods with default implementations that return an "unsupported" error, so a
-custom store still compiles; `MemoryJobStore` and `SqlJobStore` implement them all.
+With the feature on, `create_job_tables(dialect, prefix)` returns schema version 2:
 
-```rust
-fn upsert_trigger(&self, t: &TriggerRow) -> BoxFuture<Result<()>>;
-fn advance_trigger(&self, id: &str, from_ms: i64, to_ms: i64) -> BoxFuture<Result<bool>>;
-fn enqueue_tick(&self, job: NewJob, tick_key: &str) -> BoxFuture<Result<Enqueued>>;
-fn set_paused(&self, target: PauseTarget<'_>, paused: bool) -> BoxFuture<Result<()>>;
-fn history(&self, query: &DataQuery) -> BoxFuture<Result<Page<RunRow>>>;
-fn prune_history(&self, before_ms: i64, limit: usize) -> BoxFuture<Result<u64>>;
-```
-
-`Enqueued` is `Queued(id)` or `Duplicate`. `history` takes a `DataQuery`, so the run history is a
-normal DataGrid source with sorting, filters and cursor paging, and the page size limits of
-`DataQuery` apply.
-
-### Tables
-
-Changes to `zeyn_jobs` (new columns are nullable or have defaults, so the migration is online):
-
-| Column | PostgreSQL | Oracle | Meaning |
+| Column of `zeyn_jobs` | PostgreSQL | Oracle | Meaning |
 |---|---|---|---|
-| `trigger_id` | `VARCHAR(64)` | `VARCHAR2(64)` | `manual`, `every`, or the trigger id |
-| `tick_key` | `VARCHAR(100)` | `VARCHAR2(100)` | unique per trigger time; null for manual runs |
+| `trigger_id` | `VARCHAR(64)` | `VARCHAR2(64)` | `manual`, `chain`, the trigger id, or null |
+| `tick_key` | `VARCHAR(160)` | `VARCHAR2(160)` | unique per trigger time; null for other runs |
 | `scheduled_ms` | `BIGINT` | `NUMBER(19)` | the tick, for `ctx.scheduled_at()` |
-| `priority` | `SMALLINT DEFAULT 0` | `NUMBER(5) DEFAULT 0` | claim order |
+| `priority` | `SMALLINT DEFAULT 0 NOT NULL` | `NUMBER(5) DEFAULT 0 NOT NULL` | claim order |
 | `timeout_ms` | `BIGINT` | `NUMBER(19)` | per run timeout |
-| `started_ms` | `BIGINT` | `NUMBER(19)` | first claim of the current try |
+| `started_ms` | `BIGINT` | `NUMBER(19)` | start of the current try |
+| `started_by` | `VARCHAR(128)` | `VARCHAR2(128)` | the caller of a manual run |
 
-New index: `CREATE UNIQUE INDEX zeyn_jobs_tick ON zeyn_jobs (tick_key)`. PostgreSQL and Oracle
-both allow many nulls in a unique index on one nullable column, so manual runs are not affected.
-The due index becomes `(state, priority, run_at)`.
+and next to it `zeyn_jobs_tick` (unique index on `tick_key`; many nulls are allowed on both
+databases), `zeyn_job_triggers` (primary key `(job, id)`: expression, zone, calendar, misfire,
+priority, `paused`, `next_ms`, `updated_ms`), `zeyn_job_pauses` (one row per paused job),
+`zeyn_job_runs` (history, indexed on `(job, ended_ms)` and `ended_ms`) and `zeyn_job_schema`
+(one row, version 2). Oracle uses `VARCHAR2`, `NUMBER(5)`, `NUMBER(10)` and `NUMBER(19)`, with
+`DEFAULT` before `NOT NULL`; every name takes the table prefix and stays within 30 bytes with a
+prefix of up to 8 bytes, which a test checks.
 
-New table `zeyn_job_triggers`:
-
-```sql
-CREATE TABLE zeyn_job_triggers (
-  id VARCHAR(64) NOT NULL,
-  job VARCHAR(64) NOT NULL,
-  expr VARCHAR(200) NOT NULL,
-  time_zone VARCHAR(64) NOT NULL,
-  calendar VARCHAR(64),
-  misfire VARCHAR(16) NOT NULL,
-  misfire_max INTEGER,
-  priority SMALLINT NOT NULL DEFAULT 0,
-  paused SMALLINT NOT NULL DEFAULT 0,
-  next_ms BIGINT NOT NULL,
-  updated_ms BIGINT NOT NULL,
-  PRIMARY KEY (job, id)
-)
-```
-
-New table `zeyn_job_pauses` (`job VARCHAR(64) PRIMARY KEY, paused_by VARCHAR(128), paused_ms
-BIGINT`), so pausing a job is one row and does not touch its triggers.
-
-New table `zeyn_job_runs` for history (one row per finished try):
-
-```sql
-CREATE TABLE zeyn_job_runs (
-  id VARCHAR(80) NOT NULL PRIMARY KEY,
-  run_id VARCHAR(80) NOT NULL,
-  job VARCHAR(64) NOT NULL,
-  trigger_id VARCHAR(64),
-  scheduled_ms BIGINT,
-  started_ms BIGINT NOT NULL,
-  ended_ms BIGINT NOT NULL,
-  attempt INTEGER NOT NULL,
-  outcome VARCHAR(16) NOT NULL,
-  error_code VARCHAR(64),
-  worker VARCHAR(64) NOT NULL,
-  started_by VARCHAR(128)
-)
-CREATE INDEX zeyn_job_runs_job ON zeyn_job_runs (job, ended_ms)
-CREATE INDEX zeyn_job_runs_ended ON zeyn_job_runs (ended_ms)
-```
-
-`outcome` is `succeeded`, `failed`, `timeout`, `lost` (lease ended) or `skipped` (misfire
-policy). The payload is not copied to history (see "Security").
-
-New table `zeyn_job_calendars` (`calendar VARCHAR(64), day DATE, version BIGINT`, primary key
-`(calendar, day)`) for `Calendar::from_store`.
-
-Oracle uses `VARCHAR2`, `NUMBER(5)`, `NUMBER(10)` and `NUMBER(19)` as in today's
-`create_job_tables`; `DEFAULT` comes before `NOT NULL`. Every table and index name takes the
-existing prefix, and Oracle names stay within 30 bytes for 11g with a prefix of up to 8 bytes
-(checked by a test, as names are today).
-
-### Migration
-
-- `create_job_tables(dialect, prefix)` keeps returning the full schema for new apps.
-- New `migrate_job_tables(dialect, prefix, from)` returns the `ALTER TABLE ... ADD` and `CREATE`
-  statements from schema version 1 (today's) to version 2. Columns are added nullable or with a
-  default, so no table rewrite and no long lock on PostgreSQL 11 and later; Oracle 11g adds a
-  column with a default as a metadata change.
-- A one row table `zeyn_job_schema (version INTEGER)` records the version. `SqlJobStore` reads it
-  at startup and refuses to start with a message that names `migrate_job_tables` when the
-  database is older than the code, instead of failing at the first claim.
-- Rolling deploys: a version 1 server keeps working against a version 2 schema (it ignores the new
-  columns and never sets `tick_key`). Mixed versions may queue a duplicate tick of an
-  `every` schedule during the deploy, which is today's behavior.
-- `zeyn check` reports a store without the migration; the CLI gains `zeyn jobs migrate --print`
-  to print the statements for review, never to run them on its own.
+`migrate_job_tables(dialect, prefix)` returns the statements from version 1 (a table made without
+the feature) to version 2: `ALTER TABLE ... ADD` for each column, all nullable or with a default,
+so PostgreSQL 11 and later and Oracle 11g change only metadata, then the new tables. Review them
+and put them in a migration. A version 1 server keeps working against a version 2 schema; it
+ignores the new columns.
 
 ## Run history and retention
 
-- One row per finished try is written in the same transaction as `complete` or `fail`, so history
-  does not miss a run and costs one extra insert per try.
-- Retention: `.job_history(Retention::days(30).max_rows(100_000))`, default 30 days and 100,000
-  rows per app. A pruning pass runs every ten minutes on the server that wins a short lease on the
-  pseudo job `zeyn:prune`, and deletes at most 1,000 rows per pass by `ended_ms`, so it never
-  holds a long lock. It is an ordinary job, so it shows up in status and history.
-- `MemoryJobStore` keeps history in a ring buffer of `MEMORY_HISTORY_CAPACITY` (1,000) rows.
+- One row per finished try, written in the same transaction as `complete` or `fail` on
+  `SqlJobStore`, so history does not miss a run, at the cost of one insert per try.
+- Rows hold the job, trigger, scheduled time, start, end, try, outcome (`succeeded`, `failed`,
+  `timeout` or `skipped`), error code, worker and `started_by`. Never the payload, never the
+  error text; details stay in the server log.
+- Retention: `App::job_history(Retention::days(30).max_rows(100_000))`, which is the default.
+  Every `PRUNE_EVERY` (ten minutes) each server deletes at most `PRUNE_BATCH` (1,000) rows that
+  are older than the retention or beyond the newest `max_rows`, so it never holds a long lock.
+  Deletes are idempotent, so servers need no coordination for it.
+- `MemoryJobStore` keeps history in a ring of `MEMORY_HISTORY_CAPACITY` (1,000) rows.
+- `GET /_zeyn/jobs/runs` returns history as JSON (`?job=`, `?offset=`, `?limit=` up to
+  `MAX_PAGE_SIZE`) to users with `jobs_permission`, like `GET /_zeyn/jobs`.
 
 ## Operations screen
 
-A screen the app mounts with `.jobs_screen("/ops/jobs")`, built only from existing components:
+`App::feature(zeyn::metronome::ops())` mounts the screen at `/ops/jobs`, built only from
+existing components, with a menu entry under "Operations":
 
-- **Jobs grid** (`DataGrid` over `jobs.status()`): name, state, paused, next run in the viewer's
-  time zone, last outcome, runs and failures in the last 24 hours. Row actions: run now (with an
-  optional payload in a form), pause, resume (with the skip or misfire choice), retry the last
-  failed run.
-- **Triggers grid** under the selected job: id, expression, time zone, calendar, next three ticks,
-  paused. Row actions: pause and resume a trigger.
-- **Runs grid** (`DataGrid` over `history`): job, trigger, scheduled time, start, duration,
-  attempt, outcome, error code, worker, started by. Server side paging and filters through
-  `DataQuery`, so a history of a million rows costs one page of rows.
-- **Live status**: the grids `.listens("zeyn.jobs")`. The worker notifies the topic `zeyn.jobs`
-  through the realtime hub (feature `realtime`, `ZeynSocket::notify_tenant`) when a run starts or ends,
-  at most once per second per server (coalesced), so a busy queue does not flood browsers. Without
-  the `realtime` feature the grids refresh on the existing grid refresh control. Only the topic
-  name travels; the refresh goes through the normal endpoints with permission checks.
-- Texts come from the framework locale files (`en.json`, `tr.json`); times use the viewer's time
-  zone; the screen uses theme tokens and the standard grid keyboard model, so it meets WCAG 2.2
-  AA with no new browser module.
+- **Jobs grid**: name, state, paused, next run in the viewer's time zone, last error code, runs
+  and failures. Row actions: run now, pause, resume (next tick) and resume with catch up (misfire
+  policy).
+- **Triggers grid**: job, id, expression, time zone, calendar, paused and the next three ticks.
+  Row actions: pause and resume a trigger.
+- **Runs grid**: job, trigger, scheduled time, start, duration, try, outcome, error code, worker
+  and started by, paged on the server.
+- **Live status**: the grids listen to the topic `zeyn.jobs`. With the feature `realtime`,
+  workers notify it when a run ends, at most once a second per server; without it the grids
+  refresh with the grid's refresh control. Only the topic name travels; the refresh goes through
+  the normal endpoints with their permission checks.
+- Texts come from the framework locale files in every built in language; the screen uses theme
+  tokens and the standard grid keyboard model and adds no browser module.
 
 ## Security
 
-- **Permissions**: `jobs_permission` (read status and history, today's permission),
-  `jobs_run_permission` (run now, retry), `jobs_admin_permission` (pause, resume, change triggers
-  and calendars). All three are checked on the server for every action, including actions the
-  screen hides. Without the run or admin permission configured, those actions are off.
-- **Audit**: run now, pause, resume, trigger changes and calendar changes are audited actions with
-  the caller's identity, through the existing audit trail.
-- **CSRF and rate limit**: every action goes through the normal action endpoint (`check_csrf`),
-  and run now and retry are in the write rate limit.
-- **Payloads**: `MAX_JOB_PAYLOAD` (4000 bytes) still applies; payloads entered on the screen are
-  validated by the job's own `params` type when the job declares one. Payloads are never written
-  to history, logs, the status endpoint or the screen; the screen shows the payload length only.
-  The recommended pattern stays "the payload is an id; the job reads the record", so secrets and
-  personal data do not enter the job table at all.
-- **Error details**: history stores the error code (`&'static str`, as today), never the error
-  text, which can hold data. Details stay in the server log.
-- **Identity**: a scheduled run runs as `job:<name>` with no permissions, as today. A manual run
-  records `started_by` but still runs as `job:<name>`; it does not inherit the caller's
-  permissions, so "run now" cannot raise privileges.
-- **Cron strings from the screen** (admin only, off by default): parsed with the same parser, with
-  a minimum interval of `MIN_TRIGGER_INTERVAL` (ten seconds) so a typo does not queue a run every
-  second.
-- **Tenants**: in multi tenant apps a trigger belongs to the app, not a tenant; a job that works
-  per tenant loops over tenants itself. Tenant scoped history filters on `started_by` tenant.
+- **Permissions**: `zeyn.jobs.read` (`metronome::JOBS_READ`) opens the screen and its grids,
+  `zeyn.jobs.run` (`JOBS_RUN`) runs a job now, `zeyn.jobs.admin` (`JOBS_ADMIN`) pauses and
+  resumes. Each action checks its permission on the server for every call, including calls the
+  screen does not offer; row action buttons only show to users who may use them. The JSON
+  endpoints keep `jobs_permission`.
+- **Audit**: run now, pause and resume are `audit` actions with the caller's identity.
+- **CSRF and rate limit**: row actions go through the grid endpoint (`check_csrf`, write rate
+  limit).
+- **Payloads**: `MAX_JOB_PAYLOAD` still applies. Payloads are never written to history, logs, the
+  status endpoint or the screen. The recommended pattern stays "the payload is an id; the job
+  reads the record".
+- **Identity**: scheduled, chained and manual runs all run as `job:<name>` with no permissions.
+- **Tenants**: a trigger belongs to the app, not a tenant; a job that works per tenant loops over
+  tenants itself. The live notification goes to the tenant-less topic.
 
-## Performance budget and memory caps
+## Performance and memory
 
-| Item | Budget |
-|---|---|
-| Memory per trigger in the scheduler | one `TriggerState` (id, job index, compiled cron, next tick): at most 256 bytes; cron fields compiled to bit sets (60 + 60 + 24 + 31 + 12 + 7 bits) |
-| Triggers per app | `MAX_TRIGGERS` 1,000, checked at startup |
-| Next tick computation | under 2 microseconds per trigger on a desktop CPU, measured with a bench; no allocation |
-| Scheduler loop when nothing is due | no database query: next due time is the minimum of the in memory ticks, refreshed from the store every 30 seconds for pause and trigger changes from other servers |
-| Database load per poll | unchanged claim query; one insert per due tick; one history insert per finished try |
-| Misfire catch up | at most `MAX_CATCH_UP` (100) runs per trigger per pass, computed lazily, never a `Vec` of all missed ticks |
-| Calendars | `MAX_CALENDAR_DAYS` (3660) days per calendar, stored as a sorted `Vec<i32>` of day numbers |
-| History in memory store | ring buffer of 1,000 rows |
-| Live notifications | at most one `zeyn.jobs` notification per second per server |
-| Binary size | behind the feature `metronome`; apps without it pay nothing. Target under 60 KB added to a release build with the feature on, measured before and after |
+| Item | Budget | Measured |
+|---|---|---|
+| Memory per trigger in the scheduler | at most 256 bytes | about 200 bytes; the compiled `Cron` is 80 bytes |
+| Triggers per app | `MAX_TRIGGERS` 1,000 | checked at startup |
+| Next tick computation | under 2 microseconds, no allocation | 0.17 to 1.3 microseconds in a release build (0.3 for a daily time in Europe/Berlin, 1.3 for `L` and `#` days), no allocation |
+| Scheduler pass when nothing is due | no database query | one comparison per trigger; triggers and pauses are read from the store every 30 seconds |
+| Misfire catch up | bounded, never a list of all missed ticks | at most 10,000 ticks looked at and 100 runs queued per trigger and pass; a year of downtime on a trigger of every second takes under 60 ms in a release build, with 100 runs queued |
+| History in the memory store | ring of 1,000 rows | as budgeted |
+| Live notifications | at most one per second per server | as budgeted |
+| Binary size of the showcase (release) | under 60 KB with the feature on | missed: +228,352 bytes (223 KB) for the scheduler, store and three triggers; +928,256 bytes (906 KB) with the operations screen, whose three DataGrids are most of it. Apps without the feature pay nothing in code; the framework texts of the screen add about 2 KB of JSON to every build |
 
-The implementation commit reports the measured numbers for each line above.
+## Not built yet
 
-## Test plan
+These parts of the design are open; each would be a change of its own.
 
-- **Fake clock**: the scheduler takes time from a `Clock` trait (`now_ms()` and `sleep_until()`),
-  with `SystemClock` in production and `FakeClock` in tests, which advances only when the test
-  says so. No test sleeps in real time.
-- **Cron parser**: table tests for every field form, `L`, `W`, `#`, year field, rejection of five
-  field expressions with the expected message, and a property test that `next(t) > t` and that
-  `next` matches a brute force second by second search over random expressions and a year.
-- **DST**: gap and fold rules for the zones listed above, for fixed hours and for step patterns.
-- **Calendars**: excluded days, weekly off days, time ranges, union, a range that crosses
-  midnight, and a calendar reload from the store.
-- **Misfires**: each policy after a simulated downtime of one tick, of `max + 1` ticks and of a
-  year; the history row with the skipped count; memory stays flat (no growth with downtime).
-- **Cluster**: two schedulers on one `MemoryJobStore` and on PostgreSQL and Oracle (behind
-  `ZEYN_TEST_PG` and `ZEYN_TEST_ORACLE`) race on the same ticks; each tick runs exactly once over
-  1,000 ticks.
-- **Pause and resume**: paused job not claimed, paused trigger queues nothing, both resume modes,
-  pause state seen by a second scheduler within the refresh interval.
-- **Timeout, priority, chains**: a run past its timeout fails with `timeout`; a higher priority
-  run is claimed first; aging lifts a starved run; chains enqueue on success only and reject
-  cycles at startup.
-- **Migration**: a version 1 schema with rows migrates to version 2; old rows still claim; a
-  version 1 server runs against a version 2 schema.
-- **Security**: run now without `jobs_run_permission` is refused on the server; payloads never
-  appear in the status JSON, history, screen HTML or logs (a regression test greps all four);
-  CSRF on every action; manual runs keep the `job:<name>` identity.
-- **Screen**: `TestApp` renders the jobs, triggers and runs grids with a nested `NodePath`; a
-  browser check in the showcase with no console errors, in both themes and at phone width.
-- **compile_fail doctests**: a `queued_job` trigger with a payload of the wrong `params` type, and
-  a chain that names a job type the compiler can see is missing.
+- `Trigger::overlap` (skip, queue one, allow). Today ticks queue as they come and
+  `job_concurrency` bounds what runs at once; a job that must not overlap itself guards itself.
+- `Calendar::from_store` with the table `zeyn_job_calendars`, to edit holidays from a screen.
+- Editing triggers from the screen (with `MIN_TRIGGER_INTERVAL`), and a payload form for "run
+  now"; the screen runs a job with an empty payload.
+- `RunNow::EvenIfPaused`.
+- A startup check of `zeyn_job_schema` that refuses an old schema, `zeyn jobs migrate --print`
+  and a `zeyn check` warning for a store without the migration.
+- History rows for runs whose lease was lost (`lost`).
+- Pruning under a short lease on one server; today every server prunes, which is safe because
+  deletes are idempotent.
 
-## Implementation tickets
+## Decisions
 
-Each ticket is one PR to `dev` with docs and tests.
-
-1. **Cron and clock core.** `metronome` feature, `Cron` parser and next tick with seconds, year,
-   `L`, `W`, `#`; time zones through `jiff`; DST rules; `Clock` and `FakeClock`. Acceptance: the
-   parser, property and DST tests pass; the bench shows under 2 microseconds per next tick with no
-   allocation; feature off adds 0 bytes.
-2. **Triggers and misfires in memory.** `App::trigger`, several triggers per job, `Overlap`,
-   misfire policies, `ctx.scheduled_at()` and `ctx.trigger_id()`, startup validation with agent
-   oriented messages, `Schedule::every` mapped onto a trigger. Acceptance: misfire and overlap
-   tests with the fake clock; existing job tests pass unchanged; memory flat after a simulated one
-   year downtime.
-3. **Store schema version 2 and migration.** New columns and tables for PostgreSQL and Oracle,
-   `migrate_job_tables`, `zeyn_job_schema`, unique tick key, `enqueue_tick`, `advance_trigger`.
-   Acceptance: cluster race test runs each of 1,000 ticks once on PostgreSQL and Oracle in Docker;
-   migration test from version 1 with rows; Oracle names within 30 bytes.
-4. **Calendars.** Code calendars, `Calendar::from_store`, `MAX_CALENDAR_DAYS`. Acceptance:
-   calendar tests including reload; a holiday tick is neither run nor counted as a misfire.
-5. **Pause, resume, run now, priority, timeout, chains.** Store backed pause, both resume modes,
-   priority with aging on both dialects, per run timeout, `chain` with cycle check. Acceptance:
-   the tests in "Test plan" for these items; `JobStatus` shows pause and next run.
-6. **Run history and retention.** `zeyn_job_runs`, history insert in the completion transaction,
-   pruning job with a short lease, memory ring buffer, `history(DataQuery)`. Acceptance: no lost
-   history rows under a crash test; pruning deletes in batches of at most 1,000; payload never in
-   history.
-7. **Operations screen.** `jobs_screen`, three grids, row actions behind the three permissions,
-   audit, live `zeyn.jobs` topic with coalescing, en and tr texts, docs page. Acceptance: TestApp
-   tests for permissions and nested paths; browser check with no console errors in both themes
-   and at phone width; no new browser module.
-8. **Docs and CLI.** `docs/enterprise.md` sections, a docs app page in nine languages,
-   `zeyn jobs migrate --print`, `zeyn check` warning, skill and template updates. Acceptance:
-   docs tests and `record_translations` pass; the embedded docs are recorded.
-
-Tickets 1 and 2 can ship without a database; 3 unlocks 4 to 6; 7 needs 5 and 6.
-
-## Open questions for the owner
-
-1. The final name: Metronome, Clockwork, Chronos or another.
-2. Should triggers be editable from the screen at all, or only from code (simpler, and every
-   change goes through review)? This document proposes code only by default with an opt in.
-3. Default retention of 30 days and 100,000 rows: fine for most apps, or should it follow the
-   audit retention setting?
-4. Five field cron: reject (as proposed, one dialect) or accept and assume second 0.
+1. The name: Metronome.
+2. Triggers come from code only; the screen pauses, resumes and runs, but does not edit.
+3. Retention defaults to 30 days and 100,000 rows, set per app with `App::job_history`.
+4. Five field cron is refused with a message that shows the six field form.

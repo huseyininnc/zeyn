@@ -191,3 +191,21 @@ jobs.enqueue("send_invoice", "42").await?;
 - 워커는 `JOB_POLL`(1초)마다, 그리고 같은 서버에서 `enqueue` 직후 바로 기한이 된 실행을 찾습니다. 각 claim은 빈 작업 슬롯 수만큼만 실행을 가져가므로 메모리가 큐와 함께 늘어나지 않습니다.
 - PostgreSQL은 하나의 `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING`으로 가져갑니다. Oracle 11g 이상은 트랜잭션에서 `ROWNUM`과 `FOR UPDATE SKIP LOCKED`로 id를 선택하고, 갱신한 다음, 커밋 전에 다시 읽습니다. Oracle은 잠금 select를 정렬할 수 없으므로 그곳에서는 기한이 된 실행이 정해진 순서 없이 선택됩니다. 시각은 `BIGINT` 또는 `NUMBER(19)` 열의 Unix 밀리초입니다.
 - 스토어가 있으면 같은 작업의 예약된 실행과 트리거된 실행이 겹칠 수 있습니다. 동시에 두 번 실행되면 안 되는 작업은 스스로 보호해야 합니다(예: 행 잠금).
+
+### Metronome
+
+`metronome` 기능은 이 작업들 위에 벽시계 기준 일정을 더합니다. 전체 안내는 `docs/metronome.md`에 있습니다.
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- `Trigger`는 등록된 작업의 실행을 대기열에 넣습니다. Quartz 방언의 초 단위 cron, 일광 절약 시간의 건너뜀과 반복에 정해진 동작을 가진 IANA 시간대, 페이로드, 우선순위, 시간 제한, 누락 정책(`RunOnce`, `RunAll { max }`, `Skip`)을 가집니다. 달력은 날짜, 요일, 매년의 날짜, 하루 중 시간 범위를 제외합니다.
+- 저장소를 공유하는 서버들은 각 시각을 정확히 한 번만 대기열에 넣습니다. `pause`, `resume`, `run_now`는 서버 전체에 적용됩니다.
+- 끝난 시도마다 기록 한 줄이 남고(페이로드와 오류 문구는 남기지 않음), `jobs.history`, `GET /_zeyn/jobs/runs`, 운영 화면 `/ops/jobs`에서 읽습니다(`zeyn.jobs.read`, `zeyn.jobs.run`, `zeyn.jobs.admin`).

@@ -312,3 +312,34 @@ jobs.enqueue("send_invoice", "42").await?;
   `NUMBER(19)` columns.
 - With a store, a scheduled run and a triggered run of the same job may overlap; jobs that must
   not run twice at once should guard themselves (a row lock, for example).
+
+### Metronome
+
+The feature `metronome` adds wall clock schedules on top of these jobs; the full guide is
+`docs/metronome.md`.
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- A `Trigger` queues runs of a registered job: cron with seconds in the Quartz dialect, an IANA
+  time zone with defined behavior in daylight saving gaps and folds, a payload, a priority, a
+  timeout and a misfire policy (`RunOnce`, `RunAll { max }`, `Skip`). A job can have several.
+  Calendars exclude dates, weekdays, yearly dates and daily time ranges.
+- Servers that share a store queue every tick exactly once: the store moves the trigger's next
+  tick with a compare and set in the transaction that inserts the runs.
+- `jobs.pause`, `pause_trigger`, `resume` (`Resume::Skip` or `Resume::Misfire`), `resume_trigger`
+  and `run_now(&ctx, job, payload)` work across servers; the pause is kept in the store.
+- Each finished try is a history row (never the payload or the error text) kept for 30 days and
+  100,000 rows unless `App::job_history` says otherwise, readable with `jobs.history`, at
+  `GET /_zeyn/jobs/runs` and on the operations screen `/ops/jobs` (permissions `zeyn.jobs.read`,
+  `zeyn.jobs.run`, `zeyn.jobs.admin`).
+- With the feature on, `create_job_tables` gives schema version 2 and `migrate_job_tables` the
+  statements from version 1. Mistakes in triggers, calendars and chains stop the app at startup
+  with problem `Z0508`.
