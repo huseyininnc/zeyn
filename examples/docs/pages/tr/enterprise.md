@@ -336,3 +336,21 @@ jobs.enqueue("send_invoice", "42").await?;
   `BIGINT` veya `NUMBER(19)` sütunlarında Unix milisaniyesidir.
 - Bir depo varken, aynı işin zamanlanmış bir çalıştırması ile tetiklenmiş bir çalıştırması çakışabilir;
   aynı anda iki kez çalışmaması gereken işler kendilerini korumalıdır (örneğin bir satır kilidiyle).
+
+### Metronome
+
+`metronome` özelliği bu işlerin üzerine duvar saati zamanlamaları ekler; tam kılavuz `docs/metronome.md`.
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- Bir `Trigger`, kayıtlı bir işin çalıştırmalarını kuyruğa alır: Quartz lehçesinde saniyeli cron, yaz saati boşluk ve tekrarlarında tanımlı davranışı olan bir IANA saat dilimi, yük, öncelik, zaman aşımı ve kaçırma politikası (`RunOnce`, `RunAll { max }`, `Skip`). Takvimler tarihleri, hafta günlerini, yıllık tarihleri ve günlük saat aralıklarını dışarıda bırakır.
+- Aynı depoyu paylaşan sunucular her vuruşu tam bir kez kuyruğa alır. `pause`, `resume` ve `run_now` sunucular arasında çalışır.
+- Her bitmiş deneme bir geçmiş satırıdır (yük ve hata metni asla); `jobs.history`, `GET /_zeyn/jobs/runs` ve `/ops/jobs` işlem ekranından okunur (`zeyn.jobs.read`, `zeyn.jobs.run`, `zeyn.jobs.admin`).
