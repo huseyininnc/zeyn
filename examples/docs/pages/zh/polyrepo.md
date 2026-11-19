@@ -100,3 +100,34 @@ acme-domain = { path = "../acme-domain" }
 1. 提升 `Cargo.toml` 中的 `version`。
 2. 如果已安装，运行 `cargo semver-checks`。它会报告会使调用方出错的公共 API 变更。在库的版本低于 1.0 时，破坏性变更需要新的次版本号。
 3. 提交，打标签 `v<version>`，推送标签。当标签与 `Cargo.toml` 不一致时，CI 作业 `tag-matches-version` 会失败。
+
+## 组件 crate
+
+一个 crate 可以提供带有自己的脚本、样式表和文本的组件。名为 `zeyn-<name>` 的 crate 注册浏览器模块 `<name>`；它的类以 `z-<name>-` 开头，属性以 `data-zeyn-<name>-` 开头，文本键以 `<name>.` 开头。`examples/widget` 是一个带测试的完整示例。
+
+```rust
+use zeyn::{App, Module, Plugin};
+
+pub struct RatingPlugin;
+
+impl Plugin for RatingPlugin {
+    fn install(self, app: App) -> App {
+        app.module(
+            Module::new("rating")
+                .js(include_str!("../assets/rating.js"))
+                .css(include_str!("../assets/rating.css"))
+                .marker("data-zeyn-rating-stars")
+                .texts(&[("en", include_str!("../assets/en.json"))]),
+        )
+    }
+}
+```
+
+应用添加 `.plugin(RatingPlugin)`。只有当页面的 HTML 含有标记时，页面才会链接 `/_zeyn/ext/rating.js` 和 `/_zeyn/ext/rating.css`；这类内容稍后到达时，`zeyn.js` 会加载它们。文件的 URL 带有构建号，因此浏览器会一直保留到下一次构建；它们从不内联，因此 Content Security Policy 保持严格。脚本是一个 ES 模块，为稍后到达的内容监听 `zeyn:content`；样式表从主题变量（`var(--z-text)`、`var(--z-space)`）获取颜色和尺寸。应用自己的目录优先于模块的文本。
+
+当模块违反命名规则、与框架的模块或标记或另一个模块冲突，或者带有无效 JSON 的目录时，`App::module` 会在启动时停止应用，并在消息中写明修复方法。在测试中，`TestResponse::links` 列出页面头部链接的文件。
+
+| Zeyn | 组件 crate |
+|---|---|
+| 0.0.10 之后的版本 | `App::module`, `Module`, `TestResponse::links` |
+| 0.0.10 及更早 | 仅 HTML；没有自己的脚本或样式 |

@@ -30,6 +30,13 @@ needless_collect = "warn"
 redundant_clone = "warn"
 too_many_lines = "deny"
 
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 1
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

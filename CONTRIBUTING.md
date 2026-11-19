@@ -42,6 +42,10 @@ Windows Defender scans every file the compiler writes, which slows a build a lot
    Files in these folders are no longer scanned, so exclude only build output and the toolchain.
 2. Or create a Dev Drive (Settings, System, Storage, Advanced storage settings, Disks and volumes, Create Dev Drive; at least 50 GB). Defender scans a Dev Drive in performance mode. Point the build there for your user: `setx CARGO_TARGET_DIR D:\zeyn-target`, and open a new terminal.
 
+### Build time budget
+
+CI builds the workspace with `cargo build --workspace --timings` and fails when the build takes longer than the number of seconds in `ci/build-budget.txt` (`sh ci/check-build-budget.sh <seconds>` is the check). The job uploads the report as the artifact `cargo-timings`; open `cargo-timing.html` to see which crate took the time. A change that makes a crate much slower to compile should bring the build back under the budget, or raise the budget in the same change and say why in the commit. After the first CI runs on a new runner or toolchain, set the budget to the measured time plus 30 percent, so it catches a real slowdown and not noise.
+
 ## Branches and pull requests
 
 - Create your work branch from `dev`.

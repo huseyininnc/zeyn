@@ -14,6 +14,7 @@
 | `zeyn check` | 컴파일하고 구조적 문제와 누락된 번역을 보고합니다 |
 | `zeyn check --fix` | `src`, `tests`, `examples`에서 이름이 바뀐 Zeyn API를 다시 쓴 다음 검사합니다 |
 | `zeyn check --json` | 안정된 코드, 이유, 해결 방법과 함께 보고서를 JSON으로 출력합니다 |
+| `zeyn doctor` | 프로젝트가 어떻게 빌드되는지 읽고 느리거나 커지는 원인을 보고하며, 각 항목에 한 줄짜리 해결 방법을 붙입니다 |
 | `zeyn mcp` | AI 에이전트를 위한 MCP 서버를 stdio로 실행합니다 |
 
 crates.io에서 설치합니다.
@@ -56,6 +57,7 @@ cargo run
 
   `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`처럼 쓰지 않습니다.
 - `build.rs`와 `Cargo.toml`의 `[package.metadata.zeyn]`에 있는 `max_file_lines = 300`: `src/`의 파일에 비어 있지 않은 줄이 더 많으면 `cargo build`가 멈춥니다. clippy `too_many_lines`(60, `clippy.toml`)는 함수에 같은 일을 합니다. [Project structure](structure.md)를 참고하세요.
+- `Cargo.toml`의 `[profile.dev]`, `.cargo/config.toml`, `.vscode/settings.json`: 빠른 빌드 루프입니다. 의존성은 `opt-level = 1`과 디버그 정보 없이 빌드되고, 내 코드는 줄 테이블만 유지하며(백트레이스에 파일과 줄이 표시됩니다. 지역 변수로 디버깅하려면 `CARGO_PROFILE_DEV_DEBUG=full`을 설정하세요), Windows는 `rust-lld`로 링크하고, rust-analyzer는 자체 target 폴더를 사용하므로 `cargo build`를 기다리지 않습니다.
 - `Dockerfile`과 `.dockerignore`: 작은 컨테이너 이미지입니다.
 - 일반적인 CI 서버용 파이프라인이며, 모두 같은 검사(`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`)를 실행하고 `Cargo.toml`과 일치하지 않는 태그 `vX.Y.Z`를 거부합니다.
   - GitHub Actions용 `.github/workflows/ci.yml`, 그리고 `.github/dependabot.yml`(Cargo와 action의 주간 업데이트)과 pull request 체크리스트
@@ -116,6 +118,10 @@ zeyn check --json
 
 `zeyn check`는 앱의 소스도 읽고 파일과 줄을 붙여 다음을 경고합니다. `W0106`은 `src` 없는 `<script>`나 `onclick=` 같은 인라인 이벤트 핸들러를 담은 문자열(CSP가 둘 다 막습니다), `W0107`은 `escape(..)`, `r.text(..)`, `r.value(..)` 없이 HTML을 쓰는 직접 작성한 컴포넌트, `W0108`은 범위를 제한하는 쿼리 없이 `Vec` 전체를 반환하는 action, `W0109`는 `.trusted()`로 표시한 `DocumentViewer`입니다. `permission`이나 `public`이 빠지면 경고할 필요도 없이 컴파일되지 않습니다.
 
+## 빌드 속도와 디스크 사용량
+
+`zeyn doctor`는 프로젝트가 어떻게 빌드되는지 읽고 느리거나 커지는 원인을 보고합니다. target 폴더의 크기와 가장 큰 폴더, 링커, dev 프로필(디버그 정보와 의존성 최적화), `rust-version`과 비교한 rustc와 cargo, 이전 툴체인이 남긴 산출물, rust-analyzer의 target 폴더, 그리고 Windows에서는 target 폴더와 `~/.cargo`가 Defender 검사 밖에 있는지(제외 항목 또는 Dev Drive, Windows가 읽기를 허용하지 않으면 그렇다고 알려 줍니다)를 다룹니다. 각 항목에는 안정된 코드와 한 줄짜리 해결 방법이 있습니다. `--json`은 이를 하나의 문서로 출력하고, `--target-limit-gb`는 큰 것으로 볼 크기를 정하며(기본 20), 종료 코드는 항상 0입니다. `zeyn doctor --fix`는 빠른 dev 프로필을 `Cargo.toml`에, `rust-lld` 링커를 `.cargo/config.toml`에 추가하고 다른 것은 바꾸지 않으며, 두 번째 실행은 아무것도 바꾸지 않습니다. MCP 도구 `zeyn_doctor`는 에이전트를 위해 같은 일을 합니다.
+
 ## DevTools
 
 `cargo run`(또는 `zeyn dev`)으로 서비스하는 디버그 빌드는 각 요청이 한 일을 기록합니다. 실행한 Screen과 Action, 상태와 시간, Screen을 빌드하고 렌더링하는 데 걸린 시간, 각 SQL 문과 그 시간 및 영향받은 행 수, Action이 반환한 효과와 토픽입니다. Alt+Shift+D는 최근 50개 요청을 보여 주는 패널을 열고, 각 요청을 펼치면 SQL 문이 나타납니다. `GET /_zeyn/devtools`는 같은 목록을 JSON으로 반환하고, MCP 도구 `zeyn_devtools`가 에이전트를 위해 이를 읽습니다.
@@ -135,4 +141,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP 서버
 
-`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_inspect`(Screen의 노드 트리와 각 노드를 배치한 Rust 줄), `zeyn_devtools`(실행 중인 디버그 빌드의 DevTools 요청 로그: Screen, action, 시간, SQL 문), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.
+`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_inspect`(Screen의 노드 트리와 각 노드를 배치한 Rust 줄), `zeyn_devtools`(실행 중인 디버그 빌드의 DevTools 요청 로그: Screen, action, 시간, SQL 문), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_doctor`, `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.

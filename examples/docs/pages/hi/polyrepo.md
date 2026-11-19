@@ -100,3 +100,34 @@ acme-domain = { path = "../acme-domain" }
 1. `Cargo.toml` में `version` बढ़ाएँ।
 2. यदि `cargo semver-checks` इंस्टॉल है तो उसे चलाएँ। यह सार्वजनिक API बदलाव बताता है जो कॉलर को तोड़ते हैं। जब तक लाइब्रेरी 1.0 से नीचे है, तोड़ने वाले बदलाव को नया minor संस्करण चाहिए।
 3. कमिट करें, `v<version>` टैग करें, टैग पुश करें। जब टैग और `Cargo.toml` असहमत हों तो CI जॉब `tag-matches-version` विफल होता है।
+
+## कंपोनेंट crate
+
+एक crate ऐसे कंपोनेंट दे सकता है जिनकी अपनी स्क्रिप्ट, स्टाइलशीट और टेक्स्ट हों। `zeyn-<name>` नाम का crate ब्राउज़र मॉड्यूल `<name>` रजिस्टर करता है; उसकी क्लासें `z-<name>-` से, एट्रिब्यूट `data-zeyn-<name>-` से और टेक्स्ट कुंजियाँ `<name>.` से शुरू होती हैं। `examples/widget` टेस्ट सहित एक पूरा उदाहरण है।
+
+```rust
+use zeyn::{App, Module, Plugin};
+
+pub struct RatingPlugin;
+
+impl Plugin for RatingPlugin {
+    fn install(self, app: App) -> App {
+        app.module(
+            Module::new("rating")
+                .js(include_str!("../assets/rating.js"))
+                .css(include_str!("../assets/rating.css"))
+                .marker("data-zeyn-rating-stars")
+                .texts(&[("en", include_str!("../assets/en.json"))]),
+        )
+    }
+}
+```
+
+ऐप `.plugin(RatingPlugin)` जोड़ता है। कोई पेज `/_zeyn/ext/rating.js` और `/_zeyn/ext/rating.css` को तभी लिंक करता है जब उसके HTML में कोई मार्कर हो, और ऐसी सामग्री बाद में आने पर `zeyn.js` उन्हें लोड करता है। फ़ाइलों के URL में बिल्ड होता है, इसलिए ब्राउज़र उन्हें अगले बिल्ड तक रखते हैं; वे कभी इनलाइन नहीं होतीं, इसलिए Content Security Policy सख़्त रहती है। स्क्रिप्ट एक ES मॉड्यूल है जो बाद की सामग्री के लिए `zeyn:content` सुनता है; स्टाइलशीट अपने रंग और माप थीम वेरिएबल (`var(--z-text)`, `var(--z-space)`) से लेती है। ऐप के अपने कैटलॉग मॉड्यूल के टेक्स्ट से ऊपर रहते हैं।
+
+जब कोई मॉड्यूल नामकरण नियम तोड़ता है, फ़्रेमवर्क के किसी मॉड्यूल या मार्कर से या किसी दूसरे मॉड्यूल से टकराता है, या ऐसा कैटलॉग रखता है जो मान्य JSON नहीं है, तो `App::module` ऐप को शुरू होते ही रोक देता है और संदेश में सुधार बताता है। टेस्ट में `TestResponse::links` बताता है कि पेज का हेड क्या लिंक करता है।
+
+| Zeyn | कंपोनेंट crate |
+|---|---|
+| 0.0.10 के बाद के रिलीज़ | `App::module`, `Module`, `TestResponse::links` |
+| 0.0.10 और पहले | केवल HTML; अपनी स्क्रिप्ट या स्टाइल नहीं |

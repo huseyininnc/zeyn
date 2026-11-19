@@ -54,7 +54,7 @@ Which page answers what:
 | Database | `guides/database` (`docs/database.md`) |
 | Themes | `guides/theming` (`docs/theming.md`) |
 | AI assistant, MCP, AI attributes | `guides/mcp` (`mcp.md`), `docs/assistant.md` |
-| Shared libraries in other repositories | `guides/polyrepo` (`docs/polyrepo.md`) |
+| Shared libraries in other repositories; component crates with their own script, stylesheet and texts (`App::module`, `Module`) | `guides/polyrepo` (`docs/polyrepo.md`) |
 | Operations: Docker, tracing, Redis, licenses | `docs/operations.md` |
 | Desktop exe, WASM islands, live socket | `docs/desktop.md`, `docs/islands.md`, `docs/socket.md`, `docs/realtime.md` |
 
