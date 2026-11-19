@@ -160,6 +160,8 @@ pub use files::{
     File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,
     UPLOAD_CHUNK, UploadValue, clean_file_name, valid_file_id,
 };
+#[cfg(feature = "image")]
+pub use files::{MAX_IMAGE_MEMORY, MAX_IMAGE_SIDE, clean_image};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid,
