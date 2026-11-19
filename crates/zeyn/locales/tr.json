@@ -1267,7 +1267,8 @@
       "open": "Bitmemiş yüklemeniz çok fazla. Birini bitirin ya da iptal edin, sonra yeniden deneyin.",
       "offset": "Yükleme sunucuyla aynı noktada değil. Sunucunun kaldığı yerden sürer.",
       "busy": "Bu yükleme hâlâ veri alıyor. Biraz sonra yeniden deneyin.",
-      "length": "Yükleme dosyanın boyutunu bildirmedi."
+      "length": "Yükleme dosyanın boyutunu bildirmedi.",
+      "not_found": "{label} alanındaki bir dosya bulunamadı. Dosyayı yeniden yükleyin."
     }
   },
   "AccountLogin": {

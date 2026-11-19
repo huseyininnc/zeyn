@@ -268,7 +268,7 @@ impl<L: Model> LinesEditor for Lines<L> {
                     .get(m.name)
                     .cloned()
                     .unwrap_or(Json::Null);
-                match parse_value(m, raw, reading, &base) {
+                match parse_value(m, raw, reading, &base, false) {
                     Ok(v) => {
                         line.insert(m.name.to_string(), v);
                     }
@@ -276,6 +276,7 @@ impl<L: Model> LinesEditor for Lines<L> {
                         let key = match problem {
                             Unreadable::Format => "zeyn.validation.format",
                             Unreadable::SkippedTime => "zeyn.validation.skipped_time",
+                            Unreadable::File => "zeyn.files.not_found",
                         };
                         errors.push(FieldError {
                             field: meta.name,

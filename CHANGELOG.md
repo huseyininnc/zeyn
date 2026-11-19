@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Security
+
+- Form submits, `FileDrop` upload actions and `Composer` sends accept only file ids the same user uploaded into the store in the same tenant. Before, any id of the server's shape passed, so a user who learned the id of another user's or tenant's file could attach it to a record of their own and download it from there. Files a record already held stay on edit; an anonymous request can name only uploads made without a signed in user. File fields without an upload store (`Form::auto`, `.field(...)`, editable grid columns, imports and lines editors) keep only the files their record or line held, and API actions that take `Valid<M>` accept only file ids the caller uploaded into one of the app's stores. A file store name registered in two features stops the app with problem `Z0509`.
+
 ### Fixed
 
 - The line editor no longer makes the page scroll sideways on a narrow touch screen: its screen reader only text sat outside the scroll box of the table and reached past the viewport.

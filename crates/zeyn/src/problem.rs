@@ -17,7 +17,7 @@ pub const DOCS_URL: &str = "https://docs.zeynsoft.com/";
 /// | `Z02xx` | security: sign in, accounts, CSP and IP ranges |
 /// | `Z03xx` | public pages: sitemap, site URL and the site shell |
 /// | `Z04xx` | menus, commands and keyboard shortcuts |
-/// | `Z05xx` | data: media sources, jobs and workflows |
+/// | `Z05xx` | data: media sources, file stores, jobs and workflows |
 /// | `Z06xx` | page checks of components (`App::check_page`) |
 ///
 /// The text form (its `Display`) keeps the first line as the summary and adds one line each for

@@ -1267,7 +1267,8 @@
       "open": "You have too many unfinished uploads. Finish or cancel one and try again.",
       "offset": "The upload is out of step with the server. It continues from where the server is.",
       "busy": "This upload is still receiving data. Try again in a moment.",
-      "length": "The upload did not say how large the file is."
+      "length": "The upload did not say how large the file is.",
+      "not_found": "{label} holds a file that was not found. Upload it again."
     }
   },
   "AccountLogin": {
