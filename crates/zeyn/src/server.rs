@@ -4328,7 +4328,15 @@ async fn page(
                 .await
         }
     };
-    let mut response = response;
+    let mut response = if open
+        || response
+            .headers()
+            .contains_key(header::CACHE_CONTROL)
+    {
+        response
+    } else {
+        private_page(response)
+    };
     if let Ok(lang) = HeaderValue::from_str(ctx.locale()) {
         response
             .headers_mut()
@@ -4388,7 +4396,8 @@ fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds:
     response
 }
 
-/// A cacheable screen opened with a session: never stored.
+/// A page or screen fragment of a request with a session (or of a screen that is not public):
+/// never stored, so records do not stay in the browser's disk cache after sign out.
 fn private_page(mut response: Response) -> Response {
     response.headers_mut().insert(
         header::CACHE_CONTROL,
@@ -4447,10 +4456,10 @@ async fn screen_fragment(
     }
     .await;
     st.after(&ctx, &call, started, &result);
-    match result {
+    private_page(match result {
         Ok(html) => Html(html).into_response(),
         Err(f) => st.error_response(&ctx, f),
-    }
+    })
 }
 
 async fn route_redirect(

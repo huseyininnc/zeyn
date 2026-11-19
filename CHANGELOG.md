@@ -74,6 +74,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 ### Security
 
 - CI runs `cargo audit` and fails on any advisory that `.cargo/audit.toml` does not ignore with a reason. Four are ignored there: quick-xml 0.38 in Typst's bibliography reader (feature `pdf`, only the app's own templates reach it, no fixed release yet), libsqlite3-sys 0.37, which sits in `Cargo.lock` through sqlx's optional SQLite driver but is never built, and glib 0.18 from the Linux desktop window stack.
+- Pages and screen fragments of signed in users, and of screens that are not public, are sent with `Cache-Control: private, no-store`, so records do not stay in the browser's disk cache or a shared cache after sign out. Public screens opened without a session keep their caching.
 
 ## [0.0.10] - 2026-11-10
 
