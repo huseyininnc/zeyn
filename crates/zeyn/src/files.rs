@@ -350,6 +350,9 @@ pub struct FileRules {
     accept: &'static [FileType],
     /// Bytes one user may upload to the store per window, in seconds.
     quota: Option<(u64, u64)>,
+    /// Whether PNG, JPEG and WebP uploads are decoded and encoded again.
+    #[cfg(feature = "image")]
+    clean_images: bool,
 }
 
 impl FileRules {
@@ -362,7 +365,26 @@ impl FileRules {
             max_files: 10,
             accept: &[FileType::Png, FileType::Jpeg, FileType::Webp, FileType::Pdf],
             quota: None,
+            #[cfg(feature = "image")]
+            clean_images: false,
         }
+    }
+
+    /// Decodes every PNG, JPEG and WebP upload and stores it encoded again, at most
+    /// [`MAX_IMAGE_SIDE`] pixels on a side: EXIF (with GPS), XMP, ICC profiles, comments and any
+    /// bytes hidden after the image data are dropped, and the EXIF orientation is applied to the
+    /// pixels first. JPEG is written at quality 90, PNG and WebP losslessly. An image that does
+    /// not decode is refused. The stored file gets a new id. Needs the `image` feature.
+    #[cfg(feature = "image")]
+    pub const fn clean_images(mut self) -> Self {
+        self.clean_images = true;
+        self
+    }
+
+    /// Whether uploads of `kind` are cleaned with [`FileRules::clean_images`].
+    #[cfg(feature = "image")]
+    pub(crate) fn cleans(&self, kind: FileType) -> bool {
+        self.clean_images && matches!(kind, FileType::Png | FileType::Jpeg | FileType::Webp)
     }
 
     /// At most `bytes` per user (by IP without a user) in the store per `window`, counted with
@@ -447,6 +469,60 @@ impl FileRules {
         }
         parts.join(",")
     }
+}
+
+/// Longest side, in pixels, of an image [`FileRules::clean_images`] decodes.
+#[cfg(feature = "image")]
+pub const MAX_IMAGE_SIDE: u32 = 12_000;
+
+/// Most memory, in bytes, decoding one image for [`FileRules::clean_images`] may take.
+#[cfg(feature = "image")]
+pub const MAX_IMAGE_MEMORY: u64 = 256 * 1024 * 1024;
+
+/// `bytes` of an image of `kind` decoded and encoded again in the same format, without
+/// metadata and with its EXIF orientation applied; `None` when it does not decode inside
+/// [`MAX_IMAGE_SIDE`] and [`MAX_IMAGE_MEMORY`]. Both limits are checked against the size in the
+/// image header before any pixel is decoded. Only the first frame of an animated image is kept.
+///
+/// ```
+/// # #[cfg(feature = "image")] {
+/// use zeyn::FileType;
+/// assert!(zeyn::clean_image(FileType::Png, b"not an image").is_none());
+/// # }
+/// ```
+#[cfg(feature = "image")]
+pub fn clean_image(kind: FileType, bytes: &[u8]) -> Option<Vec<u8>> {
+    use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
+    let format = match kind {
+        FileType::Png => ImageFormat::Png,
+        FileType::Jpeg => ImageFormat::Jpeg,
+        FileType::Webp => ImageFormat::WebP,
+        _ => return None,
+    };
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_IMAGE_SIDE);
+    limits.max_image_height = Some(MAX_IMAGE_SIDE);
+    limits.max_alloc = Some(MAX_IMAGE_MEMORY);
+    let mut reader = ImageReader::with_format(std::io::Cursor::new(bytes), format);
+    reader.limits(limits);
+    let mut decoder = reader.into_decoder().ok()?;
+    if decoder.total_bytes() > MAX_IMAGE_MEMORY {
+        return None;
+    }
+    let orientation = decoder.orientation().ok()?;
+    let mut picture = DynamicImage::from_decoder(decoder).ok()?;
+    picture.apply_orientation(orientation);
+    let mut out = std::io::Cursor::new(Vec::new());
+    let written = match kind {
+        FileType::Jpeg => DynamicImage::ImageRgb8(picture.into_rgb8()).write_with_encoder(
+            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 90),
+        ),
+        FileType::Webp => DynamicImage::ImageRgba8(picture.into_rgba8())
+            .write_with_encoder(image::codecs::webp::WebPEncoder::new_lossless(&mut out)),
+        _ => picture.write_to(&mut out, format),
+    };
+    written.ok()?;
+    Some(out.into_inner())
 }
 
 /// Whether a file id has the shape the server generates: 32 lower case hex digits.
