@@ -1,0 +1,19 @@
+- main:
+  - region "MenuBar":
+    - heading "MenuBar" [level=1]
+    - paragraph: A menu bar of commands.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/shell
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=MenuBar
+    - tablist "MenuBar sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - menubar "Main menu":
+        - menuitem "File"
+        - menuitem "Go"
+      - group: Show code
+      - button "Copy"
+      - status

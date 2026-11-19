@@ -1,0 +1,60 @@
+- main:
+  - region "Line editor":
+    - heading "Line editor" [level=1]
+    - paragraph: Rows of a model inside a form, with totals.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/lines
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Lines
+    - tablist "Line editor sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - text: Customer
+      - textbox "Customer": Northwind
+      - paragraph: Lines
+      - table "Lines":
+        - rowgroup:
+          - 'row "Line # Item Quantity Unit price Total Actions"':
+            - 'columnheader "Line #"'
+            - columnheader "Item"
+            - columnheader "Quantity"
+            - columnheader "Unit price"
+            - columnheader "Total"
+            - columnheader "Actions"
+        - rowgroup:
+          - row /1 Notebook \d+ \d+\.\d+ \d+,\d+\.\d+ Move line 1 down Remove line 1/:
+            - rowheader "1"
+            - cell "Notebook":
+              - textbox "Item, Line 1": Notebook
+            - cell /\d+/:
+              - textbox "Quantity, Line 1": /\d+/
+            - cell /\d+\.\d+/:
+              - textbox "Unit price, Line 1": /\d+\.\d+/
+            - cell /\d+,\d+\.\d+/
+            - cell "Move line 1 down Remove line 1":
+              - button "Move line 1 down"
+              - button "Remove line 1"
+          - row /2 Pencil \d+ \d+\.\d+ \d+\.\d+ Move line 2 up Remove line 2/:
+            - rowheader "2"
+            - cell "Pencil":
+              - textbox "Item, Line 2": Pencil
+            - cell /\d+/:
+              - textbox "Quantity, Line 2": /\d+/
+            - cell /\d+\.\d+/:
+              - textbox "Unit price, Line 2": /\d+\.\d+/
+            - cell /\d+\.\d+/
+            - cell "Move line 2 up Remove line 2":
+              - button "Move line 2 up"
+              - button "Remove line 2"
+        - rowgroup:
+          - row /Total \d+,\d+\.\d+/:
+            - rowheader "Total"
+            - cell /\d+,\d+\.\d+/
+            - cell
+      - button "Add line"
+      - button "Save"
+      - group: Show code
+      - button "Copy"
+      - status

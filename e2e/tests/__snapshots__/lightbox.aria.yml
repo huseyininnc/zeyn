@@ -1,0 +1,29 @@
+- main:
+  - region "Lightbox":
+    - heading "Lightbox" [level=1]
+    - paragraph: Images and videos that open full screen, with captions, zoom and swipes.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/social#lightbox
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Image
+    - tablist "Lightbox sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - link "Morning light over the hills":
+        - /url: /site/img/2.svg
+        - img "Morning light over the hills"
+      - link "A quiet street after the rain":
+        - /url: /site/img/3.svg
+        - img "A quiet street after the rain"
+      - link "The harbor at dusk":
+        - /url: /site/img/4.svg
+        - img "The harbor at dusk"
+      - link "Fields in early summer":
+        - /url: /site/img/5.svg
+        - img "Fields in early summer"
+      - group: Show code
+      - button "Copy"
+      - status

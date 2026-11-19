@@ -1,0 +1,31 @@
+- main:
+  - region "OrgChart":
+    - heading "OrgChart" [level=1]
+    - paragraph: A hierarchy as boxes joined by lines.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/data#orgchart
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=OrgChart
+    - tablist "OrgChart sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - group "Company":
+        - list:
+          - listitem:
+            - text: Ada Lovelace Director
+            - list:
+              - listitem:
+                - text: Alan Turing Engineering
+                - list:
+                  - listitem: İlknur Şahin Backend
+                  - listitem: Ömer Çelik Frontend
+              - listitem:
+                - text: Grace Hopper Operations
+                - list:
+                  - listitem: Barbara Liskov Support
+              - listitem: Edsger Dijkstra Finance
+      - group: Show code
+      - button "Copy"
+      - status

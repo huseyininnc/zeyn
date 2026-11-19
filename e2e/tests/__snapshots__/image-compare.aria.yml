@@ -1,0 +1,19 @@
+- main:
+  - region "ImageCompare":
+    - heading "ImageCompare" [level=1]
+    - paragraph: Two pictures under a slider.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#imagecompare
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ImageCompare
+    - tablist "ImageCompare sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - img "The second sample picture"
+      - img "The first sample picture"
+      - slider "Compare the two pictures": /\d+/
+      - group: Show code
+      - button "Copy"
+      - status

@@ -1,0 +1,42 @@
+- main:
+  - region "Tour":
+    - heading "Tour" [level=1]
+    - paragraph: A guided tour of the page.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#tour
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Tour
+    - tablist "Tour sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - button "Show me around"
+      - group "Orders":
+        - paragraph: Orders
+        - paragraph: /\d+,\d+/
+        - paragraph: Up 3.1% from the previous period
+      - group "New customers":
+        - paragraph: New customers
+        - paragraph: /\d+/
+        - paragraph: Down 2.0% from the previous period
+      - group "Opening hours":
+        - table "Opening hours":
+          - caption: Opening hours
+          - rowgroup:
+            - row "Day Opens Closes":
+              - columnheader "Day"
+              - columnheader "Opens"
+              - columnheader "Closes"
+          - rowgroup:
+            - row /Weekdays \d+:\d+ \d+:\d+/:
+              - rowheader "Weekdays"
+              - cell /\d+:\d+/
+              - cell /\d+:\d+/
+            - row /Saturday \d+:\d+ \d+:\d+/:
+              - rowheader "Saturday"
+              - cell /\d+:\d+/
+              - cell /\d+:\d+/
+      - group: Show code
+      - button "Copy"
+      - status

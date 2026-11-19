@@ -1,0 +1,18 @@
+- main:
+  - region "Countdown":
+    - heading "Countdown" [level=1]
+    - paragraph: The time left until a moment on the server's clock, with an end state.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/commerce#countdown
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Countdown
+    - tablist "Countdown sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - text: /Sale ends in 1 d 2 h \d+ min left/
+      - group: Show code
+      - button "Copy"
+      - status

@@ -394,7 +394,7 @@ impl<E: Model> Inbox<E> {
         ));
         if !allowed.is_empty() {
             out.push_str(&format!(
-                r#"<div class="z-inbox-bar" role="toolbar" aria-label="{}"><label class="z-inbox-all"><input type="checkbox" class="z-inbox-check-all"> {}</label>"#,
+                r#"<div class="z-inbox-bar" role="group" aria-label="{}"><label class="z-inbox-all"><input type="checkbox" class="z-inbox-check-all"> {}</label>"#,
                 t("actions"),
                 t("select_all")
             ));

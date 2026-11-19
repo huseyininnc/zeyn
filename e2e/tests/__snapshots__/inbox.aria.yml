@@ -1,0 +1,55 @@
+- main:
+  - region "Inbox":
+    - heading "Inbox" [level=1]
+    - paragraph: Notifications by day with bulk mark read and archive, and the bell with the unread count.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/admin#inbox-and-notificationcenter
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Inbox
+    - tablist "Inbox sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - region "Notifications":
+        - heading "Notifications" [level=2]
+        - paragraph: 3 unread
+        - group "Notification actions":
+          - checkbox "Select all"
+          - text: Select all
+          - button "Mark as read" [disabled]
+          - button "Archive" [disabled]
+        - region "Today":
+          - heading "Today" [level=3]
+          - list:
+            - listitem:
+              - checkbox "Select"
+              - text: "/Select Unread: Order SO-\\d+ was paid Payment of \\$\\d+\\.\\d+ received/"
+              - time: /1:\d+ PM/
+            - listitem:
+              - checkbox "Select"
+              - text: "/Select Unread: Stock of Green tea is low \\d+ units left in Warehouse A/"
+              - time: /\d+:\d+ AM/
+        - region "Yesterday":
+          - heading "Yesterday" [level=3]
+          - list:
+            - listitem:
+              - checkbox "Select"
+              - text: Select Weekly report is ready Sales rose 8% against last week
+              - time: /\d+:\d+ PM/
+            - listitem:
+              - checkbox "Select"
+              - text: "Select Unread: New customer signed up Ada Lovelace, London"
+              - time: /8:\d+ AM/
+        - region /Monday \d+\/\d+\/\d+/:
+          - heading /Monday \d+\/\d+\/\d+/ [level=3]
+          - list:
+            - listitem:
+              - checkbox "Select"
+              - text: /Select Import finished \d+,\d+ products updated/
+              - time: /\d+:\d+ AM/
+        - status
+      - group: Show code
+      - button "Copy"
+      - status

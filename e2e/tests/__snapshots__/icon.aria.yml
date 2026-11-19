@@ -1,0 +1,105 @@
+- main:
+  - region "Icon":
+    - heading "Icon" [level=1]
+    - paragraph: The icons of buttons, menus and tools.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/language/screens#toolbar-and-context-menu
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Icon
+    - tablist "Icon sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Every icon" [level=3]
+      - toolbar "Icons":
+        - button "home" [pressed]
+        - button "dashboard"
+        - button "chart-bar"
+        - button "chart-line"
+        - button "chart-pie"
+        - button "table"
+        - button "list"
+        - button "users"
+        - button "user"
+        - button "user-plus"
+        - button "building"
+        - button "cart"
+      - toolbar "Icons":
+        - button "box" [pressed]
+        - button "tag"
+        - button "receipt"
+        - button "credit-card"
+        - button "banknote"
+        - button "truck"
+        - button "undo"
+        - button "bell"
+        - button "mail"
+        - button "message"
+        - button "activity"
+        - button "shield"
+      - toolbar "Icons":
+        - button "lock" [pressed]
+        - button "key"
+        - button "fingerprint"
+        - button "settings"
+        - button "globe"
+        - button "help"
+        - button "plus"
+        - button "minus"
+        - button "x"
+        - button "check"
+        - button "edit"
+        - button "trash"
+      - toolbar "Icons":
+        - button "copy" [pressed]
+        - button "save"
+        - button "download"
+        - button "upload"
+        - button "refresh"
+        - button "external"
+        - button "link"
+        - button "search"
+        - button "filter"
+        - button "sliders"
+        - button "columns"
+        - button "sort"
+      - toolbar "Icons":
+        - button "arrow-up" [pressed]
+        - button "arrow-down"
+        - button "more-horizontal"
+        - button "more-vertical"
+        - button "grip"
+        - button "eye"
+        - button "eye-off"
+        - button "sign-out"
+        - button "sign-in"
+        - button "chevron-down"
+        - button "chevron-up"
+        - button "chevron-left"
+      - toolbar "Icons":
+        - button "chevron-right" [pressed]
+        - button "trend-up"
+        - button "trend-down"
+        - button "info"
+        - button "check-circle"
+        - button "alert-triangle"
+        - button "alert-circle"
+        - button "clock"
+        - button "history"
+        - button "calendar"
+        - button "star"
+        - button "menu"
+      - toolbar "Icons":
+        - button "sidebar" [pressed]
+        - button "command"
+        - button "sun"
+        - button "moon"
+        - button "monitor"
+        - button "file"
+        - button "file-text"
+        - button "folder"
+        - button "image"
+        - button "paperclip"
+      - group: Show code
+      - button "Copy"
+      - status

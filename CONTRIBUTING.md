@@ -20,6 +20,22 @@ cargo clippy --workspace --all-targets -- -D warnings
 - `cargo test` does not rebuild a binary you then run by hand. Run `cargo build -p <example>` first.
 - Run an example to see a change: `cargo run -p zeyn-example-showcase` (http://127.0.0.1:3002), `cargo run -p zeyn-example-docs` (http://127.0.0.1:3008) or `cargo run -p zeyn-example-components` (http://127.0.0.1:3010).
 
+### Browser tests
+
+The browser tests in `e2e/` open every page of the component catalog in Chromium and check
+rendering, keys, visible focus, accessibility (axe), both themes, right to left, touch targets,
+console errors, accessibility tree snapshots and size budgets. They need Node.js 20 or later:
+
+```
+cd e2e && npm ci && npx playwright install chromium && npm test
+```
+
+The suite starts the catalog with `cargo run -p zeyn-example-components` on port 3110 (set
+`ZEYN_E2E_PORT` to change it) unless one already runs there. `npm run update` rewrites the
+accessibility tree snapshots after an intended change. See
+[docs/component-quality.md](docs/component-quality.md#4-browser-tests) for what each check does,
+the budgets and the known issues list.
+
 ## Branches and pull requests
 
 - Create your work branch from `dev`.

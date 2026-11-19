@@ -1,0 +1,20 @@
+- main:
+  - region "LinkButton":
+    - heading "LinkButton" [level=1]
+    - paragraph: A link to another page that looks like a button.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#linkbutton
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=LinkButton
+    - tablist "LinkButton sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - link "Card":
+        - /url: /ui/card
+      - link "Breadcrumb":
+        - /url: /ui/breadcrumb
+      - group: Show code
+      - button "Copy"
+      - status
