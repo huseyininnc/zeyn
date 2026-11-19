@@ -976,18 +976,6 @@
       "offset": "La subida no coincide con el servidor. Continúa desde donde está el servidor.",
       "busy": "Esta subida todavía está recibiendo datos. Inténtalo de nuevo en un momento.",
       "length": "La subida no indicó el tamaño del archivo."
-    },
-    "jobs": {
-      "title": "Tareas",
-      "subtitle": "Tareas en segundo plano, sus disparadores y el historial de ejecuciones.",
-      "jobs": "Tareas",
-      "triggers": "Disparadores",
-      "runs": "Historial de ejecuciones",
-      "run_now": "Ejecutar ahora",
-      "pause": "Pausar",
-      "resume": "Reanudar",
-      "catch_up": "Reanudar y recuperar",
-      "menu": "Operaciones"
     }
   },
   "AccountLogin": {
@@ -1058,39 +1046,5 @@
     "code": "Código del correo",
     "remember_machine": "Recordar este navegador",
     "return_to": "Volver a"
-  },
-  "JobRow": {
-    "name": "Tarea",
-    "state": "Estado",
-    "paused": "En pausa",
-    "next_run": "Próxima ejecución",
-    "last_error": "Último error",
-    "runs": "Ejecuciones",
-    "failures": "Fallos"
-  },
-  "TriggerRow": {
-    "key": "Clave",
-    "job": "Tarea",
-    "id": "Disparador",
-    "expr": "Programación",
-    "time_zone": "Zona horaria",
-    "calendar": "Calendario",
-    "paused": "En pausa",
-    "next_run": "Próxima ejecución",
-    "then": "Luego",
-    "after": "Después"
-  },
-  "RunRow": {
-    "id": "Id",
-    "job": "Tarea",
-    "trigger": "Disparador",
-    "scheduled": "Programada para",
-    "started": "Inicio",
-    "duration_ms": "Duración (ms)",
-    "attempt": "Intento",
-    "outcome": "Resultado",
-    "error_code": "Código de error",
-    "worker": "Proceso",
-    "started_by": "Iniciada por"
   }
 }

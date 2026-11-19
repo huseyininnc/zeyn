@@ -21,9 +21,11 @@
 //! See `docs/metronome.md`.
 
 mod cron;
-mod screen;
+#[cfg(feature = "metronome-ops")]
+pub(crate) mod screen;
 
 pub use cron::{Cron, MAX_YEAR, MIN_YEAR};
+#[cfg(feature = "metronome-ops")]
 pub use screen::{
     JobRow, RunRow as RunView, TOPIC, TriggerRef, TriggerRow as TriggerView, ops, zeyn_jobs,
     zeyn_jobs_catch_up, zeyn_jobs_list, zeyn_jobs_pause, zeyn_jobs_pause_trigger, zeyn_jobs_resume,

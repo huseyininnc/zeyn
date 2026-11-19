@@ -56,7 +56,7 @@ fn types(dialect: &str) -> Result<(&'static str, &'static str)> {
 fn metronome_columns(dialect: &str) -> Vec<String> {
     let (text, big, small) = match dialect {
         "oracle" => ("VARCHAR2", "NUMBER(19)", "NUMBER(5)"),
-        _ => ("VARCHAR", "BIGINT", "SMALLINT"),
+        _ => ("VARCHAR", "BIGINT", "BIGINT"),
     };
     vec![
         format!("trigger_id {text}(64)"),
@@ -75,7 +75,7 @@ fn metronome_tables(dialect: &str, p: &str) -> Result<Vec<String>> {
     let (text, big) = types(dialect)?;
     let (small, int) = match dialect {
         "oracle" => ("NUMBER(5)", "NUMBER(10)"),
-        _ => ("SMALLINT", "INTEGER"),
+        _ => ("BIGINT", "BIGINT"),
     };
     Ok(vec![
         format!("CREATE UNIQUE INDEX {p}jobs_tick ON {p}jobs (tick_key)"),
@@ -217,6 +217,9 @@ fn claimed_of(row: Vec<Cell>) -> Option<ClaimedJob> {
 fn aged(now_ms: i64) -> Arg {
     Arg::Int(now_ms.saturating_sub(super::ms(crate::metronome::PRIORITY_AGING)))
 }
+
+/// Most runs one Oracle claim takes: the ids go back in an `IN` list, which Oracle caps at 1,000.
+const MAX_ORACLE_CLAIM: usize = 1_000;
 
 /// SQL of the crate's own job table for a dialect and checked prefix.
 fn sql(d: &dyn Dialect, p: &str, template: &str, args: Vec<Arg>, cols: &[Col]) -> Sql {
@@ -422,7 +425,7 @@ impl SqlJobStore {
             &names,
             now_ms,
             lease_ms,
-            limit,
+            limit.min(MAX_ORACLE_CLAIM),
             band,
         );
         let ids: Vec<Arg> = tx

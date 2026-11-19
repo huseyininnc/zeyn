@@ -212,10 +212,10 @@ pub fn zeyn_jobs(_: ()) -> Screen {
         job: t.job.clone(),
         id: t.id.clone(),
     };
-    Screen::new(t!("zeyn.jobs.title"))
-        .subtitle(t!("zeyn.jobs.subtitle"))
+    Screen::new(Text::key("zeyn.jobs.title"))
+        .subtitle(Text::key("zeyn.jobs.subtitle"))
         .body(
-            Panel::new(t!("zeyn.jobs.jobs")).add(
+            Panel::new(Text::key("zeyn.jobs.jobs")).add(
                 DataGrid::of(zeyn_jobs_list)
                     .column(JobRow::name)
                     .column(JobRow::state)
@@ -224,15 +224,15 @@ pub fn zeyn_jobs(_: ()) -> Screen {
                     .column(JobRow::last_error)
                     .column(JobRow::runs)
                     .column(JobRow::failures)
-                    .row_action(t!("zeyn.jobs.run_now"), zeyn_jobs_run_now, name)
-                    .row_action(t!("zeyn.jobs.pause"), zeyn_jobs_pause, name)
-                    .row_action(t!("zeyn.jobs.resume"), zeyn_jobs_resume, name)
-                    .row_action(t!("zeyn.jobs.catch_up"), zeyn_jobs_catch_up, name)
+                    .row_action(Text::key("zeyn.jobs.run_now"), zeyn_jobs_run_now, name)
+                    .row_action(Text::key("zeyn.jobs.pause"), zeyn_jobs_pause, name)
+                    .row_action(Text::key("zeyn.jobs.resume"), zeyn_jobs_resume, name)
+                    .row_action(Text::key("zeyn.jobs.catch_up"), zeyn_jobs_catch_up, name)
                     .listens(TOPIC),
             ),
         )
         .body(
-            Panel::new(t!("zeyn.jobs.triggers")).add(
+            Panel::new(Text::key("zeyn.jobs.triggers")).add(
                 DataGrid::of(zeyn_jobs_triggers)
                     .column(TriggerRow::job)
                     .column(TriggerRow::id)
@@ -243,13 +243,21 @@ pub fn zeyn_jobs(_: ()) -> Screen {
                     .column(TriggerRow::next_run)
                     .column(TriggerRow::then)
                     .column(TriggerRow::after)
-                    .row_action(t!("zeyn.jobs.pause"), zeyn_jobs_pause_trigger, trigger)
-                    .row_action(t!("zeyn.jobs.resume"), zeyn_jobs_resume_trigger, trigger)
+                    .row_action(
+                        Text::key("zeyn.jobs.pause"),
+                        zeyn_jobs_pause_trigger,
+                        trigger,
+                    )
+                    .row_action(
+                        Text::key("zeyn.jobs.resume"),
+                        zeyn_jobs_resume_trigger,
+                        trigger,
+                    )
                     .listens(TOPIC),
             ),
         )
         .body(
-            Panel::new(t!("zeyn.jobs.runs")).add(
+            Panel::new(Text::key("zeyn.jobs.runs")).add(
                 DataGrid::of(zeyn_jobs_runs)
                     .mode(DataMode::Server)
                     .column(RunRow::job)
@@ -272,7 +280,28 @@ pub fn ops() -> Feature {
     Feature::new("zeyn_jobs")
         .screen(zeyn_jobs)
         .menu(|m| {
-            m.group(t!("zeyn.jobs.menu"), Icon::Settings)
-                .item(t!("zeyn.jobs.title"), zeyn_jobs)
+            m.group(Text::key("zeyn.jobs.menu"), Icon::Settings)
+                .item(Text::key("zeyn.jobs.title"), zeyn_jobs)
         })
 }
+
+/// Texts of the operations screen, kept out of the main catalogs so builds without the feature
+/// carry none of them. Merged into the framework's catalog of each language when it is read.
+pub(crate) const CATALOGS: &[(&str, &str)] = &[
+    ("en", include_str!("../../locales/ops/en.json")),
+    ("tr", include_str!("../../locales/ops/tr.json")),
+    #[cfg(feature = "lang-zh")]
+    ("zh", include_str!("../../locales/ops/zh.json")),
+    #[cfg(feature = "lang-ru")]
+    ("ru", include_str!("../../locales/ops/ru.json")),
+    #[cfg(feature = "lang-es")]
+    ("es", include_str!("../../locales/ops/es.json")),
+    #[cfg(feature = "lang-ko")]
+    ("ko", include_str!("../../locales/ops/ko.json")),
+    #[cfg(feature = "lang-ja")]
+    ("ja", include_str!("../../locales/ops/ja.json")),
+    #[cfg(feature = "lang-hi")]
+    ("hi", include_str!("../../locales/ops/hi.json")),
+    #[cfg(feature = "lang-ar")]
+    ("ar", include_str!("../../locales/ops/ar.json")),
+];

@@ -54,6 +54,9 @@ resumable = ["server", "dep:base64"]
 # calendars, misfire policies, pause and resume, chains, run history and an operations screen.
 # See docs/metronome.md.
 metronome = ["server"]
+# The operations screen of Metronome at /ops/jobs (`metronome::ops()`): jobs, triggers and run
+# history in DataGrids, and its texts. About 680 KB of a release build, so it is a feature of its own.
+metronome-ops = ["metronome"]
 # The `ui::Markdown` component: safe Markdown to HTML, with no dependencies.
 markdown = []
 # Framework texts (`zeyn.*`) in more languages. English and Turkish are always built in; each

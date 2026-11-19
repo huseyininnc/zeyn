@@ -159,6 +159,7 @@ App::new("Billing")
   the job's retries apply. No limit unless set.
 - `App::chain(a, b)`: after a run of `a` succeeds, `b` is queued with the payload of `a`'s run
   (trigger `chain`, started by `job:a`). A failed or timed out run starts nothing.
+- `.feature(zeyn::metronome::ops())` needs the feature `metronome-ops` (see "Operations screen").
 - `App::trigger`, `App::calendar` and `App::chain` are checked when the app starts: a bad
   expression, an unknown time zone, job or calendar, a duplicate trigger id, a trigger that never
   runs, a chain cycle or a chain longer than `MAX_CHAIN` (8) stop `App::check` and `serve` with
@@ -278,7 +279,7 @@ With the feature on, `create_job_tables(dialect, prefix)` returns schema version
 | `trigger_id` | `VARCHAR(64)` | `VARCHAR2(64)` | `manual`, `chain`, the trigger id, or null |
 | `tick_key` | `VARCHAR(160)` | `VARCHAR2(160)` | unique per trigger time; null for other runs |
 | `scheduled_ms` | `BIGINT` | `NUMBER(19)` | the tick, for `ctx.scheduled_at()` |
-| `priority` | `SMALLINT DEFAULT 0 NOT NULL` | `NUMBER(5) DEFAULT 0 NOT NULL` | claim order |
+| `priority` | `BIGINT DEFAULT 0 NOT NULL` | `NUMBER(5) DEFAULT 0 NOT NULL` | claim order |
 | `timeout_ms` | `BIGINT` | `NUMBER(19)` | per run timeout |
 | `started_ms` | `BIGINT` | `NUMBER(19)` | start of the current try |
 | `started_by` | `VARCHAR(128)` | `VARCHAR2(128)` | the caller of a manual run |
@@ -287,9 +288,10 @@ and next to it `zeyn_jobs_tick` (unique index on `tick_key`; many nulls are allo
 databases), `zeyn_job_triggers` (primary key `(job, id)`: expression, zone, calendar, misfire,
 priority, `paused`, `next_ms`, `updated_ms`), `zeyn_job_pauses` (one row per paused job),
 `zeyn_job_runs` (history, indexed on `(job, ended_ms)` and `ended_ms`) and `zeyn_job_schema`
-(one row, version 2). Oracle uses `VARCHAR2`, `NUMBER(5)`, `NUMBER(10)` and `NUMBER(19)`, with
-`DEFAULT` before `NOT NULL`; every name takes the table prefix and stays within 30 bytes with a
-prefix of up to 8 bytes, which a test checks.
+(one row, version 2). Whole numbers are `BIGINT` on PostgreSQL, the type the data layer reads.
+Oracle uses `VARCHAR2`, `NUMBER(5)`, `NUMBER(10)` and `NUMBER(19)`, with `DEFAULT` before
+`NOT NULL`; every name takes the table prefix and stays within 30 bytes with a prefix of up to
+8 bytes, which a test checks. An Oracle claim takes at most 1,000 runs, the size of an `IN` list.
 
 `migrate_job_tables(dialect, prefix)` returns the statements from version 1 (a table made without
 the feature) to version 2: `ALTER TABLE ... ADD` for each column, all nullable or with a default,
@@ -314,8 +316,11 @@ ignores the new columns.
 
 ## Operations screen
 
-`App::feature(zeyn::metronome::ops())` mounts the screen at `/ops/jobs`, built only from
-existing components, with a menu entry under "Operations":
+With the feature `metronome-ops` (which turns on `metronome`),
+`App::feature(zeyn::metronome::ops())` mounts the screen at `/ops/jobs`, built only from existing components, with a menu entry under
+"Operations". It is a feature of its own because its three DataGrids are most of the binary
+size; apps that only schedule leave it off, and its texts live in `locales/ops/` so builds
+without it carry none of them.
 
 - **Jobs grid**: name, state, paused, next run in the viewer's time zone, last error code, runs
   and failures. Row actions: run now, pause, resume (next tick) and resume with catch up (misfire
@@ -359,7 +364,7 @@ existing components, with a menu entry under "Operations":
 | Misfire catch up | bounded, never a list of all missed ticks | at most 10,000 ticks looked at and 100 runs queued per trigger and pass; a year of downtime on a trigger of every second takes under 60 ms in a release build, with 100 runs queued |
 | History in the memory store | ring of 1,000 rows | as budgeted |
 | Live notifications | at most one per second per server | as budgeted |
-| Binary size of the showcase (release) | under 60 KB with the feature on | missed: +228,352 bytes (223 KB) for the scheduler, store and three triggers; +928,256 bytes (906 KB) with the operations screen, whose three DataGrids are most of it. Apps without the feature pay nothing in code; the framework texts of the screen add about 2 KB of JSON to every build |
+| Binary size of the showcase (release) | under 60 KB with the feature on | `metronome`: +238,592 bytes (233 KB) for the scheduler, store and three triggers; `metronome-ops`: +904,704 bytes (884 KB) with the operations screen, whose three DataGrids are most of it, so the screen is a feature of its own. Without either feature the binary is the size it was before (28,018,688 bytes against 28,023,296 on `dev`, within noise) |
 
 ## Not built yet
 

@@ -16,7 +16,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use zeyn::metronome::{Calendar, Cron, FakeClock, Misfire, Resume, Trigger, Weekday};
 use zeyn::prelude::*;
-use zeyn::testing::TestApp;
 use zeyn::{JobStore, Jobs, MemoryJobStore, Schedule};
 
 const HOUR: i64 = 3_600_000;
@@ -890,11 +889,13 @@ fn the_memory_history_is_a_ring_of_fixed_size() {
         });
 }
 
+#[cfg(feature = "metronome-ops")]
 #[zeyn::screen(route = "/home", public)]
 pub fn home(_: ()) -> Screen {
     Screen::new("Home")
 }
 
+#[cfg(feature = "metronome-ops")]
 fn ops_app() -> App {
     App::new("Ops")
         .job("report", Schedule::manual(), |_ctx: Ctx| async { Ok(()) })
@@ -909,9 +910,10 @@ fn ops_app() -> App {
         .feature(Feature::new("home").screen(home))
 }
 
+#[cfg(feature = "metronome-ops")]
 #[tokio::test]
 async fn the_operations_screen_and_endpoints_check_each_permission_on_the_server() {
-    let reader = TestApp::signed_in(
+    let reader = zeyn::testing::TestApp::signed_in(
         ops_app(),
         Identity::user("rita").with_permissions(["zeyn.jobs.read"]),
     );
@@ -955,7 +957,7 @@ async fn the_operations_screen_and_endpoints_check_each_permission_on_the_server
         200
     );
 
-    let outsider = TestApp::signed_in(ops_app(), Identity::user("otto"));
+    let outsider = zeyn::testing::TestApp::signed_in(ops_app(), Identity::user("otto"));
     assert_eq!(outsider.get("/ops/jobs").await.status, 403);
     assert_eq!(
         outsider
@@ -977,7 +979,7 @@ async fn the_operations_screen_and_endpoints_check_each_permission_on_the_server
         !jobs.body.contains("Run now"),
         "no button without the run permission"
     );
-    let run = |who: &TestApp| {
+    let run = |who: &zeyn::testing::TestApp| {
         let who = who.clone();
         async move {
             who.post(
@@ -993,7 +995,7 @@ async fn the_operations_screen_and_endpoints_check_each_permission_on_the_server
         403,
         "run now is refused on the server without zeyn.jobs.run"
     );
-    let operator = TestApp::signed_in(
+    let operator = zeyn::testing::TestApp::signed_in(
         ops_app(),
         Identity::user("omar").with_permissions(["zeyn.jobs.read", "zeyn.jobs.run"]),
     );
@@ -1068,10 +1070,17 @@ async fn two_servers_on_a_sql_store_queue_each_tick_once_and_keep_pauses_and_his
             x.unwrap();
             y.unwrap();
         }
-        let runs = store()
-            .claim("test", &["report"], clock.now_ms(), 60_000, 2_000)
-            .await
-            .unwrap();
+        let mut runs = Vec::new();
+        loop {
+            let batch = store()
+                .claim("test", &["report"], clock.now_ms(), 60_000, 500)
+                .await
+                .unwrap();
+            if batch.is_empty() {
+                break;
+            }
+            runs.extend(batch);
+        }
         let ticks: HashSet<Option<i64>> = runs
             .iter()
             .map(|r| r.scheduled_ms)

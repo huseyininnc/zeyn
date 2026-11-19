@@ -328,6 +328,9 @@ App::new("Billing")
     .feature(zeyn::metronome::ops())
 ```
 
+- The operations screen `metronome::ops()` needs the feature `metronome-ops`, which turns on
+  `metronome`; apps that only schedule leave it off and pay for neither its grids nor its texts.
+
 - A `Trigger` queues runs of a registered job: cron with seconds in the Quartz dialect, an IANA
   time zone with defined behavior in daylight saving gaps and folds, a payload, a priority, a
   timeout and a misfire policy (`RunOnce`, `RunAll { max }`, `Skip`). A job can have several.
