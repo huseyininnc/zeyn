@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Zeyn playground</title>
+<link rel="stylesheet" href="/play.css">
+<script type="module" src="/play.js"></script>
+</head>
+<body>
+<main>
+<section class="editor" aria-labelledby="code-label">
+<label id="code-label" for="code">Body of <code>pub fn playground() -&gt; Screen</code></label>
+<textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off">Screen::new("Hello")
+    .body(
+        Stack::new()
+            .add(Heading::h2("Playground"))
+            .add(Paragraph::new("Edit the code and press Run.")),
+    )</textarea>
+<div class="bar">
+<button id="run" type="button" aria-keyshortcuts="Control+Enter">Run</button>
+<span class="hint">Ctrl+Enter runs</span>
+<p id="status" role="status" aria-live="polite"></p>
+</div>
+<pre id="log" tabindex="0" aria-label="Compiler messages" hidden></pre>
+</section>
+<section class="preview" aria-label="Preview">
+<iframe id="preview" title="Rendered screen" sandbox="allow-scripts allow-same-origin"></iframe>
+</section>
+</main>
+</body>
+</html>

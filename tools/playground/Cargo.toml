@@ -1,0 +1,15 @@
+[package]
+name = "zeyn-playground"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "Local prototype of the browser playground: an editor page, a preview origin and a Docker sandbox runner"
+
+[dependencies]
+zeyn = { path = "../../crates/zeyn" }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "time", "sync", "io-util"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
