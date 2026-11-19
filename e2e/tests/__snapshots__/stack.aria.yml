@@ -1,0 +1,20 @@
+- main:
+  - region "Stack":
+    - heading "Stack" [level=1]
+    - paragraph: Nodes one under the other with a gap.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/layouts#stack
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Stack
+    - tablist "Stack sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - paragraph: "Information: First"
+      - paragraph: "Success: Second"
+      - paragraph: "Warning: Third"
+      - group: Show code
+      - button "Copy"
+      - status

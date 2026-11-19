@@ -176,6 +176,7 @@ pub(crate) const MODULES: &[Builtin] = &[
             "z-image-blocked",
             "z-img",
             "z-img-host",
+            "z-link-external",
             "z-link-external-icon",
         ],
         needs: &[],

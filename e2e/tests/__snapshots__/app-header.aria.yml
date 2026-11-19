@@ -1,0 +1,17 @@
+- main:
+  - region "App header":
+    - heading "App header" [level=1]
+    - paragraph: A bar over the screens of the app shell, with a search box and links.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/shell#the-app-header
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=SiteHeader
+    - tablist "App header sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "The header of this catalog" [level=3]
+      - paragraph: "Information: The bar at the top of this page is the app header: try its search box."
+      - group: Show code
+      - button "Copy"
+      - status

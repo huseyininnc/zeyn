@@ -1,0 +1,50 @@
+- main:
+  - region "FacetPanel":
+    - heading "FacetPanel" [level=1]
+    - paragraph: Counted filters, a price range and chosen filter chips that refresh product cards in place.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/commerce#facet-panel
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=FacetPanel
+    - tablist "FacetPanel sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - form "Filters":
+        - group:
+          - group:
+            - text: Kind −
+            - group "Kind":
+              - text: ""
+              - checkbox /Books, \d+ results/
+              - checkbox /Tools, \d+ results/
+              - checkbox /Plants, \d+ results/
+          - group:
+            - text: Price −
+            - group "Price":
+              - text: ""
+              - slider "Price, from": "0"
+              - slider "Price, to": /\d+/
+      - list:
+        - listitem: /Field notes \d+ ₺\d+\.\d+/
+        - listitem: /Garden trowel \d+ ₺\d+\.\d+/
+        - listitem: /Fern \d+ ₺\d+\.\d+/
+        - listitem: /City atlas \d+ ₺\d+\.\d+/
+        - listitem: /Hand saw \d+ ₺\d+\.\d+/
+        - listitem: /Olive tree \d+ ₺\d+\.\d+/
+        - listitem: /Cookbook \d+ ₺\d+\.\d+/
+        - listitem: /Tape measure \d+ ₺\d+\.\d+/
+        - listitem: /Cactus \d+ ₺\d+\.\d+/
+        - listitem: /Poetry \d+ ₺\d+\.\d+/
+        - listitem: /Pliers \d+ ₺\d+\.\d+/
+        - listitem: /Bamboo \d+ ₺\d+\.\d+/
+        - listitem: /Field notes \d+ ₺\d+\.\d+/
+        - listitem: /Garden trowel \d+ ₺\d+\.\d+/
+        - listitem: /Fern \d+ ₺\d+\.\d+/
+        - listitem: /City atlas \d+ ₺\d+\.\d+/
+      - button "Show more"
+      - status: /\d+ items shown/
+      - group: Show code
+      - button "Copy"
+      - status

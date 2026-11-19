@@ -344,7 +344,6 @@ function close(ed) {
   ed.list.replaceChildren();
   ed.items = [];
   ed.input.removeAttribute('aria-activedescendant');
-  ed.input.setAttribute('aria-expanded', 'false');
 }
 
 /** Makes option `i` the active one. */
@@ -416,7 +415,6 @@ function show(ed, items, forced) {
   );
   const opened = ed.list.hidden;
   ed.list.hidden = false;
-  ed.input.setAttribute('aria-expanded', 'true');
   place(ed);
   activate(ed, 0);
   if (forced || opened || list.length !== ed.announced) ed.status.textContent = fill(ed.texts.count ?? '', { n: list.length });
@@ -665,7 +663,6 @@ function setup(root) {
       if (option) accept(ed, [...ed.list.children].indexOf(option));
     });
   }
-  if (ed.list) input.setAttribute('aria-expanded', 'false');
   if (input.dataset.check && input.value) scheduleCheck(ed);
 }
 
