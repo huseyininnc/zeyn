@@ -1,0 +1,24 @@
+- main:
+  - region "Lookup":
+    - heading "Lookup" [level=1]
+    - paragraph: Pick a record from a search on the server.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/controls
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=LookupItem
+    - tablist "Lookup sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - text: Product
+      - combobox "Product Product"
+      - button "Show options"
+      - text: Product
+      - combobox
+      - button "Show options"
+      - button "Save"
+      - group: Show code
+      - button "Copy"
+      - status

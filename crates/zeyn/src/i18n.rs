@@ -402,6 +402,14 @@ impl I18n {
             self.merge(locale, json, false)
                 .expect("built in catalog");
         }
+        #[cfg(feature = "metronome-ops")]
+        if let Some((_, json)) = crate::metronome::screen::CATALOGS
+            .iter()
+            .find(|(l, _)| *l == locale)
+        {
+            self.merge(locale, json, false)
+                .expect("built in catalog of the operations screen");
+        }
     }
 
     /// Locales whose framework texts are compiled into this build, English first.

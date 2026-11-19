@@ -1,0 +1,32 @@
+- main:
+  - region "Masked inputs":
+    - heading "Masked inputs" [level=1]
+    - paragraph: Masked, decimal, percent and password inputs.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/controls
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Form
+    - tablist "Masked inputs sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - text: Rate
+      - spinbutton "Rate": /\d+\.\d+/
+      - button "Increase"
+      - button "Decrease"
+      - text: Discount
+      - spinbutton "Discount"
+      - text: percent
+      - button "Increase"
+      - button "Decrease"
+      - text: Phone
+      - textbox "Phone":
+        - /placeholder: (___) ___ __ __
+      - text: Password
+      - textbox "Password"
+      - button "Show password"
+      - button "Save"
+      - group: Show code
+      - button "Copy"
+      - status

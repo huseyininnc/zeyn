@@ -191,3 +191,21 @@ jobs.enqueue("send_invoice", "42").await?;
 - ワーカーは `JOB_POLL` (1 秒) ごとに、また同じサーバーで `enqueue` された直後に、期限が来た実行を探します。各 claim が取得するのは空きジョブスロットの数までなので、メモリがキューとともに増えることはありません。
 - PostgreSQL は 1 つの `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING` で claim します。Oracle 11g 以降は、トランザクション内で `ROWNUM` と `FOR UPDATE SKIP LOCKED` で ID を選択し、更新して、コミットの前に読み戻します。Oracle ではロックを伴う select を並べ替えられないため、そこでは期限が来た実行が決まった順序なしで取得されます。時刻は、`BIGINT` または `NUMBER(19)` 列の Unix ミリ秒です。
 - ストアがある場合、同じジョブのスケジュールされた実行とトリガーされた実行が重なることがあります。同時に 2 つ実行してはいけないジョブは、自分で保護してください (たとえば行ロック)。
+
+### Metronome
+
+`metronome` 機能は、これらのジョブに壁時計の時刻によるスケジュールを加えます。詳しい手引きは `docs/metronome.md` にあります。
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- `Trigger` は登録済みジョブの実行をキューに入れます。Quartz 方言の秒付き cron、夏時間の飛びと重なりで決まった動きをする IANA タイムゾーン、ペイロード、優先度、タイムアウト、取りこぼし方針（`RunOnce`、`RunAll { max }`、`Skip`）を持ちます。カレンダーは日付、曜日、毎年の日付、毎日の時間帯を除外します。
+- ストアを共有するサーバーは各時刻をちょうど一度だけキューに入れます。`pause`、`resume`、`run_now` はサーバーをまたいで働きます。
+- 終わった試行ごとに履歴が 1 行残り（ペイロードとエラー文は残しません）、`jobs.history`、`GET /_zeyn/jobs/runs`、運用画面 `/ops/jobs` で読めます（`zeyn.jobs.read`、`zeyn.jobs.run`、`zeyn.jobs.admin`）。

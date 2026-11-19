@@ -1,0 +1,28 @@
+- main:
+  - region "QuantityStepper":
+    - heading "QuantityStepper" [level=1]
+    - paragraph: Minus and plus buttons around a number whose stock the server checks.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/commerce#quantity-stepper
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=QuantityStepper
+    - tablist "QuantityStepper sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - group "Mugs, 5 in stock":
+        - text: ""
+        - button "Decrease"
+        - spinbutton "Mugs, 5 in stock": "2"
+        - button "Increase"
+        - status
+      - group "Tea":
+        - text: ""
+        - button "Decrease"
+        - spinbutton "Tea": "1"
+        - button "Increase"
+        - status
+      - group: Show code
+      - button "Copy"
+      - status

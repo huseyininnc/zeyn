@@ -671,7 +671,8 @@ impl<E: Model> MessageThread<E> {
             .and_then(|p| p.total)
             .unwrap_or(count as u64);
         out.push_str(&format!(
-            r#"<section class="z-thread" data-zeyn-thread data-room="{room}" data-topics="{topics}" data-page="{THREAD_PAGE}" data-count="{count}" data-total="{total}" data-texts="{texts}"{reply}{live} data-testid="{scope}.thread">{title}<div class="z-thread-view" role="feed" tabindex="0"{labelled} aria-busy="false">"#,
+            r#"<section class="z-thread" data-zeyn-thread data-room="{room}" data-topics="{topics}" data-page="{THREAD_PAGE}" data-count="{count}" data-total="{total}" data-texts="{texts}"{reply}{live} data-testid="{scope}.thread">{title}<div class="z-thread-view" role="{role}" tabindex="0"{labelled} aria-busy="false">"#,
+            role = if count == 0 { "region" } else { "feed" },
             room = escape(&self.conversation),
             topics = escape(&topics),
             texts = attr(&self.texts(r)),

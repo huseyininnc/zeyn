@@ -1,0 +1,18 @@
+- main:
+  - region "Badge":
+    - heading "Badge" [level=1]
+    - paragraph: A short status label in a tone.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#badge
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Badge
+    - tablist "Badge sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - text: Paid Overdue Pending New Draft
+      - group: Show code
+      - button "Copy"
+      - status

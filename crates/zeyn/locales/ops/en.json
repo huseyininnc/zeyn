@@ -1,0 +1,50 @@
+{
+  "zeyn": {
+    "jobs": {
+      "title": "Jobs",
+      "subtitle": "Background jobs, their triggers and the history of their runs.",
+      "jobs": "Jobs",
+      "triggers": "Triggers",
+      "runs": "Run history",
+      "run_now": "Run now",
+      "pause": "Pause",
+      "resume": "Resume",
+      "catch_up": "Resume and catch up",
+      "menu": "Operations"
+    }
+  },
+  "JobRow": {
+    "name": "Job",
+    "state": "State",
+    "paused": "Paused",
+    "next_run": "Next run",
+    "last_error": "Last error",
+    "runs": "Runs",
+    "failures": "Failures"
+  },
+  "TriggerRow": {
+    "key": "Key",
+    "job": "Job",
+    "id": "Trigger",
+    "expr": "Schedule",
+    "time_zone": "Time zone",
+    "calendar": "Calendar",
+    "paused": "Paused",
+    "next_run": "Next run",
+    "then": "Then",
+    "after": "After that"
+  },
+  "RunRow": {
+    "id": "Id",
+    "job": "Job",
+    "trigger": "Trigger",
+    "scheduled": "Scheduled for",
+    "started": "Started",
+    "duration_ms": "Duration (ms)",
+    "attempt": "Try",
+    "outcome": "Outcome",
+    "error_code": "Error code",
+    "worker": "Worker",
+    "started_by": "Started by"
+  }
+}

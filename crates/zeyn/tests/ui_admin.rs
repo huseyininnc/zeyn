@@ -479,6 +479,10 @@ async fn the_inbox_groups_by_day_marks_unread_and_escapes() {
     let (status, page) = get("/inbox").await;
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains(">Today</h3>") && page.contains(">Yesterday</h3>"));
+    assert!(
+        page.contains(r#"<div class="z-inbox-bar" role="group""#),
+        "a bar without arrow keys is a group, not an APG toolbar"
+    );
     assert_eq!(
         page.matches(r#"class="z-inbox-day""#)
             .count(),

@@ -1,0 +1,34 @@
+- main:
+  - region "Toc":
+    - heading "Toc" [level=1]
+    - paragraph: Links to the headings of the page.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#toc
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Toc
+    - tablist "Toc sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - navigation "On this page":
+        - list:
+          - listitem:
+            - link "Delivery":
+              - /url: "#toc-delivery"
+            - list:
+              - listitem:
+                - link "Abroad":
+                  - /url: "#toc-abroad"
+          - listitem:
+            - link "Returns":
+              - /url: "#toc-returns"
+      - heading "Delivery" [level=3]
+      - paragraph: /Orders placed before \d+:\d+ leave the same day\./
+      - heading "Abroad" [level=4]
+      - paragraph: Parcels abroad take three to seven working days.
+      - heading "Returns" [level=3]
+      - paragraph: /Send it back within \d+ days for a full refund\./
+      - group: Show code
+      - button "Copy"
+      - status

@@ -191,3 +191,21 @@ jobs.enqueue("send_invoice", "42").await?;
 - वर्कर हर `JOB_POLL` (एक सेकंड) पर और उसी सर्वर पर `enqueue` के तुरंत बाद देय रन खोजते हैं। हर दावा अधिकतम उतने रन लेता है जितने जॉब स्लॉट खाली हैं, इसलिए मेमोरी कतार के साथ नहीं बढ़ती।
 - PostgreSQL एक `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING` में दावा करता है। Oracle 11g और बाद के ट्रांज़ैक्शन में `ROWNUM` और `FOR UPDATE SKIP LOCKED` के साथ आईडी select करते हैं, उन्हें अपडेट करते हैं और कमिट से पहले उन्हें वापस पढ़ते हैं। Oracle लॉक करने वाले select को क्रमबद्ध नहीं कर सकता, इसलिए वहाँ देय रन किसी निश्चित क्रम के बिना लिए जाते हैं। समय `BIGINT` या `NUMBER(19)` कॉलम में Unix मिलीसेकंड हैं।
 - स्टोर के साथ, एक ही जॉब का शेड्यूल्ड रन और ट्रिगर किया रन ओवरलैप कर सकते हैं; जो जॉब एक साथ दो बार नहीं चलने चाहिए उन्हें खुद अपनी रक्षा करनी चाहिए (उदाहरण के लिए पंक्ति लॉक)।
+
+### Metronome
+
+`metronome` फ़ीचर इन जॉब के ऊपर दीवार घड़ी के समय वाली सारणियाँ जोड़ता है; पूरी गाइड `docs/metronome.md` में है।
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- एक `Trigger` किसी दर्ज जॉब के रन कतार में डालता है: Quartz शैली में सेकंड वाला cron, डेलाइट सेविंग के अंतराल और दोहराव में तय व्यवहार वाला IANA समय क्षेत्र, पेलोड, प्राथमिकता, समय सीमा और छूटे रन की नीति (`RunOnce`, `RunAll { max }`, `Skip`)। कैलेंडर तारीखें, सप्ताह के दिन, हर साल की तारीखें और रोज़ के समय खंड बाहर रखते हैं।
+- एक ही स्टोर साझा करने वाले सर्वर हर समय बिंदु को ठीक एक बार कतार में डालते हैं। `pause`, `resume` और `run_now` सभी सर्वरों पर काम करते हैं।
+- हर पूरा प्रयास इतिहास की एक पंक्ति है (पेलोड या त्रुटि का पाठ कभी नहीं), जिसे `jobs.history`, `GET /_zeyn/jobs/runs` और संचालन स्क्रीन `/ops/jobs` पर पढ़ा जाता है (`zeyn.jobs.read`, `zeyn.jobs.run`, `zeyn.jobs.admin`)।

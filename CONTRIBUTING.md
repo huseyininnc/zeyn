@@ -48,6 +48,22 @@ Windows Defender scans every file the compiler writes, which slows a build a lot
 
 CI builds the workspace with `cargo build --workspace --timings` and fails when the build takes longer than the number of seconds in `ci/build-budget.txt` (`sh ci/check-build-budget.sh <seconds>` is the check). The job uploads the report as the artifact `cargo-timings`; open `cargo-timing.html` to see which crate took the time. A change that makes a crate much slower to compile should bring the build back under the budget, or raise the budget in the same change and say why in the commit. After the first CI runs on a new runner or toolchain, set the budget to the measured time plus 30 percent, so it catches a real slowdown and not noise.
 
+### Browser tests
+
+The browser tests in `e2e/` open every page of the component catalog in Chromium and check
+rendering, keys, visible focus, accessibility (axe), both themes, right to left, touch targets,
+console errors, accessibility tree snapshots and size budgets. They need Node.js 20 or later:
+
+```
+cd e2e && npm ci && npx playwright install chromium && npm test
+```
+
+The suite starts the catalog with `cargo run -p zeyn-example-components` on port 3110 (set
+`ZEYN_E2E_PORT` to change it) unless one already runs there. `npm run update` rewrites the
+accessibility tree snapshots after an intended change. See
+[docs/component-quality.md](docs/component-quality.md#4-browser-tests) for what each check does,
+the budgets and the known issues list.
+
 ## Branches and pull requests
 
 - Create your work branch from `dev`.

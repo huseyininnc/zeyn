@@ -1,0 +1,21 @@
+- main:
+  - region "ThemePicker":
+    - heading "ThemePicker" [level=1]
+    - paragraph: The theme choice inside a screen, in step with the menu.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/shell#theme-picker-in-a-screen
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ThemePicker
+    - tablist "ThemePicker sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "An Appearance section" [level=3]
+      - region "Appearance":
+        - heading "Appearance" [level=2]
+        - paragraph: "The same choice as the picker in the menu: change one and the other follows."
+        - text: Theme
+        - combobox "Theme": System
+      - group: Show code
+      - button "Copy"
+      - status

@@ -227,6 +227,7 @@ async function latestNow(s) {
   const stay = atBottom(s);
   const all = messages(s);
   s.view.querySelector(':scope > .z-thread-empty')?.remove();
+  s.view.setAttribute('role', 'feed');
   const streaming = s.view.querySelector(':scope > article[aria-busy="true"]');
   for (const m of list) s.view.insertBefore(m, streaming);
   track(s, list);
@@ -271,6 +272,7 @@ async function reply(s, text) {
   m.append(bubble);
   const last = messages(s).at(-1);
   s.view.querySelector(':scope > .z-thread-empty')?.remove();
+  s.view.setAttribute('role', 'feed');
   s.view.append(m);
   join(last, m);
   s.view.scrollTop = s.view.scrollHeight;
