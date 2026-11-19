@@ -1018,7 +1018,7 @@ fn highlights_mark_every_word_of_the_query_and_escape_both() {
     assert_eq!(highlight_ranges("ŞEKER şeker", "şeker"), [0..6, 7..13]);
     assert_eq!(
         highlight_ranges("İstanbul", "i"),
-        [],
+        Vec::<std::ops::Range<usize>>::new(),
         "a match never ends inside a character"
     );
     let words: Vec<String> = ('a'..='z')
