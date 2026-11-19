@@ -14,6 +14,7 @@ Bir ajanın çalıştığı proje kendi kurallarını ve araçlarını taşır:
 | `zeyn_docs` | Konuya göre framework başvurusu: `rules`, `language`, `protocol`; `search: "kelimeler"` bu sürümün docs sayfalarını sıralar, `page: "/language/forms"` birini Markdown olarak döndürür |
 | `zeyn_describe` | Uygulamanın Feature'ları, ekranları, rotaları, erişimi, API'leri, sorunları ve eksik çevirileri |
 | `zeyn_inspect` | Bir screen'in node ağacı: yol, bileşen türü ve her node'u yerleştiren Rust `file:line:column` bilgisi |
+| `zeyn_devtools` | Debug modunda çalışan uygulamanın DevTools istek günlüğü: en yeni istekler önce, her biri screen, action, durum, süreler ve SQL cümleleriyle (metin ve süre, değer yok); `addr` ve `limit` isteğe bağlı |
 | `zeyn_check` | Derler ve sorunları bildirir; `fix: true` önce yeniden adlandırılmış API'leri yeniden yazar |
 | `zeyn_test` | `cargo test` çalıştırır ve çıktının sonunu döndürür |
 | `zeyn_new_feature` | Bir Feature klasörü oluşturur ve kaydeder |

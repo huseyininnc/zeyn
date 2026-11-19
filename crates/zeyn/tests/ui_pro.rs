@@ -124,6 +124,20 @@ pub fn designer() -> Screen {
         )
 }
 
+#[screen(route = "/shape-settings", permission = "orders.read")]
+pub fn shape_settings() -> Screen {
+    Screen::new("Shape settings").body(
+        Form::of(Shape {
+            name: "A".into(),
+            width: 5,
+        })
+        .settings()
+        .section("General")
+        .field(Shape::name)
+        .submit("Save", save_shape),
+    )
+}
+
 fn denied(_: &Ctx) -> GuardResult {
     GuardResult::Deny("No".into())
 }
@@ -177,6 +191,7 @@ fn app_with(counter: Counter, views: bool) -> Router {
             .screen(orders)
             .screen(order_form)
             .screen(designer)
+            .screen(shape_settings)
             .screen(work)
             .command(new_order())
             .command(archive())
@@ -323,6 +338,10 @@ async fn commands_the_user_may_not_run_never_reach_the_html() {
         "the palette button is in the menu"
     );
     assert!(html.contains(r#"/_zeyn/palette.js"#));
+    assert!(
+        !html.contains("/_zeyn/drag.js"),
+        "a menu bar without a dock never links the drag core"
+    );
     assert!(html.contains(r#"data-zeyn-command="orders.hello""#));
     assert!(!html.contains("orders.new"), "needs orders.write");
     assert!(!html.contains("orders.archive"), "needs orders.admin");
@@ -570,6 +589,24 @@ async fn menubar_follows_the_apg_pattern_and_leaves_out_commands_the_user_may_no
 }
 
 #[tokio::test]
+async fn settings_forms_mark_themselves_and_link_their_stylesheet_only_where_used() {
+    let router = app(Counter::default());
+    let (_, html) = send(&router, get("/shape-settings", "orders.read")).await;
+    assert!(
+        html.contains(r#"<form class="z-form z-form-settings" data-testid="shape_settings.form""#),
+        "{html}"
+    );
+    assert!(html.contains(r#"<div class="z-form-actions"><span class="z-form-unsaved">You have unsaved changes.</span><button type="submit""#));
+    assert!(html.contains("/_zeyn/forms.css"));
+    let (_, plain) = send(&router, get("/designer", "orders.read")).await;
+    assert!(!plain.contains("z-form-unsaved"));
+    assert!(
+        !plain.contains("/_zeyn/forms.css"),
+        "other forms do not load the settings stylesheet"
+    );
+}
+
+#[tokio::test]
 async fn toolbox_status_bar_and_inspector_sections_render_their_aria() {
     let router = app(Counter::default());
     let (_, html) = send(&router, get("/designer", "orders.read")).await;
@@ -653,7 +690,11 @@ async fn dock_renders_areas_tabs_and_dividers_with_node_paths() {
         ),
         "an area without panels starts hidden"
     );
-    assert!(html.contains(r#"role="tab" class="z-dock-tab" id="work-dock-0-1-tab-main" aria-controls="work-dock-0-1-panel-main" aria-selected="true" tabindex="0" draggable="true" data-panel="main""#));
+    assert!(html.contains(r#"role="tab" class="z-dock-tab" id="work-dock-0-1-tab-main" aria-controls="work-dock-0-1-panel-main" aria-selected="true" tabindex="0" data-panel="main""#));
+    assert!(
+        html.contains("/_zeyn/drag.js?v="),
+        "dock tabs drag through the drag core, linked with the first paint"
+    );
     assert!(html.contains(
         r#"id="work-dock-0-1-tab-notes" aria-controls="work-dock-0-1-panel-notes" aria-selected="false" tabindex="-1""#
     ));

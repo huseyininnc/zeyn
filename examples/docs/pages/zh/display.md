@@ -80,7 +80,9 @@ DescriptionList::of(&invoice)
 
 ## EmptyState 和 Skeleton
 
-`EmptyState::new(title).text(text)` 用下一步操作填充空白区域：`.link(label, screen, params)` 通过 `LinkButton` 前往另一个页面，`.opens(label, screen, params)` 则以窗口形式打开应用的一个 screen。`Skeleton::lines(n)` 是内容加载期间的占位。
+`EmptyState::new(title).text(text)` 用下一步操作填充空白区域：`.link(label, screen, params)` 通过 `LinkButton` 前往另一个页面，`.opens(label, screen, params)` 则以窗口形式打开应用的一个 screen。`Skeleton::lines(n)` 是内容加载期间的占位。骨架屏只在等待 300 ms 后才出现，因此快速加载时不会闪现；较晚到达的延迟部分会让它至少保留 400 ms。
+
+`Skeleton::kpi()`、`Skeleton::grid(rows)`、`Skeleton::list(items)` 和 `Skeleton::chart()` 采用 KPI 卡片、DataGrid、List 以及柱状图、折线图或面积图的形状和大小，因此内容到达时页面不会移动。`Deferred::new(part).skeleton(Skeleton::chart())` 在延迟部分加载时显示其中一个。表格骨架的高度与其行数相同，但不超过表格的高度；表格上方的工具栏不包括在内。色条缓慢闪烁，当用户要求减少动态效果时保持静止。
 
 ## LinkButton
 

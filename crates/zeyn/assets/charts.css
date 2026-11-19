@@ -66,7 +66,8 @@
 
 .z-bullet-text { font-variant-numeric: tabular-nums; }
 
-.z-kpi {
+.z-kpi,
+.z-skeleton.z-skeleton-kpi {
   display: flex;
   flex-direction: column;
   gap: var(--z-s-1);
@@ -147,30 +148,47 @@
 
 [dir="rtl"] .z-kpi-spark { scale: -1 1; }
 
+/* The KPI skeleton (`Skeleton::kpi`): bars as tall as the title, value, change and trend lines. */
+
+.z-skeleton-kpi .z-skeleton-value { height: 28px; margin-block: 4px; }
+
+.z-skeleton-kpi .z-skeleton-chip { height: 20px; border-radius: 999px; }
+
+.z-skeleton-kpi .z-skeleton-trend { height: 48px; margin-top: auto; border-top: var(--z-s-2) solid transparent; background-clip: padding-box; }
+
 /* Kpis in a row or an auto grid: as tall as the tallest; a row of four wraps to two, then one. */
 
-.z-autogrid > .z-node:has(> .z-kpi),
-.z-col > .z-node:has(> .z-kpi) { height: 100%; }
+.z-autogrid > .z-node:has(> :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)),
+.z-col > .z-node:has(> :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) { height: 100%; }
 
-.z-row:has(> .z-col > .z-node > .z-kpi) { container-type: inline-size; align-items: stretch; }
+.z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) { container-type: inline-size; align-items: stretch; }
 
-.z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex: 1 1 calc((100% - 3 * var(--z-gap)) / 4 - 0.1px); }
+.z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) > .z-col { flex: 1 1 calc((100% - 3 * var(--z-gap)) / 4 - 0.1px); }
 
 @container (max-width: 52rem) {
-  .z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
+  .z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
 }
 
 @container (max-width: 30rem) {
-  .z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
+  .z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
 }
 
 @container (max-width: 22.5rem) {
-  .z-row:has(> .z-col > .z-node > .z-kpi) .z-kpi-trend { display: none; }
+  .z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) :is(.z-kpi-trend, .z-skeleton-kpi > .z-skeleton-trend) { display: none; }
 }
+
+/* A donut that does not fit (fewer than 2 or more than 5 parts, or one part of 75% or more) is a
+   list of rows: name, a bar as wide as its share, value and percentage. */
+.z-chart-barlist { display: grid; gap: var(--z-s-2); margin: 0; padding: 0; list-style: none; }
+.z-chart-barlist li { display: grid; grid-template-columns: minmax(6rem, 1fr) 2fr auto; align-items: center; gap: var(--z-s-3); }
+.z-chart-barlist-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.z-chart-barlist-bar { height: 8px; width: var(--z-share); min-width: 2px; border-radius: 2px; background: var(--z-series); }
+.z-chart-barlist-value { color: var(--z-text-muted); font-variant-numeric: tabular-nums; text-align: end; }
 
 @media (forced-colors: active) {
   .z-chart-mark:focus-visible { outline-color: Highlight; }
   .z-chart-dot, .z-chart-gauge-value, .z-spark polyline, .z-bullet-bar { forced-color-adjust: none; fill: CanvasText; stroke: CanvasText; }
   .z-chart-gauge-value, .z-spark polyline { fill: none; }
   .z-chart-tip { border-color: CanvasText; }
+  .z-chart-barlist-bar { forced-color-adjust: none; background: CanvasText; }
 }

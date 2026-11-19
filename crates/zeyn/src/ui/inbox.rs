@@ -537,7 +537,9 @@ impl<E: Model> From<Inbox<E>> for Node {
 /// page shows (the action's permission checked) and again whenever one of its topics is named:
 /// after a bulk action of an [`Inbox`], `ui.refresh("notifications")` or, with
 /// [`NotificationCenter::live`] and the `realtime` feature, `socket.notify(&ctx, "notifications")`.
-/// Above 99 it shows `99+`. The link's name says the count, for screen readers.
+/// Above 99 it shows `99+`. The link's name says the count, for screen readers. Users without
+/// the count action's permission get no bell at all, so the page never asks for a count the
+/// server would refuse.
 ///
 /// ```ignore
 /// App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
@@ -584,6 +586,9 @@ impl NotificationCenter {
 
 impl Component for NotificationCenter {
     fn render(&self, out: &mut String, r: &Render) {
+        if !r.can(&self.source.action().access) {
+            return;
+        }
         let t = |key: &str| {
             r.i18n
                 .text(r.locale, &Text::key(format!("zeyn.ui.inbox.{key}")))

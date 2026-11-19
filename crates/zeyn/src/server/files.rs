@@ -53,14 +53,15 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/files/{store}/{id}", get(download))
 }
 
-/// Whether a path is an upload, for the write limit.
+/// Whether a path is an upload or the creation of a resumable one, for the write limit.
 pub(super) fn is_upload(path: &str) -> bool {
     path.strip_prefix("/_zeyn/files/")
+        .or_else(|| path.strip_prefix("/_zeyn/uploads/"))
         .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'))
 }
 
 /// The store behind a request and its feature, after the permission and the guards.
-fn entry<'a>(
+pub(super) fn entry<'a>(
     st: &'a AppState,
     ctx: &Ctx,
     store: &str,
@@ -91,7 +92,7 @@ fn entry<'a>(
     Ok((feature, entry.clone()))
 }
 
-fn status(code: StatusCode, name: &'static str, message: Text) -> Failure {
+pub(super) fn status(code: StatusCode, name: &'static str, message: Text) -> Failure {
     Failure::Status(code, name, message)
 }
 
@@ -105,58 +106,17 @@ async fn upload(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let result = async {
-        let (feature, entry) = entry(&st, &ctx, &store, true)?;
-        let call = Call {
-            kind: CallKind::Upload,
-            screen: entry.rules.store(),
-            action: None,
-            via_agent: ctx.via_agent(),
-        };
-        let scanner = feature.file_scanner().cloned();
-        let quota = entry
-            .rules
-            .quota_limit()
-            .map(|(bytes, window)| {
-                let who = ctx
-                    .identity()
-                    .user
-                    .clone()
-                    .unwrap_or_else(|| "anon".into());
-                (
-                    format!("files:{}:{who}", entry.rules.store()),
-                    crate::RateLimit::per_user(u32::try_from(bytes).unwrap_or(u32::MAX), window),
-                )
-            });
-        if let Some((key, limit)) = &quota
-            && st
-                .rate_store
-                .charge(key, limit, 0)
-                .await
-                .is_err()
-        {
-            return Err(status(
-                StatusCode::TOO_MANY_REQUESTS,
-                "quota",
-                Text::key("zeyn.files.quota"),
-            ));
-        }
-        let file = st
-            .intercept(&ctx, &call, || {
-                receive(&ctx, entry, scanner, &headers, body)
-            })
-            .await?;
-        if let Some((key, limit)) = &quota {
-            let used = u32::try_from(file.size).unwrap_or(u32::MAX);
-            let _ = st
-                .rate_store
-                .charge(key, limit, used)
-                .await;
-        }
-        Ok(file)
-    }
-    .await;
-    match result {
+    let name = clean_file_name(&decode(
+        headers
+            .get("x-zeyn-file-name")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or(""),
+    ));
+    let declared = headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok());
+    match store_body(&st, &ctx, &store, name, declared, body).await {
         Ok(file) => {
             let mut r = (StatusCode::CREATED, axum::Json(file)).into_response();
             r.headers_mut()
@@ -167,12 +127,96 @@ async fn upload(
     }
 }
 
+/// Whether a path is an open resumable upload (`/_zeyn/uploads/{store}/{id}`). Its `PATCH`es
+/// do not count against the write limit: the creation did, and they cannot carry more than the
+/// length it declared.
+pub(super) fn is_upload_part(path: &str) -> bool {
+    path.strip_prefix("/_zeyn/uploads/")
+        .and_then(|rest| rest.split_once('/'))
+        .is_some_and(|(store, id)| !store.is_empty() && !id.is_empty() && !id.contains('/'))
+}
+
+/// The quota key and limit of a user on a store, when the store has a quota.
+pub(super) fn quota(ctx: &Ctx, entry: &FileEntry) -> Option<(String, crate::RateLimit)> {
+    entry
+        .rules
+        .quota_limit()
+        .map(|(bytes, window)| {
+            let who = ctx
+                .identity()
+                .user
+                .clone()
+                .unwrap_or_else(|| "anon".into());
+            (
+                format!("files:{}:{who}", entry.rules.store()),
+                crate::RateLimit::per_user(u32::try_from(bytes).unwrap_or(u32::MAX), window),
+            )
+        })
+}
+
+/// `429` when the user has used up the store's quota.
+pub(super) async fn check_quota(
+    st: &AppState,
+    quota: &Option<(String, crate::RateLimit)>,
+) -> Result<(), Failure> {
+    if let Some((key, limit)) = quota
+        && st
+            .rate_store
+            .charge(key, limit, 0)
+            .await
+            .is_err()
+    {
+        return Err(status(
+            StatusCode::TOO_MANY_REQUESTS,
+            "quota",
+            Text::key("zeyn.files.quota"),
+        ));
+    }
+    Ok(())
+}
+
+/// Checks access and quota, then reads, checks and stores a whole file from `body` inside the
+/// interceptors. Plain uploads and finished resumable uploads both end here.
+pub(super) async fn store_body(
+    st: &AppState,
+    ctx: &Ctx,
+    store: &str,
+    name: String,
+    declared: Option<u64>,
+    body: Body,
+) -> Result<crate::File, Failure> {
+    let (feature, entry) = entry(st, ctx, store, true)?;
+    let call = Call {
+        kind: CallKind::Upload,
+        screen: entry.rules.store(),
+        action: None,
+        via_agent: ctx.via_agent(),
+    };
+    let scanner = feature.file_scanner().cloned();
+    let quota = quota(ctx, &entry);
+    check_quota(st, &quota).await?;
+    let file = st
+        .intercept(ctx, &call, || {
+            receive(ctx, entry, scanner, name, declared, body)
+        })
+        .await?;
+    if let Some((key, limit)) = &quota {
+        let used = u32::try_from(file.size).unwrap_or(u32::MAX);
+        let _ = st
+            .rate_store
+            .charge(key, limit, used)
+            .await;
+    }
+    Ok(file)
+}
+
 /// Reads the body, checks it and stores it. See the module documentation.
 async fn receive(
     ctx: &Ctx,
     entry: FileEntry,
     scanner: Option<Arc<dyn crate::FileScanner>>,
-    headers: &HeaderMap,
+    name: String,
+    declared: Option<u64>,
     body: Body,
 ) -> Result<crate::File, Failure> {
     let rules = entry.rules;
@@ -184,19 +228,9 @@ async fn receive(
             too_large(&rules, ctx.locale()),
         )
     };
-    let declared = headers
-        .get(header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u64>().ok());
     if declared.is_some_and(|n| n > max) {
         return Err(big());
     }
-    let name = clean_file_name(&decode(
-        headers
-            .get("x-zeyn-file-name")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or(""),
-    ));
     let mut stream = body.into_data_stream();
     let mut head: Vec<u8> = Vec::with_capacity(SNIFF_BYTES);
     let mut pending: Vec<Bytes> = Vec::new();
@@ -303,6 +337,12 @@ async fn receive(
         return Err(f);
     }
     stored.map_err(Failure::App)?;
+    #[cfg(feature = "image")]
+    let (meta, size) = if rules.cleans(kind) {
+        clean(&entry, meta, kind).await?
+    } else {
+        (meta, size)
+    };
     if let Some(scanner) = scanner {
         let refuse = || {
             status(
@@ -351,9 +391,77 @@ async fn receive(
     })
 }
 
+/// Replaces the stored image `meta` with its [`clean_image`](crate::clean_image) under a new
+/// id and answers the new record and size. The original is deleted in every case; an image that
+/// does not decode is refused.
+#[cfg(feature = "image")]
+async fn clean(
+    entry: &crate::FileEntry,
+    meta: FileMeta,
+    kind: FileType,
+) -> Result<(FileMeta, u64), Failure> {
+    let refuse = || {
+        status(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "image_invalid",
+            Text::key("zeyn.files.type"),
+        )
+    };
+    let max = entry.rules.limit();
+    let read = entry.store.get(meta.id.clone()).await;
+    let cleaned = match read {
+        Ok(file) => tokio::task::spawn_blocking(move || {
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            file.reader
+                .take(max)
+                .read_to_end(&mut bytes)
+                .ok()?;
+            crate::clean_image(kind, &bytes)
+        })
+        .await
+        .ok()
+        .flatten(),
+        Err(_) => None,
+    };
+    let _ = entry
+        .store
+        .delete(meta.id.clone())
+        .await;
+    let bytes = Bytes::from(cleaned.ok_or_else(refuse)?);
+    let fresh = FileMeta {
+        id: new_file_id(),
+        ..meta
+    };
+    let size = bytes.len() as u64;
+    let (tx, rx) = tokio::sync::mpsc::channel::<std::io::Result<Bytes>>(4);
+    let put = tokio::spawn(
+        entry
+            .store
+            .put(fresh.clone(), FileChunks(rx)),
+    );
+    let mut at = 0;
+    while at < bytes.len() {
+        let end = (at + UPLOAD_CHUNK).min(bytes.len());
+        if tx
+            .send(Ok(bytes.slice(at..end)))
+            .await
+            .is_err()
+        {
+            break;
+        }
+        at = end;
+    }
+    drop(tx);
+    put.await
+        .map_err(|e| Failure::App(Error::Internal(e.to_string())))?
+        .map_err(Failure::App)?;
+    Ok((fresh, size))
+}
+
 /// The next part of the body. A client that stops sending for [`IDLE`] or breaks the
 /// connection ends the upload.
-async fn next<S>(stream: &mut S) -> Result<Option<Bytes>, Failure>
+pub(super) async fn next<S>(stream: &mut S) -> Result<Option<Bytes>, Failure>
 where
     S: Stream<Item = Result<Bytes, axum::Error>> + Unpin,
 {

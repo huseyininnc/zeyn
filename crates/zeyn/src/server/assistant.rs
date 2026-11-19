@@ -9,7 +9,7 @@
 //! confirmation card (`POST /_zeyn/assistant/confirm`); nothing the model says can confirm.
 
 use super::{AppState, Chunks, Failure, Tool, ToolTarget, asset};
-use crate::action::{Error, Filter, MAX_FILTERS};
+use crate::action::{DataQuery, Error, FilterGroup};
 use crate::assistant::{
     Assistant, Audio, ChatEvent, ChatKey, ChatMessage, ChatRequest, Role, ToolCall, ToolSpec, chat,
     clip,
@@ -698,6 +698,18 @@ fn builtin_specs(screens: &[(&'static str, String, String)]) -> Vec<ToolSpec> {
                         "type": "array",
                         "description": "Filters for the screen's list: field plus one of contains, equals, starts_with, from, to (dates as YYYY-MM-DD), any_of, is.",
                         "items": { "type": "object", "properties": { "field": { "type": "string" } }, "required": ["field"] }
+                    },
+                    "filter_groups": {
+                        "type": "array",
+                        "description": "Groups of filters every row must also match, for OR conditions: { any: true, filters: [...] } matches rows that pass any of its filters, { any: false, ... } rows that pass all. A group may hold groups of its own in groups, up to four levels deep.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "any": { "type": "boolean" },
+                                "filters": { "type": "array", "items": { "type": "object" } },
+                                "groups": { "type": "array", "items": { "type": "object" } }
+                            }
+                        }
                     }
                 },
                 "required": ["screen"]
@@ -759,22 +771,39 @@ fn navigate(
         .iter()
         .find(|(n, _, _)| *n == name)
         .ok_or_else(|| format!("There is no screen `{}` the user may open.", clip(name, 60)))?;
-    let mut filters: Vec<Filter> =
-        serde_json::from_value(args["filters"].clone()).unwrap_or_default();
-    filters.retain(|f| !f.is_empty() && f.field.len() <= 64);
-    filters.truncate(MAX_FILTERS);
+    let mut q = DataQuery {
+        filters: serde_json::from_value(args["filters"].clone()).unwrap_or_default(),
+        filter_groups: serde_json::from_value(args["filter_groups"].clone()).unwrap_or_default(),
+        ..DataQuery::default()
+    };
+    q.retain_filters(|f| !f.is_empty() && f.field.len() <= 64);
+    let count = q.filters.len() + group_filters(&q.filter_groups);
     let note = format!(
         "Opened `{name}` for the user{}.",
-        if filters.is_empty() {
+        if count == 0 {
             String::new()
         } else {
-            format!(" with {} filter(s)", filters.len())
+            format!(" with {count} filter(s)")
         }
     );
     Ok((
-        json!({ "t": "navigate", "url": st.url(path), "screen": name, "filters": filters }),
+        json!({
+            "t": "navigate",
+            "url": st.url(path),
+            "screen": name,
+            "filters": q.filters,
+            "filter_groups": q.filter_groups,
+        }),
         note,
     ))
+}
+
+/// Number of filters in `groups` and the groups inside them.
+fn group_filters(groups: &[FilterGroup]) -> usize {
+    groups
+        .iter()
+        .map(|g| g.filters.len() + group_filters(&g.groups))
+        .sum()
 }
 
 /// One conversation step: the user's message (or answer to a confirmation), then model rounds

@@ -118,7 +118,7 @@ zeyn check --json
 
 ## DevTools
 
-A debug build served with `cargo run` (or `zeyn dev`) records what each request did: the screen and action it ran, its status and time, how long the screen took to build and to render, every SQL statement with its time and affected rows, and the effects and topics the action returned. Alt+Shift+D opens a panel with the last 50 requests; each one opens to show its statements. `GET /_zeyn/devtools` returns the same list as JSON.
+A debug build served with `cargo run` (or `zeyn dev`) records what each request did: the screen and action it ran, its status and time, how long the screen took to build and to render, every SQL statement with its time and affected rows, and the effects and topics the action returned. Alt+Shift+D opens a panel with the last 50 requests; each one opens to show its statements. `GET /_zeyn/devtools` returns the same list as JSON, and the MCP tool `zeyn_devtools` reads it for an agent.
 
 Statements are kept without their arguments, so no values reach the panel. Release builds have no DevTools: no code, no route and no memory for them. An app that serves `App::router` itself, or a test, turns them on with `zeyn::server::devtools(true)`.
 
@@ -135,4 +135,4 @@ The image of a generated app is about 43 MB and an idle app uses a few MB of RAM
 
 ## The MCP server
 
-`zeyn mcp` speaks MCP over stdio. Its tools are `zeyn_docs` (framework reference by topic), `zeyn_describe` (features, screens, routes and problems of the app in the current directory), `zeyn_inspect` (the node tree of a screen with the Rust line that placed each node), `zeyn_check` (with `fix: true` it runs `check --fix`), `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. See [MCP and AI agents](mcp.md).
+`zeyn mcp` speaks MCP over stdio. Its tools are `zeyn_docs` (framework reference by topic), `zeyn_describe` (features, screens, routes and problems of the app in the current directory), `zeyn_inspect` (the node tree of a screen with the Rust line that placed each node), `zeyn_devtools` (the DevTools request log of the running debug build: screen, action, times, SQL statements), `zeyn_check` (with `fix: true` it runs `check --fix`), `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. See [MCP and AI agents](mcp.md).

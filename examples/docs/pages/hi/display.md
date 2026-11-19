@@ -80,7 +80,9 @@ DescriptionList::of(&invoice)
 
 ## EmptyState और Skeleton
 
-`EmptyState::new(title).text(text)` खाली जगह को अगले कदम से भरता है: `.link(label, screen, params)` `LinkButton` के माध्यम से दूसरे पेज पर जाता है, और `.opens(label, screen, params)` ऐप की एक स्क्रीन को विंडो के रूप में खोलता है। `Skeleton::lines(n)` कुछ लोड होते समय का प्लेसहोल्डर है।
+`EmptyState::new(title).text(text)` खाली जगह को अगले कदम से भरता है: `.link(label, screen, params)` `LinkButton` के माध्यम से दूसरे पेज पर जाता है, और `.opens(label, screen, params)` ऐप की एक स्क्रीन को विंडो के रूप में खोलता है। `Skeleton::lines(n)` कुछ लोड होते समय का प्लेसहोल्डर है। स्केलेटन केवल 300 ms प्रतीक्षा के बाद दिखता है, ताकि तेज़ लोड में वह कभी न झपके, और देर से आने वाला deferred भाग उसे कम से कम 400 ms रखता है।
+
+`Skeleton::kpi()`, `Skeleton::grid(rows)`, `Skeleton::list(items)` और `Skeleton::chart()` एक KPI टाइल, एक DataGrid, एक List और बार, लाइन या एरिया चार्ट का आकार और माप लेते हैं, ताकि सामग्री आने पर पेज न खिसके। `Deferred::new(part).skeleton(Skeleton::chart())` deferred भाग लोड होते समय इनमें से एक दिखाता है। ग्रिड स्केलेटन अपनी पंक्तियों जितना ऊँचा होता है, ग्रिड की ऊँचाई तक; ग्रिड के ऊपर का टूलबार इसमें शामिल नहीं है। पट्टियाँ धीरे से धड़कती हैं और जब उपयोगकर्ता कम गति माँगता है तो स्थिर रहती हैं।
 
 ## LinkButton
 

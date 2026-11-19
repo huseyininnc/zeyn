@@ -38,12 +38,18 @@ socket-client = ["realtime", "dep:tokio-tungstenite"]
 xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
 # PDF documents from Typst templates, and grid export to PDF.
 pdf = ["server", "dep:typst", "dep:typst-layout", "dep:typst-pdf"]
+# Uploaded PNG, JPEG and WebP images decoded and encoded again, which drops EXIF, GPS and other
+# metadata and anything hidden after the image data; the EXIF orientation is applied first.
+image = ["server", "dep:image"]
 # E-mail notifications over SMTP, sent from a background job.
 email = ["server", "dep:lettre"]
 # Optional user accounts with the structure of ASP.NET Core Identity: stores, managers, Argon2id
 # passwords, purpose tokens, sealed session cookies, two factor, passkeys and a default UI.
 # Off unless an app asks for it. See docs/accounts.md.
 accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
+# Resumable uploads: a tus 1.0 subset (creation, HEAD, PATCH, expiration, termination) under
+# `/_zeyn/uploads/`, used by the upload field and FileDrop. See examples/docs/pages/forms.md.
+resumable = ["server", "dep:base64"]
 # The `ui::Markdown` component: safe Markdown to HTML, with no dependencies.
 markdown = []
 # Framework texts (`zeyn.*`) in more languages. English and Turkish are always built in; each
@@ -93,6 +99,7 @@ yrs = { version = "0.28", optional = true }
 rust_xlsxwriter = { version = "0.102", default-features = false, features = ["constant_memory"], optional = true }
 calamine = { version = "0.38", default-features = false, optional = true }
 zip = { version = "9", default-features = false, features = ["deflate"], optional = true }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"], optional = true }
 typst = { version = "0.15", optional = true }
 typst-layout = { version = "0.15", optional = true }
 typst-pdf = { version = "0.15", optional = true }
@@ -106,7 +113,7 @@ base64 = "0.22"
 ed25519-dalek = { version = "3", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "registry"] }
@@ -121,6 +128,14 @@ flate2 = "1.1"
 [[test]]
 name = "assistant"
 required-features = ["assistant"]
+
+[[test]]
+name = "resumable"
+required-features = ["resumable"]
+
+[[test]]
+name = "files_image"
+required-features = ["image"]
 
 [[test]]
 name = "oidc"

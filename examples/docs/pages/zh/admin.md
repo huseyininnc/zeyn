@@ -82,6 +82,8 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 批量操作之后，收件箱会触发它的主题（`"notifications"`，可用 `.topic(..)` 更改）：收件箱和所有 `.listens` 该主题的节点就地重新渲染，铃铛也会重新加载计数。铃铛用一个接收 `UnreadCount { limit }` 并在上限（100）处停止的动作计数，只需一次有上限的查询；超过 99 时显示 `99+`，链接的名称会为屏幕阅读器读出计数。它在页面显示后用一个请求加载计数，并在主题被收件箱、`ui.refresh("notifications")`，或在启用 `.live()` 和 `realtime` 特性时被任意动作中的 `socket.notify(&ctx, "notifications")` 触发时重新加载（主题需用 `ZeynSocket::topic` 声明）。`inbox.js`（6.1 KB，gzip 后 2.3 KB）和 `inbox.css`（3.1 KB）只随这些组件加载。
 
+没有计数操作权限的用户看不到铃铛:顶栏会省略它,因此页面不加载收件箱代码,也不会请求服务器会拒绝的计数。
+
 ## Kanban
 
 `Kanban::of(flow, cards, move_card)` 把一个动作返回的记录显示为分列的卡片，工作流 `#[choice]` 枚举的每个状态一列，按枚举顺序排列。每一列都是该状态下卡片的虚拟列表：动作收到限定于该状态的 `DataQuery`，因此在数据库中过滤，卡片随列滚动按每块 50 张（`KANBAN_BLOCK`）加载。列头显示卡片数和 WIP 上限；超过上限的列会被标出。
@@ -103,7 +105,9 @@ Kanban::of(task_flow(), search_tasks, move_task)
 
 把卡片从一列移到另一列，会像 `Transitions` 一样用 `TransitionRequest` 运行两个状态之间的转换。看板只提供用户可以执行的移动；服务器找到转换，检查它的权限和移动动作的权限（通过 `POST /_zeyn/data` 检查 CSRF 和写入限制），动作再用 `Workflow::apply` 应用转换，如果卡片此时已处于其他状态就会被拒绝。`.confirm(name, message)` 会先在共享对话框中询问。卡片会立即移动；服务器拒绝时，卡片带着原因回到原列，接受时两列用一个请求重新渲染。
 
-鼠标或触控笔可以拖动卡片；可去的列会加轮廓，其他列变暗。在触摸屏上各列照常滚动，每张卡片上的按钮会打开与键盘相同的菜单（WCAG 2.5.7）。`kanban.js`（15.5 KB，gzip 后 5 KB）和 `kanban.css`（4 KB）只随看板加载，`vlist.js` 随其各列加载。
+鼠标或触控笔移动 6 px 后开始拖动卡片，触摸屏需按住 250 ms，因此滑动仍会滚动列（共享的拖动核心 `drag.js`）。可去的列会加轮廓，其他列变暗；卡片靠近看板边缘时看板会横向滚动。每张卡片上的按钮打开与键盘相同的菜单，这是单指针移动的方式（WCAG 2.5.7）。`kanban.js`（19.7 KB，gzip 后 6 KB）、`drag.js` 和 `kanban.css`（4.5 KB）只随看板加载，`vlist.js` 随其列加载。
+
+`.sortable(Task::rank, reorder_tasks)` 让每列的卡片按 `Rank` 字段排序，使用可排序列表的重排动作（`ReorderRequest`）。每张卡片会有一个手柄，用来在列内重排（拖动、按键或移动菜单）。拖到另一张卡片上的卡片会落在它之前或之后，并有一条线显示位置：在自己的列内会发送重排；拖到另一列时先执行状态转换，再用卡片的新邻居发送重排。两个请求都经过服务器的检查：列的节点、CSRF、写入限制和每个动作的权限。`sortable.js` 只随可排序的看板加载。
 
 | 按键 | 作用 |
 |---|---|
@@ -113,6 +117,7 @@ Kanban::of(task_flow(), search_tasks, move_task)
 | Home, End | 列中可见的第一张或最后一张卡片 |
 | Enter, Space | 打开移动菜单：Up 和 Down 选择列，Enter 移动，Escape 关闭 |
 | Shift + Left, Shift + Right | 在工作流允许时把卡片移到前一列或后一列 |
+| Alt + 上, Alt + 下 | 在可排序看板上，把卡片在其列中上移或下移 |
 
 ## Calendar
 

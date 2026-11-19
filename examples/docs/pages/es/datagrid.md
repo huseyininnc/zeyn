@@ -85,6 +85,7 @@ Los números y los importes se alinean a la derecha con cifras tabulares. Los en
   botón y una tecla para borrar, y ediciones guardadas juntas. Consulta la [referencia de DataGrid](grid.md).
 - `.groupable()`, `.summary(label, |t| ...)` en una columna: el usuario agrupa por ella desde su menú o el panel de grupos, y bajo ella aparece un valor calculado a partir de los totales.
 - `.filter_builder()`: un botón "Filtrar" que abre un diálogo para crear las condiciones del filtro; la misma lista que usan la fila de filtros, las vistas guardadas y los agentes de IA.
+- `.filter_chips()`: los filtros activos como chips sobre la tabla, cada uno con un botón para quitarlo, sincronizados con la fila de filtros, el constructor de filtros y las vistas guardadas.
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.
 
 ## Columnas conocidas en tiempo de ejecución

@@ -74,7 +74,7 @@ pub(crate) const MODULES: &[Module] = &[
         style: &[],
         needs: &["drag"],
     },
-    script("drag", &[]),
+    script("drag", &["data-zeyn-dock"]),
     script("net", &[]),
     script(
         "components",
@@ -114,7 +114,12 @@ pub(crate) const MODULES: &[Module] = &[
     control("lines", &["data-zeyn-lines"]),
     control("steps", &["data-zeyn-steps"]),
     control("tree", &["data-zeyn-tree"]),
-    control("treedrag", &["data-zeyn-tree-drag"]),
+    Module {
+        name: "treedrag",
+        script: &["data-zeyn-tree-drag", "data-zeyn-tree-move"],
+        style: &["z-tree-movable"],
+        needs: &["components"],
+    },
     control("overlays", &["data-zeyn-tip", "z-popover-button"]),
     control("menubutton", &["z-menu-trigger", "z-split-button"]),
     script("busy", &["data-zeyn-busy"]),
@@ -147,7 +152,12 @@ pub(crate) const MODULES: &[Module] = &[
         needs: &["palette"],
     },
     script("reveal", &["data-zeyn-reveal"]),
-    script("forms", &["data-zeyn-submit", "data-zeyn-transition"]),
+    Module {
+        name: "forms",
+        script: &["data-zeyn-submit", "data-zeyn-transition"],
+        style: &["z-form-settings"],
+        needs: &[],
+    },
     script("import", &["data-zeyn-import"]),
     Module {
         name: "catalog",
@@ -179,7 +189,7 @@ pub(crate) const MODULES: &[Module] = &[
     Module {
         name: "charts",
         script: &["data-zeyn-chart"],
-        style: &["z-chart", "z-spark", "z-kpi", "z-bullet"],
+        style: &["z-chart", "z-spark", "z-kpi", "z-skeleton-kpi", "z-bullet"],
         needs: &[],
     },
     script("share", &["data-zeyn-share", "data-zeyn-copy"]),
@@ -219,7 +229,7 @@ pub(crate) const MODULES: &[Module] = &[
         name: "kanban",
         script: &["data-zeyn-kanban"],
         style: &["z-kanban"],
-        needs: &["net"],
+        needs: &["drag", "net"],
     },
     Module {
         name: "calendar",
@@ -321,6 +331,18 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-doc"],
         needs: &[],
     },
+    Module {
+        name: "gridchips",
+        script: &["data-zeyn-filter-chips"],
+        style: &["z-filter-chips"],
+        needs: &[],
+    },
+    Module {
+        name: "surface",
+        script: &["data-zeyn-surface"],
+        style: &["z-surface"],
+        needs: &["drag", "net"],
+    },
     #[cfg(debug_assertions)]
     script("inspect", &["data-zeyn-src"]),
 ];
@@ -331,8 +353,9 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 24] = [
+const STYLES: [&str; 27] = [
     "components",
+    "forms",
     "catalog",
     "content",
     "display",
@@ -356,6 +379,8 @@ const STYLES: [&str; 24] = [
     "lightbox",
     "feed",
     "document",
+    "gridchips",
+    "surface",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -520,7 +545,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 64] = [
+const FILES: [(&str, &str); 70] = [
     (
         "/_zeyn/display.css",
         include_str!("../../assets/display.css"),
@@ -560,6 +585,11 @@ const FILES: [(&str, &str); 64] = [
     ),
     ("/_zeyn/kanban.css", include_str!("../../assets/kanban.css")),
     ("/_zeyn/kanban.js", include_str!("../../assets/kanban.js")),
+    (
+        "/_zeyn/surface.css",
+        include_str!("../../assets/surface.css"),
+    ),
+    ("/_zeyn/surface.js", include_str!("../../assets/surface.js")),
     (
         "/_zeyn/sortable.css",
         include_str!("../../assets/sortable.css"),
@@ -622,6 +652,10 @@ const FILES: [(&str, &str); 64] = [
         include_str!("../../assets/treedrag.js"),
     ),
     (
+        "/_zeyn/treedrag.css",
+        include_str!("../../assets/treedrag.css"),
+    ),
+    (
         "/_zeyn/overlays.js",
         include_str!("../../assets/overlays.js"),
     ),
@@ -634,6 +668,7 @@ const FILES: [(&str, &str); 64] = [
     ("/_zeyn/palette.js", include_str!("../../assets/palette.js")),
     ("/_zeyn/reveal.js", include_str!("../../assets/reveal.js")),
     ("/_zeyn/forms.js", include_str!("../../assets/forms.js")),
+    ("/_zeyn/forms.css", include_str!("../../assets/forms.css")),
     ("/_zeyn/import.js", include_str!("../../assets/import.js")),
     (
         "/_zeyn/stories.css",
@@ -656,6 +691,14 @@ const FILES: [(&str, &str); 64] = [
     (
         "/_zeyn/document.css",
         include_str!("../../assets/document.css"),
+    ),
+    (
+        "/_zeyn/gridchips.js",
+        include_str!("../../assets/gridchips.js"),
+    ),
+    (
+        "/_zeyn/gridchips.css",
+        include_str!("../../assets/gridchips.css"),
     ),
 ];
 

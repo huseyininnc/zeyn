@@ -61,7 +61,8 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `tour.js` | 页面导览（`Tour`）：显示开始按钮，并让对话框依次停在页面的各个站点 |
 | `thread.js` 和 `thread.css`, `stream.js`, `composer.js` 和 `composer.css`, `typing.js` 和 `typing.css` | 消息线程；线程和助手共用的流式 Markdown 和 JSON 行；聊天 composer；正在输入指示器 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 帖子信息流；图片和视频的灯箱；故事环及其行，无需脚本 |
-| `drag.js`, `net.js` | 没有自身标记的共享辅助模块，随导入它们的模块一起链接（见下文） |
+| `surface.js`, `surface.css` | 自由区域（`data-zeyn-surface`）：项目可拖动、用方向键移动，或用两次点击选中并放置，限制在边界内、网格上和各自的轴上；移动发送到区域的 `move` 数据源；导入 `drag.js` 和 `net.js`；可调整大小的项目（`data-min`、`data-max`、`data-aspect`）还可用角上的手柄、`Shift` 加方向键或两次点击在限制内改变尺寸，尺寸随移动一起发送 |
+| `drag.js`, `net.js` | 共享辅助模块，随导入它们的模块一起链接（见下文）；`drag.js` 也随 dock（`data-zeyn-dock`）一起链接，`pro.js` 用它拖动 dock 的标签 |
 
 两个辅助模块收纳了原本会被多个模块复制的代码。`net.js`（由 `kanban.js`、`files.js` 和 `vlist.js` 导入）导出 `BASE`、`csrf()`、`parse(text)` 和 `post(path, body)`；`post` 在页面同源上带 `x-zeyn-csrf` 请求头发送 JSON，并返回 `{ ok, body }`。`drag.js`（由 `grid.js` 用于移动列、由 `catalog.js` 用于拖动滚动轨道导入）是之后可排序列表、看板和画布的拖动核心：`press(e, { threshold, longPress, tolerance, axis, onStart })` 在鼠标或笔移动 6 px，或触摸在 5 px 范围内按住 250 ms 时，把 `pointerdown` 变为拖动（滑动仍然滚动，先滚动会取消按下）；`capture(el, e, move, end)` 用指针捕获跟随拖动，每个动画帧最多调用一次 `move`，在松开、取消或按 Escape 时调用 `end(event, cancelled)`；`swallowClick()` 取消松开后的点击；`announce(text)` 在每页一个 polite 实时区域中朗读本地化文本，最多每 500 ms 一次。`.z-drag-handle`（在 `zeyn.css` 中）只在拖动手柄上关闭触摸平移。每个可拖动的组件也提供用键盘和单指针移动的方式（移动菜单，WCAG 2.5.7）。两个模块都不写入 HTML。
 
@@ -206,7 +207,7 @@ Effects：
 - 键盘：方向键、Page Up、Page Down、Home 和 End 移动活动行并将其滚动到可见位置。表格带有 `aria-rowcount` = total，每一行带有 `aria-rowindex`。
 - 位置文本（`data-zeyn-page-info`）使用 `data-zeyn-text-range-total`。
 
-卡片网格（`zeyn::ui::CardGrid`，不包括 rail 和行列表）在包含 200 张卡片后，会对页面本身的滚动而不是滚动容器进行窗口化：`catalog.js` 给列表加上 `data-zeyn-window`，在其中保留距视口 800 px 以内的行，把上方和下方的行变成内边距，让每一行的高度等于前几张卡片中最高的那张（`grid-auto-rows`），并在每张卡片上设置 `aria-posinset` 和 `aria-setsize`（在可能还有更多页面时为 `-1`）。窗口之外获得焦点的卡片会带着 `z-cards-kept` 留在 DOM 中，并放在它自己的单元格上方。来自“显示更多”或其他页面的卡片会加入同一个窗口。当页面滚动速度超过每 ms 3 px 时，卡片进入时会暂缓加载图片（`data-zeyn-park`，`src` 和 `srcset` 先另存起来），在 120 ms 内没有滚动后再取回图片。
+卡片网格（`zeyn::ui::CardGrid`，不包括 rail 和行列表）在包含 200 张卡片后，会对页面本身的滚动而不是滚动容器进行窗口化：`catalog.js` 给列表加上 `data-zeyn-window`，在其中保留距视口 800 px 以内的行，把上方和下方的行变成内边距，让每一行的高度等于前几张卡片中最高的那张（`grid-auto-rows`），并在每张卡片上设置 `aria-posinset` 和 `aria-setsize`（在可能还有更多页面时为 `-1`）。窗口之外获得焦点的卡片会带着 `z-cards-kept` 留在 DOM 中，并放在它自己的单元格上方。来自“显示更多”或其他页面的卡片会加入同一个窗口。当页面滚动速度超过每 ms 3 px 时，卡片进入时会暂缓加载图片（`data-zeyn-park`，`src` 和 `srcset` 先另存起来），在 120 ms 内没有滚动后再取回图片。当滚动速度降到每 ms 1 px 以下时，暂缓的图片也会立即取回。窗口之外 600 px 以内的行带着 `z-cards-far`（`content-visibility: hidden`）留在 DOM 中，因此保留布局，滚回它们的代价很小；更远的卡片中只有最后离开的 200 张保留图片，更早的卡片以同样方式释放 `src` 和 `srcset`。
 
 ### 4.3 Form submit（表单提交）
 

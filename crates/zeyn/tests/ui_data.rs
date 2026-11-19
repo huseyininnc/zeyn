@@ -27,6 +27,95 @@ pub fn org() -> Screen {
     Screen::new("Org").body(Card::new().add(Tree::of(departments).label("Departments")))
 }
 
+/// Parents of the folders a movable tree test moves: `b` in `a`, `c` in `b`.
+static PARENTS: std::sync::Mutex<Vec<(&str, Option<&str>)>> = std::sync::Mutex::new(Vec::new());
+
+/// The parent of a test folder.
+fn parent_of(id: &str) -> Option<String> {
+    PARENTS
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|p| p.0 == id)
+        .and_then(|p| p.1)
+        .map(String::from)
+}
+
+#[action(permission = "org.write")]
+pub async fn move_folder(m: TreeMove) -> Result<()> {
+    let parent = m.parent(parent_of)?;
+    let mut all = PARENTS.lock().unwrap();
+    let parent = parent.and_then(|p| {
+        all.iter()
+            .find(|f| f.0 == p)
+            .map(|f| f.0)
+    });
+    let folder = all
+        .iter_mut()
+        .find(|f| f.0 == m.id)
+        .ok_or(Error::NotFound)?;
+    folder.1 = parent;
+    Ok(())
+}
+
+#[screen(route = "/folders", public)]
+pub fn folders() -> Screen {
+    Screen::new("Folders").body(
+        Card::new().add(
+            Tree::of(departments)
+                .label("Folders")
+                .movable(move_folder),
+        ),
+    )
+}
+
+#[tokio::test]
+async fn a_movable_tree_moves_through_its_action_and_refuses_cycles_on_the_server() {
+    *PARENTS.lock().unwrap() = vec![("a", None), ("b", Some("a")), ("c", Some("b"))];
+    let html = folders::run().html(&folders::META);
+    assert!(html.contains("data-zeyn-tree-move"));
+    assert!(html.contains("z-tree-move-keys"));
+    let call = |id: &str, target: &str, place: &str| serde_json::json!({ "id": id, "target": target, "place": place });
+    let write = "org.read,org.write";
+    let (status, _) = data_on("folders", false, write, call("c", "a", "after"), "move").await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "CSRF");
+    let (status, _) = data_on("folders", true, "org.read", call("c", "a", "after"), "move").await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the move action's permission"
+    );
+    let (status, _) = data_on("folders", true, write, call("a", "c", "inside"), "move").await;
+    assert_eq!(status, StatusCode::CONFLICT, "into its own descendant");
+    let (status, _) = data_on("folders", true, write, call("a", "b", "after"), "move").await;
+    assert_eq!(status, StatusCode::CONFLICT, "next to its own child");
+    let (status, _) = data_on("folders", true, write, call("a", "a", "inside"), "move").await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "into itself");
+    let (status, _) = data_on("folders", true, write, call("a", "b", "sideways"), "move").await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "an unknown place");
+    let long = "x".repeat(201);
+    let (status, _) = data_on("folders", true, write, call(&long, "a", "after"), "move").await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "an id that is too long");
+    assert_eq!(parent_of("a"), None);
+    let (status, body) = data_on("folders", true, write, call("c", "a", "after"), "move").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(parent_of("c"), None);
+    let (status, _) = data_on("folders", true, write, call("a", "c", "inside"), "move").await;
+    assert_eq!(status, StatusCode::OK, "c is no longer below a");
+    assert_eq!(parent_of("a").as_deref(), Some("c"));
+}
+
+#[test]
+fn tree_move_parent_stops_on_a_broken_chain() {
+    let looped = |id: &str| Some(if id == "p" { "q" } else { "p" }.to_string());
+    let m = TreeMove {
+        id: "x".into(),
+        target: "p".into(),
+        place: TreePlace::Inside,
+    };
+    assert!(m.parent(looped).is_err());
+}
+
 #[test]
 fn trees_render_an_empty_aria_tree_that_loads_its_top_level() {
     let html = org::run().html(&org::META);
@@ -44,6 +133,16 @@ fn trees_render_an_empty_aria_tree_that_loads_its_top_level() {
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 async fn data(perms: &str, input: serde_json::Value, key: &str) -> (StatusCode, serde_json::Value) {
+    data_on("org", true, perms, input, key).await
+}
+
+async fn data_on(
+    screen: &str,
+    csrf: bool,
+    perms: &str,
+    input: serde_json::Value,
+    key: &str,
+) -> (StatusCode, serde_json::Value) {
     let router = App::new("Test")
         .i18n(I18n::new("en"))
         .auth(|h: &HeaderMap| {
@@ -56,15 +155,19 @@ async fn data(perms: &str, input: serde_json::Value, key: &str) -> (StatusCode, 
                 .collect();
             Some(Identity::user("u").with_permissions(perms))
         })
-        .feature(Feature::new("org").screen(org))
+        .feature(
+            Feature::new("org")
+                .screen(org)
+                .screen(folders),
+        )
         .router()
         .unwrap();
-    let body = serde_json::json!({ "screen": "org", "node": "0.0", "key": key, "input": input });
+    let body = serde_json::json!({ "screen": screen, "node": "0.0", "key": key, "input": input });
     let req = Request::post("/_zeyn/data")
         .header("x-perms", perms)
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
-        .header("x-zeyn-csrf", TOKEN)
+        .header("x-zeyn-csrf", if csrf { TOKEN } else { "wrong" })
         .body(Body::from(body.to_string()))
         .unwrap();
     let res = router.oneshot(req).await.unwrap();
@@ -260,18 +363,59 @@ fn line_and_donut_charts_describe_themselves() {
     let donut = render(
         Chart::donut("Units")
             .labels(["A", "B"])
-            .series("Count", [30.0, 10.0]),
+            .series("Count", [30.0, 20.0]),
         "en",
     );
     assert!(
-        donut.contains(r#"aria-label="A: 30 (75%)""#)
-            && donut.contains(r#"aria-label="B: 10 (25%)""#)
+        donut.contains(r#"aria-label="A: 30 (60%)""#)
+            && donut.contains(r#"aria-label="B: 20 (40%)""#)
     );
     assert!(
-        donut.contains(r#">40</text>"#),
+        donut.contains(r#">50</text>"#),
         "the total sits in the middle"
     );
     assert!(donut.contains("Donut chart of 2 parts. Largest: A, 30."));
+}
+
+#[test]
+fn donuts_that_do_not_read_well_become_a_bar_list() {
+    let fits = render(
+        Chart::donut("Units")
+            .labels(["A", "B", "C"])
+            .series("Count", [50.0, 30.0, 20.0]),
+        "en",
+    );
+    assert!(fits.contains("z-chart-slice") && !fits.contains("z-chart-barlist"));
+    let dominant = render(
+        Chart::donut("Orders")
+            .labels(["Delivered", "<Lost>"])
+            .series("Count", [90.0, 10.0]),
+        "en",
+    );
+    assert!(
+        dominant.contains(r#"<ol class="z-chart-barlist""#) && !dominant.contains("z-chart-slice"),
+        "one part of 75% or more is a bar list: {dominant}"
+    );
+    assert!(dominant.contains(r#"style="--z-share:90.0%""#));
+    assert!(dominant.contains(">90 (90%)<") && dominant.contains("&lt;Lost&gt;"));
+    assert!(dominant.contains("<table"), "the data table stays");
+    let many = render(
+        Chart::donut("Units")
+            .labels(["A", "B", "C", "D", "E", "F"])
+            .series("Count", [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
+        "en",
+    );
+    assert!(many.contains("z-chart-barlist"), "six parts are a bar list");
+    let one = render(
+        Chart::donut("Units")
+            .labels(["A", "B"])
+            .series("Count", [5.0, 0.0]),
+        "en",
+    );
+    assert!(
+        one.contains("z-chart-barlist"),
+        "one part above zero is a bar list"
+    );
 }
 
 /// Every chart kind with its data, for the checks that apply to all of them.
@@ -323,7 +467,7 @@ fn every_kind() -> Vec<(&'static str, Chart)> {
             "donut",
             Chart::donut("Units")
                 .labels(["A", "B"])
-                .series("Count", [30.0, 10.0]),
+                .series("Count", [30.0, 20.0]),
         ),
         (
             "gauge",
@@ -492,14 +636,17 @@ fn kpi_money_shows_the_currency_in_the_users_locale() {
 #[test]
 fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
     let css = include_str!("../assets/charts.css");
-    assert!(css.contains(".z-col > .z-node:has(> .z-kpi) { height: 100%; }"));
-    assert!(css.contains(".z-autogrid > .z-node:has(> .z-kpi)"));
+    let kpi = ":is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)";
+    assert!(css.contains(&format!(
+        ".z-col > .z-node:has(> {kpi}) {{ height: 100%; }}"
+    )));
+    assert!(css.contains(&format!(".z-autogrid > .z-node:has(> {kpi})")));
     assert!(css.contains("align-items: stretch"));
     assert!(css.contains("margin-top: auto; padding-top: var(--z-s-2)"));
     for basis in [
         "calc((100% - 3 * var(--z-gap)) / 4 - 0.1px)",
         "calc((100% - var(--z-gap)) / 2 - 0.1px)",
-        ".z-kpi-trend { display: none; }",
+        ":is(.z-kpi-trend, .z-skeleton-kpi > .z-skeleton-trend) { display: none; }",
     ] {
         assert!(css.contains(basis), "{basis}");
     }
@@ -513,8 +660,8 @@ fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
     assert!(components.contains(".z-chart-round { max-height: 18rem; }"));
     let mut donut = String::new();
     Chart::donut("Units")
-        .labels(["A"])
-        .series("N", [1.0])
+        .labels(["A", "B"])
+        .series("N", [1.0, 1.0])
         .render(&mut donut, &Render::english("s"));
     assert!(donut.contains(r#"<svg class="z-chart-svg z-chart-round""#));
     let mut bar = String::new();

@@ -61,7 +61,8 @@ head にあるフレームワークのスクリプトとスタイルシートに
 | `tour.js` | ページのツアー（`Tour`）：開始ボタンを表示し、ダイアログをページの各ストップへ順に移動します |
 | `thread.js` と `thread.css`, `stream.js`, `composer.js` と `composer.css`, `typing.js` と `typing.css` | メッセージスレッド、スレッドとアシスタントが共有するストリーミングの Markdown と JSON 行、チャットの composer、入力中インジケーター |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 投稿のフィード、画像と動画のライトボックス、ストーリーリングとその行、スクリプト不要 |
-| `drag.js`, `net.js` | 独自のマーカーを持たない共有ヘルパー。インポートするモジュールと一緒にリンクされる(下記) |
+| `surface.js`, `surface.css` | 自由配置の領域 (`data-zeyn-surface`): 項目をドラッグ、矢印キーで移動、または 2 回のクリックで選んで配置する。境界内、グリッド上、各項目の軸上に収まる。移動は領域の `move` ソースに送られる。`drag.js` と `net.js` をインポートする。リサイズ可能な項目（`data-min`、`data-max`、`data-aspect`）は隅のハンドル、`Shift` と矢印キー、または 2 回のクリックで制限内のサイズも変え、サイズは移動と一緒に送られます |
+| `drag.js`, `net.js` | 共有ヘルパー。インポートするモジュールと一緒にリンクされる(下記)。`drag.js` は dock (`data-zeyn-dock`) とも一緒に届き、`pro.js` がそのタブをドラッグする |
 
 2つのヘルパーモジュールは、複数のモジュールが本来コピーするはずのコードをまとめています。`net.js`(`kanban.js`、`files.js`、`vlist.js` がインポート)は `BASE`、`csrf()`、`parse(text)`、`post(path, body)` をエクスポートします。`post` はページのオリジンで `x-zeyn-csrf` ヘッダー付きの JSON を送り、`{ ok, body }` を返します。`drag.js`(列の移動に `grid.js`、レールのドラッグスクロールに `catalog.js` がインポート)は、今後の並べ替えリスト、ボード、サーフェスの土台となるドラッグコアです。`press(e, { threshold, longPress, tolerance, axis, onStart })` は、マウスやペンが 6 px 動いたとき、またはタッチが 5 px 以内で 250 ms 押し続けられたときに `pointerdown` をドラッグに変えます(スワイプはそのままスクロールし、先にスクロールすると押下は取り消されます)。`capture(el, e, move, end)` はポインターキャプチャでドラッグを追い、`move` をアニメーションフレームごとに最大1回、離したとき・キャンセル時・Escape で `end(event, cancelled)` を呼びます。`swallowClick()` は離した後のクリックを取り消します。`announce(text)` はローカライズされたテキストを、ページに1つの polite ライブリージョンで最大 500 ms に1回読み上げます。`.z-drag-handle`(`zeyn.css` 内)はドラッグハンドル上でだけタッチのパンを止めます。ドラッグするすべてのコンポーネントは、キーボードと単一ポインターで移動する方法(移動メニュー、WCAG 2.5.7)も提供します。どちらのモジュールも HTML を書きません。
 
@@ -206,7 +207,7 @@ Effects:
 - キーボード: 矢印キー、Page Up、Page Down、Home、End でアクティブな行が移動し、表示範囲にスクロールされます。テーブルには `aria-rowcount` = total が、各行には `aria-rowindex` が付きます。
 - 位置を示すテキスト（`data-zeyn-page-info`）は `data-zeyn-text-range-total` を使います。
 
-カードグリッド（`zeyn::ui::CardGrid`。rail や行のリストは含みません）は、カードが 200 枚になると、スクロールコンテナではなくページ自体のスクロールに対してウィンドウ処理を行います。`catalog.js` はリストに `data-zeyn-window` を付け、ビューポートから 800 px 以内の行をその中に保持し、上下の行はパディングに置き換え、各行に最初のカードのうち最も高いものの高さを与え（`grid-auto-rows`）、各カードに `aria-posinset` と `aria-setsize`（まだページが続く可能性がある間は `-1`）を設定します。ウィンドウの外にあるフォーカス中のカードは `z-cards-kept` 付きで DOM に残り、自分のセルの上に配置されます。「もっと見る」や別のページから来たカードも同じウィンドウに加わります。ページが 1 ms あたり 3 px より速くスクロールしている間、カードは画像を保留した状態で入り（`data-zeyn-park`。`src` と `srcset` は別に保持）、スクロールが 120 ms 止まると画像を取り戻します。
+カードグリッド（`zeyn::ui::CardGrid`。rail や行のリストは含みません）は、カードが 200 枚になると、スクロールコンテナではなくページ自体のスクロールに対してウィンドウ処理を行います。`catalog.js` はリストに `data-zeyn-window` を付け、ビューポートから 800 px 以内の行をその中に保持し、上下の行はパディングに置き換え、各行に最初のカードのうち最も高いものの高さを与え（`grid-auto-rows`）、各カードに `aria-posinset` と `aria-setsize`（まだページが続く可能性がある間は `-1`）を設定します。ウィンドウの外にあるフォーカス中のカードは `z-cards-kept` 付きで DOM に残り、自分のセルの上に配置されます。「もっと見る」や別のページから来たカードも同じウィンドウに加わります。ページが 1 ms あたり 3 px より速くスクロールしている間、カードは画像を保留した状態で入り（`data-zeyn-park`。`src` と `srcset` は別に保持）、スクロールが 120 ms 止まると画像を取り戻します。 保留された画像は、スクロールが 1 ms あたり 1 px 未満に遅くなった時点でも戻ります。ウィンドウの先 600 px までの行は `z-cards-far`（`content-visibility: hidden`）付きで DOM に残るため、レイアウトを保ち、そこへ戻るスクロールは軽く済みます。それより遠いカードのうち画像を保持するのは最後に外れた 200 枚だけで、古いものは同じ方法で `src` と `srcset` を手放します。
 
 ### 4.3 Form submit
 

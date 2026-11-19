@@ -656,10 +656,11 @@ impl Component for ListDetail {
 /// use zeyn::prelude::*;
 /// use zeyn::ui::Deferred;
 /// let part = Deferred::new(Alert::info("Sales this year")).lines(4);
+/// let chart = Deferred::new(Alert::info("Sales by month")).skeleton(Skeleton::chart());
 /// ```
 pub struct Deferred {
     node: Vec<Node>,
-    lines: u8,
+    skeleton: super::Skeleton,
 }
 
 into_node!(Deferred);
@@ -669,13 +670,21 @@ impl Deferred {
     pub fn new(node: impl Into<Node>) -> Self {
         Deferred {
             node: vec![Node::placed(node)],
-            lines: 3,
+            skeleton: super::Skeleton::lines(3),
         }
     }
 
     /// How many placeholder lines show while the part loads, 1 to 20 (3 unless set).
     pub fn lines(mut self, lines: u8) -> Self {
-        self.lines = lines.clamp(1, 20);
+        self.skeleton = super::Skeleton::lines(lines);
+        self
+    }
+
+    /// The placeholder shown while the part loads, in the shape of the part
+    /// (`Skeleton::kpi()`, `Skeleton::grid(rows)`, `Skeleton::list(items)`, `Skeleton::chart()`),
+    /// so nothing moves when the part arrives.
+    pub fn skeleton(mut self, skeleton: super::Skeleton) -> Self {
+        self.skeleton = skeleton;
         self
     }
 }
@@ -688,10 +697,11 @@ impl Component for Deferred {
             format!("{}.0", r.path)
         };
         out.push_str(&format!(
-            r#"<div class="z-deferred" data-zeyn-defer="{path}" aria-busy="true" data-zeyn-failed="{}">"#,
+            r#"<div class="z-deferred z-{}-deferred" data-zeyn-defer="{path}" aria-busy="true" data-zeyn-failed="{}">"#,
+            self.skeleton.name(),
             r.text(&Text::key("zeyn.ui.load_failed"))
         ));
-        super::Skeleton::lines(self.lines).render(out, r);
+        self.skeleton.render(out, r);
         out.push_str("</div>");
     }
 

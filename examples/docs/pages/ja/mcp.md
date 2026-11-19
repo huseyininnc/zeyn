@@ -14,6 +14,7 @@ Zeyn は 2 つの側面のエージェントを想定して作られています
 | `zeyn_docs` | トピック別のフレームワークリファレンス: `rules`、`language`、`protocol`。`search: "語句"` はこのバージョンのドキュメントページを順位付けし、`page: "/language/forms"` は 1 ページを Markdown で返します |
 | `zeyn_describe` | アプリの Feature、画面、ルート、アクセス権、API、問題点、欠けている翻訳 |
 | `zeyn_inspect` | 1 つの画面のノードツリー：パス、コンポーネントの種類、各ノードを置いた Rust の `file:line:column` |
+| `zeyn_devtools` | デバッグモードで動くアプリの DevTools リクエストログ: 新しいリクエストから順に、画面、アクション、ステータス、時間、SQL 文（文と時間のみ、値は含まない）。`addr` と `limit` は省略可能 |
 | `zeyn_check` | コンパイルして問題を報告します。`fix: true` を付けると、先に名前が変わった API を書き換えます |
 | `zeyn_test` | `cargo test` を実行し、出力の末尾を返します |
 | `zeyn_new_feature` | Feature のフォルダを作成して登録します |

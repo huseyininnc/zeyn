@@ -510,7 +510,7 @@
         "brand": "Nota"
       },
       "upload": {
-        "drop": "Suelta archivos aquí o elígelos.",
+        "drop": "Suelta archivos o carpetas aquí, pégalos o elígelos.",
         "hint": "{types}, hasta {max}.",
         "hint_many": "{types}, hasta {max} cada uno, máximo {n} archivos.",
         "list": "Archivos",
@@ -522,7 +522,10 @@
         "cancel": "Cancelar",
         "retry": "Reintentar",
         "remove": "Quitar",
-        "remove_name": "Quitar {name}"
+        "remove_name": "Quitar {name}",
+        "waiting": "{name} espera para subirse",
+        "skipped": "Se omitieron {n} archivos de un tipo que este campo no admite.",
+        "not_added": "El archivo se subió, pero no se pudo añadir."
       },
       "kpi": {
         "up": "Sube un {pct}% respecto al periodo anterior",
@@ -968,7 +971,11 @@
       "refused": "La comprobación de seguridad rechazó el archivo.",
       "aborted": "La subida se detuvo antes de que llegara todo el archivo. Inténtalo de nuevo.",
       "empty": "El archivo está vacío.",
-      "store_full": "No queda espacio para este archivo."
+      "store_full": "No queda espacio para este archivo.",
+      "open": "Tienes demasiadas subidas sin terminar. Termina o cancela una e inténtalo de nuevo.",
+      "offset": "La subida no coincide con el servidor. Continúa desde donde está el servidor.",
+      "busy": "Esta subida todavía está recibiendo datos. Inténtalo de nuevo en un momento.",
+      "length": "La subida no indicó el tamaño del archivo."
     }
   },
   "AccountLogin": {

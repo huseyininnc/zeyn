@@ -46,6 +46,7 @@
       "split": "Bir tutamakla boyutlanan iki bölme.",
       "list_detail": "Bir liste ve seçili satırının ayrıntısı; geniş ekranda yan yana, telefonda tek tek.",
       "deferred": "Ekran göründükten sonra yüklenen bir parça; yavaş bir blok geri kalanı bekletmez.",
+      "surface": "Sınırlar içinde, bir ızgarada ve bir eksende serbestçe yerleştirilen öğeler.",
       "auto_grid": "Genişliğe sığdığı kadar sütun.",
       "heading": "h2 ile h6 arası bölüm başlıkları.",
       "paragraph": "Kaçışlanmış metin paragrafı; normal ya da sönük.",
@@ -93,6 +94,7 @@
       "line_editor": "Form içinde toplamlı model satırları.",
       "masked_inputs": "Maskeli, ondalık, yüzde ve parola girişleri.",
       "action_button": "Bir eylemi çalıştıran düğme.",
+      "file_drop": "Dosyaları, klasörleri ve yapıştırılan görselleri bir depoya yükleyen, form dışında bir bırakma alanı.",
       "data_grid": "Sayfalama, sıralama ve süzgeçli eylem satırları.",
       "card_grid": "Kart olarak gösterilen eylem satırları.",
       "image_card": "Resimli, rozetli ve ilerlemeli kart.",
@@ -107,7 +109,7 @@
       "embed": "Kilitli çerçevede başka bir sitenin sayfası.",
       "alert": "Renkli kutuda bir mesaj.",
       "progress": "Etiketli ilerleme çubuğu.",
-      "skeleton": "İçerik yüklenirken yer tutucu satırlar.",
+      "skeleton": "Yüklenen içeriğin biçiminde yer tutucu: satırlar, KPI kutusu, tablo satırları, liste öğeleri ya da grafik.",
       "empty_state": "Liste boşken gösterilen içerik.",
       "popover": "Küçük bir panel açan düğme.",
       "busy": "Yavaş bir eylem sürerken katman.",
@@ -244,6 +246,10 @@
         "overview": "Örnek",
         "sizes": "Boyutlar"
       },
+      "file_drop": {
+        "overview": "Örnek",
+        "single": "Tek dosya"
+      },
       "action_button": {
         "overview": "Örnek"
       },
@@ -253,6 +259,11 @@
       },
       "alpha_index": {
         "overview": "Örnek"
+      },
+      "surface": {
+        "overview": "Örnek",
+        "on_one_axis": "Tek eksende",
+        "resizable": "Boyutlandırılabilir, en boy oranıyla"
       },
       "auto_grid": {
         "overview": "Örnek",
@@ -285,6 +296,7 @@
       "chart": {
         "overview": "Örnek",
         "donut": "Halka",
+        "bar_list": "Tek büyük parçalı halka çubuk listesine döner",
         "gauge": "Gösterge",
         "side_by_side": "Yan yana, genişliği dolduran"
       },
@@ -325,7 +337,8 @@
         "overview": "Örnek"
       },
       "form": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "settings": "Bir şey değişince kaydetme çubuğu görünen ayarlar formu"
       },
       "heading": {
         "overview": "Örnek",
@@ -455,7 +468,8 @@
         "another_screen": "Başka bir ekran"
       },
       "skeleton": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "shapes": "KPI kutusu, liste, grafik ve tablo satırları"
       },
       "split": {
         "overview": "Örnek"
@@ -465,7 +479,8 @@
         "nothing_selected": "Seçili bir şey yok"
       },
       "deferred": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "chart": "Kendi biçiminde iskeletiyle bir grafik"
       },
       "spoiler": {
         "overview": "Örnek"
@@ -502,7 +517,8 @@
       },
       "tree": {
         "overview": "Örnek",
-        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar"
+        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar",
+        "movable": "Sürükleyerek, menüyle ya da Alt ve ok tuşlarıyla taşınan klasörler"
       },
       "week_schedule": {
         "overview": "Örnek"
@@ -531,7 +547,8 @@
         "bell": "Bildirim zili"
       },
       "kanban": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "ordered": "Her sütunda kendi sırasında duran kartlar"
       },
       "calendar": {
         "overview": "Örnek"

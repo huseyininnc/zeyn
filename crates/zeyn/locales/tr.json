@@ -12,7 +12,8 @@
     },
     "draft": {
       "restored": "Daha önce kaydetmediğiniz girişler geri yüklendi.",
-      "discard": "Girişleri at"
+      "discard": "Girişleri at",
+      "unsaved": "Kaydedilmemiş değişiklikleriniz var."
     },
     "session": {
       "idle_title": "Hâlâ orada mısınız?",
@@ -161,6 +162,9 @@
       "page_size": "Sayfa başına satır",
       "filter_builder": "Süz",
       "builder_title": "Satırları süz",
+      "active_filters": "Etkin süzgeçler",
+      "remove_filter": "{label} süzgecini kaldır",
+      "filter_group": "{n} koşul",
       "add_condition": "Koşul ekle",
       "remove_condition": "Koşulu kaldır",
       "add_group": "Grup ekle",
@@ -400,6 +404,16 @@
         "empty": "Açık panel yok. Panel seçeneklerinden birini açın.",
         "resize": "{area} alanı yeniden boyutlandır"
       },
+      "surface": {
+        "item": "taşınabilir öğe",
+        "hint": "Ok tuşları öğeyi taşır. Ya da bir öğeye tıklayın, sonra alanda koymak istediğiniz yere tıklayın.",
+        "moved": "{item} {x}, {y} konumuna taşındı.",
+        "picked": "{item} seçildi. Koymak için alanda bir yere tıklayın ya da Escape tuşuna basın.",
+        "refused": "Taşıma kaydedilmedi.",
+        "resized": "{item} boyutu {w} x {h} oldu.",
+        "picked_size": "{item} boyutu seçildi. Sağ alt köşenin gideceği yere tıklayın ya da Escape tuşuna basın.",
+        "hint_resize": "Shift ve ok tuşları köşe tutamacı olan bir öğenin boyutunu değiştirir. Ya da tutamaca tıklayın, sonra köşenin gideceği yere tıklayın."
+      },
       "loading": "Yükleniyor…",
       "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
       "date": {
@@ -518,7 +532,17 @@
         "insert": "Ekle",
         "insert_hint": "Control+Enter ekler.",
         "insert_label": "{label} ekle",
-        "inserted": "{label} eklendi."
+        "inserted": "{label} eklendi.",
+        "move": "Taşı",
+        "move_down": "Aşağı",
+        "move_hint": "Alt ile ok tuşları öğeyi taşır: Yukarı, Aşağı, Sol dalın dışına, Sağ üstteki dalın içine.",
+        "move_into": "Üstteki dalın içine",
+        "move_label": "{label} öğesini taşı",
+        "move_none": "Taşınacak yer yok",
+        "move_out": "Bu dalın dışına",
+        "move_refused": "{label} taşınamadı.",
+        "move_up": "Yukarı",
+        "moved": "{label} taşındı."
       },
       "select": {
         "none": "Seçilmedi",
@@ -564,7 +588,7 @@
         "brand": "Not"
       },
       "upload": {
-        "drop": "Dosyaları buraya bırakın ya da seçin.",
+        "drop": "Dosyaları ya da klasörleri buraya bırakın, yapıştırın ya da seçin.",
         "hint": "{types}, en fazla {max}.",
         "hint_many": "{types}, her biri en fazla {max}, en çok {n} dosya.",
         "list": "Dosyalar",
@@ -576,7 +600,10 @@
         "cancel": "İptal",
         "retry": "Yeniden dene",
         "remove": "Kaldır",
-        "remove_name": "{name} dosyasını kaldır"
+        "remove_name": "{name} dosyasını kaldır",
+        "waiting": "{name} yüklenmeyi bekliyor",
+        "skipped": "Bu alanın almadığı türde {n} dosya atlandı.",
+        "not_added": "Dosya yüklendi ama eklenemedi."
       },
       "kpi": {
         "up": "Önceki döneme göre yüzde {pct} artış",
@@ -1236,7 +1263,11 @@
       "refused": "Dosya güvenlik denetiminden geçmedi.",
       "aborted": "Yükleme dosyanın tamamı gelmeden durdu. Yeniden deneyin.",
       "empty": "Dosya boş.",
-      "store_full": "Bu dosya için yer kalmadı."
+      "store_full": "Bu dosya için yer kalmadı.",
+      "open": "Bitmemiş yüklemeniz çok fazla. Birini bitirin ya da iptal edin, sonra yeniden deneyin.",
+      "offset": "Yükleme sunucuyla aynı noktada değil. Sunucunun kaldığı yerden sürer.",
+      "busy": "Bu yükleme hâlâ veri alıyor. Biraz sonra yeniden deneyin.",
+      "length": "Yükleme dosyanın boyutunu bildirmedi."
     }
   },
   "AccountLogin": {

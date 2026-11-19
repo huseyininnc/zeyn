@@ -70,3 +70,28 @@ Her bölüm yerel bir açılır bölümdür (`<details>` ve `<summary>`), başl�
 ## Dock
 
 `Dock`, paneller bir merkez alanın çevresine yerleştirir: kullanıcıların taşıdığı, yeniden boyutlandırdığı, kapattığı ve geri getirdiği sol, sağ, alt ve merkez sekmeler. Her kullanıcının yerleşimi ekran başına kaydedilir. Bkz. [Shell ve komutlar](shell.md).
+
+## Surface
+
+`Surface::new(label, width, height)`, kişilerin öğeleri serbestçe yerleştirdiği sabit boyutlu bir alandır, örneğin bir kat planındaki masalar. `.item(Draggable::new(id, node).at(x, y).size(w, h))` bir öğe ekler, `.axis(Axis::X)` veya `Axis::Y` onu tek bir çizgide tutar, `.snap(step)` her konumu bir ızgaraya oturtur. `.on_move(action)` her taşımayı kaydeder: sunucu kimliğin bu alana ait olduğunu denetleyip konumu sınırların içinde, ızgarada ve eksende tuttuktan sonra eylem, öğenin kimliği ile yeni `x` ve `y` değerlerini taşıyan bir `SurfaceMove` alır.
+
+`.resizable()` öğenin sağ alt köşesine bir tutamaç ekler; `.min_size(w, h)`, `.max_size(w, h)` ve `.aspect(w, h)` boyutu sınırlar ve öğeyi de yeniden boyutlandırılabilir yapar. Eylem bu durumda yeni `w` ve `h` değerlerini de alır; bunlar sınırların, alanın ve ızgaranın içinde tutulur. En boy oranı verildiğinde yükseklik genişliği izler.
+
+```rust
+Surface::new(t!("floor.plan"), 800, 480)
+    .snap(20)
+    .on_move(move_table)
+    .item(
+        Draggable::new("t1", Paragraph::new(t!("floor.table")))
+            .at(40, 60)
+            .size(120, 80),
+    )
+```
+
+Fare veya kalem bir öğeyi sürükler; dokunmatik ekranda kısa bir basılı tutmadan sonra sürüklenir. Tek bir işaretçiyle, bir tıklama öğeyi seçer ve alana yapılan bir tıklama onu oraya koyar. Köşe tutamacına yapılan bir tıklama boyutu seçer, alana yapılan bir tıklama köşeyi oraya koyar.
+
+| Tuş | Ne yapar |
+|---|---|
+| Ok tuşları | Odaktaki öğeyi bir ızgara adımı taşır (ızgara yoksa 10 piksel) |
+| `Shift` + ok tuşları | Boyutlandırılabilir öğeyi bir ızgara adımı büyütür veya küçültür |
+| `Escape` | Seçilen öğeyi bırakır veya sürüklenen öğeyi geri koyar |

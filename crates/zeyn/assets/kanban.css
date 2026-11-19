@@ -54,3 +54,9 @@
   .z-kanban-card:focus-visible, .z-kanban-menu [role="menuitem"]:focus { outline: 2px solid Highlight; }
   .z-kanban-col[data-drop="ok"] { border-color: Highlight; }
 }
+.z-kanban-before .z-kanban-card { box-shadow: inset 0 3px 0 var(--z-primary); }
+.z-kanban-after .z-kanban-card { box-shadow: inset 0 -3px 0 var(--z-primary); }
+@media (forced-colors: active) {
+  .z-kanban-before .z-kanban-card { border-block-start: 3px solid Highlight; }
+  .z-kanban-after .z-kanban-card { border-block-end: 3px solid Highlight; }
+}
