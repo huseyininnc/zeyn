@@ -209,6 +209,7 @@ impl PageCheck {
 
     /// Problems of the topics of the page: a topic driven on the page that nothing on the page
     /// listens to.
+    #[cfg(feature = "server")]
     pub(crate) fn finish(mut self) -> Vec<String> {
         for (path, topic) in &self.drives {
             if !self.listens.contains(topic) {

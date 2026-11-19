@@ -967,6 +967,7 @@ impl Node {
 
     /// Link shortcuts of this node and every node below it, lazy ones included, with the path
     /// of the node that declares each.
+    #[cfg(feature = "server")]
     pub(crate) fn all_shortcuts<'a>(&'a self, path: String, out: &mut Vec<(String, &'a str)>) {
         for keys in self.shortcuts() {
             out.push((path.clone(), keys));
@@ -977,6 +978,7 @@ impl Node {
     }
 
     /// Runs [`Component::page_check`] on this node and every node below it, lazy ones included.
+    #[cfg(feature = "server")]
     pub(crate) fn page_check(&self, path: String, check: &mut crate::ui::PageCheck) {
         check.path.clone_from(&path);
         self.0.page_check(check);
@@ -1695,6 +1697,7 @@ pub struct Screen {
     primary: Option<Toolbar>,
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     moved: Option<(&'static str, serde_json::Value, bool)>,
     head: Option<Box<crate::seo::Head>>,
 }
@@ -1753,6 +1756,7 @@ impl Screen {
     }
 
     /// Screen, params and permanence of [`Screen::moved_to`] or [`Screen::redirect`], if any.
+    #[cfg(feature = "server")]
     pub(crate) fn take_moved(&mut self) -> Option<(&'static str, serde_json::Value, bool)> {
         self.moved.take()
     }

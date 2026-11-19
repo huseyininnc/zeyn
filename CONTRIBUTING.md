@@ -13,11 +13,13 @@ cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,ac
 cargo check -p zeyn --all-features --tests
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
+sh ci/clippy-features.sh
 ```
 
 - Tests that need PostgreSQL, Oracle, Redis or an identity provider skip unless `ZEYN_TEST_PG`, `ZEYN_TEST_ORACLE`, `ZEYN_TEST_REDIS` or `ZEYN_TEST_OIDC` is set. Each test file says how to start the server in Docker.
 - Disk space can be tight. Use `CARGO_INCREMENTAL=0`, and delete your own `target` directory when you are done. The `pdf` feature links Typst (about 40 MB); do not turn it on for the whole workspace.
 - `cargo test` does not rebuild a binary you then run by hand. Run `cargo build -p <example>` first.
+- The workspace clippy run unifies Cargo features, so an unused import or item in a smaller feature set stays hidden. `sh ci/clippy-features.sh` runs clippy on the `zeyn` library with no default features, with each feature that builds without `server` (`signed-licenses`, `postgres`, `oracle`, `xlsx`, `markdown`, `lang-all`) and with the default features; CI runs it too. Code that only the `server` feature reads gets `#[cfg(feature = "server")]`, not `#[allow]`.
 - Run an example to see a change: `cargo run -p zeyn-example-showcase` (http://127.0.0.1:3002), `cargo run -p zeyn-example-docs` (http://127.0.0.1:3008) or `cargo run -p zeyn-example-components` (http://127.0.0.1:3010).
 
 ### Build speed and disk use

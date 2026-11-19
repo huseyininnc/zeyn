@@ -445,6 +445,7 @@ impl I18n {
 
     /// Adds the texts of a component's catalog that no catalog has yet, without offering its
     /// locale, so the app's own catalogs and the built in texts win.
+    #[cfg(feature = "server")]
     pub(crate) fn defaults(&mut self, locale: &str, json: &str) -> Result<(), String> {
         let value: serde_json::Value = serde_json::from_str(json)
             .map_err(|e| format!("catalog `{locale}` is not valid JSON: {e}"))?;
