@@ -22,7 +22,7 @@ Then read `my-app/AGENTS.md` and `my-app/.claude/skills/zeyn/SKILL.md`, and run 
 - [crates.io](https://crates.io/crates/zeyn) and [docs.rs](https://docs.rs/zeyn): the published crate and its API reference
 
 - [Documentation](https://docs.zeynsoft.com/): introduction, project structure, CLI, the language (entities, actions, screens, forms, DataGrid), components and guides
-- [Live demo](https://framework.zeynsoft.com/): every component and feature in one running app
+- [Live demo](https://framework.zeynsoft.com/): the admin template running on sample data, read only
 - [Component catalog](https://components.zeynsoft.com/): every component running live, with its code to copy and its API
 - [Source on GitHub](https://github.com/huseyininnc/zeyn): code, issues and releases
 
