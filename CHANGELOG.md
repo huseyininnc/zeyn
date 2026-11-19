@@ -68,6 +68,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 ### Fixed
 
 - `cargo clippy -p zeyn-cli` and builds of `zeyn` without the `server` feature no longer fail on unused imports and dead code (`platform.rs`, `ui/thread.rs` and 28 more items that only the server reads). CI runs clippy on `zeyn` with no default features, the features that build without `server` and the default features (`ci/clippy-features.sh`).
+- On a 390 px screen a `Kpi` value stays on one line (the font shrinks with the width, a value that still does not fit ends in an ellipsis and keeps its full text in the title and for screen readers), and the search button of the top bar shows its icon again instead of an empty box.
+- A `Kanban` board no longer widens the page on a phone: its hidden status line sat outside the scroll box of the board and stretched the document to about 1040 px.
+
+- `Db::migrate` and `Db::migrate_dir` ignore line endings in migration checksums, so a migration checked out with CRLF on Windows and LF elsewhere validates on both. A checksum stored before this change, computed with the `` bytes, is still accepted; a real content change still fails.
 
 - Findings of the new browser tests: a select whose label has no id (the card grid's sort) gets an accessible name; the code editor's text area no longer carries `aria-expanded`, which a text area may not have; an empty message thread is a region with its empty text and becomes a feed with its first message; the inbox's bulk action bar is a group instead of a toolbar without arrow keys; external links are at least 24 px tall; the grid's column menu button is 24 px on touch screens; the component catalog adds its stylesheet and script to compressed pages too.
 - The test of the rate store eviction counts how often a full store scans its map (`MemoryRateStore::evictions`) instead of measuring seconds, so it no longer fails on a busy machine.

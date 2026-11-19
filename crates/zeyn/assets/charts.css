@@ -85,12 +85,14 @@
 .z-kpi-title { color: var(--z-text-muted); font-size: var(--z-text-sm); font-weight: 500; line-height: var(--z-leading-sm); overflow-wrap: anywhere; }
 
 .z-kpi-value {
-  font-size: var(--z-text-num);
+  font-size: clamp(1.25rem, 6vw, var(--z-text-num));
   font-weight: 600;
   line-height: var(--z-leading-num);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums lining-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .z-kpi-unit { font-size: var(--z-text-xl); font-weight: 500; letter-spacing: 0; color: var(--z-text-muted); }

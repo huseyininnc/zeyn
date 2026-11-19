@@ -1360,3 +1360,65 @@ fn rank_cursor_values_are_checked() {
     };
     assert!(build::plan_find::<Card>(&Postgres, &q, 10).is_err());
 }
+
+#[cfg(feature = "postgres")]
+mod migration_checksums {
+    use super::super::{line_ending_checksum, reconcile_migrator};
+    use sqlx::migrate::{Migration, MigrationType, Migrator};
+    use sqlx::{AssertSqlSafe, SqlSafeStr};
+    use std::collections::HashMap;
+
+    fn migration(sql: &str) -> Migration {
+        Migration::new(
+            1,
+            "create".into(),
+            MigrationType::Simple,
+            AssertSqlSafe(sql.to_string()).into_sql_str(),
+            false,
+        )
+    }
+
+    fn checksum_after(sql: &str, applied: &HashMap<i64, Vec<u8>>) -> Vec<u8> {
+        let migrator = Migrator::with_migrations(vec![migration(sql)]);
+        let migrator = reconcile_migrator(&migrator, applied);
+        migrator.migrations[0].checksum.to_vec()
+    }
+
+    #[test]
+    fn crlf_and_lf_give_the_same_checksum() {
+        let none = HashMap::new();
+        let lf = checksum_after("CREATE TABLE a (id INT);\nSELECT 1;\n", &none);
+        let crlf = checksum_after("CREATE TABLE a (id INT);\r\nSELECT 1;\r\n", &none);
+        assert_eq!(lf, crlf);
+    }
+
+    #[test]
+    fn a_checksum_stored_with_carriage_returns_still_validates() {
+        let sql = "CREATE TABLE a (id INT);\r\nSELECT 1;\r\n";
+        let stored = migration(sql).checksum.to_vec();
+        let applied = HashMap::from([(1, stored.clone())]);
+        assert_eq!(checksum_after(sql, &applied), stored);
+    }
+
+    #[test]
+    fn a_checksum_stored_without_carriage_returns_validates_a_crlf_file() {
+        let lf = migration("CREATE TABLE a (id INT);\n");
+        let applied = HashMap::from([(1, lf.checksum.to_vec())]);
+        let crlf = checksum_after("CREATE TABLE a (id INT);\r\n", &applied);
+        assert_eq!(crlf, lf.checksum.to_vec());
+    }
+
+    #[test]
+    fn a_real_content_change_still_differs() {
+        let stored = migration("CREATE TABLE a (id INT);\n")
+            .checksum
+            .to_vec();
+        let applied = HashMap::from([(1, stored.clone())]);
+        let changed = checksum_after("CREATE TABLE b (id INT);\r\n", &applied);
+        assert_ne!(changed, stored);
+        assert_eq!(
+            changed,
+            line_ending_checksum(&migration("CREATE TABLE b (id INT);\n"))
+        );
+    }
+}
