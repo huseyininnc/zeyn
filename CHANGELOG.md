@@ -54,6 +54,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- The test of the rate store eviction counts how often a full store scans its map (`MemoryRateStore::evictions`) instead of measuring seconds, so it no longer fails on a busy machine.
 - Side menu counts emptied every DataGrid on the page: `menu.js` filled every `[data-zeyn-count]`, and the grid uses that attribute for its row count. Menu counts now use `data-zeyn-menu-count` (and `data-zeyn-menu-count-topics`), and grid pages no longer load `menu.js` for that attribute. The breadcrumb that `nav.js` writes after a navigation takes the label of each menu group and link, without the rail's first letter or the item's count.
 - A button with the `hidden` attribute is hidden: `.z-button` set `display`, so a card grid's "Load more" showed even when there were no more rows. Progress cells in grids have classes of their own (`z-cell-progress`), so a page that also loads the `Progress` widget no longer stacks the bar and the number in a narrow cell.
 - `accounts::create_tables` for Oracle uses a sequence and a trigger for claim ids instead of identity columns, so the account tables are created on Oracle 11g too.
