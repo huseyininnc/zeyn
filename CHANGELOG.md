@@ -78,6 +78,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - `DocStore::allow(ctx, key, write)` decides per document who may open and change a collaborative document; it runs on every join, also while the room is open for others. Before, the kind's permission let every user of a tenant open every document of the kind by its id. The default keeps that behavior, so stores whose documents belong to people should implement it.
 - `GET /_zeyn/devtools` (debug builds only) answers only signed in users with the `zeyn.devtools` permission (`DevAuth` has it) and lists only their own requests. Before, anyone who reached a debug build read the requests of every user.
 - `POST /_zeyn/reason`, `/_zeyn/socket/open` and `/_zeyn/auth/totp/enroll` count against the write limit.
+- Uploads take their declared size (the store's limit without one) from the quota before the body is read and give back what the file did not use or, when the upload fails, all of it (`RateStore::refund`), so uploads sent at the same time can no longer pass the quota together.
 
 ## [0.0.10] - 2026-11-10
 
