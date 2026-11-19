@@ -431,6 +431,46 @@ Scrolling down is about twice as fast and the page holds a third of the cells. S
 was already smooth; frames where the window moves cost up to 29 ms. The rest of the cost is
 parsing blocks of 200 rows with every column, which column virtualization does not change.
 
+Measured again on an idle machine, with no builds running, a release server and one Chromium
+session (isolated context) on a 144 Hz display. Each run scrolls the grid body by 60 px per frame for 150 frames; the table shows
+the range of three runs. Frame times are quantized to the 6.9 ms refresh. The machine is a
+Windows 11 desktop with 20 logical cores. The grids are the gallery's wide grid (62 columns,
+100,000 rows) and the same screen cut to 12, 30, 39 and 40 columns, counting the selection
+column. Column windowing starts at 40.
+
+| Case | Columns | CPU | Scroll | p50 | p95 | fps |
+|---|---|---|---|---|---|---|
+| Wide grid, windowed | 40 | none | sideways | 6.9 to 7.0 ms | 7.1 to 7.2 ms | 140 to 144 |
+| Wide grid, windowed | 40 | none | down | 6.9 to 7.0 ms | 7.1 ms | 143 |
+| Wide grid, windowed | 62 | none | sideways and down | 6.9 to 7.0 ms | 7.1 to 7.2 ms | 138 to 144 |
+| Wide grid | 12 | 4x | sideways | 6.9 ms | 7.1 ms | 144 |
+| Wide grid | 12 | 4x | down | 14.0 ms | 27.8 ms | 57 |
+| Wide grid | 30 | 4x | sideways | 6.9 ms | 7.1 ms | 144 |
+| Wide grid | 30 | 4x | down | 27.8 to 34.7 ms | 41.7 ms | 31 |
+| Wide grid | 39 | 4x | sideways | 6.9 ms | 7.1 ms | 139 to 144 |
+| Wide grid | 39 | 4x | down | 34.8 to 41.6 ms | 48.7 ms | 26 |
+| Wide grid, windowed | 40 | 4x | sideways | 7.0 ms | 41.5 to 41.7 ms | 98 to 107 |
+| Wide grid, windowed | 40 | 4x | down | 20.8 ms | 27.8 ms | 50 |
+| Wide grid, windowed | 62 | 4x | sideways | 7.0 ms | 41.8 to 48.6 ms | 94 to 97 |
+| Wide grid, windowed | 62 | 4x | down | 20.9 ms | 34.8 to 41.6 ms | 41 to 43 |
+| Card grid, 390 by 844 phone at 3x | 2,000 cards | 4x | down, 30 px per frame | 6.9 to 7.0 ms | 7.1 ms | 136 to 145 |
+| Card grid, 390 by 844 phone at 3x | 2,000 cards | 4x | fling, 300 px per frame | 7.0 to 13.8 ms | 14.0 to 55.7 ms | 56 to 113 |
+
+In the card grid fling, the first run was the slow one; the other two ended at 7.0 and 14.0 ms
+at p50 and 14.0 ms at p95.
+
+The threshold stays at 40. A trial build with the threshold at 24 put the 30 column grid in the
+window: scrolling down at 4x went from 34.7 to 27.7 ms at p50, but p95 stayed at 41.7 to 48.6 ms,
+so the long frames remained. Sideways, the window costs frames when it moves (41 ms at p95 for
+40 columns). A 12 column grid shows no gain from windowing, so the data does not support a lower
+number.
+
+Frames stay over 16 ms when scrolling down at 4x. Turning off box shadows, sticky pinned cells,
+transitions or cell borders in the page changed the mean frame by less than 1 ms (about 25 ms in
+every case), and `contain: layout paint style` on rows gained about 0.8 ms. Paint is therefore not
+dominated by one of these, and the windowed grid has no cheap style change left; the rest of the
+cost is parsing and inserting blocks of rows.
+
 ## Export
 
 `exportable()` (and optionally `export_permission(...)`, `export_limit(n)`) lets the toolbar's
