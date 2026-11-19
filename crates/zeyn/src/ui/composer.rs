@@ -417,10 +417,11 @@ impl Component for Composer {
         ));
         if let Some(rules) = &self.files {
             out.push_str(r#"<div class="z-composer-files">"#);
+            let label = ATTACH.label_text();
             crate::files::render_upload(
                 out,
                 r,
-                &ATTACH,
+                crate::files::UploadField::of(&ATTACH, &label),
                 &format!("{id}-files"),
                 rules,
                 true,

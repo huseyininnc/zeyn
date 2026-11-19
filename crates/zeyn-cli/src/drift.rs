@@ -353,6 +353,7 @@ const NOT_IN_INDEX: &[&str] = &[
     "Embed",
     "EventNode",
     "ExternalLink",
+    "FileDrop",
     "Import",
     "Island",
     "KanbanCard",

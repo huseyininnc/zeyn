@@ -94,6 +94,7 @@
       "line_editor": "Rows of a model inside a form, with totals.",
       "masked_inputs": "Masked, decimal, percent and password inputs.",
       "action_button": "A button that runs an action.",
+      "file_drop": "A drop zone outside a form that uploads files, folders and pasted images into a store.",
       "data_grid": "Rows of an action with paging, sorting and filters.",
       "card_grid": "Rows of an action shown as cards.",
       "image_card": "A card with an image, badges and progress.",
@@ -245,6 +246,10 @@
         "overview": "Example",
         "sizes": "Sizes"
       },
+      "file_drop": {
+        "overview": "Example",
+        "single": "One file"
+      },
       "action_button": {
         "overview": "Example"
       },
@@ -257,7 +262,8 @@
       },
       "surface": {
         "overview": "Example",
-        "on_one_axis": "On one axis"
+        "on_one_axis": "On one axis",
+        "resizable": "Resizable, with an aspect ratio"
       },
       "auto_grid": {
         "overview": "Example",

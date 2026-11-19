@@ -266,6 +266,7 @@ pub use serde_json as __serde_json;
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
     pub use crate::seo::{Robots, SitemapPart, SitemapUrl};
+    pub use crate::ui::FileDrop;
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{

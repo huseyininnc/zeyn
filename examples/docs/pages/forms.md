@@ -113,10 +113,13 @@ A permission name lets the same users upload and download. To let readers open f
 
 The control is a native file input inside a drop zone. Each file uploads on its own with a progress bar, can be canceled while it runs, retried when it failed and removed when it is done. Images show a preview made from an object URL of the chosen file. Progress and results are announced in a polite live region. The showcase has a working example at `/uploads`; this documentation site has no signed in user, so it shows no live upload.
 
+A dropped folder adds the files inside it and its subfolders, read in pages of at most 100 entries until the folder is done; files of a type the field does not take are skipped and counted in the live region. Files pasted while the field has focus upload too. A file whose extension or type is not in `accept` is refused in the browser before any byte is sent, and the server checks the content again. At most three files of a field upload at the same time; the others wait in line with a busy progress bar.
+
 | Key | What it does |
 |---|---|
 | Tab | Moves to the file input, then to each file's download link and its Cancel, Retry or Remove button |
 | Enter or Space on the file input | Opens the system file picker (the keyboard path for drag and drop) |
+| Ctrl+V or Cmd+V on the file input | Uploads the files on the clipboard, such as a screenshot |
 | Enter or Space on Cancel, Retry, Remove | Runs it; after Cancel focus moves to Retry, after Remove to the next file or back to the input |
 
 What the server does for `POST /_zeyn/files/{store}`:
@@ -133,4 +136,17 @@ Downloads (`GET /_zeyn/files/{store}/{id}`) check the id's shape, the permission
 
 `FileRules::quota(bytes, window)` caps what one user uploads to a store per window, counted with the app's rate store; the upload that crosses it still lands and the next one answers `429`. `DiskStore` removes `.part` files older than an hour (uploads stopped by a crash) at most once an hour. `ZipGuard` is a scanner for ZIP based uploads (ZIP, Word, Excel, PowerPoint): it refuses archives whose central directory declares more than 10,000 entries, more than 1 GiB in all or more than 200 times the file's size, and ZIP64 archives; code that unpacks an accepted archive must still stop at those limits.
 
-Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 12 KB raw and 4 KB gzip, `files.css` 3 KB raw and 1 KB gzip.
+Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 17 KB raw and 6 KB gzip, `files.css` 3 KB raw and 1 KB gzip.
+
+## File drop
+
+`FileDrop::new(label, rules)` is the same upload control on its own, outside a form, for screens where files are the whole task, such as a document inbox. It takes folders, pasted files and the accept list like the form field, and uploads into the store of `rules`, which `Feature::files` registers with its permission. `.single()` takes one file at a time. `.on_upload(action)` runs an action with each stored `File`; the server first checks that the id has the shape it generates, cleans the name again and keeps only a content type of the rules, so the action gets nothing the browser made up. When the action refuses, the item shows the reason. The file picker inside the zone is the keyboard and single pointer path.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

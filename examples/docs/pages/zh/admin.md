@@ -82,6 +82,8 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 批量操作之后，收件箱会触发它的主题（`"notifications"`，可用 `.topic(..)` 更改）：收件箱和所有 `.listens` 该主题的节点就地重新渲染，铃铛也会重新加载计数。铃铛用一个接收 `UnreadCount { limit }` 并在上限（100）处停止的动作计数，只需一次有上限的查询；超过 99 时显示 `99+`，链接的名称会为屏幕阅读器读出计数。它在页面显示后用一个请求加载计数，并在主题被收件箱、`ui.refresh("notifications")`，或在启用 `.live()` 和 `realtime` 特性时被任意动作中的 `socket.notify(&ctx, "notifications")` 触发时重新加载（主题需用 `ZeynSocket::topic` 声明）。`inbox.js`（6.1 KB，gzip 后 2.3 KB）和 `inbox.css`（3.1 KB）只随这些组件加载。
 
+没有计数操作权限的用户看不到铃铛:顶栏会省略它,因此页面不加载收件箱代码,也不会请求服务器会拒绝的计数。
+
 ## Kanban
 
 `Kanban::of(flow, cards, move_card)` 把一个动作返回的记录显示为分列的卡片，工作流 `#[choice]` 枚举的每个状态一列，按枚举顺序排列。每一列都是该状态下卡片的虚拟列表：动作收到限定于该状态的 `DataQuery`，因此在数据库中过滤，卡片随列滚动按每块 50 张（`KANBAN_BLOCK`）加载。列头显示卡片数和 WIP 上限；超过上限的列会被标出。

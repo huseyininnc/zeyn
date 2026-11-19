@@ -162,6 +162,9 @@
       "page_size": "Rows per page",
       "filter_builder": "Filter",
       "builder_title": "Filter rows",
+      "active_filters": "Active filters",
+      "remove_filter": "Remove filter {label}",
+      "filter_group": "{n} conditions",
       "add_condition": "Add condition",
       "remove_condition": "Remove condition",
       "add_group": "Add group",
@@ -406,7 +409,10 @@
         "hint": "Arrow keys move the item. Or click an item, then click a place on the surface to put it there.",
         "moved": "{item} moved to {x}, {y}.",
         "picked": "{item} picked. Click a place on the surface to put it there, or press Escape.",
-        "refused": "The move was not saved."
+        "refused": "The move was not saved.",
+        "resized": "{item} resized to {w} by {h}.",
+        "picked_size": "Size of {item} picked. Click where its bottom right corner should go, or press Escape.",
+        "hint_resize": "Shift and the arrow keys change the size of an item with a corner handle. Or click the handle, then click where its corner should go."
       },
       "loading": "Loading…",
       "load_failed": "Could not load this part. Try again.",
@@ -582,7 +588,7 @@
         "brand": "Note"
       },
       "upload": {
-        "drop": "Drop files here or choose them.",
+        "drop": "Drop files or folders here, paste them, or choose them.",
         "hint": "{types}, up to {max}.",
         "hint_many": "{types}, up to {max} each, at most {n} files.",
         "list": "Files",
@@ -594,7 +600,10 @@
         "cancel": "Cancel",
         "retry": "Retry",
         "remove": "Remove",
-        "remove_name": "Remove {name}"
+        "remove_name": "Remove {name}",
+        "waiting": "{name} is waiting to upload",
+        "skipped": "{n} files of a type this field does not take were skipped.",
+        "not_added": "The file was uploaded but could not be added."
       },
       "kpi": {
         "up": "Up {pct}% from the previous period",

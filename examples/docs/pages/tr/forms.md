@@ -113,10 +113,13 @@ Tek bir izin adı aynı kullanıcılara hem yükleme hem indirme verir. Okuyucul
 
 Kontrol, bir bırakma alanının içindeki yerel bir dosya girdisidir. Her dosya kendi ilerleme çubuğuyla ayrı ayrı yüklenir; çalışırken iptal edilebilir, başarısız olduysa yeniden denenebilir ve bittiğinde kaldırılabilir. Görseller, seçilen dosyanın bir nesne URL'sinden üretilen bir önizleme gösterir. İlerleme ve sonuçlar, nazik (polite) bir canlı bölgede duyurulur. Showcase'in `/uploads` adresinde çalışan bir örnek vardır; bu dokümantasyon sitesinde oturum açmış kullanıcı olmadığı için canlı yükleme göstermez.
 
+Bırakılan bir klasör, içindeki ve alt klasörlerindeki dosyaları ekler; klasör, bitene kadar en fazla 100 girdilik sayfalarla okunur. Alanın almadığı türdeki dosyalar atlanır ve sayıları canlı bölgede duyurulur. Alan odaktayken yapıştırılan dosyalar da yüklenir. Uzantısı veya türü `accept` içinde olmayan bir dosya, tek bir bayt gönderilmeden tarayıcıda reddedilir; sunucu içeriği yine denetler. Bir alanın en fazla üç dosyası aynı anda yüklenir; diğerleri meşgul bir ilerleme çubuğuyla sırada bekler.
+
 | Tuş | Ne yapar |
 |---|---|
 | Tab | Dosya girdisine, sonra her dosyanın indirme bağlantısına ve İptal, Yeniden dene ya da Kaldır düğmesine geçer |
 | Dosya girdisinde Enter veya Space | Sistemin dosya seçicisini açar (sürükle bırak için klavye yolu) |
+| Dosya girişinde Ctrl+V veya Cmd+V | Panodaki dosyaları, örneğin bir ekran görüntüsünü yükler |
 | İptal, Yeniden dene, Kaldır üzerinde Enter veya Space | Çalıştırır; İptal'den sonra odak Yeniden dene'ye, Kaldır'dan sonra sonraki dosyaya ya da girdiye döner |
 
 Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:
@@ -133,4 +136,17 @@ Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:
 
 `FileRules::quota(bytes, window)` bir kullanıcının bir depoya belirli bir sürede yükleyebileceği miktarı sınırlar ve uygulamanın rate store'u ile sayılır; sınırı aşan yükleme yine kaydedilir, sonraki `429` alır. `DiskStore`, bir saatten eski `.part` dosyalarını (çökme nedeniyle yarım kalan yüklemeler) saatte en fazla bir kez siler. `ZipGuard`, ZIP tabanlı yüklemeler (ZIP, Word, Excel, PowerPoint) için bir tarayıcıdır: merkezi dizini 10.000'den fazla girdi, toplam 1 GiB'tan fazla veya dosya boyutunun 200 katından fazla açılacağını söyleyen arşivleri ve ZIP64 arşivlerini reddeder; kabul edilen bir arşivi açan kod da bu sınırlarda durmalıdır.
 
-Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 12 KB ve gzip 4 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 17 KB ve gzip 6 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+
+## File drop
+
+`FileDrop::new(label, rules)`, aynı yükleme kontrolünün form dışında, tek başına kullanılan hâlidir; bir belge gelen kutusu gibi işin tamamının dosyalar olduğu ekranlar içindir. Form alanı gibi klasörleri, yapıştırılan dosyaları ve kabul listesini alır ve `rules` deposuna yükler; bu depoyu izniyle birlikte `Feature::files` kaydeder. `.single()` bir seferde tek dosya alır. `.on_upload(action)` saklanan her `File` için bir eylem çalıştırır; sunucu önce kimliğin kendi ürettiği biçimde olduğunu denetler, adı yeniden temizler ve yalnızca kurallardaki bir içerik türünü bırakır, böylece eylem tarayıcının uydurduğu hiçbir şeyi almaz. Eylem reddederse öğe nedeni gösterir. Alanın içindeki dosya seçici, klavye ve tek işaretçi yoludur.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

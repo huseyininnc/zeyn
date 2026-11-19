@@ -1,0 +1,62 @@
+/** Filter chips above a grid (`DataGrid::filter_chips`, `gridchips.js`). */
+.z-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 1.5);
+  min-width: 0;
+}
+
+.z-filter-chips[hidden] { display: none; }
+
+.z-filter-chips .z-filter-chip {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  border: 1px solid var(--z-border-strong);
+  border-radius: 999px;
+  background: var(--z-brand-subtle);
+  color: var(--z-text);
+  font-size: var(--z-font-size-sm);
+}
+
+.z-filter-chips .z-filter-chip > button {
+  min-height: 28px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.z-filter-chips .z-filter-chip-edit {
+  flex-shrink: 0;
+  max-width: min(20rem, calc(100vw - 96px));
+  overflow: hidden;
+  padding-inline: calc(var(--z-space) * 2.5) var(--z-space);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-start-start-radius: 999px;
+  border-end-start-radius: 999px;
+}
+
+.z-filter-chips .z-filter-chip-remove {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  padding-inline: var(--z-space) calc(var(--z-space) * 1.5);
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
+  color: var(--z-text-muted);
+}
+
+.z-filter-chips .z-filter-chip > button:hover { color: var(--z-accent); }
+
+.z-filter-chips .z-filter-chip > button:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: -2px;
+}
+
+@media (forced-colors: active) {
+  .z-filter-chips .z-filter-chip { border-color: ButtonText; }
+}

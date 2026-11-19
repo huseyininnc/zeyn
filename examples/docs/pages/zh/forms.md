@@ -113,10 +113,13 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 该控件是放在拖放区域内的原生文件输入。每个文件独立上传并带进度条，上传过程中可以取消，失败后可以重试，完成后可以移除。图片会显示由所选文件的对象 URL 生成的预览。进度和结果通过一个 polite 实时区域播报。showcase 在 `/uploads` 有一个可运行的示例；本文档站点没有已登录的用户，因此不显示实时上传。
 
+拖放的文件夹会加入其中及子文件夹里的文件，每次最多读取 100 个条目，直到读完整个文件夹；字段不接受的类型的文件会被跳过，并在实时区域中报告数量。字段获得焦点时粘贴的文件也会上传。扩展名或类型不在 `accept` 中的文件会在发送任何字节之前被浏览器拒绝，服务器还会再次检查内容。一个字段最多同时上传三个文件，其余文件带着忙碌进度条排队等待。
+
 | 按键 | 作用 |
 |---|---|
 | Tab | 移到文件输入，然后依次移到每个文件的下载链接及其取消、重试或移除按钮 |
 | 在文件输入上按 Enter 或 Space | 打开系统文件选择器（拖放的键盘替代方式） |
+| 在文件输入上按 Ctrl+V 或 Cmd+V | 上传剪贴板中的文件，例如截图 |
 | 在取消、重试、移除上按 Enter 或 Space | 执行该操作；取消后焦点移到重试，移除后移到下一个文件或回到输入框 |
 
 服务器对 `POST /_zeyn/files/{store}` 所做的处理：
@@ -133,4 +136,17 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 `FileRules::quota(bytes, window)` 限制单个用户在每个时间窗口内向某个存储上传的量，并通过应用的 rate store 计数；超过限额的那次上传仍会保存，下一次上传返回 `429`。`DiskStore` 最多每小时一次删除超过一小时的 `.part` 文件（因崩溃而中断的上传）。`ZipGuard` 是针对基于 ZIP 的上传（ZIP、Word、Excel、PowerPoint）的扫描器：它会拒绝中央目录声明超过 10,000 个条目、总计超过 1 GiB 或超过文件大小 200 倍的归档，以及 ZIP64 归档；解压已接受归档的代码仍须在这些限制处停止。
 
-预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 12 KB 原始大小和 4 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。
+预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 17 KB 原始大小和 6 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。
+
+## File drop
+
+`FileDrop::new(label, rules)` 是同一个上传控件脱离表单单独使用，适用于文件就是全部任务的界面，例如文档收件箱。它像表单字段一样接受文件夹、粘贴的文件和 accept 列表，并上传到 `rules` 的存储，该存储由 `Feature::files` 连同权限一起注册。`.single()` 每次只接受一个文件。`.on_upload(action)` 对每个已保存的 `File` 运行一个动作；服务器先检查 id 是否是它生成的格式，再次清理名称，并只保留规则中的内容类型，因此动作不会收到浏览器编造的任何内容。动作拒绝时，条目会显示原因。区域内的文件选择器是键盘和单指针的操作路径。
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

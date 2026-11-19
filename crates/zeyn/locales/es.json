@@ -510,7 +510,7 @@
         "brand": "Nota"
       },
       "upload": {
-        "drop": "Suelta archivos aquí o elígelos.",
+        "drop": "Suelta archivos o carpetas aquí, pégalos o elígelos.",
         "hint": "{types}, hasta {max}.",
         "hint_many": "{types}, hasta {max} cada uno, máximo {n} archivos.",
         "list": "Archivos",
@@ -522,7 +522,10 @@
         "cancel": "Cancelar",
         "retry": "Reintentar",
         "remove": "Quitar",
-        "remove_name": "Quitar {name}"
+        "remove_name": "Quitar {name}",
+        "waiting": "{name} espera para subirse",
+        "skipped": "Se omitieron {n} archivos de un tipo que este campo no admite.",
+        "not_added": "El archivo se subió, pero no se pudo añadir."
       },
       "kpi": {
         "up": "Sube un {pct}% respecto al periodo anterior",

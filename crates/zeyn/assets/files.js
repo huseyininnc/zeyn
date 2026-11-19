@@ -1,11 +1,17 @@
 /**
  * Zeyn upload fields.
  *
- * Browser behavior of `Form::file`: files chosen with the native file input or dropped on the
- * zone are sent one by one to `POST /_zeyn/files/{store}` with the CSRF header. Each shows a
- * progress bar and can be canceled while it uploads, retried when it failed and removed when it
- * is done. The field's value, a JSON text in a hidden text input, holds the files the server
+ * Browser behavior of `Form::file`: files chosen with the native file input, dropped on the zone
+ * (folders too, read through `webkitGetAsEntry`) or pasted while the field has focus are sent to
+ * `POST /_zeyn/files/{store}` with the CSRF header, at most `PARALLEL` at a time while the rest
+ * wait. A file whose name or type the input's `accept` list does not cover is refused before it is
+ * sent; one inside a dropped folder is skipped. Each shows a progress bar and can be canceled
+ * while it uploads, retried when it failed and removed when it is done. The field's value, a JSON text in a hidden text input, holds the files the server
  * accepted; the form submits it like any other input.
+ *
+ * Inside a `FileDrop` with an upload action (`[data-zeyn-file-drop][data-save]`), each stored
+ * file is then posted to the drop's `upload` source, which runs the action; a refusal shows on
+ * the item like a failed upload.
  *
  * Image previews use object URLs of the chosen file, revoked when the item goes away. Nothing the
  * user picked is ever put into the page as HTML: names are set with `textContent`.
@@ -14,9 +20,13 @@
  */
 
 /** The shared request helpers (`net.js`). */
-const { BASE, csrf, parse } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
+const { BASE, csrf, parse, post } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
 const PREVIEW = /^image\/(png|jpeg|gif|webp)$/;
 const ANNOUNCE_STEP = 25;
+/** Uploads of one field that run at the same time; the others wait for a free slot. */
+const PARALLEL = 3;
+/** Entries a dropped folder tree is read for at most, so a huge tree cannot stall the page. */
+const MAX_ENTRIES = 10000;
 
 /** Upload state by item element: the chosen file, the running request and the object URL. */
 const items = new WeakMap();
@@ -63,6 +73,51 @@ function field(root) {
 function announce(f, text) {
   f.status.textContent = '';
   requestAnimationFrame(() => (f.status.textContent = text));
+}
+
+/**
+ * Whether the input's `accept` list covers `file`, by extension or by content type.
+ * @example allowed(f, new File([], 'a.png', { type: 'image/png' })) // true for ".png,image/png"
+ */
+function allowed(f, file) {
+  const list = (f.input.accept || '')
+    .toLowerCase()
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean);
+  const name = file.name.toLowerCase();
+  const type = (file.type || '').toLowerCase();
+  return !list.length || list.some((a) => (a.startsWith('.') ? name.endsWith(a) : a.endsWith('/*') ? type.startsWith(a.slice(0, -1)) : type === a));
+}
+
+/** Starts waiting uploads of the field while fewer than `PARALLEL` run. */
+function pump(f) {
+  let running = f.list.querySelectorAll('.z-upload-item[data-state="uploading"]').length;
+  for (const li of f.list.querySelectorAll('.z-upload-item[data-state="queued"]')) {
+    if (running >= PARALLEL) return;
+    running += 1;
+    send(f, li);
+  }
+}
+
+/** Puts an item in line for upload. */
+function queue(f, li) {
+  li.dataset.state = 'queued';
+  li.querySelector('.z-upload-error').textContent = '';
+  const name = items.get(li)?.file.name ?? '';
+  let bar = li.querySelector('.z-upload-progress');
+  if (!bar) {
+    bar = document.createElement('progress');
+    bar.className = 'z-upload-progress';
+    bar.max = 100;
+    li.querySelector('.z-upload-size').after(bar);
+  }
+  bar.removeAttribute('value');
+  bar.setAttribute('aria-label', fill(f.texts.waiting, { name }));
+  const hadFocus = li.contains(document.activeElement);
+  actions(li, button('z-upload-remove', f.texts.remove, fill(f.texts.remove_name, { name })));
+  if (hadFocus) li.querySelector('.z-upload-remove').focus();
+  pump(f);
 }
 
 /** Writes the accepted files into the value input and tells the form it changed. */
@@ -157,6 +212,7 @@ async function send(f, li) {
       announce(f, fill(f.texts.uploading, { name: s.file.name, pct: step }));
     }
   });
+  xhr.addEventListener('loadend', () => queueMicrotask(() => pump(field(f.root))));
   xhr.addEventListener('load', () => {
     s.xhr = null;
     const body = parse(xhr.responseText);
@@ -164,6 +220,7 @@ async function send(f, li) {
       done(f, li, body);
       sync(f);
       announce(f, fill(f.texts.uploaded, { name: body.name }));
+      report(f, li, body);
     } else {
       const final = [413, 415, 422].includes(xhr.status) || xhr.status === 403;
       failed(f, li, body?.message ?? String(xhr.status), !final);
@@ -178,6 +235,24 @@ async function send(f, li) {
     failed(f, li, fill(f.texts.canceled, { name: s.file.name }), true);
   });
   xhr.send(s.file);
+}
+
+/** Runs the upload action of a `FileDrop` for a stored file; a refusal marks the item failed. */
+async function report(f, li, file) {
+  const drop = f.root.closest('[data-zeyn-file-drop][data-save]');
+  if (!drop) return;
+  const screen = drop.closest('[data-zeyn-screen]');
+  const r = await post('/_zeyn/data', {
+    screen: screen?.dataset.zeynScreen ?? null,
+    params: parse(screen?.dataset.zeynParams ?? 'null'),
+    node: drop.closest('[data-zeyn-node]')?.dataset.zeynNode ?? null,
+    key: 'upload',
+    input: file,
+  });
+  if (r.ok) return;
+  li.removeAttribute('data-id');
+  sync(f);
+  failed(f, li, r.body?.message || f.texts.not_added, false);
 }
 
 /** Adds an item for a chosen file, with a preview for images, and starts its upload. */
@@ -205,11 +280,15 @@ function add(f, file) {
   error.className = 'z-upload-error';
   li.append(name, sz, error);
   f.list.append(li);
+  if (!allowed(f, file)) {
+    failed(f, li, f.texts.type, false);
+    return;
+  }
   if (f.maxBytes && file.size > f.maxBytes) {
     failed(f, li, f.texts.too_large, false);
     return;
   }
-  send(f, li);
+  queue(f, li);
 }
 
 /** Removes an item: stops its upload, frees its preview and moves focus to a neighbor. */
@@ -222,6 +301,7 @@ function drop(f, li) {
   const wasDone = li.hasAttribute('data-id');
   li.remove();
   if (wasDone) sync(f);
+  pump(f);
   (next?.querySelector('button') ?? f.input).focus();
   announce(f, fill(f.texts.removed, { name }));
 }
@@ -238,6 +318,41 @@ function take(f, list) {
   const room = f.maxFiles - f.list.querySelectorAll('.z-upload-item:not([data-state="failed"])').length;
   files.slice(0, Math.max(room, 0)).forEach((file) => add(f, file));
   if (files.length > room) announce(f, f.texts.too_many);
+}
+
+/**
+ * The files of a drop: those of `dataTransfer.files`, or, when folders were dropped, the files
+ * of the whole tree that `f` accepts, read until `cap` are found. `readEntries` gives at most 100
+ * entries a call, so each folder is read until it answers with none. The entries are taken before
+ * the first await, while the drop data can still be read.
+ */
+async function dropped(f, dt, cap) {
+  const entries = [...(dt?.items ?? [])]
+    .filter((i) => i.kind === 'file')
+    .map((i) => i.webkitGetAsEntry?.())
+    .filter(Boolean);
+  if (!entries.some((e) => e.isDirectory)) return [...(dt?.files ?? [])];
+  const out = [];
+  let seen = 0;
+  let skipped = 0;
+  const visit = async (entry) => {
+    if (out.length >= cap || ++seen > MAX_ENTRIES || entry.name.startsWith('.')) return;
+    if (entry.isFile) {
+      const file = await new Promise((ok) => entry.file(ok, () => ok(null)));
+      if (file && allowed(f, file)) out.push(file);
+      else skipped += 1;
+      return;
+    }
+    const reader = entry.createReader();
+    for (;;) {
+      const batch = await new Promise((ok) => reader.readEntries(ok, () => ok([])));
+      if (!batch.length || out.length >= cap || seen > MAX_ENTRIES) return;
+      for (const child of batch) await visit(child);
+    }
+  };
+  for (const entry of entries) await visit(entry);
+  if (skipped) announce(f, fill(f.texts.skipped, { n: skipped }));
+  return out;
 }
 
 /** Links and previews of the files a form opened with. */
@@ -275,7 +390,7 @@ document.addEventListener('click', (e) => {
   const f = field(b.closest('.z-upload'));
   const li = b.closest('.z-upload-item');
   if (b.classList.contains('z-upload-cancel')) items.get(li)?.xhr?.abort();
-  else if (b.classList.contains('z-upload-retry')) send(f, li);
+  else if (b.classList.contains('z-upload-retry')) queue(f, li);
   else drop(f, li);
 });
 
@@ -299,7 +414,16 @@ document.addEventListener('drop', (e) => {
   if (!zone) return;
   e.preventDefault();
   zone.classList.remove('z-dragging');
-  take(field(zone.closest('.z-upload')), e.dataTransfer?.files ?? []);
+  const f = field(zone.closest('.z-upload'));
+  dropped(f, e.dataTransfer, f.many ? f.maxFiles + 1 : 1).then((files) => take(f, files));
+});
+
+document.addEventListener('paste', (e) => {
+  const root = e.target.closest?.('.z-upload');
+  const files = e.clipboardData?.files;
+  if (!root || !files?.length) return;
+  e.preventDefault();
+  take(field(root), files);
 });
 
 document.addEventListener('zeyn:content', (e) => init(e.detail instanceof Element ? e.detail : document));
