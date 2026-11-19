@@ -126,9 +126,17 @@ fn review_patterns_are_reported_with_their_reason_and_change_nothing() {
         .iter()
         .map(|t| t.split(':').next().unwrap())
         .collect();
-    assert_eq!(lines, ["1", "3", "6", "10"], "{todos:#?}");
+    assert_eq!(
+        lines,
+        ["1", "3", "6", "10", "14", "19", "21", "23"],
+        "{todos:#?}"
+    );
     assert!(todos[2].contains("ReorderRequest::new(key, after, before)"));
     assert!(todos[3].contains("POST /_zeyn/account/logout"));
+    assert!(todos[4].contains("ImportPreview"));
+    assert!(todos[5].contains("RateStore::refund"));
+    assert!(todos[6].contains("DocStore::allow"));
+    assert!(todos[7].contains("PageCheck::problem"));
 }
 
 #[test]
