@@ -121,6 +121,16 @@ pub const STEP: Step = Step {
             Pattern::Impl("DocStore"),
             "`DocStore::allow(ctx, key, write)` is new: it decides per document who may open and change it. The default keeps the old behavior (the kind's permission opens every document of the tenant), so implement it when documents belong to people",
         ),
+        Change::DefaultRest("NewJob"),
+        Change::DefaultRest("ClaimedJob"),
+        Change::Review(
+            Pattern::Impl("JobStore"),
+            "`JobStore` has new methods for triggers, pauses and history (`add_trigger`, `triggers`, `fire`, `move_trigger`, `set_paused`, `paused_jobs`, `history`, `prune_history`). They exist with the feature `metronome` and have defaults that refuse, so the store compiles, but Metronome needs them: see docs/metronome.md",
+        ),
+        Change::Review(
+            Pattern::Name("SqlJobStore"),
+            "The job tables have a new schema version: run the statements of `zeyn::migrate_job_tables(dialect, prefix)` (feature `metronome`) once in a migration before this store runs on an existing database; `create_job_tables` gives the new schema for fresh ones",
+        ),
         Change::Review(
             Pattern::Name("PageCheck"),
             "`PageCheck::problem` takes a `zeyn::Problem` (`Problem::new(code, summary).why(..).fix(..).docs(..)`, codes `Z06xx`) instead of a message",
