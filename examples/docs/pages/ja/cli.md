@@ -14,6 +14,7 @@
 | `zeyn check` | コンパイルし、構造上の問題と翻訳の欠落を報告します |
 | `zeyn check --fix` | `src`、`tests`、`examples` 内で名前が変わった Zeyn API を書き換えてから検査します |
 | `zeyn check --json` | 安定したコード、理由、修正方法つきでレポートを JSON で出力します |
+| `zeyn doctor` | プロジェクトのビルド方法を読み取り、遅さや大きさの原因を、各項目に1行の修正方法を添えて報告します |
 | `zeyn mcp` | AI エージェント向けに標準入出力で MCP サーバーを起動します |
 
 crates.io からインストールします。
@@ -115,6 +116,10 @@ zeyn check --json
 
 `zeyn check` はアプリのソースも読み、ファイルと行を添えて次を警告します。`W0106` は `src` のない `<script>` や `onclick=` のようなインラインのイベントハンドラーを含む文字列 (CSP はどちらもブロックします)、`W0107` は `escape(..)`、`r.text(..)`、`r.value(..)` を使わずに HTML を書く手書きのコンポーネント、`W0108` は範囲を限るクエリなしで `Vec` 全体を返す action、`W0109` は `.trusted()` を付けた `DocumentViewer` です。`permission` や `public` がない場合は警告するまでもなく、コンパイルできません。
 
+## ビルド速度とディスク使用量
+
+`zeyn doctor` はプロジェクトのビルド方法を読み取り、遅さや大きさの原因を報告します。target フォルダのサイズと最大のフォルダ、リンカー、dev プロファイル（デバッグ情報と依存関係の最適化）、`rust-version` と比べた rustc と cargo、古いツールチェーンが残した成果物、rust-analyzer 用の target フォルダ、そして Windows では target フォルダと `~/.cargo` が Defender のスキャン対象外かどうか（除外設定または Dev Drive。Windows が読み取りを許可しない場合はその旨を伝えます）を調べます。各項目には安定したコードと1行の修正方法があります。`--json` はそれらを1つのドキュメントとして出力し、`--target-limit-gb` は大きいとみなすサイズを決め（既定は 20）、終了コードは常に 0 です。`zeyn doctor --fix` は高速な dev プロファイルを `Cargo.toml` に、`rust-lld` リンカーを `.cargo/config.toml` に追加し、ほかは何も変更しません。2回目の実行では何も変わりません。MCP ツール `zeyn_doctor` はエージェント向けに同じことを行います。
+
 ## DevTools
 
 `cargo run`（または `zeyn dev`）で動かすデバッグビルドは、各リクエストが何をしたかを記録します。実行した画面とアクション、ステータスと時間、画面の構築と描画にかかった時間、各 SQL 文とその時間および影響を受けた行数、アクションが返したエフェクトとトピックです。Alt+Shift+D で直近 50 件のリクエストを表示するパネルが開き、各リクエストを開くとその SQL 文が表示されます。`GET /_zeyn/devtools` は同じ一覧を JSON で返し、MCP ツール `zeyn_devtools` がそれをエージェントのために読みます。
@@ -134,4 +139,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP サーバー
 
-`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_inspect`（画面のノードツリーと、各ノードを置いた Rust の行）、`zeyn_devtools`（実行中のデバッグビルドの DevTools リクエストログ: 画面、アクション、時間、SQL 文）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。
+`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_inspect`（画面のノードツリーと、各ノードを置いた Rust の行）、`zeyn_devtools`（実行中のデバッグビルドの DevTools リクエストログ: 画面、アクション、時間、SQL 文）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_doctor`, `zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。

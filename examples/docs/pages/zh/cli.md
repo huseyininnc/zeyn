@@ -14,6 +14,7 @@
 | `zeyn check` | 编译并报告结构问题和缺失的翻译 |
 | `zeyn check --fix` | 改写 `src`、`tests` 和 `examples` 中已重命名的 Zeyn API，然后检查 |
 | `zeyn check --json` | 以 JSON 输出报告，包含稳定的代码、原因和修复方法 |
+| `zeyn doctor` | 读取项目的构建方式，并报告导致构建缓慢或体积过大的原因，每项发现都附带一行修复方法 |
 | `zeyn mcp` | 在 stdio 上为 AI 智能体运行 MCP 服务器 |
 
 从 crates.io 安装：
@@ -117,6 +118,10 @@ zeyn check --json
 
 `zeyn check` 还会读取应用的源代码，并附上文件和行号对以下情况发出警告：`W0106` 字符串包含没有 `src` 的 `<script>` 或 `onclick=` 这类内联事件处理器（CSP 会阻止两者），`W0107` 手写组件在没有 `escape(..)`、`r.text(..)` 或 `r.value(..)` 的情况下写出 HTML，`W0108` action 在没有限制范围的查询时返回整个 `Vec`，`W0109` 标记为 `.trusted()` 的 `DocumentViewer`。缺少 `permission` 或 `public` 不需要警告：它无法编译。
 
+## 构建速度与磁盘占用
+
+`zeyn doctor` 读取项目的构建方式，并报告导致构建缓慢或体积过大的原因：target 文件夹的大小及其最大的子文件夹、链接器、dev 配置（调试信息和依赖项优化）、rustc 和 cargo 与 `rust-version` 的对比、旧工具链留下的产物、rust-analyzer 的 target 文件夹，以及在 Windows 上 target 文件夹和 `~/.cargo` 是否不在 Defender 扫描范围内（排除项或 Dev Drive；如果 Windows 不允许读取，会如实说明）。每项发现都有稳定的代码和一行修复方法。`--json` 把它们输出为一个文档，`--target-limit-gb` 设定多大算大（默认 20），退出码始终为 0。`zeyn doctor --fix` 把快速 dev 配置加入 `Cargo.toml`，把 `rust-lld` 链接器加入 `.cargo/config.toml`，不改动其他任何内容；再运行一次不会有任何变化。MCP 工具 `zeyn_doctor` 为智能体做同样的事。
+
 ## DevTools
 
 用 `cargo run`（或 `zeyn dev`）提供服务的调试构建会记录每个请求做了什么：运行的 screen 和 action、状态和耗时、screen 构建和渲染所用的时间、每条 SQL 语句及其耗时和受影响的行数，以及 action 返回的效果和主题。Alt+Shift+D 打开一个面板，列出最近 50 个请求；展开某个请求即可看到它的语句。`GET /_zeyn/devtools` 以 JSON 返回同样的列表，MCP 工具 `zeyn_devtools` 为智能体读取它。
@@ -136,4 +141,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP 服务器
 
-`zeyn mcp` 通过 stdio 使用 MCP 协议。它的工具有 `zeyn_docs`（按主题提供框架参考）、`zeyn_describe`（当前目录中应用的 feature、screen、路由和问题）、`zeyn_inspect`（某个 screen 的节点树，以及放置每个节点的 Rust 代码行）、`zeyn_devtools`（正在运行的调试构建的 DevTools 请求日志：screen、action、耗时、SQL 语句）、`zeyn_check`（带 `fix: true` 时运行 `check --fix`）、`zeyn_test`、`zeyn_new_feature` 和 `zeyn_new_screen`。参见 [MCP 与 AI 智能体](mcp.md)。
+`zeyn mcp` 通过 stdio 使用 MCP 协议。它的工具有 `zeyn_docs`（按主题提供框架参考）、`zeyn_describe`（当前目录中应用的 feature、screen、路由和问题）、`zeyn_inspect`（某个 screen 的节点树，以及放置每个节点的 Rust 代码行）、`zeyn_devtools`（正在运行的调试构建的 DevTools 请求日志：screen、action、耗时、SQL 语句）、`zeyn_check`（带 `fix: true` 时运行 `check --fix`）、`zeyn_doctor`, `zeyn_test`、`zeyn_new_feature` 和 `zeyn_new_screen`。参见 [MCP 与 AI 智能体](mcp.md)。

@@ -14,6 +14,7 @@ The `zeyn` command creates projects, adds features, checks an app and runs an MC
 | `zeyn check` | Compiles and reports structural problems and missing translations |
 | `zeyn check --fix` | Rewrites renamed Zeyn APIs in `src`, `tests` and `examples`, then checks |
 | `zeyn check --json` | Prints the report as JSON with stable codes, reasons and fixes |
+| `zeyn doctor` | Reads how the project builds and reports what makes it slow or large, with a one line fix for each finding |
 | `zeyn mcp` | Runs an MCP server on stdio for AI agents |
 
 Install it from crates.io:
@@ -117,6 +118,10 @@ zeyn check --json
 
 `zeyn check` also reads the app's source and warns, with file and line, about `W0106` a string that holds a `<script>` without `src` or an inline event handler such as `onclick=` (the CSP blocks both), `W0107` a hand written component that writes HTML without `escape(..)`, `r.text(..)` or `r.value(..)`, `W0108` an action that returns a whole `Vec` without a query that bounds it, and `W0109` a `DocumentViewer` marked `.trusted()`. A missing `permission` or `public` needs no warning: it does not compile.
 
+## Build speed and disk use
+
+`zeyn doctor` reads how the project builds and reports what makes it slow or large: the size of the target folder and its largest folders, the linker, the dev profile (debug info and dependency optimization), rustc and cargo against `rust-version`, artifacts left by an older toolchain, the rust-analyzer target folder and, on Windows, whether the target folder and `~/.cargo` are outside Defender's scans (an exclusion or a Dev Drive; it says so when Windows does not let it read them). Each finding has a stable code and a one line fix. `--json` prints them as one document, `--target-limit-gb` sets the size that counts as large (default 20), and the exit code is always 0. `zeyn doctor --fix` adds the fast dev profile to `Cargo.toml` and the `rust-lld` linker to `.cargo/config.toml` and edits nothing else; a second run changes nothing. The MCP tool `zeyn_doctor` does the same for an agent.
+
 ## DevTools
 
 A debug build served with `cargo run` (or `zeyn dev`) records what each request did: the screen and action it ran, its status and time, how long the screen took to build and to render, every SQL statement with its time and affected rows, and the effects and topics the action returned. Alt+Shift+D opens a panel with the last 50 requests; each one opens to show its statements. `GET /_zeyn/devtools` returns the same list as JSON, and the MCP tool `zeyn_devtools` reads it for an agent.
@@ -136,4 +141,4 @@ The image of a generated app is about 43 MB and an idle app uses a few MB of RAM
 
 ## The MCP server
 
-`zeyn mcp` speaks MCP over stdio. Its tools are `zeyn_docs` (framework reference by topic), `zeyn_describe` (features, screens, routes and problems of the app in the current directory), `zeyn_inspect` (the node tree of a screen with the Rust line that placed each node), `zeyn_devtools` (the DevTools request log of the running debug build: screen, action, times, SQL statements), `zeyn_check` (with `fix: true` it runs `check --fix`), `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. See [MCP and AI agents](mcp.md).
+`zeyn mcp` speaks MCP over stdio. Its tools are `zeyn_docs` (framework reference by topic), `zeyn_describe` (features, screens, routes and problems of the app in the current directory), `zeyn_inspect` (the node tree of a screen with the Rust line that placed each node), `zeyn_devtools` (the DevTools request log of the running debug build: screen, action, times, SQL statements), `zeyn_check` (with `fix: true` it runs `check --fix`), `zeyn_doctor`, `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. See [MCP and AI agents](mcp.md).

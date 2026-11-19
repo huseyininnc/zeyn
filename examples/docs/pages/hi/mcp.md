@@ -16,6 +16,7 @@ Zeyn दो तरफ़ के एजेंट के लिए बना ह�
 | `zeyn_inspect` | एक Screen का node ट्री: पाथ, कंपोनेंट का प्रकार और हर node को रखने वाला Rust `file:line:column` |
 | `zeyn_devtools` | debug mode में चल रहे ऐप का DevTools request log: सबसे नए request पहले, हर एक के साथ उसकी Screen, action, status, समय और SQL statements (text और समय, कोई value नहीं); `addr` और `limit` वैकल्पिक हैं |
 | `zeyn_check` | कंपाइल करता है और समस्याएँ बताता है; `fix: true` पहले नाम बदले गए API को फिर से लिखता है |
+| `zeyn_doctor` | प्रोजेक्ट के बिल्ड का तरीका पढ़ता है: target का आकार, लिंकर, dev प्रोफ़ाइल, टूलचेन, Windows स्कैन अपवाद; `fix: true` तेज़ dev प्रोफ़ाइल और लिंकर जोड़ता है (केवल `Cargo.toml` और `.cargo/config.toml`) |
 | `zeyn_test` | `cargo test` चलाता है और आउटपुट का अंत लौटाता है |
 | `zeyn_new_feature` | feature फ़ोल्डर बनाता है और उसे पंजीकृत करता है |
 | `zeyn_new_screen` | feature में एक screen फ़ाइल जोड़ता है और उसे पंजीकृत करता है |

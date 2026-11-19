@@ -14,6 +14,7 @@
 | `zeyn check` | Derler ve yapısal sorunları ile eksik çevirileri bildirir |
 | `zeyn check --fix` | `src`, `tests` ve `examples` içinde adı değişen Zeyn API'lerini yeniden yazar, sonra denetler |
 | `zeyn check --json` | Raporu kararlı kodlar, nedenler ve çözümlerle JSON olarak yazar |
+| `zeyn doctor` | Projenin nasıl derlendiğini okur ve onu yavaş ya da büyük yapanı, her bulgu için tek satırlık bir çözümle bildirir |
 | `zeyn mcp` | AI ajanları için stdio üzerinde bir MCP sunucusu çalıştırır |
 
 crates.io üzerinden kurun:
@@ -115,6 +116,10 @@ zeyn check --json
 
 `zeyn check` uygulamanın kaynağını da okur ve dosya ile satırıyla şu durumlarda uyarır: `W0106` `src` olmadan `<script>` ya da `onclick=` gibi satır içi bir olay işleyicisi tutan bir metin (CSP ikisini de engeller), `W0107` `escape(..)`, `r.text(..)` veya `r.value(..)` kullanmadan HTML yazan elle yazılmış bir bileşen, `W0108` onu sınırlayan bir sorgu olmadan bütün bir `Vec` döndüren bir action, `W0109` `.trusted()` işaretli bir `DocumentViewer`. Eksik `permission` veya `public` için uyarıya gerek yoktur: derlenmez.
 
+## Derleme hızı ve disk kullanımı
+
+`zeyn doctor` projenin nasıl derlendiğini okur ve onu yavaş ya da büyük yapanı bildirir: hedef klasörün boyutu ve en büyük klasörleri, bağlayıcı, dev profili (hata ayıklama bilgisi ve bağımlılık eniyilemesi), rustc ve cargo sürümü ile `rust-version`, eski bir araç zincirinden kalan çıktılar, rust-analyzer hedef klasörü ve Windows'ta hedef klasörün ve `~/.cargo` klasörünün Defender taramalarının dışında olup olmadığı (bir dışlama ya da Dev Drive; Windows okumasına izin vermiyorsa bunu söyler). Her bulgunun kararlı bir kodu ve tek satırlık bir çözümü vardır. `--json` hepsini tek belge olarak yazar, `--target-limit-gb` neyin büyük sayılacağını belirler (varsayılan 20) ve çıkış kodu her zaman 0'dır. `zeyn doctor --fix` hızlı dev profilini `Cargo.toml` dosyasına, `rust-lld` bağlayıcısını `.cargo/config.toml` dosyasına ekler ve başka hiçbir şeyi değiştirmez; ikinci çalıştırma hiçbir şeyi değiştirmez. `zeyn_doctor` MCP aracı aynısını bir ajan için yapar.
+
 ## DevTools
 
 `cargo run` (ya da `zeyn dev`) ile sunulan bir debug derlemesi her isteğin ne yaptığını kaydeder: çalıştırdığı screen ve action, durumu ve süresi, screen'in oluşturulması ve çizilmesinin ne kadar sürdüğü, her SQL ifadesi ile süresi ve etkilenen satır sayısı, action'ın döndürdüğü etkiler ve konular. Alt+Shift+D son 50 isteği gösteren bir panel açar; her istek açılınca SQL ifadelerini gösterir. `GET /_zeyn/devtools` aynı listeyi JSON olarak döndürür; MCP aracı `zeyn_devtools` bunu bir ajan için okur.
@@ -134,4 +139,4 @@ Oluşturulan bir uygulamanın imajı yaklaşık 43 MB'tır ve boşta çalışan 
 
 ## MCP sunucusu
 
-`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_inspect` (bir screen'in node ağacı ve her node'u yerleştiren Rust satırı), `zeyn_devtools` (çalışan debug derlemesinin DevTools istek günlüğü: screen, action, süreler, SQL cümleleri), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.
+`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_inspect` (bir screen'in node ağacı ve her node'u yerleştiren Rust satırı), `zeyn_devtools` (çalışan debug derlemesinin DevTools istek günlüğü: screen, action, süreler, SQL cümleleri), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_doctor`, `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.
