@@ -66,6 +66,8 @@ pub enum Pattern {
     Text(&'static str),
     /// A struct literal of this type.
     Struct(&'static str),
+    /// An `impl Trait for Type` block of this trait, by the last name of its path.
+    Impl(&'static str),
 }
 
 /// A text edit: bytes `start..end` become `text`. `note` describes it in the report.
@@ -667,6 +669,22 @@ impl<'ast> Visit<'ast> for Finder<'_> {
             });
         }
         visit::visit_path(self, path);
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
+        if let Some((_, path, _)) = &item.trait_ {
+            for change in self.changes {
+                if let Change::Review(Pattern::Impl(name), reason) = change
+                    && path
+                        .segments
+                        .last()
+                        .is_some_and(|s| s.ident == name)
+                {
+                    self.todo(path.segments[0].ident.span(), reason.to_string());
+                }
+            }
+        }
+        visit::visit_item_impl(self, item);
     }
 
     fn visit_expr_struct(&mut self, expr: &'ast syn::ExprStruct) {
