@@ -66,7 +66,8 @@
 
 .z-bullet-text { font-variant-numeric: tabular-nums; }
 
-.z-kpi {
+.z-kpi,
+.z-skeleton.z-skeleton-kpi {
   display: flex;
   flex-direction: column;
   gap: var(--z-s-1);
@@ -147,25 +148,33 @@
 
 [dir="rtl"] .z-kpi-spark { scale: -1 1; }
 
+/* The KPI skeleton (`Skeleton::kpi`): bars as tall as the title, value, change and trend lines. */
+
+.z-skeleton-kpi .z-skeleton-value { height: 28px; margin-block: 4px; }
+
+.z-skeleton-kpi .z-skeleton-chip { height: 20px; border-radius: 999px; }
+
+.z-skeleton-kpi .z-skeleton-trend { height: 48px; margin-top: auto; border-top: var(--z-s-2) solid transparent; background-clip: padding-box; }
+
 /* Kpis in a row or an auto grid: as tall as the tallest; a row of four wraps to two, then one. */
 
-.z-autogrid > .z-node:has(> .z-kpi),
-.z-col > .z-node:has(> .z-kpi) { height: 100%; }
+.z-autogrid > .z-node:has(> :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)),
+.z-col > .z-node:has(> :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) { height: 100%; }
 
-.z-row:has(> .z-col > .z-node > .z-kpi) { container-type: inline-size; align-items: stretch; }
+.z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) { container-type: inline-size; align-items: stretch; }
 
-.z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex: 1 1 calc((100% - 3 * var(--z-gap)) / 4 - 0.1px); }
+.z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) > .z-col { flex: 1 1 calc((100% - 3 * var(--z-gap)) / 4 - 0.1px); }
 
 @container (max-width: 52rem) {
-  .z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
+  .z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
 }
 
 @container (max-width: 30rem) {
-  .z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
+  .z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
 }
 
 @container (max-width: 22.5rem) {
-  .z-row:has(> .z-col > .z-node > .z-kpi) .z-kpi-trend { display: none; }
+  .z-row:has(> .z-col > .z-node > :is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)) :is(.z-kpi-trend, .z-skeleton-kpi > .z-skeleton-trend) { display: none; }
 }
 
 /* A donut that does not fit (fewer than 2 or more than 5 parts, or one part of 75% or more) is a

@@ -3,7 +3,7 @@
 
 use std::sync::LazyLock;
 use zeyn::prelude::*;
-use zeyn::ui::{BulletCell, SparklineCell};
+use zeyn::ui::{BulletCell, Deferred, SparklineCell};
 
 /// A sales rep with twelve weeks of sales.
 #[entity(table = "reps")]
@@ -60,18 +60,24 @@ pub fn charts() -> Screen {
                             .trend([140.0, 152.0, 149.0, 160.0, 171.0, 184.0]),
                     )
                     .col(
-                        Kpi::new(t!("charts.wait"), 6.5)
-                            .decimals(1)
-                            .unit(t!("charts.minutes"))
-                            .delta(-9.0)
-                            .lower_is_better()
-                            .trend([9.0, 8.2, 7.4, 7.1, 6.5]),
+                        Deferred::new(
+                            Kpi::new(t!("charts.wait"), 6.5)
+                                .decimals(1)
+                                .unit(t!("charts.minutes"))
+                                .delta(-9.0)
+                                .lower_is_better()
+                                .trend([9.0, 8.2, 7.4, 7.1, 6.5]),
+                        )
+                        .skeleton(Skeleton::kpi()),
                     )
                     .col(
-                        Kpi::new(t!("charts.returns"), 41.0)
-                            .delta(3.0)
-                            .lower_is_better()
-                            .trend([30.0, 35.0, 33.0, 41.0]),
+                        Deferred::new(
+                            Kpi::new(t!("charts.returns"), 41.0)
+                                .delta(3.0)
+                                .lower_is_better()
+                                .trend([30.0, 35.0, 33.0, 41.0]),
+                        )
+                        .skeleton(Skeleton::kpi()),
                     ),
             )
             .add(
@@ -98,14 +104,19 @@ pub fn charts() -> Screen {
             )
             .add(
                 Row::new()
-                    .col(card(
-                        Chart::area(t!("charts.visits"))
-                            .labels(months)
-                            .series(
-                                t!("charts.visits"),
-                                [420.0, 510.0, 470.0, 630.0, 700.0, 660.0],
-                            ),
-                    ))
+                    .col(
+                        Card::new().add(
+                            Deferred::new(
+                                Chart::area(t!("charts.visits"))
+                                    .labels(months)
+                                    .series(
+                                        t!("charts.visits"),
+                                        [420.0, 510.0, 470.0, 630.0, 700.0, 660.0],
+                                    ),
+                            )
+                            .skeleton(Skeleton::chart()),
+                        ),
+                    )
                     .col(card(
                         Chart::scatter(t!("charts.price_units"))
                             .decimals(1)
@@ -139,17 +150,20 @@ pub fn charts() -> Screen {
                 Card::new()
                     .title(t!("charts.reps"))
                     .add(
-                        DataGrid::of(search_reps)
-                            .paging(Paging::virtual_scroll())
-                            .column(Rep::name)
-                            .flex(1)
-                            .filter()
-                            .column(Rep::sales)
-                            .width(220)
-                            .cell(BulletCell::new(80_000.0, 120_000.0))
-                            .column(Rep::weeks)
-                            .width(120)
-                            .cell(SparklineCell::new()),
+                        Deferred::new(
+                            DataGrid::of(search_reps)
+                                .paging(Paging::virtual_scroll())
+                                .column(Rep::name)
+                                .flex(1)
+                                .filter()
+                                .column(Rep::sales)
+                                .width(220)
+                                .cell(BulletCell::new(80_000.0, 120_000.0))
+                                .column(Rep::weeks)
+                                .width(120)
+                                .cell(SparklineCell::new()),
+                        )
+                        .skeleton(Skeleton::grid(16)),
                     ),
             ),
     )

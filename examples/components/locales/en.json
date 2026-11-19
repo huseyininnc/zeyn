@@ -109,7 +109,7 @@
       "embed": "A page of another site in a locked frame.",
       "alert": "A message in a tinted box.",
       "progress": "A labelled progress bar.",
-      "skeleton": "Placeholder lines while content loads.",
+      "skeleton": "A placeholder in the shape of what loads: lines, a KPI tile, table rows, list items or a chart.",
       "empty_state": "What a list shows when it has nothing.",
       "popover": "A button that opens a small panel.",
       "busy": "An overlay while a slow action runs.",
@@ -468,7 +468,8 @@
         "another_screen": "Another screen"
       },
       "skeleton": {
-        "overview": "Example"
+        "overview": "Example",
+        "shapes": "A KPI tile, a list, a chart and table rows"
       },
       "split": {
         "overview": "Example"
@@ -478,7 +479,8 @@
         "nothing_selected": "Nothing selected"
       },
       "deferred": {
-        "overview": "Example"
+        "overview": "Example",
+        "chart": "A chart with a skeleton in its shape"
       },
       "spoiler": {
         "overview": "Example"

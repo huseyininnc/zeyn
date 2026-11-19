@@ -82,6 +82,8 @@ DescriptionList::of(&invoice)
 
 `EmptyState::new(title).text(text)` 用下一步操作填充空白区域：`.link(label, screen, params)` 通过 `LinkButton` 前往另一个页面，`.opens(label, screen, params)` 则以窗口形式打开应用的一个 screen。`Skeleton::lines(n)` 是内容加载期间的占位。骨架屏只在等待 300 ms 后才出现，因此快速加载时不会闪现；较晚到达的延迟部分会让它至少保留 400 ms。
 
+`Skeleton::kpi()`、`Skeleton::grid(rows)`、`Skeleton::list(items)` 和 `Skeleton::chart()` 采用 KPI 卡片、DataGrid、List 以及柱状图、折线图或面积图的形状和大小，因此内容到达时页面不会移动。`Deferred::new(part).skeleton(Skeleton::chart())` 在延迟部分加载时显示其中一个。表格骨架的高度与其行数相同，但不超过表格的高度；表格上方的工具栏不包括在内。色条缓慢闪烁，当用户要求减少动态效果时保持静止。
+
 ## LinkButton
 
 去往某处用链接，执行某事用按钮。`LinkButton::new(label, screen, params)` 是指向该 screen 规范路径（例如 `/products/42`）的真正的 `<a href>`，外观像按钮，因此中键点击、“在新标签页中打开”和搜索引擎都把它当作链接处理。它通过 `nav.js` 打开，无需重新加载页面，按 Enter 即可跟随。除非用 `.primary()` 要求主要操作的实心样式，否则外观为次要样式。该 screen 必须有路由，否则无法编译。`EmptyState::link` 和 `Hero::link` 使用它。
