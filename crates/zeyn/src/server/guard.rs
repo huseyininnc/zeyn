@@ -160,6 +160,12 @@ pub(super) async fn remember_identity(
             .as_ref()
             .and_then(|a| a.authenticate(req.headers())),
     };
+    #[cfg(debug_assertions)]
+    devtools::user(
+        identity
+            .as_ref()
+            .and_then(|i| i.user.as_deref()),
+    );
     IDENTITY
         .scope(identity, next.run(req))
         .await

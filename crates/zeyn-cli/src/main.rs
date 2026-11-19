@@ -609,7 +609,7 @@ fn devtools(root: &Path, addr: Option<&str>, limit: u64) -> Result<String, Strin
         Some("200") => {}
         Some("404") => {
             return Err(format!(
-                "the app at {addr} has no DevTools: they exist only in debug builds served with `App::serve` (`cargo run`)"
+                "the app at {addr} shows no DevTools: they exist only in debug builds served with `App::serve` (`cargo run`), and only a signed in user with the `zeyn.devtools` permission reads them (`DevAuth` has it)"
             ));
         }
         _ => {

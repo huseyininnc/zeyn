@@ -76,6 +76,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - CI runs `cargo audit` and fails on any advisory that `.cargo/audit.toml` does not ignore with a reason. Four are ignored there: quick-xml 0.38 in Typst's bibliography reader (feature `pdf`, only the app's own templates reach it, no fixed release yet), libsqlite3-sys 0.37, which sits in `Cargo.lock` through sqlx's optional SQLite driver but is never built, and glib 0.18 from the Linux desktop window stack.
 - Pages and screen fragments of signed in users, and of screens that are not public, are sent with `Cache-Control: private, no-store`, so records do not stay in the browser's disk cache or a shared cache after sign out. Public screens opened without a session keep their caching.
 - `DocStore::allow(ctx, key, write)` decides per document who may open and change a collaborative document; it runs on every join, also while the room is open for others. Before, the kind's permission let every user of a tenant open every document of the kind by its id. The default keeps that behavior, so stores whose documents belong to people should implement it.
+- `GET /_zeyn/devtools` (debug builds only) answers only signed in users with the `zeyn.devtools` permission (`DevAuth` has it) and lists only their own requests. Before, anyone who reached a debug build read the requests of every user.
 
 ## [0.0.10] - 2026-11-10
 

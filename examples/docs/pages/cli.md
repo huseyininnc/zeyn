@@ -118,7 +118,7 @@ zeyn check --json
 
 ## DevTools
 
-A debug build served with `cargo run` (or `zeyn dev`) records what each request did: the screen and action it ran, its status and time, how long the screen took to build and to render, every SQL statement with its time and affected rows, and the effects and topics the action returned. Alt+Shift+D opens a panel with the last 50 requests; each one opens to show its statements. `GET /_zeyn/devtools` returns the same list as JSON, and the MCP tool `zeyn_devtools` reads it for an agent.
+A debug build served with `cargo run` (or `zeyn dev`) records what each request did: the screen and action it ran, its status and time, how long the screen took to build and to render, every SQL statement with its time and affected rows, and the effects and topics the action returned. Alt+Shift+D opens a panel with the last 50 requests; each one opens to show its statements. `GET /_zeyn/devtools` returns the same list as JSON, and the MCP tool `zeyn_devtools` reads it for an agent. Only a signed in user with the `zeyn.devtools` permission reads the list, and only their own requests; `DevAuth` grants the permission, so the MCP tool works with it, and anonymous callers get `404`.
 
 Statements are kept without their arguments, so no values reach the panel. Release builds have no DevTools: no code, no route and no memory for them. An app that serves `App::router` itself, or a test, turns them on with `zeyn::server::devtools(true)`.
 

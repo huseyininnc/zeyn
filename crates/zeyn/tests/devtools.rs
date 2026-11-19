@@ -58,6 +58,17 @@ const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789a
 fn router() -> Router {
     App::new("DevTools")
         .service(Store::default())
+        .auth(|h: &axum::http::HeaderMap| {
+            h.get("x-user")
+                .and_then(|v| v.to_str().ok())
+                .map(|u| {
+                    let id = zeyn::Identity::user(u);
+                    match u {
+                        "intern" => id,
+                        _ => id.with_permissions(["zeyn.devtools"]),
+                    }
+                })
+        })
         .feature(
             Feature::new("notes")
                 .screen(notes)
@@ -84,6 +95,17 @@ async fn send(router: &Router, req: Request<Body>) -> (StatusCode, String) {
 }
 
 fn get(path: &str) -> Request<Body> {
+    as_user(path, "dev")
+}
+
+fn as_user(path: &str, user: &str) -> Request<Body> {
+    Request::get(path)
+        .header("x-user", user)
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn anonymous(path: &str) -> Request<Body> {
     Request::get(path)
         .body(Body::empty())
         .unwrap()
@@ -92,6 +114,7 @@ fn get(path: &str) -> Request<Body> {
 fn submit() -> Request<Body> {
     let body = serde_json::json!({ "screen": "notes", "node": 0, "values": { "text": "Hello" } });
     Request::post("/_zeyn/form")
+        .header("x-user", "dev")
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
         .header("x-zeyn-csrf", TOKEN)
@@ -111,9 +134,29 @@ async fn requests_are_recorded_only_while_the_devtools_are_on() {
     zeyn::server::devtools(true);
     let (_, page) = send(&router, get("/notes")).await;
     let (saved, body) = send(&router, submit()).await;
+    let (_, _) = send(&router, as_user("/notes", "other")).await;
     let (status, log) = send(&router, get("/_zeyn/devtools")).await;
     let (_, script) = send(&router, get("/_zeyn/devtools.js")).await;
+    let (stranger, _) = send(&router, anonymous("/_zeyn/devtools")).await;
+    let (intern, _) = send(&router, as_user("/_zeyn/devtools", "intern")).await;
+    let (_, others) = send(&router, as_user("/_zeyn/devtools", "other")).await;
     zeyn::server::devtools(false);
+
+    assert_eq!(
+        stranger,
+        StatusCode::NOT_FOUND,
+        "anonymous callers see nothing"
+    );
+    assert_eq!(intern, StatusCode::NOT_FOUND, "the permission is needed");
+    let others: serde_json::Value = serde_json::from_str(&others).unwrap();
+    assert_eq!(
+        others["requests"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1,
+        "each user sees only their own requests: {others}"
+    );
 
     assert!(page.contains("/_zeyn/devtools.js"), "{page}");
     assert!(script.contains("Alt+Shift+D"));
