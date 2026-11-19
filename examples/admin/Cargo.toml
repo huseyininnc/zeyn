@@ -1,0 +1,20 @@
+[package]
+name = "zeyn-example-admin"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+zeyn = { path = "../../crates/zeyn", features = ["realtime"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde_json = "1"
+
+[features]
+postgres = ["zeyn/postgres"]
+
+[dev-dependencies]
+zeyn = { path = "../../crates/zeyn", features = ["realtime", "socket-client"] }
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
