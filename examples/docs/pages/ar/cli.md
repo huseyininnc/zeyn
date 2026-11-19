@@ -14,6 +14,7 @@
 | `zeyn check` | يصرّف المشروع ويبلّغ عن المشكلات البنيوية والترجمات الناقصة |
 | `zeyn check --fix` | يعيد كتابة واجهات Zeyn المعاد تسميتها في `src` و`tests` و`examples`، ثم يفحص |
 | `zeyn check --json` | يطبع التقرير بصيغة JSON مع رموز ثابتة وأسباب وحلول |
+| `zeyn doctor` | يقرأ كيف يُبنى المشروع ويبلغ عمّا يجعله بطيئا أو كبيرا، مع إصلاح من سطر واحد لكل ملاحظة |
 | `zeyn mcp` | يشغّل خادم MCP على stdio لوكلاء الذكاء الاصطناعي |
 
 ثبّته من crates.io:
@@ -56,6 +57,7 @@ cargo run
 
   وليس `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
 - `build.rs` و`max_file_lines = 300` تحت `[package.metadata.zeyn]` في `Cargo.toml`: يتوقف `cargo build` عندما يزيد عدد الأسطر غير الفارغة في ملف داخل `src/`؛ ويفعل clippy `too_many_lines` (60، في `clippy.toml`) الشيء نفسه للدوال. انظر [Project structure](structure.md).
+- `[profile.dev]` في `Cargo.toml` و`.cargo/config.toml` و`.vscode/settings.json`: حلقة بناء سريعة. تُبنى الاعتماديات بـ `opt-level = 1` ودون معلومات تصحيح، ويحتفظ كودك بجداول الأسطر فقط (تعرض آثار الاستدعاء الملف والسطر؛ اضبط `CARGO_PROFILE_DEV_DEBUG=full` للتصحيح مع المتغيرات المحلية)، ويربط Windows عبر `rust-lld`، ويستخدم rust-analyzer مجلد target خاصا به فلا ينتظر `cargo build`.
 - `Dockerfile` و`.dockerignore`: صورة حاوية صغيرة.
 - خطوط إنتاج (pipelines) لخوادم CI الشائعة، وكلها تجري الفحوص نفسها (`cargo fmt --check` و`cargo clippy -D warnings` و`cargo test` و`cargo deny check`) وترفض وسمًا `vX.Y.Z` لا يطابق `Cargo.toml`:
   - `.github/workflows/ci.yml` لـ GitHub Actions، مع `.github/dependabot.yml` (تحديثات أسبوعية لـ Cargo والإجراءات) وقائمة مراجعة لطلبات السحب (pull requests)؛
@@ -116,6 +118,10 @@ zeyn check --json
 
 يقرأ `zeyn check` أيضًا مصدر التطبيق وينبّه، مع الملف والسطر، إلى `W0106` نص يحمل `<script>` دون `src` أو معالج أحداث مضمّنًا مثل `onclick=` (تحظر سياسة CSP كليهما)، و`W0107` مكوّن مكتوب يدويًا يكتب HTML دون `escape(..)` أو `r.text(..)` أو `r.value(..)`، و`W0108` action يعيد `Vec` كاملًا دون استعلام يحدّه، و`W0109` `DocumentViewer` مُعلَّم بـ `.trusted()`. ولا يحتاج غياب `permission` أو `public` إلى تنبيه: فهو لا يُترجم.
 
+## سرعة البناء واستخدام القرص
+
+يقرأ `zeyn doctor` كيف يُبنى المشروع ويبلغ عمّا يجعله بطيئا أو كبيرا: حجم مجلد target وأكبر مجلداته، والرابط، وملف dev (معلومات التصحيح وتحسين الاعتماديات)، وإصدارَي rustc وcargo مقارنة بـ `rust-version`، والنواتج التي تركتها سلسلة أدوات أقدم، ومجلد target الخاص بـ rust-analyzer، وفي Windows ما إذا كان مجلد target و`~/.cargo` خارج فحص Defender (استثناء أو Dev Drive؛ ويقول ذلك إذا لم يسمح Windows بقراءته). لكل ملاحظة رمز ثابت وإصلاح من سطر واحد. يطبعها `--json` في مستند واحد، ويحدد `--target-limit-gb` الحجم الذي يُعدّ كبيرا (الافتراضي 20)، ورمز الخروج دائما 0. يضيف `zeyn doctor --fix` ملف dev السريع إلى `Cargo.toml` والرابط `rust-lld` إلى `.cargo/config.toml` ولا يعدّل شيئا آخر؛ ولا يغيّر التشغيل الثاني شيئا. وأداة MCP ‏`zeyn_doctor` تفعل الشيء نفسه للوكيل.
+
 ## DevTools
 
 تسجّل بنية التصحيح التي تُخدَّم بـ `cargo run` (أو `zeyn dev`) ما فعله كل طلب: الشاشة والإجراء اللذين شغّلهما، وحالته ومدته، والوقت الذي استغرقه بناء الشاشة وعرضها، وكل جملة SQL مع وقتها وعدد الصفوف المتأثرة، والتأثيرات والمواضيع التي أعادها الإجراء. يفتح Alt+Shift+D لوحة بآخر 50 طلبًا؛ ويُفتح كل طلب ليعرض جمله. ويعيد `GET /_zeyn/devtools` القائمة نفسها بصيغة JSON، وتقرؤها أداة MCP `zeyn_devtools` للوكيل.
@@ -135,4 +141,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## خادم MCP
 
-يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_inspect` (شجرة عُقد الشاشة مع سطر Rust الذي وضع كل عقدة) و`zeyn_devtools` (سجل طلبات DevTools لبناء التصحيح الجاري: الشاشة والإجراء والأزمنة وعبارات SQL) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_test` و`zeyn_new_feature` و`zeyn_new_screen`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).
+يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_inspect` (شجرة عُقد الشاشة مع سطر Rust الذي وضع كل عقدة) و`zeyn_devtools` (سجل طلبات DevTools لبناء التصحيح الجاري: الشاشة والإجراء والأزمنة وعبارات SQL) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_doctor`, `zeyn_test` و`zeyn_new_feature` و`zeyn_new_screen`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).

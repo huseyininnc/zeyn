@@ -14,6 +14,7 @@ El comando `zeyn` crea proyectos, añade features, comprueba una aplicación y e
 | `zeyn check` | Compila e informa de problemas estructurales y traducciones que faltan |
 | `zeyn check --fix` | Reescribe las APIs de Zeyn renombradas en `src`, `tests` y `examples`, y luego comprueba |
 | `zeyn check --json` | Imprime el informe como JSON con códigos estables, motivos y soluciones |
+| `zeyn doctor` | Lee cómo se compila el proyecto e informa de lo que lo hace lento o grande, con una corrección de una línea para cada hallazgo |
 | `zeyn mcp` | Ejecuta un servidor MCP por stdio para agentes de IA |
 
 Instálalo desde crates.io:
@@ -56,6 +57,7 @@ cargo run
 
   y no `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
 - `build.rs` y `max_file_lines = 300` en `[package.metadata.zeyn]` de `Cargo.toml`: `cargo build` se detiene cuando un archivo de `src/` tiene más líneas no vacías; clippy `too_many_lines` (60, en `clippy.toml`) hace lo mismo con las funciones. Consulta [Project structure](structure.md).
+- `[profile.dev]` en `Cargo.toml`, `.cargo/config.toml` y `.vscode/settings.json`: un ciclo de compilación rápido. Las dependencias se compilan con `opt-level = 1` y sin información de depuración, tu propio código conserva solo las tablas de líneas (las trazas muestran archivo y línea; define `CARGO_PROFILE_DEV_DEBUG=full` para depurar con variables locales), Windows enlaza con `rust-lld` y rust-analyzer usa su propia carpeta target para no esperar a `cargo build`.
 - `Dockerfile` y `.dockerignore`: una imagen de contenedor pequeña.
 - Pipelines para los servidores de CI habituales, todos con las mismas comprobaciones (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) y que rechazan una etiqueta `vX.Y.Z` que no coincida con `Cargo.toml`:
   - `.github/workflows/ci.yml` para GitHub Actions, con `.github/dependabot.yml` (actualizaciones semanales de Cargo y de actions) y una lista de verificación para pull requests;
@@ -116,6 +118,10 @@ zeyn check --json
 
 `zeyn check` también lee el código de la app y avisa, con archivo y línea, de `W0106` una cadena que contiene un `<script>` sin `src` o un manejador de eventos en línea como `onclick=` (la CSP bloquea ambos), `W0107` un componente escrito a mano que escribe HTML sin `escape(..)`, `r.text(..)` ni `r.value(..)`, `W0108` una action que devuelve un `Vec` entero sin una consulta que lo limite y `W0109` un `DocumentViewer` marcado `.trusted()`. Un `permission` o `public` ausente no necesita aviso: no compila.
 
+## Velocidad de compilación y uso de disco
+
+`zeyn doctor` lee cómo se compila el proyecto e informa de lo que lo hace lento o grande: el tamaño de la carpeta target y sus carpetas más grandes, el enlazador, el perfil dev (información de depuración y optimización de dependencias), rustc y cargo frente a `rust-version`, artefactos de una toolchain anterior, la carpeta target de rust-analyzer y, en Windows, si la carpeta target y `~/.cargo` quedan fuera de los análisis de Defender (una exclusión o un Dev Drive; lo dice cuando Windows no permite leerlo). Cada hallazgo tiene un código estable y una corrección de una línea. `--json` los imprime como un solo documento, `--target-limit-gb` fija el tamaño que cuenta como grande (20 por defecto) y el código de salida es siempre 0. `zeyn doctor --fix` añade el perfil dev rápido a `Cargo.toml` y el enlazador `rust-lld` a `.cargo/config.toml` y no modifica nada más; una segunda ejecución no cambia nada. La herramienta MCP `zeyn_doctor` hace lo mismo para un agente.
+
 ## DevTools
 
 Una compilación de depuración servida con `cargo run` (o `zeyn dev`) registra lo que hizo cada solicitud: la pantalla y la acción que ejecutó, su estado y su tiempo, cuánto tardó la pantalla en construirse y en renderizarse, cada sentencia SQL con su tiempo y las filas afectadas, y los efectos y temas que devolvió la acción. Alt+Shift+D abre un panel con las últimas 50 solicitudes; cada una se abre para mostrar sus sentencias. `GET /_zeyn/devtools` devuelve la misma lista en JSON, y la herramienta MCP `zeyn_devtools` la lee para un agente.
@@ -135,4 +141,4 @@ La imagen de una aplicación generada pesa unos 43 MB y una aplicación inactiva
 
 ## El servidor MCP
 
-`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_inspect` (el árbol de nodos de una pantalla con la línea de Rust que colocó cada nodo), `zeyn_devtools` (el registro de peticiones de DevTools de la compilación de depuración en marcha: pantalla, acción, tiempos, sentencias SQL), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_test`, `zeyn_new_feature` y `zeyn_new_screen`. Consulta [MCP y agentes de IA](mcp.md).
+`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_inspect` (el árbol de nodos de una pantalla con la línea de Rust que colocó cada nodo), `zeyn_devtools` (el registro de peticiones de DevTools de la compilación de depuración en marcha: pantalla, acción, tiempos, sentencias SQL), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_doctor`, `zeyn_test`, `zeyn_new_feature` y `zeyn_new_screen`. Consulta [MCP y agentes de IA](mcp.md).
