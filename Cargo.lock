@@ -7143,6 +7143,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.2.17",
  "http-body-util",
+ "image",
  "jiff",
  "lettre",
  "opentelemetry",

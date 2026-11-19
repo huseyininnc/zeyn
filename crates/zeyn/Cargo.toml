@@ -38,6 +38,9 @@ socket-client = ["realtime", "dep:tokio-tungstenite"]
 xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
 # PDF documents from Typst templates, and grid export to PDF.
 pdf = ["server", "dep:typst", "dep:typst-layout", "dep:typst-pdf"]
+# Uploaded PNG, JPEG and WebP images decoded and encoded again, which drops EXIF, GPS and other
+# metadata and anything hidden after the image data; the EXIF orientation is applied first.
+image = ["server", "dep:image"]
 # E-mail notifications over SMTP, sent from a background job.
 email = ["server", "dep:lettre"]
 # Optional user accounts with the structure of ASP.NET Core Identity: stores, managers, Argon2id
@@ -96,6 +99,7 @@ yrs = { version = "0.28", optional = true }
 rust_xlsxwriter = { version = "0.102", default-features = false, features = ["constant_memory"], optional = true }
 calamine = { version = "0.38", default-features = false, optional = true }
 zip = { version = "9", default-features = false, features = ["deflate"], optional = true }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"], optional = true }
 typst = { version = "0.15", optional = true }
 typst-layout = { version = "0.15", optional = true }
 typst-pdf = { version = "0.15", optional = true }
@@ -128,6 +132,10 @@ required-features = ["assistant"]
 [[test]]
 name = "resumable"
 required-features = ["resumable"]
+
+[[test]]
+name = "files_image"
+required-features = ["image"]
 
 [[test]]
 name = "oidc"

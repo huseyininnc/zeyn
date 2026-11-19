@@ -74,7 +74,7 @@ docs/                  design documents and guides
 ```
 cargo build --workspace
 cargo test --workspace
-cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts,resumable   tests behind features
+cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts,image,resumable   tests behind features
 cargo check -p zeyn --all-features --tests                                      everything compiles
 cargo run -p zeyn-example-showcase      http://127.0.0.1:3002, every component
 cargo run -p zeyn-example-docs          http://127.0.0.1:3008, the documentation
@@ -86,7 +86,11 @@ cargo run -p zeyn-example-components    http://127.0.0.1:3010, the component cat
   how to start the server in Docker.
 - Disk space is limited on shared machines. Use `CARGO_INCREMENTAL=0`, and delete your own target
   directory when you are done. The `pdf` feature links Typst (about 40 MB); do not turn it on for
-  the whole workspace.
+  the whole workspace. `sh scripts/sweep-target.sh` removes a target directory over 20 GB or
+  built by an older toolchain.
+- One build queue per target directory. Agents that build at the same time use separate target
+  directories and set `CARGO_BUILD_JOBS` to half the cores; never start a second build in a
+  directory another build is using.
 - `cargo test` does not rebuild a binary you then run by hand; run `cargo build -p <example>` first.
 
 ## The rules

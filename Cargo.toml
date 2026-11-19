@@ -10,3 +10,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/huseyininnc/zeyn"
 readme = "README.md"
 homepage = "https://zeynsoft.com"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 1

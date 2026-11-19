@@ -130,6 +130,8 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 4. Feature의 `FileScanner`를 실행합니다. 거부된 파일이나 실패한 스캐너의 파일은 삭제되고 응답은 `422`입니다.
 5. `{id, name, size, type}`과 함께 `201`로 응답합니다. id는 서버에서 만든 128비트 난수이며, 이름은 경로와 제어 문자가 제거됩니다.
 
+`image` 기능을 켜면 `FileRules::clean_images()`가 저장소에 파일이 들어간 뒤 한 단계를 더합니다. PNG, JPEG, WebP 업로드는 디코딩된 뒤 같은 형식으로 다시 인코딩되므로 EXIF(GPS 포함), XMP, ICC 프로필, 텍스트 청크, 이미지 데이터 뒤에 숨긴 바이트가 서버에 남지 않습니다. EXIF 방향은 먼저 픽셀에 적용되고, JPEG는 품질 90으로, PNG와 WebP는 무손실로 기록됩니다. 디코딩은 한 변 `MAX_IMAGE_SIDE`(12,000) 픽셀과 `MAX_IMAGE_MEMORY`(256 MiB)에서 멈추며, 디코딩되지 않는 이미지는 삭제되고 응답은 `422`입니다. 두 한도는 픽셀을 디코딩하기 전에 이미지 헤더의 크기로 확인되므로, 거대한 이미지라고 주장하는 작은 파일은 그 메모리를 쓰지 않고 거부되며, 애니메이션 이미지는 첫 프레임만 남습니다. 정리된 파일은 새 id로 원본을 대신하고, 그 뒤 스캐너가 정리된 파일을 검사합니다. 기능이 없으면 이 메서드가 없으므로, 저장소가 정리하지 않으면서 정리한다고 여길 수 없습니다.
+
 다운로드(`GET /_zeyn/files/{store}/{id}`)는 id의 형태, 권한, 가드, 테넌트를 검사하고 미디어 제공(`docs/media.md` 참고)을 거칩니다. 범위, 엔티티 태그, `nosniff`가 적용됩니다. 래스터 이미지, 오디오, 비디오만 인라인으로 제공되며, 그 밖의 모든 것은 `Content-Security-Policy: sandbox`와 함께 따옴표로 묶은 ASCII 이름과 UTF-8 이름이 있는 `Content-Disposition: attachment`를 붙여 `application/octet-stream`으로 전송됩니다.
 
 `DiskStore`는 `{id}.bin`과 `{id}.json`을 하나의 폴더에 보관하며 업로드를 먼저 `{id}.part`에 씁니다. `MemoryStore`는 바이트 상한이 있는 메모리에 파일을 보관하며 테스트와 데모용입니다. 폼 값은 파일의 이름만 담습니다. 파일이 존재하는지 확실히 해야 하는 저장 action은 쇼케이스처럼 `store.meta(id)`를 호출합니다.

@@ -337,6 +337,12 @@ async fn receive(
         return Err(f);
     }
     stored.map_err(Failure::App)?;
+    #[cfg(feature = "image")]
+    let (meta, size) = if rules.cleans(kind) {
+        clean(&entry, meta, kind).await?
+    } else {
+        (meta, size)
+    };
     if let Some(scanner) = scanner {
         let refuse = || {
             status(
@@ -383,6 +389,74 @@ async fn receive(
         size,
         ..meta.file()
     })
+}
+
+/// Replaces the stored image `meta` with its [`clean_image`](crate::clean_image) under a new
+/// id and answers the new record and size. The original is deleted in every case; an image that
+/// does not decode is refused.
+#[cfg(feature = "image")]
+async fn clean(
+    entry: &crate::FileEntry,
+    meta: FileMeta,
+    kind: FileType,
+) -> Result<(FileMeta, u64), Failure> {
+    let refuse = || {
+        status(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "image_invalid",
+            Text::key("zeyn.files.type"),
+        )
+    };
+    let max = entry.rules.limit();
+    let read = entry.store.get(meta.id.clone()).await;
+    let cleaned = match read {
+        Ok(file) => tokio::task::spawn_blocking(move || {
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            file.reader
+                .take(max)
+                .read_to_end(&mut bytes)
+                .ok()?;
+            crate::clean_image(kind, &bytes)
+        })
+        .await
+        .ok()
+        .flatten(),
+        Err(_) => None,
+    };
+    let _ = entry
+        .store
+        .delete(meta.id.clone())
+        .await;
+    let bytes = Bytes::from(cleaned.ok_or_else(refuse)?);
+    let fresh = FileMeta {
+        id: new_file_id(),
+        ..meta
+    };
+    let size = bytes.len() as u64;
+    let (tx, rx) = tokio::sync::mpsc::channel::<std::io::Result<Bytes>>(4);
+    let put = tokio::spawn(
+        entry
+            .store
+            .put(fresh.clone(), FileChunks(rx)),
+    );
+    let mut at = 0;
+    while at < bytes.len() {
+        let end = (at + UPLOAD_CHUNK).min(bytes.len());
+        if tx
+            .send(Ok(bytes.slice(at..end)))
+            .await
+            .is_err()
+        {
+            break;
+        }
+        at = end;
+    }
+    drop(tx);
+    put.await
+        .map_err(|e| Failure::App(Error::Internal(e.to_string())))?
+        .map_err(Failure::App)?;
+    Ok((fresh, size))
 }
 
 /// The next part of the body. A client that stops sending for [`IDLE`] or breaks the
