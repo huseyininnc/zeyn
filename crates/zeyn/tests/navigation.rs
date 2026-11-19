@@ -513,7 +513,9 @@ async fn a_deferred_part_shows_a_placeholder_and_loads_by_its_path() {
         "the slow part is not in the page"
     );
     assert!(
-        page.contains(r#"<div class="z-deferred" data-zeyn-defer="0.1.0" aria-busy="true""#),
+        page.contains(
+            r#"<div class="z-deferred z-lines-deferred" data-zeyn-defer="0.1.0" aria-busy="true""#
+        ),
         "{page}"
     );
     assert!(

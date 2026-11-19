@@ -453,37 +453,144 @@ impl Component for EmptyState {
     }
 }
 
-/// Grey placeholder lines shown while content loads. Hidden from screen readers, which hear
-/// "Loading" instead.
+/// A grey placeholder shown while content loads, in the shape of what it stands for: lines of
+/// text, a KPI tile, DataGrid rows, list items or a chart. Each shape takes the size of the real
+/// component, so nothing moves when the content arrives. Hidden from screen readers, which hear
+/// "Loading" instead. It shows only after 300 ms, and pulses unless the user asks for reduced
+/// motion.
+///
+/// ```
+/// use zeyn::ui::Skeleton;
+/// let mut out = String::new();
+/// zeyn::Component::render(&Skeleton::grid(5), &mut out, &zeyn::Render::english("s"));
+/// assert!(out.contains("z-skeleton-grid") && out.matches("z-skeleton-row\"").count() == 5);
+/// ```
 pub struct Skeleton {
-    lines: u8,
+    shape: Shape,
+}
+
+/// What a [`Skeleton`] looks like.
+enum Shape {
+    Lines(u8),
+    Kpi,
+    Grid(u8),
+    List(u8),
+    Chart,
+}
+
+/// One grey bar `width` percent wide; `class` adds a size class.
+fn bar(out: &mut String, class: &str, width: u32) {
+    out.push_str(&format!(
+        r#"<span class="z-skeleton-line{class}" aria-hidden="true" style="--z-skeleton-width:{width}%"></span>"#
+    ));
 }
 
 impl Skeleton {
+    /// Lines of text, 1 to 20.
     pub fn lines(lines: u8) -> Self {
         Self {
-            lines: lines.clamp(1, 20),
+            shape: Shape::Lines(lines.clamp(1, 20)),
+        }
+    }
+
+    /// A KPI tile ([`super::Kpi`]) with a title, a value, a change and a trend.
+    pub fn kpi() -> Self {
+        Self { shape: Shape::Kpi }
+    }
+
+    /// A DataGrid with a header row and `rows` rows, 1 to 50.
+    pub fn grid(rows: u8) -> Self {
+        Self {
+            shape: Shape::Grid(rows.clamp(1, 50)),
+        }
+    }
+
+    /// A [`super::List`] of `items` items with a title and a subtitle, 1 to 50.
+    pub fn list(items: u8) -> Self {
+        Self {
+            shape: Shape::List(items.clamp(1, 50)),
+        }
+    }
+
+    /// A bar, line or area chart ([`super::Chart`]) with its title and plot area.
+    pub fn chart() -> Self {
+        Self {
+            shape: Shape::Chart,
+        }
+    }
+
+    /// The shape's name, used in the class and the schema.
+    pub(crate) fn name(&self) -> &'static str {
+        match self.shape {
+            Shape::Lines(_) => "lines",
+            Shape::Kpi => "kpi",
+            Shape::Grid(_) => "grid",
+            Shape::List(_) => "list",
+            Shape::Chart => "chart",
         }
     }
 }
 
 impl Component for Skeleton {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(
-            r#"<div class="z-skeleton" aria-busy="true"><span class="z-sr-only">{}</span>"#,
-            r.text(&Text::key("zeyn.ui.loading"))
-        ));
-        for i in 0..self.lines {
-            out.push_str(&format!(
-                r#"<span class="z-skeleton-line" aria-hidden="true" style="--z-skeleton-width:{}%"></span>"#,
-                100 - (i as u32 * 17) % 45
-            ));
+        let loading = r.text(&Text::key("zeyn.ui.loading"));
+        match self.shape {
+            Shape::Lines(_) => out.push_str(r#"<div class="z-skeleton" aria-busy="true">"#),
+            _ => out.push_str(&format!(
+                r#"<div class="z-skeleton z-skeleton-{}" aria-busy="true">"#,
+                self.name()
+            )),
+        }
+        out.push_str(&format!(r#"<span class="z-sr-only">{loading}</span>"#));
+        match self.shape {
+            Shape::Lines(n) => {
+                for i in 0..n as u32 {
+                    bar(out, "", 100 - (i * 17) % 45);
+                }
+            }
+            Shape::Kpi => {
+                bar(out, " z-skeleton-title", 50);
+                bar(out, " z-skeleton-value", 60);
+                bar(out, " z-skeleton-chip", 35);
+                bar(out, " z-skeleton-trend", 100);
+            }
+            Shape::Grid(n) => {
+                out.push_str(r#"<div class="z-skeleton-row z-skeleton-head">"#);
+                for w in [60, 40, 50] {
+                    bar(out, "", w);
+                }
+                out.push_str("</div>");
+                for i in 0..n as u32 {
+                    out.push_str(r#"<div class="z-skeleton-row">"#);
+                    for c in 0..3 {
+                        bar(out, "", 90 - (i * 13 + c * 29) % 50);
+                    }
+                    out.push_str("</div>");
+                }
+            }
+            Shape::List(n) => {
+                for i in 0..n as u32 {
+                    out.push_str(r#"<div class="z-skeleton-item">"#);
+                    bar(out, " z-skeleton-title", 60 - (i * 11) % 25);
+                    bar(out, "", 40 - (i * 7) % 15);
+                    out.push_str("</div>");
+                }
+            }
+            Shape::Chart => {
+                bar(out, " z-skeleton-title", 40);
+                bar(out, " z-skeleton-plot", 100);
+                bar(out, " z-skeleton-data", 20);
+            }
         }
         out.push_str("</div>");
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "skeleton", "lines": self.lines })
+        let count = match self.shape {
+            Shape::Lines(n) | Shape::Grid(n) | Shape::List(n) => Some(n),
+            Shape::Kpi | Shape::Chart => None,
+        };
+        json!({ "type": "skeleton", "shape": self.name(), "lines": count })
     }
 }
 
