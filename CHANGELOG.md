@@ -79,6 +79,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - `GET /_zeyn/devtools` (debug builds only) answers only signed in users with the `zeyn.devtools` permission (`DevAuth` has it) and lists only their own requests. Before, anyone who reached a debug build read the requests of every user.
 - `POST /_zeyn/reason`, `/_zeyn/socket/open` and `/_zeyn/auth/totp/enroll` count against the write limit.
 - Uploads take their declared size (the store's limit without one) from the quota before the body is read and give back what the file did not use or, when the upload fails, all of it (`RateStore::refund`), so uploads sent at the same time can no longer pass the quota together.
+- The access reason cookie of `#[screen(reason)]` is bound to the user and tenant who gave the reason and carries its own expiry, so another user of the same browser is asked again.
 
 ## [0.0.10] - 2026-11-10
 

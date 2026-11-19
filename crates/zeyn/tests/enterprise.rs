@@ -1161,6 +1161,38 @@ async fn a_screen_that_asks_for_a_reason_shows_no_data_until_one_is_given() {
 }
 
 #[tokio::test]
+async fn a_reason_given_by_one_user_does_not_open_the_screen_for_another() {
+    let given = send(
+        &cases_app(case_reader(), MemoryAudit::default()),
+        post(
+            "/_zeyn/reason",
+            serde_json::json!({ "screen": "case_file", "reason": "Ward round" }),
+        ),
+    )
+    .await;
+    let pair = given
+        .headers
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let other = cases_app(
+        Identity::user("doctor").with_permissions(["cases.read"]),
+        MemoryAudit::default(),
+    );
+    let r = send(&other, with_cookie(get("/cases/open"), &pair)).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
+    assert!(!r.body.contains("Subject 1"));
+    let forged = "zeyn_reason=case_file.Ward%20round";
+    let r = send(&other, with_cookie(get("/cases/open"), forged)).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
+}
+
+#[tokio::test]
 async fn reasons_need_access_to_the_screen() {
     let router = cases_app(Identity::user("guest"), MemoryAudit::default());
     let r = send(

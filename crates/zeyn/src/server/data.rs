@@ -43,13 +43,27 @@ fn valid_reason(reason: &str) -> bool {
     (3..=300).contains(&n) && !reason.chars().any(char::is_control)
 }
 
-/// Reads the reason cookie (`<screen>.<reason>`) into the request's trail. The server only uses it
-/// for that screen.
+/// Reads the reason cookie (`<screen>.<holder>.<expires>.<reason>`) into the request's trail. The
+/// server only uses it for that screen, for the user and tenant it was given by, and until it
+/// expires, so a reason left in a shared browser never opens a screen for the next user.
 pub(super) fn read_reason(ctx: &Ctx, headers: &HeaderMap) {
-    let Some((screen, reason)) = cookie(headers, REASON_COOKIE).and_then(|v| v.split_once('.'))
+    let Some(value) = cookie(headers, REASON_COOKIE) else {
+        return;
+    };
+    let mut parts = value.splitn(4, '.');
+    let (Some(screen), Some(holder), Some(expires), Some(reason)) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
     else {
         return;
     };
+    if holder != reason_holder(ctx)
+        || expires
+            .parse::<u64>()
+            .ok()
+            .is_none_or(|e| e <= unix_now())
+    {
+        return;
+    }
     let reason = percent_decode(reason)
         .trim()
         .to_string();
@@ -57,6 +71,33 @@ pub(super) fn read_reason(ctx: &Ctx, headers: &HeaderMap) {
         let screen = screen.to_string();
         ctx.update_trail(|t| t.given_reason = Some((screen, reason)));
     }
+}
+
+/// Hash of the user and tenant a reason was given by, as written into the reason cookie.
+fn reason_holder(ctx: &Ctx) -> String {
+    use std::hash::Hasher;
+    let mut h = std::hash::DefaultHasher::new();
+    h.write(
+        ctx.identity()
+            .user
+            .as_deref()
+            .unwrap_or("")
+            .as_bytes(),
+    );
+    h.write_u8(0xff);
+    h.write(
+        ctx.tenant()
+            .map_or("", |t| t.id())
+            .as_bytes(),
+    );
+    format!("{:016x}", h.finish())
+}
+
+/// Seconds since the Unix epoch.
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 /// Refuses screens that ask for a reason until the user has given one; records it otherwise.
@@ -230,7 +271,9 @@ async fn give_reason(
     }
     let secure = if st.secure_cookies { "; Secure" } else { "" };
     let c = format!(
-        "{REASON_COOKIE}={name}.{}; Path={}; Max-Age={REASON_SECONDS}; HttpOnly; SameSite=Strict{secure}",
+        "{REASON_COOKIE}={name}.{}.{}.{}; Path={}; Max-Age={REASON_SECONDS}; HttpOnly; SameSite=Strict{secure}",
+        reason_holder(&ctx),
+        unix_now() + u64::from(REASON_SECONDS),
         encode(reason),
         st.cookie_path()
     );

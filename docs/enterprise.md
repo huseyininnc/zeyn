@@ -95,7 +95,8 @@ Who saw which personal data, and when, is recorded as well as who changed it.
   its fragments, grid, form and reveal calls until a reason is given. The runtime asks in a
   dialog, sends `POST /_zeyn/reason {screen, reason}` (3 to 300 characters) and repeats the
   request. The reason is kept for 15 minutes in an `HttpOnly`, `SameSite=Strict` cookie, only
-  opens the screen it was given for and is written in `reason` of every audit record of that
+  opens the screen it was given for, only for the user and tenant who gave it (another user of
+  the same browser is asked again), and is written in `reason` of every audit record of that
   screen. Agents and API clients cannot give a reason, so they cannot open such screens.
 - Exports (CSV, XLSX, PDF) of a grid over a sensitive model write one audit record per file with
   `export` set: the model, the format, the number of rows and the sort and filters asked for.
