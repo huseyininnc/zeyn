@@ -17,6 +17,7 @@ El proyecto en el que trabaja un agente incluye sus propias reglas y herramienta
 | `zeyn_devtools` | El registro de peticiones de DevTools de la app en modo de depuración: las más nuevas primero, cada una con su pantalla, acción, estado, tiempos y sentencias SQL (texto y tiempo, sin valores); `addr` y `limit` son opcionales |
 | `zeyn_check` | Compila e informa de problemas; `fix: true` reescribe primero las APIs renombradas |
 | `zeyn_doctor` | Lee cómo se compila el proyecto: tamaño de target, enlazador, perfil dev, toolchain, exclusiones del análisis de Windows; `fix: true` añade el perfil dev rápido y el enlazador (solo `Cargo.toml` y `.cargo/config.toml`) |
+| `zeyn_migrate` | Lleva la aplicación paso a paso a una versión más reciente de Zeyn (renombrados, llamadas cambiadas, rutas movidas) manteniendo el formato; devuelve cada cambio con archivo y línea y lo que debe revisar una persona; `dry_run: true` devuelve un diff y no escribe nada |
 | `zeyn_test` | Ejecuta `cargo test` y devuelve el final de la salida |
 | `zeyn_new_feature` | Crea una carpeta de feature y la registra |
 | `zeyn_new_screen` | Añade un archivo de pantalla a una feature y lo registra |

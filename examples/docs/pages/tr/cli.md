@@ -116,6 +116,17 @@ zeyn check --json
 
 `zeyn check` uygulamanın kaynağını da okur ve dosya ile satırıyla şu durumlarda uyarır: `W0106` `src` olmadan `<script>` ya da `onclick=` gibi satır içi bir olay işleyicisi tutan bir metin (CSP ikisini de engeller), `W0107` `escape(..)`, `r.text(..)` veya `r.value(..)` kullanmadan HTML yazan elle yazılmış bir bileşen, `W0108` onu sınırlayan bir sorgu olmadan bütün bir `Vec` döndüren bir action, `W0109` `.trusted()` işaretli bir `DocumentViewer`. Eksik `permission` veya `public` için uyarıya gerek yoktur: derlenmez.
 
+## Yeni bir Zeyn sürümüne geçiş
+
+`zeyn migrate`, bir uygulamayı daha yeni bir Zeyn sürümüne taşır (`ng update` gibi). Uygulamanın kullandığı Zeyn sürümünü `Cargo.lock` dosyasından (ya da `Cargo.toml`) okur, bu sürüm ile hedef arasındaki her geçiş adımını sırayla çalıştırır, `Cargo.toml` içindeki Zeyn bağımlılıklarını hedef sürüme taşır ve ne yaptığını yazar: her değişikliği dosyası ve satırıyla, bir kişinin bakması gereken yerleri de nedenleriyle.
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+Bir adım adları ve metotları yeniden adlandırır (`Hub` yerine `Socket`, `.realtime(live)` yerine `.socket(live)`), bir çağrının biçimini değiştirir (`.sort_by(Order::date, true)` yerine `.sort_by_desc(Order::date)`), `use` yollarını taşır ve güvenle yeniden yazamadığını gösterir: değeri sabit olmayan bir `bool` bayrağı ya da kaldırılmış bir adrese giden çıkış bağlantısı gibi. Yalnızca değiştirdiği token'ları düzenler, bu yüzden biçim ve yorumlar kalır; ikinci bir çalıştırma hiçbir şeyi değiştirmez. `--dry-run` hiçbir şey yazmaz ve birleşik bir diff basar; `--json` raporu `changes`, `todos` ve `errors` alanlarıyla tek bir JSON belgesi olarak basar. Bir dosya okunamaz, ayrıştırılamaz ya da yazılamazsa çıkış kodu 0 olmaz. `zeyn check --fix` her adımın yeniden adlandırmalarını uygular. MCP aracı `zeyn_migrate` aynısını bir ajan için yapar.
+
 ## Derleme hızı ve disk kullanımı
 
 `zeyn doctor` projenin nasıl derlendiğini okur ve onu yavaş ya da büyük yapanı bildirir: hedef klasörün boyutu ve en büyük klasörleri, bağlayıcı, dev profili (hata ayıklama bilgisi ve bağımlılık eniyilemesi), rustc ve cargo sürümü ile `rust-version`, eski bir araç zincirinden kalan çıktılar, rust-analyzer hedef klasörü ve Windows'ta hedef klasörün ve `~/.cargo` klasörünün Defender taramalarının dışında olup olmadığı (bir dışlama ya da Dev Drive; Windows okumasına izin vermiyorsa bunu söyler). Her bulgunun kararlı bir kodu ve tek satırlık bir çözümü vardır. `--json` hepsini tek belge olarak yazar, `--target-limit-gb` neyin büyük sayılacağını belirler (varsayılan 20) ve çıkış kodu her zaman 0'dır. `zeyn doctor --fix` hızlı dev profilini `Cargo.toml` dosyasına, `rust-lld` bağlayıcısını `.cargo/config.toml` dosyasına ekler ve başka hiçbir şeyi değiştirmez; ikinci çalıştırma hiçbir şeyi değiştirmez. `zeyn_doctor` MCP aracı aynısını bir ajan için yapar.

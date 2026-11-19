@@ -17,6 +17,7 @@ Zeyn 从两个方面为智能体而设计：编写 Zeyn 应用的智能体，以
 | `zeyn_devtools` | 以调试模式运行的应用的 DevTools 请求日志：最新的请求在前，每个请求带有 screen、action、状态、耗时和 SQL 语句（文本和耗时，不含值）；`addr` 和 `limit` 可选 |
 | `zeyn_check` | 编译并报告问题；`fix: true` 会先重写已更名的 API |
 | `zeyn_doctor` | 读取项目的构建方式：target 大小、链接器、dev 配置、工具链、Windows 扫描排除项；`fix: true` 会添加快速 dev 配置和链接器（只改 `Cargo.toml` 和 `.cargo/config.toml`） |
+| `zeyn_migrate` | 逐步把应用迁移到更新的 Zeyn 版本（重命名、调用形式变化、路径移动），保持格式；返回每处更改及其文件和行号，以及需要人工查看的内容；`dry_run: true` 返回 diff 且不写入任何内容 |
 | `zeyn_test` | 运行 `cargo test` 并返回输出的末尾部分 |
 | `zeyn_new_feature` | 创建 feature 文件夹并注册它 |
 | `zeyn_new_screen` | 为 feature 添加屏幕文件并注册它 |

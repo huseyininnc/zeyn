@@ -274,8 +274,69 @@ impl App {
         self
     }
 
+    #[cfg(feature = "metronome")]
+    fn jobs_mut(&mut self) -> crate::jobs::Jobs {
+        let jobs = self
+            .extras
+            .jobs
+            .get_or_insert_with(crate::jobs::Jobs::default)
+            .clone();
+        self.services.insert(jobs.clone());
+        jobs
+    }
+
+    /// Queues runs of `job` when `trigger` fires: a cron expression with seconds, a time zone, a
+    /// calendar, a payload, a priority, a timeout and a misfire policy (feature `metronome`).
+    /// A job may have several triggers. Mistakes (a bad expression, an unknown job, time zone or
+    /// calendar, a duplicate id) stop the app at startup with the trigger named.
+    ///
+    /// ```ignore
+    /// App::new("Billing")
+    ///     .queued_job("close_day", Schedule::manual(), close_day)
+    ///     .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul"))
+    /// ```
+    #[cfg(feature = "metronome")]
+    pub fn trigger(mut self, job: &str, trigger: crate::metronome::Trigger) -> Self {
+        self.jobs_mut()
+            .add_trigger(job, trigger);
+        self
+    }
+
+    /// A calendar of excluded days and times that triggers name (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub fn calendar(mut self, name: &str, calendar: crate::metronome::Calendar) -> Self {
+        self.jobs_mut()
+            .add_calendar(name, calendar);
+        self
+    }
+
+    /// After a run of `first` succeeds, queues a run of `then` with the same payload (feature
+    /// `metronome`). Cycles and chains longer than `MAX_CHAIN` jobs are refused at startup.
+    #[cfg(feature = "metronome")]
+    pub fn chain(mut self, first: &str, then: &str) -> Self {
+        self.jobs_mut().add_chain(first, then);
+        self
+    }
+
+    /// How long run history is kept: 30 days and 100,000 rows unless set (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub fn job_history(mut self, retention: crate::metronome::Retention) -> Self {
+        self.jobs_mut().set_retention(retention);
+        self
+    }
+
+    /// Problems of the app's triggers, calendars and chains.
+    pub(super) fn jobs_problems(&self) -> Vec<String> {
+        #[cfg(feature = "metronome")]
+        if let Some(jobs) = &self.extras.jobs {
+            return jobs.problems();
+        }
+        Vec::new()
+    }
+
     /// Publishes job status as JSON at `GET /_zeyn/jobs` to users with this permission. Off
-    /// unless set.
+    /// unless set. With the feature `metronome`, `GET /_zeyn/jobs/runs` gives the run history
+    /// (`?job=` one job, `?offset=` and `?limit=` to page) to the same users.
     pub fn jobs_permission(mut self, permission: &'static str) -> Self {
         self.extras.jobs_permission = Some(permission);
         self
@@ -383,6 +444,45 @@ async fn jobs_status(State(st): State<Arc<AppState>>, headers: axum::http::Heade
     no_store(axum::Json(json!({ "jobs": jobs.status() })).into_response())
 }
 
+/// Query of the run history endpoint.
+#[cfg(feature = "metronome")]
+#[derive(serde::Deserialize)]
+struct RunsQuery {
+    job: Option<String>,
+    #[serde(default)]
+    offset: u64,
+    limit: Option<usize>,
+}
+
+/// Run history for users with the jobs permission: newest first, error codes only.
+#[cfg(feature = "metronome")]
+async fn jobs_runs(
+    State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<RunsQuery>,
+) -> Response {
+    let ctx = st.ctx(&headers);
+    let (Some(jobs), Some(permission)) = (&st.extras.jobs, st.extras.jobs_permission) else {
+        return st.error_response(&ctx, super::Failure::App(crate::Error::NotFound));
+    };
+    if !ctx
+        .identity()
+        .can(&crate::Access::Permission(permission))
+    {
+        return st.error_response(&ctx, super::Failure::App(crate::Error::Forbidden));
+    }
+    let limit = q
+        .limit
+        .unwrap_or(crate::DEFAULT_PAGE_SIZE as usize);
+    match jobs
+        .history(q.job.as_deref(), q.offset, limit)
+        .await
+    {
+        Ok(runs) => no_store(axum::Json(json!({ "runs": runs })).into_response()),
+        Err(e) => st.error_response(&ctx, super::Failure::App(e)),
+    }
+}
+
 fn no_store(mut r: Response) -> Response {
     r.headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -442,7 +542,10 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     let router = router
         .route("/_zeyn/health", get(health))
         .route("/_zeyn/ready", get(ready))
-        .route("/_zeyn/jobs", get(jobs_status))
+        .route("/_zeyn/jobs", get(jobs_status));
+    #[cfg(feature = "metronome")]
+    let router = router.route("/_zeyn/jobs/runs", get(jobs_runs));
+    let router = router
         .route(
             "/_zeyn/enterprise.js",
             get(|| async { asset(JS, "text/javascript; charset=utf-8") }),

@@ -48,6 +48,7 @@ Which page answers what:
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
+| Background jobs, cron triggers with time zones, calendars, pause, run history (feature `metronome`), operations screen (feature `metronome-ops`) | `guides/enterprise` (`docs/enterprise.md`, `docs/metronome.md`) |
 | Public pages: no cookies, HTTP caching, SEO head tags, sitemap, robots.txt | `guides/public-pages` (`public-pages.md`) |
 | Sign in with an identity provider, JWT, MFA | `docs/auth.md` |
 | Own user accounts: registration, passwords, two factor, passkeys | `guides/accounts` (`accounts.md`, `docs/accounts.md`) |
@@ -339,6 +340,7 @@ What to remember:
 | Mistake | Instead |
 |---|---|
 | `Grid`, `GridQuery`, `GridMode` | `DataGrid`, `DataQuery`, `DataMode` (`zeyn check --fix` rewrites old names) |
+| Fixing an upgrade to a new Zeyn version by hand | `zeyn migrate --dry-run`, then `zeyn migrate` (or the `zeyn_migrate` MCP tool); then handle what it lists for a person |
 | A literal string in the UI | `t!("key")` with the key in every `locales/*.json` |
 | `f64` for prices | `Money` |
 | `DateTime` for a birthday or a due day | `Date` |

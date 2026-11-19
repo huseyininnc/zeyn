@@ -17,6 +17,7 @@ Zeyn은 두 가지 에이전트를 위해 만들어졌습니다. Zeyn 앱을 작
 | `zeyn_devtools` | 디버그 모드로 실행 중인 앱의 DevTools 요청 로그: 최신 요청부터, 각 요청의 Screen, action, 상태, 시간, SQL 문(문장과 시간, 값 없음). `addr`와 `limit`는 선택 사항 |
 | `zeyn_check` | 컴파일하고 문제를 보고합니다. `fix: true`는 먼저 이름이 바뀐 API를 다시 씁니다 |
 | `zeyn_doctor` | 프로젝트의 빌드 방식을 읽습니다: target 크기, 링커, dev 프로필, 툴체인, Windows 검사 제외 항목. `fix: true`는 빠른 dev 프로필과 링커를 추가합니다(`Cargo.toml`과 `.cargo/config.toml`만) |
+| `zeyn_migrate` | 앱을 단계별로 더 새로운 Zeyn 버전으로 옮깁니다(이름 변경, 바뀐 호출, 옮겨진 경로). 서식은 유지됩니다. 각 변경을 파일과 줄과 함께, 사람이 살펴봐야 할 것과 함께 돌려줍니다. `dry_run: true`는 diff를 돌려주고 아무것도 쓰지 않습니다 |
 | `zeyn_test` | `cargo test`를 실행하고 출력의 끝부분을 반환합니다 |
 | `zeyn_new_feature` | Feature 폴더를 만들고 등록합니다 |
 | `zeyn_new_screen` | Feature에 화면 파일을 추가하고 등록합니다 |

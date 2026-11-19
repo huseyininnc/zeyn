@@ -118,6 +118,17 @@ zeyn check --json
 
 `zeyn check` también lee el código de la app y avisa, con archivo y línea, de `W0106` una cadena que contiene un `<script>` sin `src` o un manejador de eventos en línea como `onclick=` (la CSP bloquea ambos), `W0107` un componente escrito a mano que escribe HTML sin `escape(..)`, `r.text(..)` ni `r.value(..)`, `W0108` una action que devuelve un `Vec` entero sin una consulta que lo limite y `W0109` un `DocumentViewer` marcado `.trusted()`. Un `permission` o `public` ausente no necesita aviso: no compila.
 
+## Pasar a una nueva versión de Zeyn
+
+`zeyn migrate` lleva una aplicación a una versión más reciente de Zeyn, como `ng update`. Lee la versión de Zeyn que usa la aplicación en `Cargo.lock` (o `Cargo.toml`), ejecuta en orden cada paso de migración entre esa versión y la de destino, cambia las dependencias de Zeyn en `Cargo.toml` a la versión de destino e imprime lo que hizo: cada cambio con su archivo y línea, y los puntos que debe revisar una persona, cada uno con su motivo.
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+Un paso renombra nombres y métodos (`Hub` a `Socket`, `.realtime(live)` a `.socket(live)`), cambia la forma de una llamada (`.sort_by(Order::date, true)` a `.sort_by_desc(Order::date)`), mueve rutas `use` y señala lo que no puede reescribir con seguridad, como un indicador `bool` que no es un literal o un enlace de cierre de sesión a una dirección eliminada. Solo edita los tokens que reemplaza, así que el formato y los comentarios se mantienen, y una segunda ejecución no cambia nada. `--dry-run` no escribe nada e imprime un diff unificado; `--json` imprime el informe como un único documento JSON con `changes`, `todos` y `errors`. El código de salida es 0 salvo que un archivo no se pueda leer, analizar o escribir. `zeyn check --fix` aplica los renombrados de todos los pasos. La herramienta MCP `zeyn_migrate` hace lo mismo para un agente.
+
 ## Velocidad de compilación y uso de disco
 
 `zeyn doctor` lee cómo se compila el proyecto e informa de lo que lo hace lento o grande: el tamaño de la carpeta target y sus carpetas más grandes, el enlazador, el perfil dev (información de depuración y optimización de dependencias), rustc y cargo frente a `rust-version`, artefactos de una toolchain anterior, la carpeta target de rust-analyzer y, en Windows, si la carpeta target y `~/.cargo` quedan fuera de los análisis de Defender (una exclusión o un Dev Drive; lo dice cuando Windows no permite leerlo). Cada hallazgo tiene un código estable y una corrección de una línea. `--json` los imprime como un solo documento, `--target-limit-gb` fija el tamaño que cuenta como grande (20 por defecto) y el código de salida es siempre 0. `zeyn doctor --fix` añade el perfil dev rápido a `Cargo.toml` y el enlazador `rust-lld` a `.cargo/config.toml` y no modifica nada más; una segunda ejecución no cambia nada. La herramienta MCP `zeyn_doctor` hace lo mismo para un agente.

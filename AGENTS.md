@@ -74,7 +74,7 @@ docs/                  design documents and guides
 ```
 cargo build --workspace
 cargo test --workspace
-cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts,image,resumable   tests behind features
+cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts,image,resumable,metronome-ops   tests behind features
 cargo check -p zeyn --all-features --tests                                      everything compiles
 cargo run -p zeyn-example-showcase      http://127.0.0.1:3002, every component
 cargo run -p zeyn-example-docs          http://127.0.0.1:3008, the documentation
@@ -153,6 +153,9 @@ missing. Never call `location.reload()` or `location.assign()` for in-app naviga
   for an AI agent to act on (`#[diagnostic::on_unimplemented]` where it fits).
 - Keep the existing structure and patterns; do not add a second way to do something that already
   has one.
+- A breaking change to a public API adds a `zeyn migrate` step in the same change: a rename, a
+  call shape or a moved path in `crates/zeyn-cli/src/migrate/` (one module per version), or a
+  review pattern with the reason when no rewrite is safe, with a fixture test.
 - Public prose (README, docs, UI text) uses no em dashes or en dashes, and stays neutral: it
   describes the framework, not who might buy it.
 

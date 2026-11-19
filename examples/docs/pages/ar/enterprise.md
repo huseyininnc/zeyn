@@ -199,3 +199,21 @@ jobs.enqueue("send_invoice", "42").await?;
   أما Oracle 11g وما بعده فيحدد المعرّفات بـ `ROWNUM` و`FOR UPDATE SKIP LOCKED` داخل معاملة، ثم يحدّثها ويقرأها قبل الإتمام (commit). لا يستطيع Oracle ترتيب استعلام قفل، لذا تؤخذ التشغيلات المستحقة هناك دون ترتيب ثابت. الأوقات هي ميلي ثانية Unix في أعمدة `BIGINT` أو
   `NUMBER(19)`.
 - مع وجود مخزن، قد يتداخل تشغيل مجدول وتشغيل مُطلَق لنفس المهمة؛ ينبغي للمهام التي يجب ألا تعمل مرتين في وقت واحد أن تحمي نفسها (بقفل صف، مثلًا).
+
+### Metronome
+
+تضيف الميزة `metronome` جداول بحسب ساعة الحائط فوق هذه المهام؛ الدليل الكامل في `docs/metronome.md`.
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- يضع `Trigger` تشغيلات مهمة مسجلة في الطابور: cron بالثواني بلهجة Quartz، ومنطقة زمنية IANA بسلوك محدد عند فجوات التوقيت الصيفي وتكراره، وحمولة، وأولوية، ومهلة، وسياسة للتشغيلات الفائتة (`RunOnce` و`RunAll { max }` و`Skip`). تستبعد التقاويم تواريخ وأيام أسبوع وتواريخ سنوية وفترات يومية.
+- الخوادم التي تتشارك مخزنًا واحدًا تضع كل لحظة في الطابور مرة واحدة فقط. تعمل `pause` و`resume` و`run_now` عبر الخوادم.
+- كل محاولة منتهية صف في السجل (دون الحمولة أو نص الخطأ أبدًا)، يُقرأ عبر `jobs.history` و`GET /_zeyn/jobs/runs` وشاشة العمليات `/ops/jobs` (`zeyn.jobs.read` و`zeyn.jobs.run` و`zeyn.jobs.admin`).
