@@ -8,6 +8,7 @@ use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::{Component, I18n, Identity, Render};
 
+#[allow(dead_code)]
 #[entity(table = "customers")]
 pub struct Customer {
     #[key]

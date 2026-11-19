@@ -265,18 +265,18 @@ App::new("Back office")
 
 ## Тестирование
 
-`crates/zeyn/tests/oidc.rs` прогоняет каждый поток против небольшого издателя внутри теста, который
+`crates/zeyn/tests/all/oidc.rs` прогоняет каждый поток против небольшого издателя внутри теста, который
 подписывает ключом, созданным для запуска, и проверяет, что отклоняются истёкшие токены, неверные
 аудитории и издатели, `alg=none`, HMAC-токен с ключом из открытого ключа, изменённые claims,
 подделанные cookie, повторно использованный или не совпавший `state` и неверный `nonce`.
-`crates/zeyn/tests/totp.rs` покрывает регистрацию, проверку, повтор, коды восстановления и лимит
+`crates/zeyn/tests/all/totp.rs` покрывает регистрацию, проверку, повтор, коды восстановления и лимит
 запросов.
 
 С Keycloak в режиме разработки те же потоки прогоняются и против него:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 Тест создаёт realm `zeyn-test` с собственным клиентом и пользователем и удаляет его в конце. Без

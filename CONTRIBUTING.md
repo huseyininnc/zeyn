@@ -9,6 +9,7 @@ Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT
 ```
 cargo build --workspace
 cargo test --workspace
+cargo test -p zeyn --test all grid::
 cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,accounts
 cargo check -p zeyn --all-features --tests
 cargo fmt --all --check
@@ -16,6 +17,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 sh ci/clippy-features.sh
 ```
 
+- The integration tests of `zeyn` are one binary (`crates/zeyn/tests/all/`, one module per file); a new test file is added there with a `mod` line in `main.rs`. Tests that install a counting global allocator or a process wide subscriber keep their own file under `crates/zeyn/tests/`.
 - Tests that need PostgreSQL, Oracle, Redis or an identity provider skip unless `ZEYN_TEST_PG`, `ZEYN_TEST_ORACLE`, `ZEYN_TEST_REDIS` or `ZEYN_TEST_OIDC` is set. Each test file says how to start the server in Docker.
 - Disk space can be tight. Use `CARGO_INCREMENTAL=0`, and delete your own `target` directory when you are done. The `pdf` feature links Typst (about 40 MB); do not turn it on for the whole workspace.
 - `cargo test` does not rebuild a binary you then run by hand. Run `cargo build -p <example>` first.

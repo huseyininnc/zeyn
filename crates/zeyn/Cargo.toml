@@ -10,6 +10,7 @@ readme.workspace = true
 homepage.workspace = true
 keywords = ["web", "framework", "datagrid", "forms", "axum"]
 categories = ["web-programming::http-server", "gui"]
+autotests = false
 
 [features]
 default = ["server"]
@@ -133,77 +134,35 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 flate2 = "1.1"
 
 [[test]]
-name = "assistant"
-required-features = ["assistant"]
-
-[[test]]
-name = "resumable"
-required-features = ["resumable"]
-
-[[test]]
-name = "files_image"
-required-features = ["image"]
-
-[[test]]
-name = "oidc"
-required-features = ["oidc"]
-
-[[test]]
-name = "totp"
-required-features = ["totp"]
-
-[[test]]
-name = "islands"
-required-features = ["islands"]
-
-[[test]]
-name = "metronome"
-required-features = ["metronome"]
-
-[[test]]
-name = "realtime"
-required-features = ["realtime"]
+name = "all"
+path = "tests/all/main.rs"
 
 [[test]]
 name = "realtime_load"
 required-features = ["realtime"]
 
 [[test]]
-name = "socket_client"
-required-features = ["socket-client"]
-
-[[test]]
-name = "xlsx"
-required-features = ["xlsx"]
-
-[[test]]
 name = "xlsx_memory"
 required-features = ["xlsx"]
-
-[[test]]
-name = "pdf"
-required-features = ["pdf"]
 
 [[test]]
 name = "pdf_measure"
 required-features = ["pdf"]
 
 [[test]]
-name = "accounts"
-required-features = ["accounts"]
+name = "otel"
 
 [[test]]
-name = "ui_markdown"
-required-features = ["markdown"]
+name = "compression_measure"
 
 [[test]]
-name = "accounts_passkeys"
-required-features = ["accounts"]
+name = "files_memory"
 
 [[test]]
-name = "accounts_sql"
-required-features = ["accounts", "postgres"]
+name = "grid_measure"
 
 [[test]]
-name = "mail"
-required-features = ["email"]
+name = "import_memory"
+
+[[test]]
+name = "logging"

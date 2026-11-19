@@ -185,13 +185,13 @@ App::new("Back office")
 
 ## 测试
 
-`crates/zeyn/tests/oidc.rs` 针对测试内的一个小型签发者运行每个流程，该签发者使用为本次运行生成的密钥签名；并检查以下情况会被拒绝：过期的令牌、错误的受众和签发者、`alg=none`、以公钥为密钥的 HMAC 令牌、被改动的 claims、被篡改的 cookie、被重用或不匹配的 `state`，以及错误的 `nonce`。`crates/zeyn/tests/totp.rs` 涵盖注册、验证、重放、恢复码和速率限制。
+`crates/zeyn/tests/all/oidc.rs` 针对测试内的一个小型签发者运行每个流程，该签发者使用为本次运行生成的密钥签名；并检查以下情况会被拒绝：过期的令牌、错误的受众和签发者、`alg=none`、以公钥为密钥的 HMAC 令牌、被改动的 claims、被篡改的 cookie、被重用或不匹配的 `state`，以及错误的 `nonce`。`crates/zeyn/tests/all/totp.rs` 涵盖注册、验证、重放、恢复码和速率限制。
 
 在开发模式下的 Keycloak 上，同样的流程也可以针对它运行：
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 测试会创建一个带有自己的客户端和用户的 `zeyn-test` realm，并在结束时删除它。没有 `ZEYN_TEST_OIDC` 时会被跳过。

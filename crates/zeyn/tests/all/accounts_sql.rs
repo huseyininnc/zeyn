@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-//! ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features accounts,postgres --test accounts_sql
+//! ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features accounts,postgres --test all accounts_sql::
 //! ```
 
 use zeyn::accounts::{

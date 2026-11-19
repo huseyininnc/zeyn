@@ -180,7 +180,7 @@ Evidence behind the scores:
   forms, menus, alerts and focus; `pro.css`, `media.css`, `assistant.css` and the dock were not
   in that measurement, so they score `part`.
 - **RTL.** Arabic pages render `<html dir="rtl">`. The framework stylesheets use logical
-  properties, and `tests/rtl.rs` fails on a new physical side unless it is listed with a reason.
+  properties, and `tests/all/rtl.rs` fails on a new physical side unless it is listed with a reason.
   Arrows that point in reading direction mirror; Left and Right swap in grid cells, tabs, menus,
   trees, calendars, sliders, split panes and docks; popups and menus anchor to the start side.
   Numbers align to the end of the cell (`text-align: end`), so left in a right to left grid.
@@ -188,7 +188,7 @@ Evidence behind the scores:
 - **Performance.** The grid (virtual scrolling, column virtualization, export), media serving
   and the XLSX and PDF exports have published measurements. Every catalog page has a budget for
   its script and stylesheet bytes and its first paint in `e2e/budgets.json`, and
-  `tests/size_budgets.rs` caps each module file and each kind of page. DOM size, heap growth and
+  `tests/all/size_budgets.rs` caps each module file and each kind of page. DOM size, heap growth and
   frame times are not measured yet, so the column scores `part`.
 - **Touch.** The browser suite opens every catalog page on an emulated touch phone and fails on a
   pointer target under 24 by 24 CSS pixels whose spacing does not make up for it (WCAG 2.5.8),

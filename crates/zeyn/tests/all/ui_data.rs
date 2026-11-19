@@ -635,7 +635,7 @@ fn kpi_money_shows_the_currency_in_the_users_locale() {
 
 #[test]
 fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
-    let css = include_str!("../assets/charts.css");
+    let css = include_str!("../../assets/charts.css");
     let kpi = ":is(.z-kpi, .z-skeleton-kpi, .z-kpi-deferred)";
     assert!(css.contains(&format!(
         ".z-col > .z-node:has(> {kpi}) {{ height: 100%; }}"
@@ -650,7 +650,7 @@ fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
     ] {
         assert!(css.contains(basis), "{basis}");
     }
-    let components = include_str!("../assets/components.css");
+    let components = include_str!("../../assets/components.css");
     assert!(
         components.contains(
             ".z-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }"
@@ -754,8 +754,8 @@ fn contrast(a: (f64, f64, f64), b: (f64, f64, f64)) -> f64 {
 
 #[test]
 fn chart_colors_reach_three_to_one_in_both_themes() {
-    let components = include_str!("../assets/components.css");
-    let zeyn = include_str!("../assets/zeyn.css");
+    let components = include_str!("../../assets/components.css");
+    let zeyn = include_str!("../../assets/zeyn.css");
     for (theme, chart_from, surface_from) in [
         ("light", ":root", ":root"),
         (

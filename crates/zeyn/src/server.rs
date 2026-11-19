@@ -117,7 +117,7 @@ const GRID_JS: &str = concat!(
     include_str!("../assets/zeyn/grid-exports.js"),
 );
 const CSS: &str = include_str!("../assets/zeyn.css");
-/// The icon set as CSS masks, generated from `assets/icons/*.svg` (see `tests/icons.rs`).
+/// The icon set as CSS masks, generated from `assets/icons/*.svg` (see `tests/all/icons.rs`).
 const ICONS: &str = include_str!("../assets/icons.css");
 const NAV: &str = include_str!("../assets/nav.js");
 

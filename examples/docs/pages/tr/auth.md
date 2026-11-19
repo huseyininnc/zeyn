@@ -267,18 +267,18 @@ içindir. TOTP anahtarını sabit tutun: başka bir anahtarla mühürlenen kayı
 
 ## Test
 
-`crates/zeyn/tests/oidc.rs` her akışı, testin içinde çalışmak için üretilmiş bir anahtarla imzalayan
+`crates/zeyn/tests/all/oidc.rs` her akışı, testin içinde çalışmak için üretilmiş bir anahtarla imzalayan
 küçük bir issuer'a karşı çalıştırır ve süresi dolmuş token'ların, yanlış audience ve issuer'ların,
 `alg=none`'ın, genel anahtarla anahtarlanmış bir HMAC token'ın, değiştirilmiş claim'lerin,
 kurcalanmış cookie'lerin, yeniden kullanılmış veya uyuşmayan `state` değerinin ve yanlış bir `nonce`
-değerinin reddedildiğini denetler. `crates/zeyn/tests/totp.rs` kaydı, doğrulamayı, tekrar oynatmayı
+değerinin reddedildiğini denetler. `crates/zeyn/tests/all/totp.rs` kaydı, doğrulamayı, tekrar oynatmayı
 (replay), kurtarma kodlarını ve rate limit'i kapsar.
 
 Geliştirme kipinde bir Keycloak ile aynı akışlar ona karşı da çalışır:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 Test kendi client'ı ve kullanıcısıyla bir `zeyn-test` realm'i oluşturur ve sonunda siler.

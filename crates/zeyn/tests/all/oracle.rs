@@ -6,15 +6,14 @@
 //! ```text
 //! docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 //! docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-//! ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+//! ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 //! ```
 //!
 //! Without it every test returns early and says so.
 #![cfg(feature = "oracle")]
 
-mod sql_common;
-
-use sql_common::{Item, Raw, urls};
+use crate::sql_common;
+use crate::sql_common::{Item, Raw, urls};
 use zeyn::prelude::*;
 use zeyn::sql::{Db, PoolLimits};
 use zeyn::{PageRequest, Sort};

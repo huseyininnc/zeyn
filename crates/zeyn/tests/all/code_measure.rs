@@ -1,6 +1,6 @@
 //! Time to render a `CodeView` of a 5,000 line Rust file on the server, and the size of its
 //! HTML. Ignored by default; run in release with
-//! `cargo test --release -p zeyn --test code_measure -- --ignored --nocapture`.
+//! `cargo test --release -p zeyn --test all code_measure:: -- --ignored --nocapture`.
 
 use std::time::Instant;
 use zeyn::ui::{CodeLang, CodeView, JsonView};

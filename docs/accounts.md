@@ -407,15 +407,15 @@ authenticator verified the user.
 
 ## Testing
 
-- `crates/zeyn/tests/accounts.rs`: managers, the policy, .NET v2 and v3 hashes and their
+- `crates/zeyn/tests/all/accounts.rs`: managers, the policy, .NET v2 and v3 hashes and their
   migration, purpose tokens and their expiry, lockout and events, constant time for missing users,
   recovery and authenticator codes, roles to permissions, the JSON endpoints, the security stamp
   sign out, bearer tokens, two factor, CSRF and content type, rate limits, secrets in output, the
   screens and external logins.
-- `crates/zeyn/tests/accounts_passkeys.rs`: registration and sign in against a software ES256
+- `crates/zeyn/tests/all/accounts_passkeys.rs`: registration and sign in against a software ES256
   authenticator, and the refusals for a reused challenge, a counter that does not grow, a changed
   signature and another origin.
-- `crates/zeyn/tests/accounts_sql.rs`: the schema for both dialects, and a round trip against a
+- `crates/zeyn/tests/all/accounts_sql.rs`: the schema for both dialects, and a round trip against a
   database when `ZEYN_TEST_PG` (and with the `oracle` feature `ZEYN_TEST_ORACLE`) is set, as in
   `docs/database.md`.
 

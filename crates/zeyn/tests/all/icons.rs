@@ -2,7 +2,7 @@
 //! drawings follow the grid and stroke of the set, and `assets/icons.css` is generated from them.
 //!
 //! After adding or changing a drawing, write the stylesheet again with
-//! `ZEYN_WRITE_ICONS=1 cargo test -p zeyn --test icons`.
+//! `ZEYN_WRITE_ICONS=1 cargo test -p zeyn --test all icons::`.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -34,8 +34,9 @@ fn drawings() -> BTreeMap<String, String> {
 
 /// The stylesheet for the drawings: one mask per icon, in the order of `Icon::ALL`.
 fn stylesheet(drawings: &BTreeMap<String, String>) -> String {
-    let mut css =
-        String::from("/* Generated from assets/icons/*.svg by tests/icons.rs. Do not edit. */\n");
+    let mut css = String::from(
+        "/* Generated from assets/icons/*.svg by tests/all/icons.rs. Do not edit. */\n",
+    );
     for icon in Icon::ALL {
         let svg = drawings[icon.name()]
             .trim()
@@ -105,7 +106,7 @@ fn the_stylesheet_is_generated_from_the_drawings() {
     let written = std::fs::read_to_string(&path).unwrap_or_default();
     assert!(
         written == css,
-        "assets/icons.css is out of date; run `ZEYN_WRITE_ICONS=1 cargo test -p zeyn --test icons`"
+        "assets/icons.css is out of date; run `ZEYN_WRITE_ICONS=1 cargo test -p zeyn --test all icons::`"
     );
 }
 

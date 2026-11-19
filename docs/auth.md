@@ -259,17 +259,17 @@ tests. Keep the TOTP key stable: records sealed with another key no longer open.
 
 ## Testing
 
-`crates/zeyn/tests/oidc.rs` runs every flow against a small issuer in the test that signs with a
+`crates/zeyn/tests/all/oidc.rs` runs every flow against a small issuer in the test that signs with a
 key made for the run, and checks that expired tokens, wrong audiences and issuers, `alg=none`, an
 HMAC token keyed with the public key, changed claims, tampered cookies, reused or mismatched
-`state` and a wrong `nonce` are refused. `crates/zeyn/tests/totp.rs` covers enrollment,
+`state` and a wrong `nonce` are refused. `crates/zeyn/tests/all/totp.rs` covers enrollment,
 verification, replay, recovery codes and the rate limit.
 
 With a Keycloak in development mode, the same flows also run against it:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 The test creates a `zeyn-test` realm with its own client and user and deletes it at the end.

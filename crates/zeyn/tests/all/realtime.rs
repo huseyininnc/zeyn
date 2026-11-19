@@ -1362,7 +1362,7 @@ async fn the_fallback_transport_checks_csrf_tickets_and_tokens() {
 /// Two instances of one app behind one Redis: a topic notified and an event sent on one reach a
 /// page socket on the other. Runs when `ZEYN_TEST_REDIS` is set, for example
 /// `docker run -d --rm -p 6379:6379 redis:7-alpine` and
-/// `ZEYN_TEST_REDIS=redis://127.0.0.1:6379 cargo test -p zeyn --features realtime,redis --test realtime`.
+/// `ZEYN_TEST_REDIS=redis://127.0.0.1:6379 cargo test -p zeyn --features realtime,redis --test all realtime::`.
 #[cfg(feature = "redis")]
 #[tokio::test]
 async fn instances_share_topics_and_events_through_redis() {

@@ -75,6 +75,7 @@ docs/                  design documents and guides
 cargo build --workspace
 cargo test --workspace
 cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts,image,resumable,metronome-ops   tests behind features
+cargo test -p zeyn --test all grid::                                       one test file (module) of the shared test binary
 cargo check -p zeyn --all-features --tests                                      everything compiles
 cargo run -p zeyn-example-showcase      http://127.0.0.1:3002, every component
 cargo run -p zeyn-example-docs          http://127.0.0.1:3008, the documentation
@@ -112,7 +113,7 @@ Performance and a small memory footprint are the most important rule.
   markers of its HTML (`data-zeyn-*` attributes, `z-*` classes); full pages link the modules
   their HTML holds and `zeyn.js` loads missing ones when content arrives. No module scans the
   document for, or listens to, components that are not on the page; the core (`zeyn.js`,
-  `nav.js`, `enterprise.js`) holds only what every page needs. `tests/ui_modules.rs` fails when
+  `nav.js`, `enterprise.js`) holds only what every page needs. `tests/all/ui_modules.rs` fails when
   a page links a module it does not use.
 - When you add something that costs memory, binary size or time, measure it before and after and
   say the numbers in the commit or the report.
@@ -166,7 +167,7 @@ missing. Never call `location.reload()` or `location.assign()` for in-app naviga
   describes the framework, not who might buy it.
 
 ### Tests
-- New logic gets a test in the matching file under `crates/zeyn/tests/`. Security fixes get a
+- New logic gets a test in the matching file under `crates/zeyn/tests/all/` (one module per file, declared in `main.rs`). Security fixes get a
   regression test that fails without the fix.
 - Browser behavior is checked in a real browser (the showcase or the docs app) with no console
   errors, before the work is called done.
