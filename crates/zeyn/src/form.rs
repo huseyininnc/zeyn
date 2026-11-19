@@ -95,6 +95,8 @@ pub struct Form<M: Model> {
     drives: Vec<&'static str>,
     /// Completion (`complete`) and check (`check`) actions of code fields: (field, kind, source).
     codes: Vec<(&'static str, &'static str, Box<dyn DataSource>)>,
+    /// Whether the form uses the annotated settings layout.
+    settings: bool,
 }
 
 impl<M: Model> Form<M> {
@@ -123,6 +125,7 @@ impl<M: Model> Form<M> {
             depends: Vec::new(),
             drives: Vec::new(),
             codes: Vec::new(),
+            settings: false,
         }
     }
 
@@ -187,6 +190,20 @@ impl<M: Model> Form<M> {
     pub fn section(mut self, title: impl Into<Text>) -> Self {
         self.items
             .push(FormItem::Section(title.into()));
+        self
+    }
+
+    /// Lays the form out as a settings page: each field's label and help sit on the start side
+    /// with the control beside them (stacked on narrow screens), and the actions bar sticks to
+    /// the bottom of the view, shown only once the user has changed something, with a note that
+    /// there are unsaved changes. Saving hides the bar again. Its stylesheet loads only on pages
+    /// with such a form.
+    ///
+    /// ```ignore
+    /// Form::of(settings).settings().section("Mail").field(Settings::sender).submit("Save", save)
+    /// ```
+    pub fn settings(mut self) -> Self {
+        self.settings = true;
         self
     }
 
@@ -1213,7 +1230,9 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
             return true;
         }
         if let Some((rules, many)) = form.files_of(m.name) {
-            crate::files::render_upload(out, r, m, slot.id, &rules, many, &current());
+            let label = m.label_text();
+            let field = crate::files::UploadField::of(m, &label);
+            crate::files::render_upload(out, r, field, slot.id, &rules, many, &current());
             return true;
         }
         if let Some((_, many)) = form.lookup_of(m.name) {
@@ -1588,8 +1607,10 @@ where
     A::Output: Outcome,
 {
     fn render(&self, out: &mut String, r: &Render) {
+        let settings = self.form.settings;
         out.push_str(&format!(
-            r#"<form class="z-form" data-testid="{}.form" data-zeyn-submit="{}" novalidate>"#,
+            r#"<form class="z-form{}" data-testid="{}.form" data-zeyn-submit="{}" novalidate>"#,
+            if settings { " z-form-settings" } else { "" },
             r.scope,
             A::META.name
         ));
@@ -1604,8 +1625,16 @@ where
                 r.text(&Text::key("zeyn.ui.steps.next"))
             )
         };
+        let note = if settings {
+            format!(
+                r#"<span class="z-form-unsaved">{}</span>"#,
+                r.text(&Text::key("zeyn.draft.unsaved"))
+            )
+        } else {
+            String::new()
+        };
         out.push_str(&format!(
-            r#"<div class="z-form-actions">{steps}<button type="submit" class="z-button z-primary" data-testid="{}.form.submit">{}</button></div></form>"#,
+            r#"<div class="z-form-actions">{note}{steps}<button type="submit" class="z-button z-primary" data-testid="{}.form.submit">{}</button></div></form>"#,
             r.scope,
             r.text(&self.label)
         ));

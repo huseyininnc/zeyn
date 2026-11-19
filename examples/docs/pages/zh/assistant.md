@@ -105,7 +105,7 @@ pub trait ChatStore: Send + Sync + 'static {
 
 模型看到的工具与 MCP 和 WebMCP 相同（见 `docs/runtime-protocol.md` 第 9 节），每次都针对当前登录用户构建：用户可以使用的表格搜索、表单保存和 API action，去掉所有标记为 `ai = false` 的内容，描述来自 `///` 文档注释和 `ai = "..."` 指引。另外还添加了两个内置工具：
 
-- `navigate`：打开用户有权打开的带路由的屏幕，无需整页加载（`zeyn:navigate`），并且可以筛选其表格（`zeyn:filter`）。表格随后通过 `POST /_zeyn/grid` 加载，服务器在那里执行其常规检查。
+- `navigate`：打开用户有权打开的带路由的屏幕，无需整页加载（`zeyn:navigate`），并且可以筛选其表格（`zeyn:filter`），可使用普通筛选和 OR 组（`filter_groups`，与 `DataQuery::filter_groups` 相同）。服务器丢弃空筛选，并遵守 `DataQuery::retain_filters` 的上限。表格随后通过 `POST /_zeyn/grid` 加载，服务器在那里执行其常规检查。
 - `suggest`：以芯片形式显示的后续提示。
 
 每次调用都走正常的 action 路径，上下文标记为代理（agent）：屏幕的访问控制、feature 的 guard、action 的权限、拦截器、速率限制、时间限制、审计（每次助手调用都以 `via_agent: true` 记录）以及掩码。
@@ -150,7 +150,7 @@ pub trait ChatStore: Send + Sync + 'static {
 | `POST /_zeyn/assistant/stt`（音频请求体） | `{ text }`；没有服务器端语音转文字时返回 `404` |
 | `POST /_zeyn/assistant/tts` `{ text }` | 流式音频；没有服务器端文字转语音时返回 `404` |
 
-事件，每行一个 JSON 对象：`{t:"text",v}`、`{t:"tool",name,id}`、`{t:"navigate",url,screen,filters}`、`{t:"suggest",v}`、`{t:"confirm",id,tool,title,question,details}`、`{t:"resolved",id,approved}`、`{t:"error",message}`、`{t:"done"}`。
+事件，每行一个 JSON 对象：`{t:"text",v}`、`{t:"tool",name,id}`、`{t:"navigate",url,screen,filters,filter_groups}`、`{t:"suggest",v}`、`{t:"confirm",id,tool,title,question,details}`、`{t:"resolved",id,approved}`、`{t:"error",message}`、`{t:"done"}`。
 
 `assistant.js` 和 `assistant.css` 只对有权使用助手的用户加载。聊天记录是一个 `role="log"` 的实时区域（回答流式输出期间带 `aria-busy`），Enter 发送，Shift+Enter 换行，Escape 关闭侧边面板并把焦点返回启动按钮，确认卡片会先把焦点放在“取消”上。
 

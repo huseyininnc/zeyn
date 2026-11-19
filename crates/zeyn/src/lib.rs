@@ -149,6 +149,8 @@ pub use feature::{
     Feature, Guard, GuardResult, MENU_DEPTH, Menu, MenuGroup, MenuItem, Route, ScreenEntry,
     SignedIn,
 };
+#[cfg(feature = "resumable")]
+pub use files::ResumableUploads;
 #[cfg(feature = "server")]
 pub use files::{
     DiskStore, FileAccess, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore,
@@ -158,6 +160,8 @@ pub use files::{
     File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,
     UPLOAD_CHUNK, UploadValue, clean_file_name, valid_file_id,
 };
+#[cfg(feature = "image")]
+pub use files::{MAX_IMAGE_MEMORY, MAX_IMAGE_SIDE, clean_image};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid,
@@ -266,6 +270,7 @@ pub use serde_json as __serde_json;
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
     pub use crate::seo::{Robots, SitemapPart, SitemapUrl};
+    pub use crate::ui::FileDrop;
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
@@ -276,8 +281,8 @@ pub mod prelude {
         LookupQuery, MenuBar, MenuButton, MetaLine, Pagination, Panel, Paragraph, Placeholder,
         Popover, PrevNext, Progress, ProgressRing, PropertyInspector, Quote, Rail, Reactions,
         RelativeTime, Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack,
-        StatusBar, Stepper, Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
-        WeekSchedule,
+        StatusBar, Stepper, Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeMove,
+        TreePlace, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::ui::{
         ActivityRings, ComparisonTable, FlowDiagram, Funnel, Gantt, Highlight, ImageCompare,
@@ -296,6 +301,7 @@ pub mod prelude {
         Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
+    pub use crate::ui::{Draggable, Surface, SurfaceMove};
     pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
     pub use crate::ui::{FieldSpec, FormSchema, LengthUnit, SchemaForm};
     #[cfg(feature = "server")]

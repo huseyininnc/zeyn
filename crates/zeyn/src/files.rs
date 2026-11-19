@@ -350,6 +350,9 @@ pub struct FileRules {
     accept: &'static [FileType],
     /// Bytes one user may upload to the store per window, in seconds.
     quota: Option<(u64, u64)>,
+    /// Whether PNG, JPEG and WebP uploads are decoded and encoded again.
+    #[cfg(feature = "image")]
+    clean_images: bool,
 }
 
 impl FileRules {
@@ -362,7 +365,26 @@ impl FileRules {
             max_files: 10,
             accept: &[FileType::Png, FileType::Jpeg, FileType::Webp, FileType::Pdf],
             quota: None,
+            #[cfg(feature = "image")]
+            clean_images: false,
         }
+    }
+
+    /// Decodes every PNG, JPEG and WebP upload and stores it encoded again, at most
+    /// [`MAX_IMAGE_SIDE`] pixels on a side: EXIF (with GPS), XMP, ICC profiles, comments and any
+    /// bytes hidden after the image data are dropped, and the EXIF orientation is applied to the
+    /// pixels first. JPEG is written at quality 90, PNG and WebP losslessly. An image that does
+    /// not decode is refused. The stored file gets a new id. Needs the `image` feature.
+    #[cfg(feature = "image")]
+    pub const fn clean_images(mut self) -> Self {
+        self.clean_images = true;
+        self
+    }
+
+    /// Whether uploads of `kind` are cleaned with [`FileRules::clean_images`].
+    #[cfg(feature = "image")]
+    pub(crate) fn cleans(&self, kind: FileType) -> bool {
+        self.clean_images && matches!(kind, FileType::Png | FileType::Jpeg | FileType::Webp)
     }
 
     /// At most `bytes` per user (by IP without a user) in the store per `window`, counted with
@@ -447,6 +469,60 @@ impl FileRules {
         }
         parts.join(",")
     }
+}
+
+/// Longest side, in pixels, of an image [`FileRules::clean_images`] decodes.
+#[cfg(feature = "image")]
+pub const MAX_IMAGE_SIDE: u32 = 12_000;
+
+/// Most memory, in bytes, decoding one image for [`FileRules::clean_images`] may take.
+#[cfg(feature = "image")]
+pub const MAX_IMAGE_MEMORY: u64 = 256 * 1024 * 1024;
+
+/// `bytes` of an image of `kind` decoded and encoded again in the same format, without
+/// metadata and with its EXIF orientation applied; `None` when it does not decode inside
+/// [`MAX_IMAGE_SIDE`] and [`MAX_IMAGE_MEMORY`]. Both limits are checked against the size in the
+/// image header before any pixel is decoded. Only the first frame of an animated image is kept.
+///
+/// ```
+/// # #[cfg(feature = "image")] {
+/// use zeyn::FileType;
+/// assert!(zeyn::clean_image(FileType::Png, b"not an image").is_none());
+/// # }
+/// ```
+#[cfg(feature = "image")]
+pub fn clean_image(kind: FileType, bytes: &[u8]) -> Option<Vec<u8>> {
+    use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
+    let format = match kind {
+        FileType::Png => ImageFormat::Png,
+        FileType::Jpeg => ImageFormat::Jpeg,
+        FileType::Webp => ImageFormat::WebP,
+        _ => return None,
+    };
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_IMAGE_SIDE);
+    limits.max_image_height = Some(MAX_IMAGE_SIDE);
+    limits.max_alloc = Some(MAX_IMAGE_MEMORY);
+    let mut reader = ImageReader::with_format(std::io::Cursor::new(bytes), format);
+    reader.limits(limits);
+    let mut decoder = reader.into_decoder().ok()?;
+    if decoder.total_bytes() > MAX_IMAGE_MEMORY {
+        return None;
+    }
+    let orientation = decoder.orientation().ok()?;
+    let mut picture = DynamicImage::from_decoder(decoder).ok()?;
+    picture.apply_orientation(orientation);
+    let mut out = std::io::Cursor::new(Vec::new());
+    let written = match kind {
+        FileType::Jpeg => DynamicImage::ImageRgb8(picture.into_rgb8()).write_with_encoder(
+            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 90),
+        ),
+        FileType::Webp => DynamicImage::ImageRgba8(picture.into_rgba8())
+            .write_with_encoder(image::codecs::webp::WebPEncoder::new_lossless(&mut out)),
+        _ => picture.write_to(&mut out, format),
+    };
+    written.ok()?;
+    Some(out.into_inner())
 }
 
 /// Whether a file id has the shape the server generates: 32 lower case hex digits.
@@ -560,13 +636,31 @@ pub(crate) fn too_large(rules: &FileRules, locale: &str) -> Text {
     Text::key("zeyn.files.too_large").arg("max", human_size(rules.limit(), locale))
 }
 
+/// The name, label and requiredness of an upload control.
+pub(crate) struct UploadField<'a> {
+    pub label: &'a Text,
+    pub name: &'a str,
+    pub required: bool,
+}
+
+impl<'a> UploadField<'a> {
+    /// The upload control of a form field.
+    pub fn of(m: &'a crate::model::FieldMeta, label: &'a Text) -> Self {
+        UploadField {
+            label,
+            name: m.name,
+            required: m.is_required(),
+        }
+    }
+}
+
 /// Writes an upload control: a text input holding the field's JSON value (what the form
 /// submits), a native file input inside a drop zone, the list of files and a live region. The
 /// runtime (`files.js`) uploads chosen files and keeps the value in step.
 pub(crate) fn render_upload(
     out: &mut String,
     r: &crate::render::Render,
-    m: &crate::model::FieldMeta,
+    m: UploadField<'_>,
     id: &str,
     rules: &FileRules,
     many: bool,
@@ -621,25 +715,28 @@ pub(crate) fn render_upload(
         "retry": key("retry"),
         "remove": key("remove"),
         "remove_name": key("remove_name"),
+        "waiting": key("waiting"),
+        "skipped": key("skipped"),
+        "not_added": key("not_added"),
         "too_large": raw(&too_large(rules, r.locale)),
-        "too_many": raw(&Text::key("zeyn.files.too_many").arg("label", m.label_text()).arg("n", rules.files().to_string())),
+        "too_many": raw(&Text::key("zeyn.files.too_many").arg("label", m.label.clone()).arg("n", rules.files().to_string())),
         "type": raw(&Text::key("zeyn.files.type")),
         "aborted": raw(&Text::key("zeyn.files.aborted")),
     });
-    let required = if m.is_required() {
+    let required = if m.required {
         r#" aria-required="true""#
     } else {
         ""
     };
-    let star = if m.is_required() {
+    let star = if m.required {
         r#"<span class="z-required" aria-hidden="true">*</span>"#
     } else {
         ""
     };
     let multiple = if many { " multiple" } else { "" };
     out.push_str(&format!(
-        r#"<label for="{id}-pick" id="{id}-label">{label}{star}</label><div class="z-upload" data-zeyn-upload="{store}" data-multiple="{many}" data-max-bytes="{max}" data-max-files="{n}" data-texts="{texts}"><input type="text" hidden class="z-upload-value" id="{id}" name="{name}" data-testid="{scope}.field.{name}" value="{value}"><div class="z-upload-drop"><input type="file" class="z-upload-input" id="{id}-pick" accept="{accept}"{multiple}{required} aria-describedby="{id}-hint {id}-error"><p class="z-upload-hint" id="{id}-hint">{drop} {hint}</p></div><ul class="z-upload-list" aria-label="{list}">"#,
-        label = r.label(m),
+        r#"<label for="{id}-pick" id="{id}-label">{label}{star}</label><div class="z-upload" data-zeyn-upload="{store}" data-multiple="{many}" data-max-bytes="{max}" data-max-files="{n}"{resumable} data-texts="{texts}"><input type="text" hidden class="z-upload-value" id="{id}" name="{name}" data-testid="{scope}.field.{name}" value="{value}"><div class="z-upload-drop"><input type="file" class="z-upload-input" id="{id}-pick" accept="{accept}"{multiple}{required} aria-describedby="{id}-hint {id}-error"><p class="z-upload-hint" id="{id}-hint">{drop} {hint}</p></div><ul class="z-upload-list" aria-label="{list}">"#,
+        label = r.text(m.label),
         store = escape(rules.store()),
         max = rules.limit(),
         n = if many { rules.files() } else { 1 },
@@ -650,6 +747,11 @@ pub(crate) fn render_upload(
         accept = escape(&rules.accept_attr()),
         drop = t("drop"),
         list = t("list"),
+        resumable = if cfg!(feature = "resumable") {
+            r#" data-resumable"#
+        } else {
+            ""
+        },
     ));
     for f in &files {
         out.push_str(&format!(
@@ -995,9 +1097,9 @@ mod store {
     /// How old a `.part` file of a stopped upload must be before a sweep removes it.
     pub const STALE_PART: std::time::Duration = std::time::Duration::from_secs(3600);
 
-    /// Removes the `.part` files under `root` older than [`STALE_PART`]: uploads stopped by a
-    /// crash or a restart. Returns how many it removed.
-    pub(crate) fn sweep_parts(root: &std::path::Path) -> u64 {
+    /// Removes the `.part` files under `root` older than `max_age`: uploads stopped by a crash
+    /// or a restart ([`STALE_PART`] for a [`DiskStore`]). Returns how many it removed.
+    pub(crate) fn sweep_parts(root: &std::path::Path, max_age: std::time::Duration) -> u64 {
         let Ok(dir) = std::fs::read_dir(root) else {
             return 0;
         };
@@ -1010,7 +1112,7 @@ mod store {
                     .and_then(|m| m.modified())
                     .ok()
                     .and_then(|m| m.elapsed().ok())
-                    .is_some_and(|age| age > STALE_PART);
+                    .is_some_and(|age| age > max_age);
             if stale && std::fs::remove_file(&path).is_ok() {
                 removed += 1;
             }
@@ -1047,7 +1149,7 @@ mod store {
                 let work = tokio::task::spawn_blocking(move || {
                     std::fs::create_dir_all(&*root).map_err(io)?;
                     if sweep {
-                        sweep_parts(&root);
+                        sweep_parts(&root, STALE_PART);
                     }
                     let mut file = std::fs::File::create_new(&part).map_err(io)?;
                     let written = (|| {
@@ -1224,6 +1326,70 @@ mod store {
                 f.remove(&id);
             }
             Box::pin(async { Ok(()) })
+        }
+    }
+
+    /// Settings of resumable uploads (feature `resumable`), set with
+    /// [`App::resumable_uploads`](crate::App::resumable_uploads).
+    ///
+    /// Parts of unfinished uploads are kept as `{id}.part` files in `dir`; when the last byte
+    /// arrives the file goes through the same checks as a plain upload into its store. An upload
+    /// with no new bytes for `expires` is removed, and caps limit the open uploads of one user and
+    /// of the whole app. Open uploads are known to the process that created them, so several
+    /// instances need sticky sessions for these paths.
+    ///
+    /// ```ignore
+    /// App::new("Docs").resumable_uploads(
+    ///     ResumableUploads::new("data/uploads")
+    ///         .expires(Duration::from_secs(6 * 3600))
+    ///         .max_per_user(3),
+    /// )
+    /// ```
+    #[cfg(feature = "resumable")]
+    #[derive(Clone, Debug)]
+    pub struct ResumableUploads {
+        pub(crate) dir: PathBuf,
+        pub(crate) expires: std::time::Duration,
+        pub(crate) per_user: usize,
+        pub(crate) open: usize,
+    }
+
+    #[cfg(feature = "resumable")]
+    impl Default for ResumableUploads {
+        fn default() -> Self {
+            ResumableUploads::new(std::env::temp_dir().join("zeyn-uploads"))
+        }
+    }
+
+    #[cfg(feature = "resumable")]
+    impl ResumableUploads {
+        /// Unfinished uploads in `dir`, kept 24 hours after their last bytes, at most 5 open
+        /// per user and 1000 in all.
+        pub fn new(dir: impl Into<PathBuf>) -> Self {
+            ResumableUploads {
+                dir: dir.into(),
+                expires: std::time::Duration::from_secs(24 * 3600),
+                per_user: 5,
+                open: 1000,
+            }
+        }
+
+        /// How long an upload with no new bytes is kept.
+        pub fn expires(mut self, after: std::time::Duration) -> Self {
+            self.expires = after;
+            self
+        }
+
+        /// Open uploads one user may have; the next creation answers `429`.
+        pub fn max_per_user(mut self, n: usize) -> Self {
+            self.per_user = n.max(1);
+            self
+        }
+
+        /// Open uploads of the whole app; the next creation answers `429`.
+        pub fn max_open(mut self, n: usize) -> Self {
+            self.open = n.max(1);
+            self
         }
     }
 

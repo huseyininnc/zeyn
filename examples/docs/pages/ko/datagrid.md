@@ -85,6 +85,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
   키, 함께 저장되는 편집. [DataGrid 참조](grid.md)를 보세요.
 - 열의 `.groupable()`, `.summary(label, |t| ...)`: 사용자가 열 메뉴나 그룹 패널에서 그 열로 그룹화하고, 합계로 계산한 값이 열 아래에 표시됩니다.
 - `.filter_builder()`: 필터 조건을 만드는 대화 상자를 여는 "필터" 버튼. 필터 행, 저장된 뷰, AI 에이전트가 쓰는 것과 같은 목록입니다.
+- `.filter_chips()`: 활성 필터를 그리드 위에 칩으로 표시하고 각 칩에 제거 버튼을 둡니다. 필터 행, 필터 빌더, 저장된 뷰와 함께 맞춰집니다.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.
 
 ## 실행 시점에 정해지는 열

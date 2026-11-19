@@ -25,6 +25,7 @@ mod document;
 mod embed;
 mod facets;
 mod feed;
+mod file_drop;
 mod flow;
 mod funnel;
 mod gallery;
@@ -64,6 +65,7 @@ mod share;
 mod shell;
 mod stepper;
 mod story;
+mod surface;
 mod table;
 mod thread;
 mod toc;
@@ -138,6 +140,7 @@ pub use document::{
 };
 pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
 pub use feed::{Feed, MAX_FEED_BATCH, MAX_POST_MEDIA, Post};
+pub use file_drop::FileDrop;
 pub use flow::{FlowDiagram, MAX_FLOW_EDGES, MAX_FLOW_NODES};
 pub use funnel::{ActivityRings, Funnel, MAX_FUNNEL_STAGES, MAX_RINGS};
 pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
@@ -179,6 +182,7 @@ pub(crate) use schema::{limits_attr, open_section, render_spec, render_templates
 pub use share::{CopyButton, MAX_COPY_BYTES, Share};
 pub use stepper::{MAX_STEPS, Stepper};
 pub use story::{MAX_STORY_RINGS, StoryRing, StoryRow, StoryState};
+pub use surface::{Axis, Draggable, MAX_SURFACE, Surface, SurfaceMove};
 pub use table::{MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, Table};
 pub use thread::{
     Delivery, MAX_CONVERSATION, MAX_MESSAGE_CHARS, MAX_REPLY_CHARS, MAX_SHOWN_FILES, MessageThread,
@@ -190,7 +194,7 @@ pub use toc::{MAX_TOC_ITEMS, Toc};
 pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
 pub(crate) use topics::{topic_list, topics_attr};
 pub use tour::{MAX_TOUR_STOPS, Tour, TourStop};
-pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use tree::{MAX_TREE_CHILDREN, MAX_TREE_DEPTH, Tree, TreeItem, TreeMove, TreePlace, TreeQuery};
 pub use typing::{MAX_TYPING_PEOPLE, TYPING_EVERY_SECONDS, TYPING_SHOWN_SECONDS, TypingIndicator};
 pub use variants::{MAX_VARIANT_GROUPS, MAX_VARIANT_OPTIONS, VariantGroup, VariantPicker};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};

@@ -1,0 +1,41 @@
+/* Movable trees (`Tree::movable`): linked only by pages that hold `.z-tree-movable`. */
+
+.z-tree-movable .z-tree-row { position: relative; }
+
+.z-tree-movable .z-tree-move {
+  flex: none; min-width: 26px; min-height: 26px; margin-inline-start: auto; padding: 0 calc(var(--z-space) * 2);
+  border: 1px solid var(--z-border); border-radius: var(--z-radius); background: var(--z-surface); color: var(--z-text);
+  font: inherit; font-size: var(--z-font-size-xs); cursor: pointer;
+}
+
+.z-tree-movable .z-tree-hint + .z-tree-move, .z-tree-movable .z-tree-insert + .z-tree-move { margin-inline-start: 0; }
+
+.z-tree-movable .z-tree-move:hover { background: var(--z-hover); }
+
+.z-tree-movable .z-tree-menu {
+  position: absolute; inset-block-start: 100%; inset-inline-start: 0; z-index: 20; min-width: 12rem;
+  margin: 0; padding: 4px; list-style: none; border: 1px solid var(--z-border); border-radius: var(--z-radius);
+  background: var(--z-surface); box-shadow: var(--z-shadow-2);
+}
+
+.z-tree-movable .z-tree-menu [role="menuitem"], .z-tree-movable .z-tree-menu-none { padding: 6px calc(var(--z-space) * 3); min-height: 24px; border-radius: var(--z-radius); font-size: var(--z-font-size-sm); }
+
+.z-tree-movable .z-tree-menu [role="menuitem"] { cursor: pointer; }
+
+.z-tree-movable .z-tree-menu [role="menuitem"]:hover, .z-tree-movable .z-tree-menu [role="menuitem"]:focus { background: var(--z-hover); outline: none; }
+
+.z-tree-movable .z-tree-menu [role="menuitem"]:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+
+.z-tree-movable .z-tree-menu-none { color: var(--z-text-muted); }
+
+.z-tree-movable .z-tree-dragging > .z-tree-row { opacity: .45; }
+
+.z-tree-movable [data-drop="before"] > .z-tree-row { box-shadow: inset 0 2px 0 var(--z-primary); }
+
+.z-tree-movable [data-drop="after"] > .z-tree-row { box-shadow: inset 0 -2px 0 var(--z-primary); }
+
+.z-tree-movable [data-drop="inside"] > .z-tree-row { outline: 2px solid var(--z-primary); outline-offset: -2px; }
+
+@media (forced-colors: active) {
+  .z-tree-movable [data-drop] > .z-tree-row { outline: 2px solid Highlight; }
+}

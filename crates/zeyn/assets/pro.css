@@ -431,9 +431,13 @@ dialog.z-palette::before {
   font-size: var(--z-font-size-sm);
   white-space: nowrap;
   cursor: grab;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .z-dock-tab[hidden] { display: none; }
+
+.z-dock-tab[data-dragging] { cursor: grabbing; opacity: 0.6; }
 
 .z-dock-tab:hover { color: var(--z-text); background: var(--z-hover); }
 

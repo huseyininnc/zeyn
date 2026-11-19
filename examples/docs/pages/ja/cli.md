@@ -116,7 +116,7 @@ zeyn check --json
 
 ## DevTools
 
-`cargo run`（または `zeyn dev`）で動かすデバッグビルドは、各リクエストが何をしたかを記録します。実行した画面とアクション、ステータスと時間、画面の構築と描画にかかった時間、各 SQL 文とその時間および影響を受けた行数、アクションが返したエフェクトとトピックです。Alt+Shift+D で直近 50 件のリクエストを表示するパネルが開き、各リクエストを開くとその SQL 文が表示されます。`GET /_zeyn/devtools` は同じ一覧を JSON で返します。
+`cargo run`（または `zeyn dev`）で動かすデバッグビルドは、各リクエストが何をしたかを記録します。実行した画面とアクション、ステータスと時間、画面の構築と描画にかかった時間、各 SQL 文とその時間および影響を受けた行数、アクションが返したエフェクトとトピックです。Alt+Shift+D で直近 50 件のリクエストを表示するパネルが開き、各リクエストを開くとその SQL 文が表示されます。`GET /_zeyn/devtools` は同じ一覧を JSON で返し、MCP ツール `zeyn_devtools` がそれをエージェントのために読みます。
 
 SQL 文は引数なしで保存されるため、値がパネルに届くことはありません。リリースビルドには DevTools がなく、そのためのコードもルートもメモリもありません。`App::router` を自分で提供するアプリやテストは、`zeyn::server::devtools(true)` で有効にします。
 
@@ -133,4 +133,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP サーバー
 
-`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_inspect`（画面のノードツリーと、各ノードを置いた Rust の行）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。
+`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_inspect`（画面のノードツリーと、各ノードを置いた Rust の行）、`zeyn_devtools`（実行中のデバッグビルドの DevTools リクエストログ: 画面、アクション、時間、SQL 文）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。

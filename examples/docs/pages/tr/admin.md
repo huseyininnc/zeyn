@@ -82,6 +82,8 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 Bir toplu işlemden sonra gelen kutusu konusunu adlandırır (`"notifications"`, değiştirmek için `.topic(..)`): gelen kutusu ve onu `.listens` ile dinleyen her düğüm yerinde yeniden çizilir, zil de sayısını yeniden yükler. Zil, `UnreadCount { limit }` alan ve sınırda (100) duran bir eylemle sayar, yani tek ve sınırlı bir sorgu; 99'un üstünde `99+` gösterir ve bağlantının adı ekran okuyucular için sayıyı söyler. Sayıyı sayfa göründükten sonra tek bir istekle yükler; konusu bir gelen kutusu, `ui.refresh("notifications")` ya da `.live()` ve `realtime` özelliğiyle herhangi bir eylemdeki `socket.notify(&ctx, "notifications")` tarafından adlandırıldığında yeniden yükler (konuyu `ZeynSocket::topic` ile bildirin). `inbox.js` (6,1 KB, gzip ile 2,3 KB) ve `inbox.css` (3,1 KB) yalnızca bileşenlerle yüklenir.
 
+Sayma eyleminin iznine sahip olmayan kullanıcı zili görmez: üst çubuk onu dışarıda bırakır, böylece sayfa gelen kutusu kodunu yüklemez ve sunucunun reddedeceği bir sayıyı hiç istemez.
+
 ## Kanban
 
 `Kanban::of(flow, cards, move_card)` bir eylemin kayıtlarını, iş akışının `#[choice]` enum'unun her durumu için bir sütun olmak üzere, enum sırasıyla sütunlarda kartlar olarak gösterir. Her sütun, o durumdaki kartlar üzerinde sanal bir listedir: eylem duruma kapsamlanmış bir `DataQuery` alır, böylece süzme veritabanında yapılır ve kartlar sütun kaydıkça 50'lik bloklar (`KANBAN_BLOCK`) hâlinde yüklenir. Sütun başlığı kart sayısını ve WIP sınırını gösterir; sınırını aşan sütun işaretlenir.
@@ -103,7 +105,9 @@ Kanban::of(task_flow(), search_tasks, move_task)
 
 Bir kartı bir sütundan diğerine taşımak, `Transitions` gibi bir `TransitionRequest` ile iki durum arasındaki geçişi çalıştırır. Pano yalnızca kullanıcının yapabileceği taşımaları sunar; sunucu geçişi bulur, geçişin iznini ve taşıma eyleminin iznini denetler (`POST /_zeyn/data` üzerinden CSRF ve yazma sınırı), eylem de geçişi `Workflow::apply` ile uygular; bu, o sırada başka bir durumda olan kartı reddeder. `.confirm(name, message)` önce ortak iletişim kutusunda sorar. Kart hemen taşınır; sunucu reddederse kart gerekçesiyle birlikte sütununa döner, kabul ederse iki sütun tek bir istekle yeniden çizilir.
 
-Fare ya da kalem kartı sürükler; gidebileceği sütunlar çerçevelenir, diğerleri soluklaşır. Dokunmatik ekranlarda sütunlar kaymaya devam eder ve her karttaki düğme klavyedekiyle aynı menüyü açar (WCAG 2.5.7). `kanban.js` (15,5 KB, gzip ile 5 KB) ve `kanban.css` (4 KB) yalnızca panoyla, `vlist.js` de sütunlarıyla yüklenir.
+Fare ya da kalem kartı 6 piksel hareket ettikten sonra, dokunmatik ekran 250 ms basılı tuttuktan sonra sürükler; böylece parmakla kaydırmak sütunu kaydırmaya devam eder (ortak sürükleme çekirdeği, `drag.js`). Gidebileceği sütunlar çerçevelenir, diğerleri soluklaşır ve kart kenara yakın tutulduğunda pano yana kayar. Her karttaki düğme klavyedekiyle aynı menüyü açar; bu, tek işaretçiyle taşımanın yoludur (WCAG 2.5.7). `kanban.js` (19,7 KB, gzip ile 6 KB), `drag.js` ve `kanban.css` (4,5 KB) yalnızca panoyla, `vlist.js` de sütunlarıyla yüklenir.
+
+`.sortable(Task::rank, reorder_tasks)` her sütundaki kartları bir `Rank` alanının sırasında tutar ve sıralanabilir listenin sıralama aksiyonunu (`ReorderRequest`) kullanır. Her karta, onu sütununda yeniden sıralayan bir tutamaç gelir (sürükleme, tuşlar ya da taşıma menüsü). Başka bir kartın üstüne bırakılan kart onun önüne ya da arkasına yerleşir ve yeri bir çizgiyle gösterilir: kendi sütununda bu, sıralama isteğini gönderir; başka bir sütuna önce geçiş çalışır, ardından kartın yeni komşularıyla sıralama gelir. İki istek de sunucunun denetimlerinden geçer: sütunun düğümü, CSRF, yazma sınırı ve her aksiyonun izni. `sortable.js` yalnızca sıralanabilir bir panoyla yüklenir.
 
 | Tuş | Ne yapar |
 |---|---|
@@ -113,6 +117,7 @@ Fare ya da kalem kartı sürükler; gidebileceği sütunlar çerçevelenir, diğ
 | Home, End | Sütunda görünen ilk veya son kart |
 | Enter, Space | Taşıma menüsünü açar: Up ve Down sütun seçer, Enter taşır, Escape kapatır |
 | Shift + Left, Shift + Right | İş akışı izin veriyorsa kartı önceki veya sonraki sütuna taşır |
+| Alt + Yukarı, Alt + Aşağı | Sıralanabilir bir panoda kartı sütununda yukarı ya da aşağı taşır |
 
 ## Calendar
 

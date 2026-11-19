@@ -813,6 +813,11 @@ fn the_upload_field_renders_its_limits_and_files() {
     );
     assert!(!out.contains("<b>x</b>"));
     assert!(out.contains("PNG, PDF, CSV, up to 64.0 KB each, at most 2 files."));
+    assert!(out.contains("Drop files or folders here, paste them, or choose them."));
+    assert!(
+        out.contains("{name} is waiting to upload") && out.contains("{n} files of a type"),
+        "the texts for waiting uploads and skipped folder files reach the browser"
+    );
 }
 
 #[test]

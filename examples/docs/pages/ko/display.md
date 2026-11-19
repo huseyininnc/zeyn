@@ -80,7 +80,9 @@ DescriptionList::of(&invoice)
 
 ## EmptyState와 Skeleton
 
-`EmptyState::new(title).text(text)`는 빈 영역을 다음 단계로 채웁니다. `.link(label, screen, params)`는 `LinkButton`을 통해 다른 페이지로 이동하고, `.opens(label, screen, params)`는 앱의 Screen을 창(Window)으로 엽니다. `Skeleton::lines(n)`은 무언가를 불러오는 동안의 자리 표시자입니다.
+`EmptyState::new(title).text(text)`는 빈 영역을 다음 단계로 채웁니다. `.link(label, screen, params)`는 `LinkButton`을 통해 다른 페이지로 이동하고, `.opens(label, screen, params)`는 앱의 Screen을 창(Window)으로 엽니다. `Skeleton::lines(n)`은 무언가를 불러오는 동안의 자리 표시자입니다. 스켈레톤은 300 ms를 기다린 뒤에만 나타나므로 빠른 로드에서는 깜박이지 않으며, 늦게 도착하는 지연 부분은 이를 최소 400 ms 유지합니다.
+
+`Skeleton::kpi()`, `Skeleton::grid(rows)`, `Skeleton::list(items)`, `Skeleton::chart()`는 KPI 타일, DataGrid, List, 막대·선·영역 차트의 모양과 크기를 그대로 가지므로 콘텐츠가 도착해도 페이지가 움직이지 않습니다. `Deferred::new(part).skeleton(Skeleton::chart())`는 지연 부분을 불러오는 동안 이를 보여 줍니다. 그리드 스켈레톤은 행 수만큼 높고 그리드 높이를 넘지 않으며, 그리드 위의 도구 모음은 포함하지 않습니다. 막대는 천천히 깜박이고, 사용자가 동작 줄이기를 요청하면 멈춰 있습니다.
 
 ## LinkButton
 

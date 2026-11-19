@@ -130,7 +130,14 @@ fn script() -> ScriptedProvider {
             vec![
                 vec![Say::tool(
                     "navigate",
-                    json!({ "screen": "customers", "filters": [{ "field": "name", "contains": "Ada" }] }),
+                    json!({
+                        "screen": "customers",
+                        "filters": [{ "field": "name", "contains": "Ada" }],
+                        "filter_groups": [
+                            { "any": true, "filters": [{ "field": "city", "equals": "Izmir" }, { "field": "city", "equals": "Bursa" }] },
+                            { "any": true, "filters": [{ "field": "city" }] }
+                        ]
+                    }),
                 )],
                 vec![Say::text("Opened.")],
             ],
@@ -536,6 +543,12 @@ async fn navigation_goes_to_allowed_screens_with_filters() {
     let nav = r.of("navigate");
     assert_eq!(nav[0]["url"], "/customers");
     assert_eq!(nav[0]["filters"][0]["contains"], "Ada");
+    let groups = nav[0]["filter_groups"]
+        .as_array()
+        .unwrap();
+    assert_eq!(groups.len(), 1, "a group of empty filters is dropped");
+    assert_eq!(groups[0]["any"], true);
+    assert_eq!(groups[0]["filters"][1]["equals"], "Bursa");
     assert_eq!(r.text(), "Opened.");
 }
 

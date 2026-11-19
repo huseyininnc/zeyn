@@ -116,7 +116,7 @@ zeyn check --json
 
 ## DevTools
 
-`cargo run` (ya da `zeyn dev`) ile sunulan bir debug derlemesi her isteğin ne yaptığını kaydeder: çalıştırdığı screen ve action, durumu ve süresi, screen'in oluşturulması ve çizilmesinin ne kadar sürdüğü, her SQL ifadesi ile süresi ve etkilenen satır sayısı, action'ın döndürdüğü etkiler ve konular. Alt+Shift+D son 50 isteği gösteren bir panel açar; her istek açılınca SQL ifadelerini gösterir. `GET /_zeyn/devtools` aynı listeyi JSON olarak döndürür.
+`cargo run` (ya da `zeyn dev`) ile sunulan bir debug derlemesi her isteğin ne yaptığını kaydeder: çalıştırdığı screen ve action, durumu ve süresi, screen'in oluşturulması ve çizilmesinin ne kadar sürdüğü, her SQL ifadesi ile süresi ve etkilenen satır sayısı, action'ın döndürdüğü etkiler ve konular. Alt+Shift+D son 50 isteği gösteren bir panel açar; her istek açılınca SQL ifadelerini gösterir. `GET /_zeyn/devtools` aynı listeyi JSON olarak döndürür; MCP aracı `zeyn_devtools` bunu bir ajan için okur.
 
 İfadeler argümanları olmadan tutulur, bu yüzden hiçbir değer panele ulaşmaz. Release derlemelerinde DevTools yoktur: ne kodu, ne rotası, ne de onlar için bellek. `App::router`'ı kendisi sunan bir uygulama ya da bir test, onları `zeyn::server::devtools(true)` ile açar.
 
@@ -133,4 +133,4 @@ Oluşturulan bir uygulamanın imajı yaklaşık 43 MB'tır ve boşta çalışan 
 
 ## MCP sunucusu
 
-`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_inspect` (bir screen'in node ağacı ve her node'u yerleştiren Rust satırı), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.
+`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_inspect` (bir screen'in node ağacı ve her node'u yerleştiren Rust satırı), `zeyn_devtools` (çalışan debug derlemesinin DevTools istek günlüğü: screen, action, süreler, SQL cümleleri), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.

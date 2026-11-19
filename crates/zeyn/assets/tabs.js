@@ -160,16 +160,32 @@ function splitKey(e, bar) {
 
 /* Setup of panels, tabs and split panes ------------------------------------------------------ */
 
+/** Milliseconds before a skeleton shows (its CSS keeps it hidden that long), so fast loads never flash one. */
+const SKELETON_DELAY = 300;
+
+/** Milliseconds a skeleton stays once it showed, so it does not blink away. */
+const SKELETON_MIN = 400;
+
+/** Waits until a skeleton that started at `start` has either never shown or shown long enough. */
+function skeletonDone(start) {
+  const shown = performance.now() - start - SKELETON_DELAY;
+  return shown <= 0 ? Promise.resolve() : new Promise((done) => setTimeout(done, Math.max(0, SKELETON_MIN - shown)));
+}
+
 /**
  * Loads the deferred parts in `root` (`ui::Deferred`, `[data-zeyn-defer]`) from `/_zeyn/node`, all
- * at once, each replacing its placeholder when it arrives; a failure shows the error in place.
+ * at once, each replacing its placeholder when it arrives; a failure shows the error in place. A
+ * part that arrives within `SKELETON_DELAY` never shows its skeleton; one that comes later keeps
+ * the skeleton for at least `SKELETON_MIN`.
  */
 function loadDeferred(root) {
   for (const part of root.querySelectorAll?.('[data-zeyn-defer]') ?? []) {
     const path = part.dataset.zeynDefer;
     delete part.dataset.zeynDefer;
     const a = address(part);
-    post('/_zeyn/node', { screen: a.screen, params: a.params, node: path }).then((r) => {
+    const start = performance.now();
+    post('/_zeyn/node', { screen: a.screen, params: a.params, node: path }).then(async (r) => {
+      await skeletonDone(start);
       part.removeAttribute('aria-busy');
       if (!r.ok) {
         const message = parse(r.body)?.message ?? part.dataset.zeynFailed ?? '';

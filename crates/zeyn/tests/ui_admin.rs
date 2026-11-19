@@ -443,7 +443,7 @@ enum Csrf {
 #[tokio::test]
 async fn admin_stylesheets_and_scripts_load_only_on_pages_that_use_them() {
     let router = app(Notes::seeded());
-    let (_, text) = get_as(&router, "/plain", "admin.read").await;
+    let (_, text) = get_as(&router, "/plain", "admin.read,notes.read").await;
     for name in ["diff.css", "code.css", "barcode.css", "topics.js"] {
         assert!(!text.contains(&format!("/_zeyn/{name}")), "{name}");
     }
@@ -511,6 +511,22 @@ async fn the_inbox_groups_by_day_marks_unread_and_escapes() {
         "no buttons without the write permission"
     );
     assert!(!reader.contains(r#"class="z-inbox-check""#), "{reader}");
+}
+
+#[tokio::test]
+async fn the_bell_is_left_out_for_users_who_cannot_count() {
+    let (status, page) = get_as(&app(Notes::seeded()), "/plain", "admin.read").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        !page.contains("data-zeyn-notify"),
+        "no bell without the count action's permission: {page}"
+    );
+    assert!(
+        !page.contains("/_zeyn/inbox.js"),
+        "and no inbox module for it"
+    );
+    let (_, page) = get_as(&app(Notes::seeded()), "/plain", "admin.read,notes.read").await;
+    assert!(page.contains(r#"data-zeyn-notify="notifications""#));
 }
 
 #[tokio::test]
@@ -609,6 +625,7 @@ pub struct Task {
     pub id: TaskId,
     pub title: String,
     pub state: TaskState,
+    pub rank: Rank,
 }
 
 #[derive(Clone, Default)]
@@ -622,6 +639,7 @@ impl Tasks {
             id: TaskId(id),
             title: title.into(),
             state,
+            rank: zeyn::rank::rebalance(4)[id as usize - 1].clone(),
         };
         Tasks(Arc::new(Mutex::new(vec![
             task(1, "Write <docs>", TaskState::Todo),
@@ -669,6 +687,34 @@ pub fn board() -> Screen {
     )
 }
 
+#[action(permission = "tasks.work")]
+pub async fn reorder_task(r: ReorderRequest<TaskId>, tasks: Tasks) -> Result<()> {
+    let mut all = tasks.0.lock().unwrap();
+    let rank = r.rank(|k| {
+        all.iter()
+            .find(|t| t.id == *k)
+            .map(|t| t.rank.clone())
+    })?;
+    let task = all
+        .iter_mut()
+        .find(|t| t.id == r.key)
+        .ok_or(Error::NotFound)?;
+    task.rank = rank;
+    Ok(())
+}
+
+#[screen(route = "/ordered", permission = "admin.read")]
+pub fn ordered_board() -> Screen {
+    Screen::new("Ordered").body(
+        Card::new().add(
+            Kanban::of(task_flow(), search_tasks, move_task)
+                .state(Task::state)
+                .card(|t: &Task| Paragraph::new(t.title.clone()))
+                .sortable(Task::rank, reorder_task),
+        ),
+    )
+}
+
 fn board_app(tasks: Tasks) -> axum::Router {
     App::new("Admin")
         .i18n(I18n::new("en"))
@@ -683,7 +729,11 @@ fn board_app(tasks: Tasks) -> axum::Router {
                 .collect();
             Some(Identity::user("u").with_permissions(perms))
         })
-        .feature(Feature::new("board").screen(board))
+        .feature(
+            Feature::new("board")
+                .screen(board)
+                .screen(ordered_board),
+        )
         .router()
         .unwrap()
 }
@@ -727,7 +777,14 @@ async fn a_kanban_has_a_column_per_state_with_counts_wip_and_the_users_moves() {
         page.contains("data-zeyn-confirm"),
         "the confirm dialog comes along"
     );
-    for name in ["kanban.js", "kanban.css", "vlist.js", "components.js"] {
+    for name in [
+        "kanban.js",
+        "kanban.css",
+        "drag.js",
+        "net.js",
+        "vlist.js",
+        "components.js",
+    ] {
         assert!(page.contains(&format!("/_zeyn/{name}?v=")), "{name}");
     }
     let (_, admin) = get_as(
@@ -737,6 +794,42 @@ async fn a_kanban_has_a_column_per_state_with_counts_wip_and_the_users_moves() {
     )
     .await;
     assert!(admin.contains("&quot;Done&quot;:[{&quot;confirm&quot;:&quot;Open it again?&quot;"));
+}
+
+#[tokio::test]
+async fn a_sortable_kanban_reorders_cards_inside_a_column_through_the_columns_node() {
+    let tasks = Tasks::seeded();
+    let router = board_app(tasks.clone());
+    let (status, page) = get_as(&router, "/ordered", WORKER).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(
+        page.matches("data-zeyn-sortable")
+            .count(),
+        3,
+        "every column is a sortable list"
+    );
+    assert!(page.contains("z-sort-handle"));
+    let call = |key: &str, after: Option<&str>, before: Option<&str>| serde_json::json!({ "screen": "ordered_board", "params": null, "node": "0.0.1", "key": "reorder", "input": { "key": key, "after": after, "before": before } });
+    let (status, _) = data(&router, WORKER, Csrf::Missing, call("3", None, Some("2"))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = data(
+        &router,
+        "admin.read,tasks.read",
+        Csrf::Sent,
+        call("3", None, Some("2")),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the reorder action's permission"
+    );
+    let (status, _) = data(&router, WORKER, Csrf::Sent, call("3", None, Some("99"))).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "an unknown neighbor");
+    let (status, reply) = data(&router, WORKER, Csrf::Sent, call("3", None, Some("2"))).await;
+    assert_eq!(status, StatusCode::OK, "{reply}");
+    let all = tasks.0.lock().unwrap();
+    assert!(all[2].rank < all[1].rank, "Ship now comes before Review");
 }
 
 #[tokio::test]

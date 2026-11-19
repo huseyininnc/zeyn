@@ -156,6 +156,7 @@ catalog! {
         list_detail "/ui/list-detail";
         deferred "/ui/deferred";
         auto_grid "/ui/auto-grid";
+        surface "/ui/surface";
         screen_header "/ui/screen-header";
     }
     "text" FileText {
@@ -203,6 +204,7 @@ catalog! {
         color_input "/ui/color-input";
         length_input "/ui/length-input";
         action_button "/ui/action-button";
+        file_drop "/ui/file-drop";
     }
     "data" Table {
         data_grid "/ui/data-grid";

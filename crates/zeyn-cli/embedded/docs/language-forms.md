@@ -23,6 +23,7 @@ Leave the name empty or type a wrong email and press *Send*: the browser shows t
 | `.field(M::f)` | One field on its own line |
 | `.row(\|r\| r.field(a).field(b))` | Fields side by side; they stack on narrow screens |
 | `.section(title)` | A titled group of the fields after it |
+| `.settings()` | Settings layout: label and help beside each control, and a save bar that sticks to the bottom once something changes |
 | `.step(title)` | A wizard step; the form shows one step at a time |
 | `.range(M::from, M::to)` | Two dates as one range picker |
 | `Form::auto(value)` | Every field, in declaration order |
@@ -112,10 +113,13 @@ A permission name lets the same users upload and download. To let readers open f
 
 The control is a native file input inside a drop zone. Each file uploads on its own with a progress bar, can be canceled while it runs, retried when it failed and removed when it is done. Images show a preview made from an object URL of the chosen file. Progress and results are announced in a polite live region. The showcase has a working example at `/uploads`; this documentation site has no signed in user, so it shows no live upload.
 
+A dropped folder adds the files inside it and its subfolders, read in pages of at most 100 entries until the folder is done; files of a type the field does not take are skipped and counted in the live region. Files pasted while the field has focus upload too. A file whose extension or type is not in `accept` is refused in the browser before any byte is sent, and the server checks the content again. At most three files of a field upload at the same time; the others wait in line with a busy progress bar.
+
 | Key | What it does |
 |---|---|
 | Tab | Moves to the file input, then to each file's download link and its Cancel, Retry or Remove button |
 | Enter or Space on the file input | Opens the system file picker (the keyboard path for drag and drop) |
+| Ctrl+V or Cmd+V on the file input | Uploads the files on the clipboard, such as a screenshot |
 | Enter or Space on Cancel, Retry, Remove | Runs it; after Cancel focus moves to Retry, after Remove to the next file or back to the input |
 
 What the server does for `POST /_zeyn/files/{store}`:
@@ -126,10 +130,60 @@ What the server does for `POST /_zeyn/files/{store}`:
 4. runs the feature's `FileScanner`; a refused file, or a scanner that fails, is deleted and the answer is `422`;
 5. answers `201` with `{id, name, size, type}`. The id is 128 random bits from the server; names are cleaned of paths and control characters.
 
+With the `image` feature, `FileRules::clean_images()` adds a step after the store has the file: PNG, JPEG and WebP uploads are decoded and encoded again in the same format, so EXIF (with GPS), XMP, ICC profiles, text chunks and bytes hidden after the image data never stay on the server. The EXIF orientation is applied to the pixels first, JPEG is written at quality 90 and PNG and WebP losslessly. Decoding stops at `MAX_IMAGE_SIDE` (12,000) pixels on a side and `MAX_IMAGE_MEMORY` (256 MiB); an image that does not decode is deleted and the answer is `422`. Both limits are checked against the size in the image header before any pixel is decoded, so a small file that claims a huge image is refused without the memory, and an animated image keeps only its first frame. The cleaned file replaces the original under a new id, and the scanner then checks the cleaned file. Without the feature the method does not exist, so a store cannot think it is cleaned when it is not.
+
 Downloads (`GET /_zeyn/files/{store}/{id}`) check the id's shape, the permission, the guards and the tenant, and go through the media serving (see `docs/media.md`): ranges, entity tags and `nosniff`. Only raster images, audio and video are inline; everything else is sent as `application/octet-stream` with `Content-Disposition: attachment`, a quoted ASCII name plus the UTF-8 name, under `Content-Security-Policy: sandbox`.
 
 `DiskStore` keeps `{id}.bin` and `{id}.json` in one folder and writes uploads to `{id}.part` first. `MemoryStore` holds files in memory with a byte cap, for tests and demos. The form value only names files: a save action that must be sure a file exists calls `store.meta(id)`, as the showcase does.
 
 `FileRules::quota(bytes, window)` caps what one user uploads to a store per window, counted with the app's rate store; the upload that crosses it still lands and the next one answers `429`. `DiskStore` removes `.part` files older than an hour (uploads stopped by a crash) at most once an hour. `ZipGuard` is a scanner for ZIP based uploads (ZIP, Word, Excel, PowerPoint): it refuses archives whose central directory declares more than 10,000 entries, more than 1 GiB in all or more than 200 times the file's size, and ZIP64 archives; code that unpacks an accepted archive must still stop at those limits.
 
-Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 12 KB raw and 4 KB gzip, `files.css` 3 KB raw and 1 KB gzip.
+Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 21 KB raw and 7 KB gzip, `files.css` 3 KB raw and 1 KB gzip.
+
+### Resumable uploads
+
+With the `resumable` Cargo feature, the upload field and `FileDrop` send files through a subset of the tus 1.0 protocol, so an upload that loses the network continues where it stopped instead of starting over. The control needs no change:
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+Without `resumable_uploads`, unfinished uploads go to the system's temporary folder, are kept 24 hours after their last bytes, and at most 5 per user and 1000 in all may be open.
+
+| Request | Answer |
+|---|---|
+| `POST /_zeyn/uploads/{store}` with `Upload-Length` and `Upload-Metadata: filename <base64>` | `201` with `Location`, `Upload-Offset: 0` and `Upload-Expires`; `413` over the store's limit, `422` for an empty file, `429` over the quota or the open upload caps |
+| `HEAD` on the location | `200` with `Upload-Offset` and `Upload-Length` |
+| `PATCH` with `Content-Type: application/offset+octet-stream` and `Upload-Offset` | `204` with the new `Upload-Offset`; `409` when the offset is not the server's, `423` while another `PATCH` of the same upload still runs, `413` for more bytes than declared |
+| the `PATCH` that brings the last byte | `200` with `{id, name, size, type}`, like a plain upload |
+| `DELETE` on the location | `204`; the upload and its bytes are removed |
+
+Every request needs `Tus-Resumable: 1.0.0` (otherwise `412`), the store's write permission and the feature's guards; `POST`, `PATCH` and `DELETE` also need the CSRF header. An upload is found only by the user and tenant that created it; anyone else gets `404`. Creating an upload counts against the write limit like a plain upload; its `PATCH`es do not, since they cannot carry more than the declared length. The browser sends the file in `PATCH`es of 1 MiB, the default body limit of common reverse proxies, so a broken connection costs at most that much again.
+
+Bytes are written to `{id}.part` in the upload folder as they arrive, so the bytes that reached the server before a connection broke are kept and `HEAD` reports them. When the last byte arrives, the file goes through the same steps as `POST /_zeyn/files/{store}`: the type found in the content, the size limit, the quota, the store, the scanner and the interceptors (`CallKind::Upload`). The part file is then removed, also when a check refuses the file. An upload with no new bytes for the expiry time is removed when it is next asked for or when the next upload is created; part files that a restart left behind are swept once per expiry time.
+
+In the browser, a failed request (a lost network, `409`, `423`, `429` or a server error) is retried after 1, 2, 4, 8 and then every 15 seconds, after the browser is online again, up to 12 times in a row; each attempt asks for the offset first and sends only the rest. Cancel stops the request and deletes the upload on the server. Retry after a final failure resumes the same upload while the server still has it.
+
+Differences from tus 1.0: only the creation, expiration and termination extensions; no `OPTIONS` discovery, no checksums, no deferred length and no concatenation; and the last `PATCH` answers `200` with the stored file instead of `204`, so the field gets the file's id without another request. Open uploads are known to the process that created them, so behind a load balancer with several instances the `/_zeyn/uploads/` paths need sticky sessions.
+
+## File drop
+
+`FileDrop::new(label, rules)` is the same upload control on its own, outside a form, for screens where files are the whole task, such as a document inbox. It takes folders, pasted files and the accept list like the form field, and uploads into the store of `rules`, which `Feature::files` registers with its permission. `.single()` takes one file at a time. `.on_upload(action)` runs an action with each stored `File`; the server first checks that the id has the shape it generates, cleans the name again and keeps only a content type of the rules, so the action gets nothing the browser made up. When the action refuses, the item shows the reason. The file picker inside the zone is the keyboard and single pointer path.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

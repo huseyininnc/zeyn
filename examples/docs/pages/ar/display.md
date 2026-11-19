@@ -80,7 +80,9 @@ DescriptionList::of(&invoice)
 
 ## EmptyState و Skeleton
 
-`EmptyState::new(title).text(text)` يملأ منطقة فارغة بخطوة تالية: يذهب `.link(label, screen, params)` إلى صفحة أخرى عبر `LinkButton`، ويفتح `.opens(label, screen, params)` شاشة من التطبيق كنافذة. و`Skeleton::lines(n)` عنصر نائب أثناء تحميل شيء ما.
+`EmptyState::new(title).text(text)` يملأ منطقة فارغة بخطوة تالية: يذهب `.link(label, screen, params)` إلى صفحة أخرى عبر `LinkButton`، ويفتح `.opens(label, screen, params)` شاشة من التطبيق كنافذة. و`Skeleton::lines(n)` عنصر نائب أثناء تحميل شيء ما. لا يظهر الهيكل إلا بعد 300 ms من الانتظار، فلا يومض أبدًا في التحميل السريع، والجزء المؤجل الذي يصل لاحقًا يبقيه 400 ms على الأقل.
+
+`Skeleton::kpi()` و`Skeleton::grid(rows)` و`Skeleton::list(items)` و`Skeleton::chart()` تأخذ شكل وحجم بطاقة KPI وDataGrid وList ومخطط أعمدة أو خطوط أو مساحات، فيحل المحتوى محلها دون أن تتحرك الصفحة. ويعرض `Deferred::new(part).skeleton(Skeleton::chart())` واحدًا منها أثناء تحميل جزء مؤجل. هيكل الجدول بطول صفوفه، حتى ارتفاع الجدول؛ ولا يدخل فيه شريط الأدوات فوق الجدول. تنبض الأشرطة ببطء وتبقى ثابتة عندما يطلب المستخدم تقليل الحركة.
 
 ## LinkButton
 

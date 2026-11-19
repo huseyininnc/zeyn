@@ -12,7 +12,8 @@
     },
     "draft": {
       "restored": "Your unsaved entries from before were restored.",
-      "discard": "Discard them"
+      "discard": "Discard them",
+      "unsaved": "You have unsaved changes."
     },
     "session": {
       "idle_title": "Are you still there?",
@@ -161,6 +162,9 @@
       "page_size": "Rows per page",
       "filter_builder": "Filter",
       "builder_title": "Filter rows",
+      "active_filters": "Active filters",
+      "remove_filter": "Remove filter {label}",
+      "filter_group": "{n} conditions",
       "add_condition": "Add condition",
       "remove_condition": "Remove condition",
       "add_group": "Add group",
@@ -400,6 +404,16 @@
         "empty": "No open panels. Open one from the panel options.",
         "resize": "Resize the {area} area"
       },
+      "surface": {
+        "item": "movable item",
+        "hint": "Arrow keys move the item. Or click an item, then click a place on the surface to put it there.",
+        "moved": "{item} moved to {x}, {y}.",
+        "picked": "{item} picked. Click a place on the surface to put it there, or press Escape.",
+        "refused": "The move was not saved.",
+        "resized": "{item} resized to {w} by {h}.",
+        "picked_size": "Size of {item} picked. Click where its bottom right corner should go, or press Escape.",
+        "hint_resize": "Shift and the arrow keys change the size of an item with a corner handle. Or click the handle, then click where its corner should go."
+      },
       "loading": "Loading…",
       "load_failed": "Could not load this part. Try again.",
       "date": {
@@ -518,7 +532,17 @@
         "insert": "Insert",
         "insert_hint": "Control+Enter inserts.",
         "insert_label": "Insert {label}",
-        "inserted": "Inserted {label}."
+        "inserted": "Inserted {label}.",
+        "move": "Move",
+        "move_down": "Down",
+        "move_hint": "Alt with the arrow keys moves the item: Up, Down, Left out of its branch, Right into the branch above.",
+        "move_into": "Into the branch above",
+        "move_label": "Move {label}",
+        "move_none": "Nowhere to move",
+        "move_out": "Out of this branch",
+        "move_refused": "{label} could not be moved.",
+        "move_up": "Up",
+        "moved": "Moved {label}."
       },
       "select": {
         "none": "None",
@@ -564,7 +588,7 @@
         "brand": "Note"
       },
       "upload": {
-        "drop": "Drop files here or choose them.",
+        "drop": "Drop files or folders here, paste them, or choose them.",
         "hint": "{types}, up to {max}.",
         "hint_many": "{types}, up to {max} each, at most {n} files.",
         "list": "Files",
@@ -576,7 +600,10 @@
         "cancel": "Cancel",
         "retry": "Retry",
         "remove": "Remove",
-        "remove_name": "Remove {name}"
+        "remove_name": "Remove {name}",
+        "waiting": "{name} is waiting to upload",
+        "skipped": "{n} files of a type this field does not take were skipped.",
+        "not_added": "The file was uploaded but could not be added."
       },
       "kpi": {
         "up": "Up {pct}% from the previous period",
@@ -1236,7 +1263,11 @@
       "refused": "The file was refused by the security check.",
       "aborted": "The upload stopped before the whole file arrived. Try again.",
       "empty": "The file is empty.",
-      "store_full": "There is no room left for this file."
+      "store_full": "There is no room left for this file.",
+      "open": "You have too many unfinished uploads. Finish or cancel one and try again.",
+      "offset": "The upload is out of step with the server. It continues from where the server is.",
+      "busy": "This upload is still receiving data. Try again in a moment.",
+      "length": "The upload did not say how large the file is."
     }
   },
   "AccountLogin": {

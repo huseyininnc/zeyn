@@ -47,10 +47,21 @@ pub fn side_by_side(_ctx: &Ctx) -> Node {
 }
 
 /// What the catalog shows of `Chart`.
+/// A donut with one part of 75% or more is drawn as a bar list.
+pub fn bar_list(_ctx: &Ctx) -> Node {
+    Card::new()
+        .add(
+            Chart::donut("Orders by status")
+                .labels(["Delivered", "Sent", "Returned"])
+                .series("Orders", [902.0, 71.0, 27.0]),
+        )
+        .into()
+}
+
 pub const ENTRY: Entry = Entry {
     name: "Chart",
     docs: "components/data",
     api: &["Chart"],
     overview: &[ex!(overview)],
-    examples: &[ex!(donut), ex!(gauge), ex!(side_by_side)],
+    examples: &[ex!(donut), ex!(bar_list), ex!(gauge), ex!(side_by_side)],
 };
