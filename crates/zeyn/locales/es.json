@@ -971,7 +971,11 @@
       "refused": "La comprobación de seguridad rechazó el archivo.",
       "aborted": "La subida se detuvo antes de que llegara todo el archivo. Inténtalo de nuevo.",
       "empty": "El archivo está vacío.",
-      "store_full": "No queda espacio para este archivo."
+      "store_full": "No queda espacio para este archivo.",
+      "open": "Tienes demasiadas subidas sin terminar. Termina o cancela una e inténtalo de nuevo.",
+      "offset": "La subida no coincide con el servidor. Continúa desde donde está el servidor.",
+      "busy": "Esta subida todavía está recibiendo datos. Inténtalo de nuevo en un momento.",
+      "length": "La subida no indicó el tamaño del archivo."
     }
   },
   "AccountLogin": {

@@ -23,6 +23,7 @@ Leave the name empty or type a wrong email and press *Send*: the browser shows t
 | `.field(M::f)` | One field on its own line |
 | `.row(\|r\| r.field(a).field(b))` | Fields side by side; they stack on narrow screens |
 | `.section(title)` | A titled group of the fields after it |
+| `.settings()` | Settings layout: label and help beside each control, and a save bar that sticks to the bottom once something changes |
 | `.step(title)` | A wizard step; the form shows one step at a time |
 | `.range(M::from, M::to)` | Two dates as one range picker |
 | `Form::auto(value)` | Every field, in declaration order |
@@ -135,7 +136,42 @@ Downloads (`GET /_zeyn/files/{store}/{id}`) check the id's shape, the permission
 
 `FileRules::quota(bytes, window)` caps what one user uploads to a store per window, counted with the app's rate store; the upload that crosses it still lands and the next one answers `429`. `DiskStore` removes `.part` files older than an hour (uploads stopped by a crash) at most once an hour. `ZipGuard` is a scanner for ZIP based uploads (ZIP, Word, Excel, PowerPoint): it refuses archives whose central directory declares more than 10,000 entries, more than 1 GiB in all or more than 200 times the file's size, and ZIP64 archives; code that unpacks an accepted archive must still stop at those limits.
 
-Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 17 KB raw and 6 KB gzip, `files.css` 3 KB raw and 1 KB gzip.
+Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 21 KB raw and 7 KB gzip, `files.css` 3 KB raw and 1 KB gzip.
+
+### Resumable uploads
+
+With the `resumable` Cargo feature, the upload field and `FileDrop` send files through a subset of the tus 1.0 protocol, so an upload that loses the network continues where it stopped instead of starting over. The control needs no change:
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+Without `resumable_uploads`, unfinished uploads go to the system's temporary folder, are kept 24 hours after their last bytes, and at most 5 per user and 1000 in all may be open.
+
+| Request | Answer |
+|---|---|
+| `POST /_zeyn/uploads/{store}` with `Upload-Length` and `Upload-Metadata: filename <base64>` | `201` with `Location`, `Upload-Offset: 0` and `Upload-Expires`; `413` over the store's limit, `422` for an empty file, `429` over the quota or the open upload caps |
+| `HEAD` on the location | `200` with `Upload-Offset` and `Upload-Length` |
+| `PATCH` with `Content-Type: application/offset+octet-stream` and `Upload-Offset` | `204` with the new `Upload-Offset`; `409` when the offset is not the server's, `423` while another `PATCH` of the same upload still runs, `413` for more bytes than declared |
+| the `PATCH` that brings the last byte | `200` with `{id, name, size, type}`, like a plain upload |
+| `DELETE` on the location | `204`; the upload and its bytes are removed |
+
+Every request needs `Tus-Resumable: 1.0.0` (otherwise `412`), the store's write permission and the feature's guards; `POST`, `PATCH` and `DELETE` also need the CSRF header. An upload is found only by the user and tenant that created it; anyone else gets `404`. Creating an upload counts against the write limit like a plain upload; its `PATCH`es do not, since they cannot carry more than the declared length. The browser sends the file in `PATCH`es of 1 MiB, the default body limit of common reverse proxies, so a broken connection costs at most that much again.
+
+Bytes are written to `{id}.part` in the upload folder as they arrive, so the bytes that reached the server before a connection broke are kept and `HEAD` reports them. When the last byte arrives, the file goes through the same steps as `POST /_zeyn/files/{store}`: the type found in the content, the size limit, the quota, the store, the scanner and the interceptors (`CallKind::Upload`). The part file is then removed, also when a check refuses the file. An upload with no new bytes for the expiry time is removed when it is next asked for or when the next upload is created; part files that a restart left behind are swept once per expiry time.
+
+In the browser, a failed request (a lost network, `409`, `423`, `429` or a server error) is retried after 1, 2, 4, 8 and then every 15 seconds, after the browser is online again, up to 12 times in a row; each attempt asks for the offset first and sends only the rest. Cancel stops the request and deletes the upload on the server. Retry after a final failure resumes the same upload while the server still has it.
+
+Differences from tus 1.0: only the creation, expiration and termination extensions; no `OPTIONS` discovery, no checksums, no deferred length and no concatenation; and the last `PATCH` answers `200` with the stored file instead of `204`, so the field gets the file's id without another request. Open uploads are known to the process that created them, so behind a load balancer with several instances the `/_zeyn/uploads/` paths need sticky sessions.
 
 ## File drop
 

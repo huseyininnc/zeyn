@@ -82,6 +82,8 @@ DescriptionList::of(&invoice)
 
 `EmptyState::new(title).text(text)` は、空の領域を次のステップで埋めます。`.link(label, screen, params)` は `LinkButton` を通じて別のページへ移動し、`.opens(label, screen, params)` はアプリの画面をウィンドウとして開きます。`Skeleton::lines(n)` は、何かを読み込んでいる間のプレースホルダーです。 スケルトンは 300 ms 待ってから表示されるため、速い読み込みでちらつくことはありません。遅れて届く遅延部分は、表示したスケルトンを少なくとも 400 ms 保ちます。
 
+`Skeleton::kpi()`、`Skeleton::grid(rows)`、`Skeleton::list(items)`、`Skeleton::chart()` は、KPI タイル、DataGrid、List、棒・折れ線・面グラフの形と大きさを取るため、内容が届いてもページは動きません。`Deferred::new(part).skeleton(Skeleton::chart())` は、遅延部分の読み込み中にそれを表示します。グリッドのスケルトンは行の分だけの高さで、グリッドの高さを超えません。グリッドの上のツールバーは含みません。バーはゆっくり明滅し、ユーザーが動きを減らす設定にしていると静止します。
+
 ## LinkButton
 
 どこかへ移動するのはリンクで、何かを実行するのはボタンです。`LinkButton::new(label, screen, params)` は、画面の正規パス（`/products/42` など）への本物の `<a href>` で、見た目はボタンです。そのため、中クリック、「新しいタブで開く」、検索エンジンは、これをリンクとして扱います。`nav.js` を通じてページを再読み込みせずに開き、Enter で辿れます。外観は、主要なアクションの塗りつぶしの外観を `.primary()` で求めない限り、セカンダリです。画面にはルートが必要で、なければコンパイルできません。`EmptyState::link` と `Hero::link` がこれを使います。

@@ -1,0 +1,49 @@
+/**
+ * Settings forms (`Form::settings`): label and help on the start side, the control beside them,
+ * and an actions bar that sticks to the bottom of the view once the form is changed
+ * (`z-dirty`, set by `forms.js`).
+ */
+.z-form.z-form-settings { max-width: 960px; }
+
+.z-form-settings .z-field {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  column-gap: calc(var(--z-space) * 6);
+  align-items: start;
+}
+
+.z-form-settings .z-field > * { grid-column: 2; }
+
+.z-form-settings .z-field > label,
+.z-form-settings .z-field > .z-label-row { grid-column: 1; padding-block-start: 8px; }
+
+.z-form-settings .z-field > .z-field-help { grid-column: 1; margin: 0; }
+
+.z-form-settings .z-form-row { display: grid; grid-template-columns: minmax(0, 1fr); }
+
+.z-form-settings .z-form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  align-items: center;
+  margin-block-start: calc(var(--z-space) * 4);
+  padding: calc(var(--z-space) * 3) calc(var(--z-space) * 4);
+  border-top: 1px solid var(--z-border);
+  background: var(--z-surface-2);
+}
+
+.z-form-settings:not(.z-dirty) .z-form-actions { display: none; }
+
+.z-form-settings .z-form-unsaved {
+  margin-inline-end: auto;
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-sm);
+}
+
+@media (max-width: 40rem) {
+  .z-form-settings .z-field { grid-template-columns: minmax(0, 1fr); }
+  .z-form-settings .z-field > * { grid-column: 1; }
+  .z-form-settings .z-field > label,
+  .z-form-settings .z-field > .z-label-row,
+  .z-form-settings .z-field > .z-field-help { grid-column: 1; padding-block-start: 0; }
+}

@@ -82,6 +82,8 @@ Los valores se formatean como las celdas de una tabla: dinero, fechas y choices 
 
 `EmptyState::new(title).text(text)` llena un área vacía con un siguiente paso: `.link(label, screen, params)` va a otra página mediante un `LinkButton`, y `.opens(label, screen, params)` abre una pantalla de la aplicación como ventana. `Skeleton::lines(n)` es un marcador de posición mientras algo se carga. Un esqueleto solo aparece tras 300 ms de espera, así las cargas rápidas nunca lo hacen parpadear, y una parte diferida que llega más tarde lo mantiene al menos 400 ms.
 
+`Skeleton::kpi()`, `Skeleton::grid(rows)`, `Skeleton::list(items)` y `Skeleton::chart()` toman la forma y el tamaño de un mosaico KPI, un DataGrid, una List y un gráfico de barras, líneas o áreas, así el contenido los reemplaza sin mover la página. `Deferred::new(part).skeleton(Skeleton::chart())` muestra uno mientras se carga una parte diferida. Un esqueleto de grid es tan alto como sus filas, hasta la altura de un grid; una barra de herramientas sobre el grid no forma parte de él. Las barras laten despacio y quedan quietas cuando el usuario pide movimiento reducido.
+
 ## LinkButton
 
 Ir a un sitio es un enlace; hacer algo es un botón. `LinkButton::new(label, screen, params)` es un `<a href>` real a la ruta canónica de la pantalla (como `/products/42`) con aspecto de botón, de modo que el clic central, «abrir en una pestaña nueva» y los buscadores lo tratan como el enlace que es. Se abre mediante `nav.js` sin recargar la página, y Enter lo sigue. El aspecto es secundario salvo que `.primary()` pida el aspecto relleno de la acción principal. La pantalla debe tener una ruta, o el código no compila. `EmptyState::link` y `Hero::link` lo usan.

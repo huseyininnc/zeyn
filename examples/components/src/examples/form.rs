@@ -38,11 +38,30 @@ pub fn overview(_ctx: &Ctx) -> Node {
     .into()
 }
 
+pub fn settings(_ctx: &Ctx) -> Node {
+    Form::of(Message {
+        name: "Ada".into(),
+        email: "ada@example.com".into(),
+        copies: 1,
+        ..Message::default()
+    })
+    .settings()
+    .section("Sender")
+    .field(Message::name)
+    .field(Message::email)
+    .section("Delivery")
+    .field(Message::copies)
+    .field(Message::note)
+    .submit("Save", send_message)
+    .on_success(|_, ui| ui.toast("Saved. Nothing was stored."))
+    .into()
+}
+
 /// What the catalog shows of `Form`.
 pub const ENTRY: Entry = Entry {
     name: "Form",
     docs: "language/forms",
     api: &["Form", "FormRow"],
     overview: &[ex!(overview)],
-    examples: &[],
+    examples: &[ex!(settings)],
 };

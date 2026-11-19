@@ -1431,6 +1431,66 @@ tr:last-child > .z-lines-actions [data-zeyn-line-move="1"] { visibility: hidden;
   to { opacity: 0.6; }
 }
 
+/**
+ * Skeleton shapes take the box of the component they stand for (sizes from charts.css, zeyn.css
+ * and content.css), so the content replaces them without moving the page. A bar in a line box
+ * keeps the line height with its margins.
+ */
+.z-skeleton-title { height: 12px; margin-block: 4px; }
+
+.z-kpi-deferred,
+.z-kpi-deferred > .z-node { height: 100%; }
+
+.z-skeleton-grid,
+.z-skeleton-list {
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-surface);
+}
+
+.z-skeleton-grid,
+.z-skeleton-list { gap: 0; padding: 0; overflow: hidden; }
+
+.z-skeleton-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  align-items: center;
+  gap: var(--z-s-4);
+  height: var(--z-row);
+  padding-inline: var(--z-s-3);
+  border-bottom: 1px solid var(--z-border);
+}
+
+.z-skeleton-head { height: var(--z-row-head); background: var(--z-surface-2); }
+
+.z-skeleton-grid { align-content: start; max-height: max(320px, calc(100dvh - 12rem)); }
+
+.z-window .z-skeleton-grid { max-height: 60dvh; }
+
+.z-skeleton-item {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: 10px 16px;
+}
+
+.z-skeleton-item + .z-skeleton-item { border-top: 1px solid var(--z-border); }
+
+.z-skeleton-item > .z-skeleton-line { margin-block: 4px; }
+
+.z-skeleton-chart { gap: var(--z-s-2); padding: 0; }
+
+.z-skeleton-chart .z-skeleton-title { margin-block: 6px; }
+
+.z-skeleton-plot { height: 240px; margin-bottom: calc(var(--z-leading-xs) + var(--z-s-2)); }
+
+.z-skeleton-data { margin-block: 7px; }
+
+@media (max-width: 640px) {
+  .z-skeleton-plot { height: 200px; }
+}
+
 .z-progress { display: grid; gap: 4px; }
 
 .z-progress-head { display: flex; justify-content: space-between; font-size: var(--z-font-size-sm); }

@@ -109,7 +109,7 @@
       "embed": "Kilitli çerçevede başka bir sitenin sayfası.",
       "alert": "Renkli kutuda bir mesaj.",
       "progress": "Etiketli ilerleme çubuğu.",
-      "skeleton": "İçerik yüklenirken yer tutucu satırlar.",
+      "skeleton": "Yüklenen içeriğin biçiminde yer tutucu: satırlar, KPI kutusu, tablo satırları, liste öğeleri ya da grafik.",
       "empty_state": "Liste boşken gösterilen içerik.",
       "popover": "Küçük bir panel açan düğme.",
       "busy": "Yavaş bir eylem sürerken katman.",
@@ -337,7 +337,8 @@
         "overview": "Örnek"
       },
       "form": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "settings": "Bir şey değişince kaydetme çubuğu görünen ayarlar formu"
       },
       "heading": {
         "overview": "Örnek",
@@ -467,7 +468,8 @@
         "another_screen": "Başka bir ekran"
       },
       "skeleton": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "shapes": "KPI kutusu, liste, grafik ve tablo satırları"
       },
       "split": {
         "overview": "Örnek"
@@ -477,7 +479,8 @@
         "nothing_selected": "Seçili bir şey yok"
       },
       "deferred": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "chart": "Kendi biçiminde iskeletiyle bir grafik"
       },
       "spoiler": {
         "overview": "Örnek"

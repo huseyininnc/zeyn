@@ -98,6 +98,20 @@ pub fn inspector() -> Screen {
     Screen::new("Inspector").body(PropertyInspector::island("designer"))
 }
 
+#[screen(route = "/kpi-later", permission = "trips.read")]
+pub fn kpi_later() -> Screen {
+    Screen::new("Later").body(
+        Row::new().col(
+            zeyn::ui::Deferred::new(zeyn::ui::Kpi::new("Trips", 12.0)).skeleton(Skeleton::kpi()),
+        ),
+    )
+}
+
+#[screen(route = "/text-later", permission = "trips.read")]
+pub fn text_later() -> Screen {
+    Screen::new("Later").body(zeyn::ui::Deferred::new(Paragraph::new("Soon")))
+}
+
 fn app() -> axum::Router {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -113,7 +127,9 @@ fn app() -> axum::Router {
                 .screen(plain_tree)
                 .screen(drag_tree)
                 .screen(inspector)
-                .screen(faq),
+                .screen(faq)
+                .screen(kpi_later)
+                .screen(text_later),
         )
         .router()
         .unwrap()
@@ -383,4 +399,14 @@ async fn display_styles_come_only_with_a_display_component() {
     let (status, faq_page) = get("/faq").await;
     assert_eq!(status, StatusCode::OK);
     assert!(links(&faq_page).contains(&"display.css".to_string()));
+}
+
+#[tokio::test]
+async fn a_kpi_skeleton_brings_the_chart_styles_that_size_it() {
+    let (status, kpi_page) = get("/kpi-later").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(kpi_page.contains("z-skeleton-kpi"));
+    assert!(links(&kpi_page).contains(&"charts.css".to_string()));
+    let (_, text_page) = get("/text-later").await;
+    assert!(!links(&text_page).contains(&"charts.css".to_string()));
 }
