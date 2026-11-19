@@ -6,7 +6,7 @@
 
 Zeyn is an open source Rust web framework for data heavy applications: grids, forms and workflows. AI agents write the application code. People read it, review it and change it when they need to.
 
-Status: alpha, on crates.io as 0.0.10. APIs still change between versions. Everything below compiles and is tested.
+Status: alpha, on crates.io as 0.0.11. APIs still change between versions. Everything below compiles and is tested.
 
 CI checks formatting, runs clippy and runs every test on each pull request; the results are public on the [Actions page](https://github.com/huseyininnc/zeyn/actions).
 
@@ -26,6 +26,7 @@ The docs are at https://docs.zeynsoft.com, every component runs live with its so
 ```
 cargo run -p zeyn-example-components   # http://127.0.0.1:3010, every component live next to its code
 cargo run -p zeyn-example-showcase     # http://127.0.0.1:3002, the components together in sample screens
+cargo run -p zeyn-example-admin        # http://127.0.0.1:3011, an admin template on PostgreSQL or sample data
 cargo run -p zeyn-example-big-grid     # http://127.0.0.1:3000, one million rows
 cargo run -p zeyn-example-billing      # http://127.0.0.1:3004, an app using the shared-domain library
 cargo run -p zeyn-example-docs         # http://127.0.0.1:3008, the documentation site, written with Zeyn

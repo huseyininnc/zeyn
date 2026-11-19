@@ -118,3 +118,12 @@ App::new(t!("app.name"))
 ```
 
 Ambos se sirven como texto plano a todo el mundo.
+
+## La carpeta public
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+Los archivos de la carpeta `public/` del crate se incrustan en el binario con `zeyn::public_files!()` y se sirven desde la raíz del sitio: `public/favicon.svg` responde en `/favicon.svg`, y una página enlaza como icono el primero que encuentre de `/favicon.svg`, `/favicon.png` y `/favicon.ico`. Se aceptan imágenes, iconos, fuentes, texto, XML, JSON, manifiestos web y PDF; HTML y scripts detienen la compilación, porque se ejecutarían bajo el origen de la app. Los archivos llevan una etiqueta de entidad y se guardan en caché una hora. Un archivo puede tener 256 KB y la carpeta 2 MB, salvo que `max_public_file_kb` y `max_public_total_kb` en `[package.metadata.zeyn]` digan otra cosa. `App::check` informa de un archivo cuya ruta ya usa una pantalla, `/robots.txt`, `/llms.txt`, `/sitemap.xml` o `/_zeyn/`. `zeyn new` añade un `public/favicon.svg`.

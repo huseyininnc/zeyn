@@ -246,6 +246,9 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   border: 0;
 }
 
+/** A drag handle (`drag.js`): touch drags it after a long press instead of panning the page. */
+.z-drag-handle { touch-action: none; }
+
 .z-skip {
   position: absolute;
   inset-inline-start: 8px;
@@ -353,7 +356,8 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 
 .z-nav h2,
 .z-nav h3,
-.z-nav summary {
+.z-nav h4,
+.z-nav h5 {
   display: flex;
   align-items: center;
   gap: var(--z-s-2);
@@ -366,10 +370,81 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   color: var(--z-text-muted);
 }
 
-.z-nav h2 .z-icon,
-.z-nav h3 .z-icon { width: 14px; height: 14px; }
+.z-nav h2 .z-icon { width: 14px; height: 14px; }
 
-.z-nav summary { cursor: pointer; }
+/**
+ * Collapsible menu groups (`menu.js`, W3C APG disclosure): the heading is a button whose caret
+ * points down when the group is open. Closed lists are hidden only while scripting is on, so
+ * without the script every group stays open. Nested groups are rows like links, their lists
+ * indented behind a guide line.
+ */
+.z-nav-heading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--z-s-2);
+  min-width: 0;
+  min-height: 24px;
+  margin: 0 calc(var(--z-s-3) * -1);
+  padding: 0 var(--z-s-3);
+  border: 0;
+  border-radius: var(--z-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--z-dur-1) var(--z-ease-linear);
+}
+
+.z-nav-heading > span:not([class]) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.z-nav-heading:hover { background: var(--z-hover); color: var(--z-text); }
+
+.z-nav-heading:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: -2px;
+}
+
+.z-nav-caret {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  -webkit-mask: var(--z-i) center / contain no-repeat;
+  mask: var(--z-i) center / contain no-repeat;
+  --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5l3-3'/%3E%3C/svg%3E");
+  transition: transform var(--z-dur-1) var(--z-ease-linear);
+}
+
+.z-nav-heading[aria-expanded="false"] .z-nav-caret { transform: rotate(-90deg); }
+.z-nav-heading[aria-expanded="false"]:dir(rtl) .z-nav-caret { transform: rotate(90deg); }
+
+.z-nav-sub > :is(h3, h4, h5) {
+  min-height: max(28px, calc(var(--z-space) * 8));
+  margin: 0;
+  padding: 0 var(--z-s-2);
+  color: var(--z-text);
+  font-size: var(--z-text-sm);
+  line-height: var(--z-leading-sm);
+}
+
+.z-nav-sub > :is(h3, h4, h5) > .z-nav-heading {
+  align-self: stretch;
+  margin: 0 calc(var(--z-s-2) * -1);
+  padding: 0 var(--z-s-2);
+}
+
+.z-nav-sub > ul {
+  margin-block-start: 1px;
+  margin-inline-start: var(--z-s-3);
+  padding-inline-start: var(--z-s-2);
+  border-inline-start: 1px solid var(--z-border);
+}
+
+@media (scripting: enabled) {
+  .z-nav-group:has(> :is(h2, h3, h4, h5) > .z-nav-heading[aria-expanded="false"]) > ul { display: none; }
+}
 
 .z-nav li + li { margin-top: 1px; }
 
@@ -388,7 +463,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   transition: background-color var(--z-dur-1) var(--z-ease-linear);
 }
 
-.z-nav-group:has(> h2 > .z-icon) a { padding-inline-start: calc(var(--z-s-3) + 14px + var(--z-s-2)); }
+.z-nav-group:has(> h2 .z-icon) :is(a, .z-nav-sub > :is(h3, h4, h5)) { padding-inline-start: calc(var(--z-s-3) + 14px + var(--z-s-2)); }
 
 .z-nav a > .z-icon { color: var(--z-text-muted); }
 
@@ -402,6 +477,79 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 }
 
 .z-nav a[aria-current="page"] > .z-icon { color: var(--z-accent); }
+
+/**
+ * The filter box of a long menu and the pin buttons `menu.js` adds next to each link; a pin shows
+ * on hover and focus of its row, and stays visible while pinned.
+ */
+.z-nav-filter { padding: var(--z-s-2) 0 0; }
+.z-nav-filter input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--z-s-2);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-bg);
+  color: var(--z-text);
+  font: inherit;
+  font-size: var(--z-text-sm);
+}
+.z-nav-filter input::placeholder { color: var(--z-text-muted); }
+.z-nav-filter input:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 0; }
+.z-nav li:has(> .z-nav-pin) { position: relative; }
+.z-nav li > .z-nav-pin {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: var(--z-s-1);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--z-radius);
+  background: transparent;
+  color: var(--z-text-muted);
+  opacity: 0;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.z-nav li > .z-nav-pin::before {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: auto;
+  background: currentColor;
+  -webkit-mask: var(--z-i) center / contain no-repeat;
+  mask: var(--z-i) center / contain no-repeat;
+  --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath d='m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z'/%3E%3C/svg%3E");
+}
+.z-nav li > .z-nav-pin[aria-pressed="true"]::before {
+  --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='black'%3E%3Cpath d='m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z'/%3E%3C/svg%3E");
+}
+.z-nav li:is(:hover, :focus-within) > .z-nav-pin,
+.z-nav li > .z-nav-pin[aria-pressed="true"] { opacity: 1; }
+.z-nav li > .z-nav-pin:hover { background: var(--z-hover); color: var(--z-text); }
+.z-nav li > .z-nav-pin:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+.z-nav li:has(> .z-nav-pin) > a { padding-inline-end: 32px; }
+.z-nav-group[hidden],
+.z-nav li[hidden] { display: none; }
+
+/** A menu item's fixed badge (`Menu::badge`) and its count (`Menu::count`), at the end of the row. */
+.z-nav a > span:has(+ :is(.z-nav-badge, .z-nav-count)) { flex: 1; min-width: 0; }
+.z-nav-badge,
+.z-nav-count {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0 var(--z-s-1_5);
+  border-radius: var(--z-radius-full);
+  font-size: var(--z-text-xs);
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.z-nav-badge { background: var(--z-hover); color: var(--z-text-muted); }
+.z-nav-count { min-width: 18px; background: var(--z-accent); color: var(--z-on-brand); text-align: center; }
+.z-nav-count[hidden] { display: none; }
 
 .z-main {
   min-width: 0;
@@ -602,7 +750,15 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 
 @media (max-width: 640px) {
   .z-topbar-search { width: 32px; padding: 0; justify-content: center; }
-  .z-topbar-search > :not(.z-icon) { display: none; }
+  .z-topbar-search > kbd { display: none; }
+  .z-topbar-search > span:not(.z-icon) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -648,10 +804,165 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   .z-main { padding: var(--z-s-4); }
 }
 
+/**
+ * The icon rail (`[data-zeyn-rail]` on `.z-app`, wide screens only): the side menu folds to the
+ * icons of its top level groups (or their first letter). A group's name shows as a tooltip on
+ * hover and focus, and the group opens as a flyout next to the rail (`menu.js`). The button in
+ * the menu's bar folds and unfolds it; the choice lives in the `zeyn_rail` cookie.
+ */
+.z-nav-rail,
+.z-nav-initial { display: none; }
+
+@media (min-width: 1024px) {
+  .z-nav-rail {
+    display: inline-flex;
+    position: absolute;
+    top: 14px;
+    inset-inline-end: var(--z-s-2);
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--z-radius);
+    background: transparent;
+    color: var(--z-text-muted);
+    cursor: pointer;
+  }
+  .z-nav-rail:hover { background: var(--z-hover); color: var(--z-text); }
+  .z-nav-rail:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+  .z-nav-rail-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    background: currentColor;
+    -webkit-mask: var(--z-i) center / contain no-repeat;
+    mask: var(--z-i) center / contain no-repeat;
+    --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 4 6 8l4 4M2.5 2.5v11'/%3E%3C/svg%3E");
+  }
+  [dir="rtl"] .z-nav-rail-icon,
+  .z-app[data-zeyn-rail] .z-nav-rail-icon { transform: scaleX(-1); }
+  [dir="rtl"] .z-app[data-zeyn-rail] .z-nav-rail-icon { transform: none; }
+  .z-nav:has(> .z-nav-bar > .z-nav-rail) .z-app-name { padding-inline-end: 44px; }
+
+  .z-app[data-zeyn-rail] { grid-template-columns: 64px minmax(0, 1fr); }
+  .z-app[data-zeyn-rail] .z-nav {
+    align-items: center;
+    overflow: visible;
+    padding: 0 var(--z-s-2) var(--z-s-3);
+  }
+  .z-app[data-zeyn-rail] .z-app-name { justify-content: center; margin: 0; padding: 0; }
+  .z-app[data-zeyn-rail] .z-app-name > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .z-app[data-zeyn-rail] .z-nav-rail { position: static; margin-bottom: var(--z-s-2); }
+  .z-app[data-zeyn-rail] .z-nav-body > :not(.z-nav-group) { display: none; }
+  .z-app[data-zeyn-rail] .z-nav-group { position: relative; padding-top: var(--z-s-1); }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 { margin: 0; padding: 0; }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading {
+    justify-content: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 .z-icon { width: 20px; height: 20px; }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 .z-nav-caret { display: none; }
+  .z-app[data-zeyn-rail] .z-nav-initial {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--z-radius);
+    background: var(--z-hover);
+    color: var(--z-text);
+    font-size: var(--z-text-xs);
+    font-weight: 600;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading > span:not([class]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading:is(:hover, :focus-visible):not([aria-expanded="true"]) > span:not([class]) {
+    z-index: 40;
+    inset-inline-start: calc(100% + var(--z-s-2));
+    top: 50%;
+    width: auto;
+    height: auto;
+    padding: var(--z-s-1) var(--z-s-2);
+    overflow: visible;
+    clip-path: none;
+    transform: translateY(-50%);
+    border-radius: var(--z-radius);
+    background: var(--z-text);
+    color: var(--z-bg);
+    font-size: var(--z-text-xs);
+    pointer-events: none;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > ul {
+    position: absolute;
+    z-index: 40;
+    inset-inline-start: calc(100% + var(--z-s-2));
+    top: 0;
+    min-width: 220px;
+    max-height: 80dvh;
+    overflow-y: auto;
+    padding: var(--z-s-2);
+    border: 1px solid var(--z-border);
+    border-radius: var(--z-radius-lg);
+    background: var(--z-surface);
+    box-shadow: var(--z-shadow-2);
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > ul a { padding-inline-start: var(--z-s-3); }
+}
+
 /* With scripting on, the menu starts folded so the page does not jump when nav.js folds it. */
 @media (max-width: 1023px) and (scripting: enabled) {
   .z-nav-toggle[data-zeyn-nav-toggle] { display: inline-flex; }
   .z-nav-body:not([data-open]) { display: none; }
+}
+
+/**
+ * The open menu below 1024 px is a drawer over the screen: it starts under the menu's bar
+ * (`--z-drawer-top`, set by `nav.js`), a backdrop covers the rest and the page behind it does not
+ * scroll. The bar stays above the backdrop, so its button closes the drawer.
+ */
+@media (max-width: 1023px) {
+  .z-nav-body[data-open] {
+    position: fixed;
+    inset-block: var(--z-drawer-top, 0) 0;
+    inset-inline-start: 0;
+    z-index: 2;
+    width: min(20rem, 85vw);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: inherit;
+    border-inline-end: 1px solid var(--z-border);
+    box-shadow: var(--z-shadow-2);
+    animation: z-drawer-in 160ms ease-out;
+  }
+  [dir="rtl"] .z-nav-body[data-open] { animation-name: z-drawer-in-rtl; }
+  .z-nav:has(> .z-nav-body[data-open])::after {
+    content: "";
+    position: fixed;
+    inset: var(--z-drawer-top, 0) 0 0;
+    z-index: 1;
+    background: var(--z-backdrop);
+  }
+  .z-nav-bar { position: relative; z-index: 2; }
+  html:has(.z-nav-body[data-open]) { overflow: hidden; }
+}
+
+@keyframes z-drawer-in { from { translate: -100% 0; } }
+
+@keyframes z-drawer-in-rtl { from { translate: 100% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .z-nav-body[data-open] { animation: none; }
 }
 
 /**
@@ -832,6 +1143,8 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
   align-items: center;
   gap: calc(var(--z-space) * 2);
 }
+
+.z-button[hidden] { display: none; }
 
 .z-button {
   display: inline-flex;
@@ -1209,7 +1522,7 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-col-menu:hover { background: var(--z-hover); color: var(--z-text); }
 
-@media (hover: none) { .z-col-menu { opacity: 1; } }
+@media (hover: none) { .z-col-menu { opacity: 1; width: 24px; height: 24px; } }
 
 .z-resize {
   position: absolute;
@@ -1410,14 +1723,14 @@ th[aria-sort="descending"] .z-sort::after {
 .z-tone-danger { --z-tone: var(--z-danger); }
 .z-tone-brand { --z-tone: var(--z-accent); }
 
-.z-progress {
+.z-cell-progress {
   display: inline-flex;
   align-items: center;
   gap: calc(var(--z-space) * 2);
   width: 100%;
 }
 
-.z-progress-track {
+.z-cell-progress-track {
   flex: 1 1 auto;
   height: 6px;
   min-width: 32px;
@@ -1426,7 +1739,7 @@ th[aria-sort="descending"] .z-sort::after {
   overflow: hidden;
 }
 
-.z-progress-bar {
+.z-cell-progress-bar {
   display: block;
   width: var(--z-pct, 0%);
   height: 100%;
@@ -1434,7 +1747,7 @@ th[aria-sort="descending"] .z-sort::after {
   background: var(--z-accent);
 }
 
-.z-progress-text { flex: none; min-width: 3ch; text-align: end; }
+.z-cell-progress-text { flex: none; min-width: 3ch; text-align: end; }
 
 .z-bool {
   display: inline-block;
@@ -1523,6 +1836,126 @@ th[aria-sort="descending"] .z-sort::after {
 }
 
 .z-bulk[hidden] { display: none; }
+
+/** Tools above a grid: the search box, "Add row" and the bar of unsaved batch edits. */
+.z-grid-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  margin-block-end: calc(var(--z-space) * 2);
+}
+
+.z-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  margin-inline-start: auto;
+}
+
+.z-batch[hidden] { display: none; }
+
+.z-grid tr[data-zeyn-dirty] > td:first-child { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-warning); }
+
+/** Filter builder (`DataGrid::filter_builder`): a condition per row, actions at the end. */
+.z-filter-builder { --z-width: 44rem; }
+
+.z-fb-list { display: grid; gap: calc(var(--z-space) * 2); margin-block: calc(var(--z-space) * 3); }
+
+.z-fb-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+}
+
+.z-filter-builder .z-filter-pair .z-filter-select { width: 9rem; }
+
+.z-fb-actions { display: flex; flex-wrap: wrap; gap: calc(var(--z-space) * 2); }
+
+.z-fb-head, .z-fb-adds { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--z-space) * 2); }
+
+.z-fb-head > select { width: auto; }
+
+.z-fb-list > .z-fb-group {
+  padding-inline-start: calc(var(--z-space) * 3);
+  border-inline-start: 2px solid var(--z-border-strong);
+}
+
+.z-fb-group .z-fb-list { margin-block: calc(var(--z-space) * 2); }
+
+.z-filter-builder > .z-fb-group { margin-block-end: calc(var(--z-space) * 3); }
+
+.z-fb-gap { flex: 1; }
+
+@media (max-width: 40rem) {
+  .z-fb-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .z-fb-row > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/** Group panel above a grid: a drop target for headers and a button per group level. */
+.z-group-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 1.5);
+  min-height: 36px;
+  padding: 2px calc(var(--z-space) * 2);
+  border: 1px dashed var(--z-border-strong);
+  border-radius: var(--z-radius);
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-sm);
+}
+
+.z-group-panel.z-drop { border-style: solid; border-color: var(--z-focus); background: var(--z-brand-subtle); }
+
+.z-group-chip::after { content: "\00d7"; margin-inline-start: 6px; }
+
+.z-agg-custom .z-agg-label { font-style: italic; }
+
+/** Search box above a grid (`DataGrid::search`): a search input with a leading icon. */
+.z-grid-search {
+  position: relative;
+  display: flex;
+  flex: 1 1 16rem;
+  align-items: center;
+  max-width: 24rem;
+}
+
+.z-grid-search > .z-icon {
+  position: absolute;
+  inset-inline-start: 10px;
+  color: var(--z-text-muted);
+  pointer-events: none;
+}
+
+.z-grid-search input {
+  width: 100%;
+  min-height: 36px;
+  padding-block: 0;
+  padding-inline: 34px 10px;
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
+}
+
+.z-grid-search input:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 1px;
+}
+
+/** Band row of a grid with grouped headers: one cell per band, centered over its columns. */
+.z-grid .z-band-row > * { height: var(--z-row-head); background: var(--z-surface-2); }
+
+.z-grid th.z-band {
+  text-align: center;
+  font-weight: 600;
+  color: var(--z-text);
+  border-inline: 1px solid var(--z-border);
+}
 
 .z-bulk-count { font-weight: 500; margin-inline-end: auto; }
 
@@ -1690,7 +2123,7 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-grid tbody td:focus { outline: 2px solid var(--z-accent); outline-offset: -2px; }
 
-.z-grid tbody tr:has(> td:focus) > td { background: var(--z-brand-subtle); }
+.z-grid tbody tr.z-cell-focus:focus-within > td { background: var(--z-brand-subtle); }
 
 .z-grid tbody tr > td[aria-selected="true"] { background: color-mix(in oklab, var(--z-accent) 18%, var(--z-surface)); }
 
@@ -1791,7 +2224,7 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-grid tfoot td[data-agg] { white-space: nowrap; }
 
-.z-grid:has(> .z-pager) tfoot td {
+.z-grid[data-zeyn-paging="pages"] tfoot td {
   bottom: calc(28px + var(--z-space) * 3 + 1px);
 }
 
@@ -1829,6 +2262,24 @@ th[aria-sort="descending"] .z-sort::after {
   padding: 0 6px;
   font-size: 1.125rem;
   line-height: 1;
+}
+
+.z-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--z-space) * 1.5);
+  margin-inline-start: auto;
+  color: var(--z-text-muted);
+}
+
+.z-page-size select {
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius-sm);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
 }
 
 .z-page-info {

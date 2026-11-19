@@ -143,6 +143,16 @@ function filterList(s) {
     .map(([field, f]) => ({ field, ...f }));
 }
 
+/** Number of filters in a list of filter groups and their nested groups. */
+function groupCount(groups) {
+  return (groups ?? []).reduce((n, g) => n + (g.filters?.length ?? 0) + groupCount(g.groups), 0);
+}
+
+/** Whether the grid has any filter, in its filter row or in groups. */
+function hasFilters(s) {
+  return filterList(s).length > 0 || s.filterGroups.length > 0;
+}
+
 /**
  * Debounces a filter control and reloads the grid from the start. The grid shows busy (rows
  * fade) in the frame of the key press, not only when the request leaves.
@@ -158,8 +168,240 @@ function onFilter(control) {
   s.timer = setTimeout(() => {
     s.filters[cell.dataset.field] = readFilter(cell);
     s.allMatching = false;
+    showFilters(grid, s);
     saveView(grid);
     loadGrid(grid, 'reset');
   }, FILTER_DELAY_MS);
 }
 
+
+/**
+ * The grid of an element in the tools above it (`.z-grid-tools`, before the selection bar and
+ * the grid), or `null`.
+ */
+function gridOfTools(el) {
+  let grid = el.closest('.z-grid-tools')?.nextElementSibling;
+  if (grid?.matches('[data-zeyn-bulk]')) grid = grid.nextElementSibling;
+  return grid?.matches('[data-zeyn-grid]') ? grid : null;
+}
+
+/**
+ * Debounces the search box of a grid (`input[data-zeyn-grid-search]`, in the tools before the
+ * grid) and reloads the grid from the start with the text as `q`. Each reload cancels
+ * the one before it, and the result is announced in the grid's live region.
+ */
+function onSearch(input) {
+  const grid = gridOfTools(input);
+  if (!grid) return;
+  initGrid(grid);
+  const s = grids.get(grid);
+  grid.setAttribute('aria-busy', 'true');
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => {
+    const q = input.value.trim();
+    if (q === s.q) return grid.removeAttribute('aria-busy');
+    s.q = q;
+    s.allMatching = false;
+    s.searched = true;
+    loadGrid(grid, 'reset');
+  }, FILTER_DELAY_MS);
+}
+
+/** Empties the controls of a filter cell, before `fillFilter` puts other values in. */
+function clearFilter(cell, t) {
+  for (const el of cell.querySelectorAll('input, select')) {
+    if (el.type === 'checkbox') el.checked = false;
+    else if (el.tagName === 'SELECT') el.selectedIndex = 0;
+    else el.value = '';
+    delete el.dataset.iso;
+  }
+  choiceLabel(cell, t);
+}
+
+/** Replaces the grid's filters and filter groups, shows them, saves the view and reloads. */
+function setFilters(grid, s, filters, groups) {
+  s.filters = {};
+  for (const { field, ...f } of filters) s.filters[field] = f;
+  s.filterGroups = groups;
+  s.allMatching = false;
+  showFilters(grid, s);
+  saveView(grid);
+  loadGrid(grid, 'reset');
+}
+
+/**
+ * Puts the grid's filters into its filter row, the count on its "Filter" button and, for the
+ * filter chips (`gridchips.js`), the list on the chips box with a `zeyn:filters` event.
+ */
+function showFilters(grid, s) {
+  for (const cell of grid.querySelectorAll(':scope > table > thead .z-filter-cell[data-field]')) {
+    clearFilter(cell, s.texts);
+    fillFilter(cell, s.filters[cell.dataset.field], s.texts);
+  }
+  const chips = toolsOf(grid)?.querySelector('[data-zeyn-filter-chips]');
+  if (chips) {
+    chips.zeynFilters = { grid, filters: filterList(s), groups: s.filterGroups, set: (f, g) => setFilters(grid, s, f, g) };
+    chips.dispatchEvent(new Event('zeyn:filters', { bubbles: true }));
+  }
+  const badge = toolsOf(grid)?.querySelector('[data-zeyn-filter-count]');
+  if (!badge) return;
+  const n = filterList(s).length + groupCount(s.filterGroups);
+  badge.hidden = !n;
+  badge.textContent = n ? fmt(n) : '';
+}
+
+/** Focuses the column picker of a filter builder row, or the match picker of a group. */
+function focusPick(line) {
+  line?.querySelector(':scope > select, :scope > .z-fb-head > select')?.focus();
+}
+
+/** Deepest group the builder nests below its top group; with an `any` top the server sees one more. */
+const BUILDER_DEPTH = 3;
+
+/**
+ * Opens the filter builder of a grid: a modal dialog with a group of conditions, each row a
+ * column picker and that column's filter inputs (the filter row's own controls). A group
+ * matches all or any of its conditions and nested groups. Apply replaces the grid's filters and
+ * reloads it; Escape or Cancel leave them as they were, and focus returns to the button.
+ */
+function openBuilder(button) {
+  const grid = gridOfTools(button);
+  const s = grid && grids.get(grid);
+  if (!s) return;
+  const t = s.texts;
+  const heads = [...grid.querySelectorAll(':scope > table > thead th[data-filter]')];
+  if (!heads.length) return;
+  const dialog = make('dialog', 'z-dialog', { 'aria-labelledby': `z-fb-${++uid}` });
+  const body = make('div', 'z-window z-filter-builder');
+  const title = make('h2', '', { id: `z-fb-${uid}` });
+  title.textContent = t.builder_title || 'Filter rows';
+  const addOf = (box) => box.querySelector(':scope > .z-fb-adds > button');
+  const upgrade = (el) => dialog.open && document.dispatchEvent(new CustomEvent('zeyn:content', { detail: el }));
+  const row = (list, field, f) => {
+    const line = make('div', 'z-fb-row');
+    const pick = make('select', 'z-filter', { 'aria-label': t.column || 'Column' });
+    for (const th of heads) pick.append(new Option(th.textContent.trim(), th.dataset.field));
+    pick.value = field;
+    const cell = make('div');
+    const fill = () => {
+      cell.replaceChildren();
+      const th = heads.find((h) => h.dataset.field === pick.value);
+      filterControls(cell, th, t);
+      fillFilter(cell, f, t);
+      f = null;
+      upgrade(cell);
+    };
+    pick.addEventListener('change', fill);
+    fill();
+    const remove = make('button', 'z-button z-fb-remove', { type: 'button', 'aria-label': t.remove_condition || 'Remove condition' });
+    remove.append(make('span', 'z-icon z-icon-x', { 'aria-hidden': 'true' }));
+    remove.addEventListener('click', () => {
+      const next = line.nextElementSibling ?? line.previousElementSibling;
+      line.remove();
+      if (next) focusPick(next);
+      else addOf(list.parentElement).focus();
+    });
+    line.append(pick, cell, remove);
+    list.append(line);
+    upgrade(line);
+    return line;
+  };
+  const group = (parent, g, depth) => {
+    const box = make('div', 'z-fb-group', { role: 'group', 'aria-label': depth ? t.condition_group || 'Condition group' : title.textContent });
+    const head = make('div', 'z-fb-head');
+    const match = make('select', 'z-filter', { 'aria-label': t.rows_match || 'Match' });
+    match.append(new Option(t.match_all || 'All conditions', 'all'), new Option(t.match_any || 'Any condition', 'any'));
+    match.value = g?.any ? 'any' : 'all';
+    head.append(match);
+    const list = make('div', 'z-fb-list');
+    const adds = make('div', 'z-fb-adds');
+    const add = make('button', 'z-button', { type: 'button' });
+    add.textContent = t.add_condition || 'Add condition';
+    add.addEventListener('click', () => focusPick(row(list, heads[0].dataset.field, null)));
+    adds.append(add);
+    if (depth < BUILDER_DEPTH) {
+      const more = make('button', 'z-button', { type: 'button' });
+      more.textContent = t.add_group || 'Add group';
+      more.addEventListener('click', () => focusPick(group(list, null, depth + 1)));
+      adds.append(more);
+    }
+    if (depth) {
+      const remove = make('button', 'z-button z-fb-remove', { type: 'button', 'aria-label': t.remove_group || 'Remove group' });
+      remove.append(make('span', 'z-icon z-icon-x', { 'aria-hidden': 'true' }));
+      remove.addEventListener('click', () => {
+        const next = box.nextElementSibling ?? box.previousElementSibling;
+        const owner = box.parentElement.parentElement;
+        box.remove();
+        if (next) focusPick(next);
+        else addOf(owner).focus();
+      });
+      head.append(remove);
+    }
+    box.append(head, list, adds);
+    parent.append(box);
+    for (const { field, ...rest } of g?.filters ?? []) {
+      if (heads.some((h) => h.dataset.field === field)) row(list, field, rest);
+    }
+    for (const sub of g?.groups ?? []) if (depth < BUILDER_DEPTH) group(list, sub, depth + 1);
+    if (!list.children.length) row(list, heads[0].dataset.field, null);
+    return box;
+  };
+  const read = (box) => {
+    const list = box.querySelector(':scope > .z-fb-list');
+    const filters = [];
+    for (const cell of list.querySelectorAll(':scope > .z-fb-row > .z-filter-cell')) {
+      const f = readFilter(cell);
+      if (f) filters.push({ field: cell.dataset.field, ...f });
+    }
+    const groups = [...list.querySelectorAll(':scope > .z-fb-group')].map(read).filter(Boolean);
+    const any = box.querySelector(':scope > .z-fb-head > select').value === 'any';
+    return filters.length || groups.length ? { any, filters, groups } : null;
+  };
+  const flat = filterList(s);
+  const one = !flat.length && s.filterGroups.length === 1 && s.filterGroups[0].any;
+  const root = group(body, one ? s.filterGroups[0] : { any: false, filters: flat, groups: s.filterGroups }, 0);
+  const clear = make('button', 'z-button', { type: 'button' });
+  clear.textContent = t.clear_all || 'Clear all';
+  clear.addEventListener('click', () => {
+    root.querySelector(':scope > .z-fb-list').replaceChildren();
+    root.querySelector(':scope > .z-fb-head > select').value = 'all';
+    addOf(root).focus();
+  });
+  const cancel = make('button', 'z-button', { type: 'button' });
+  cancel.textContent = t.confirm_cancel || 'Cancel';
+  cancel.addEventListener('click', () => dialog.close());
+  const apply = make('button', 'z-button z-primary', { type: 'button' });
+  apply.textContent = t.apply || 'Apply';
+  apply.addEventListener('click', () => {
+    const top = read(root);
+    s.filters = {};
+    s.filterGroups = [];
+    if (top?.any && top.filters.length + top.groups.length > 1) s.filterGroups = [top];
+    else if (top) {
+      for (const { field, ...f } of top.filters) s.filters[field] = f;
+      s.filterGroups = top.groups;
+    }
+    s.allMatching = false;
+    showFilters(grid, s);
+    saveView(grid);
+    dialog.close();
+    loadGrid(grid, 'reset');
+  });
+  const actions = make('div', 'z-fb-actions');
+  actions.append(clear, make('span', 'z-fb-gap'), cancel, apply);
+  body.prepend(title);
+  body.append(actions);
+  dialog.append(body);
+  dialog.addEventListener('change', (e) => {
+    const cell = e.target.closest?.('.z-filter-cell');
+    if (cell?.dataset.kind === 'choice') choiceLabel(cell, t);
+  });
+  dialog.addEventListener('close', () => {
+    dialog.remove();
+    button.focus();
+  });
+  document.body.append(dialog);
+  loadModules(dialog);
+  dialog.showModal();
+  focusPick(root.querySelector(':scope > .z-fb-list').firstElementChild);
+}

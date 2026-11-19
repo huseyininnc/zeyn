@@ -441,10 +441,11 @@ impl SignInManager {
         Ok(())
     }
 
-    /// Signs out of this browser (`SignOutAsync`). Other sessions stay; change the security
-    /// stamp to end those too.
+    /// Signs out of this browser (`SignOutAsync`) and asks it to clear the app's storage. Other
+    /// sessions stay; change the security stamp to end those too.
     pub fn sign_out(&self, user: Option<&str>) {
         scope::set_cookie(SESSION, None, None);
+        scope::clear_storage();
         scope::set_cookie(TWO_FACTOR, None, None);
         self.0
             .event(AccountEventKind::SignedOut, user);

@@ -44,6 +44,9 @@
       "panel": "Daraltılabilen başlıklı bölüm.",
       "tabs": "Sekme listesinin arkasındaki paneller; ilk açılışta yüklenir.",
       "split": "Bir tutamakla boyutlanan iki bölme.",
+      "list_detail": "Bir liste ve seçili satırının ayrıntısı; geniş ekranda yan yana, telefonda tek tek.",
+      "deferred": "Ekran göründükten sonra yüklenen bir parça; yavaş bir blok geri kalanı bekletmez.",
+      "surface": "Sınırlar içinde, bir ızgarada ve bir eksende serbestçe yerleştirilen öğeler.",
       "auto_grid": "Genişliğe sığdığı kadar sütun.",
       "heading": "h2 ile h6 arası bölüm başlıkları.",
       "paragraph": "Kaçışlanmış metin paragrafı; normal ya da sönük.",
@@ -54,11 +57,35 @@
       "timeline": "Sıralı olaylar, her biri bir tonla.",
       "markdown": "Sunucuda işlenen güvenli Markdown.",
       "spoiler": "Okuyucu açana kadar gizli içerik.",
+      "accordion": "Başlıklarının altında açılıp kapanan bölümler.",
+      "avatar_group": "Bir işin kişileri, kalanlar için bir sayıyla.",
+      "quote": "Kimin, nerede söylediğiyle birlikte alıntı.",
+      "kbd": "Basılacak tuşlar, tek ya da birlikte.",
+      "divider": "Bölümler arasında, isteğe bağlı etiketli çizgi.",
+      "stepper": "Bir sürecin adım adım nerede olduğu.",
+      "pagination": "Bir listenin sayfalarına bağlantılar.",
+      "copy_button": "Bir metni panoya kopyalar.",
+      "progress_ring": "İçinde yüzdesi yazan halka biçiminde ilerleme.",
+      "heatmap": "Her gün için bir sayı, tonlu karelerden bir takvim olarak.",
+      "funnel": "İlkinden sonuncusuna daralan aşamalar.",
+      "activity_rings": "Birkaç hedefin payı, iç içe halkalar olarak.",
+      "gantt": "Günlere yayılmış çubuklar olarak görevler.",
+      "flow_diagram": "Bir sürecin adımları, oklarla bağlı kutular olarak.",
+      "org_chart": "Çizgilerle bağlı kutulardan bir hiyerarşi.",
+      "comparison_table": "Planlar yan yana, her özellik için bir satır.",
+      "tour": "Sayfanın adım adım tanıtımı.",
+      "image_compare": "Bir sürgünün altında iki resim.",
+      "table": "Ekranın zaten elinde olan metinlerden küçük bir tablo.",
+      "indicator": "Başka bir bileşenin köşesinde bir sayı ya da nokta.",
+      "meter": "Bir aralıktaki ölçüm, eşiklerine göre renklenir.",
+      "highlight": "Bir metinde aramanın kelimelerini işaretler.",
+      "toc": "Sayfadaki başlıklara bağlantılar.",
       "breadcrumb": "Geçerli sayfaya giden bağlantı izi.",
       "prev_next": "Önceki ve sonraki öğeye bağlantılar.",
       "alpha_index": "Kullanıcının alfabesinden harf çubuğu.",
       "menu_button": "Eylemli açılır ve bölünmüş düğmeler.",
       "menu_bar": "Komutlardan oluşan menü çubuğu.",
+      "side_menu": "Rozetler, sayılar, filtre, ikon şeridi ve telefon çekmecesiyle uygulama menüsü.",
       "external_link": "Uygulamadan güvenle çıkan bağlantı.",
       "form": "Sunucuda denetlenen bir model formu.",
       "controls": "Radyo düğmeleri, bölümlü düğmeler ve anahtarlar.",
@@ -67,6 +94,7 @@
       "line_editor": "Form içinde toplamlı model satırları.",
       "masked_inputs": "Maskeli, ondalık, yüzde ve parola girişleri.",
       "action_button": "Bir eylemi çalıştıran düğme.",
+      "file_drop": "Dosyaları, klasörleri ve yapıştırılan görselleri bir depoya yükleyen, form dışında bir bırakma alanı.",
       "data_grid": "Sayfalama, sıralama ve süzgeçli eylem satırları.",
       "card_grid": "Kart olarak gösterilen eylem satırları.",
       "image_card": "Resimli, rozetli ve ilerlemeli kart.",
@@ -81,7 +109,7 @@
       "embed": "Kilitli çerçevede başka bir sitenin sayfası.",
       "alert": "Renkli kutuda bir mesaj.",
       "progress": "Etiketli ilerleme çubuğu.",
-      "skeleton": "İçerik yüklenirken yer tutucu satırlar.",
+      "skeleton": "Yüklenen içeriğin biçiminde yer tutucu: satırlar, KPI kutusu, tablo satırları, liste öğeleri ya da grafik.",
       "empty_state": "Liste boşken gösterilen içerik.",
       "popover": "Küçük bir panel açan düğme.",
       "busy": "Yavaş bir eylem sürerken katman.",
@@ -128,6 +156,100 @@
       "property_inspector": "Bir adanın gönderdiği şemayla, adada seçili olanı düzenler."
     },
     "ex": {
+      "accordion": {
+        "overview": "Örnek",
+        "one_at_a_time": "Her seferinde tek bölüm"
+      },
+      "avatar_group": {
+        "overview": "Örnek",
+        "small_and_short": "Küçük ve daha az kişi",
+        "with_pictures": "Resimli"
+      },
+      "quote": {
+        "overview": "Örnek",
+        "text_only": "Yalnızca metin"
+      },
+      "kbd": {
+        "overview": "Örnek",
+        "single_keys": "Tek tuşlar",
+        "plus_key": "Artı tuşu"
+      },
+      "divider": {
+        "overview": "Örnek",
+        "plain": "Yalın",
+        "between_columns": "Sütunlar arasında"
+      },
+      "stepper": {
+        "overview": "Örnek",
+        "vertical": "Dikey",
+        "finished": "Tamamlanmış"
+      },
+      "pagination": {
+        "overview": "Örnek",
+        "more_numbers": "Daha çok sayfa numarası"
+      },
+      "copy_button": {
+        "overview": "Örnek",
+        "own_label": "Kendi etiketi, gizli metin"
+      },
+      "table": {
+        "overview": "Örnek",
+        "numbers_and_stripes": "Sayılar ve şeritler"
+      },
+      "indicator": {
+        "overview": "Örnek",
+        "tones_and_sizes": "Tonlar, boyutlar ve sıfır"
+      },
+      "meter": {
+        "overview": "Örnek",
+        "a_good_middle": "İyi olan orta aralık"
+      },
+      "highlight": {
+        "overview": "Örnek",
+        "several_words": "Birkaç kelime"
+      },
+      "toc": {
+        "overview": "Örnek"
+      },
+      "funnel": {
+        "overview": "Örnek",
+        "another_tone": "Başka bir ton"
+      },
+      "activity_rings": {
+        "overview": "Örnek",
+        "large": "Dört halka, daha büyük"
+      },
+      "gantt": {
+        "overview": "Örnek"
+      },
+      "flow_diagram": {
+        "overview": "Örnek",
+        "branches": "Dallar ve geri dönüş"
+      },
+      "org_chart": {
+        "overview": "Örnek"
+      },
+      "comparison_table": {
+        "overview": "Örnek"
+      },
+      "tour": {
+        "overview": "Örnek"
+      },
+      "image_compare": {
+        "overview": "Örnek"
+      },
+      "heatmap": {
+        "overview": "Örnek",
+        "a_few_weeks": "Birkaç hafta"
+      },
+      "progress_ring": {
+        "overview": "Örnek",
+        "sizes": "Boyutlar"
+      },
+      "file_drop": {
+        "overview": "Örnek",
+        "single": "Tek dosya"
+      },
       "action_button": {
         "overview": "Örnek"
       },
@@ -137,6 +259,11 @@
       },
       "alpha_index": {
         "overview": "Örnek"
+      },
+      "surface": {
+        "overview": "Örnek",
+        "on_one_axis": "Tek eksende",
+        "resizable": "Boyutlandırılabilir, en boy oranıyla"
       },
       "auto_grid": {
         "overview": "Örnek",
@@ -169,6 +296,7 @@
       "chart": {
         "overview": "Örnek",
         "donut": "Halka",
+        "bar_list": "Tek büyük parçalı halka çubuk listesine döner",
         "gauge": "Gösterge",
         "side_by_side": "Yan yana, genişliği dolduran"
       },
@@ -186,6 +314,9 @@
         "overview": "Örnek",
         "confirm_actions": "Önce soran satır ve toplu işlemler",
         "numbers": "Yerel ayara göre gruplanmış sayılar, düz bir yıl",
+        "search_and_bands": "Arama kutusu ve bir bant altında toplanan sütunlar",
+        "add_delete_batch": "Satır ekleme, silme ve toplu düzenleme (hiçbir şey saklanmaz)",
+        "user_grouping": "Kullanıcının gruplaması, özel bir özet ve süzgeç oluşturucu",
         "computed_million": "Sayfa sayfa üretilen bir milyon hesaplanmış satır",
         "dynamic_columns": "Satırlarla gelen sütunlar: 30 sütunlu 10.000 satır"
       },
@@ -206,7 +337,8 @@
         "overview": "Örnek"
       },
       "form": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "settings": "Bir şey değişince kaydetme çubuğu görünen ayarlar formu"
       },
       "heading": {
         "overview": "Örnek",
@@ -255,6 +387,9 @@
       "list": {
         "overview": "Örnek",
         "numbered_pages": "Toplamı olmayan numaralı sayfalar",
+        "sortable": "Kullanıcının kendi sırasına koyduğu satırlar",
+        "sortable_virtual": "Sanal kalan uzun sıralanabilir liste",
+        "connected": "Satırların, birkaçı birden, arasında taşındığı iki liste",
         "fixed": "Sabit öğeler",
         "builder": "Herhangi bir düğümle kurulan satırlar ve ayraç",
         "virtual_rows": "Sabit satır yüksekliğiyle sanal kaydırma",
@@ -271,6 +406,9 @@
         "overview": "Örnek"
       },
       "menu_bar": {
+        "overview": "Örnek"
+      },
+      "side_menu": {
         "overview": "Örnek"
       },
       "menu_button": {
@@ -330,10 +468,19 @@
         "another_screen": "Başka bir ekran"
       },
       "skeleton": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "shapes": "KPI kutusu, liste, grafik ve tablo satırları"
       },
       "split": {
         "overview": "Örnek"
+      },
+      "list_detail": {
+        "overview": "Örnek",
+        "nothing_selected": "Seçili bir şey yok"
+      },
+      "deferred": {
+        "overview": "Örnek",
+        "chart": "Kendi biçiminde iskeletiyle bir grafik"
       },
       "spoiler": {
         "overview": "Örnek"
@@ -370,7 +517,8 @@
       },
       "tree": {
         "overview": "Örnek",
-        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar"
+        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar",
+        "movable": "Sürükleyerek, menüyle ya da Alt ve ok tuşlarıyla taşınan klasörler"
       },
       "week_schedule": {
         "overview": "Örnek"
@@ -399,7 +547,8 @@
         "bell": "Bildirim zili"
       },
       "kanban": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "ordered": "Her sütunda kendi sırasında duran kartlar"
       },
       "calendar": {
         "overview": "Örnek"

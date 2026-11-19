@@ -18,6 +18,11 @@ document.addEventListener('click', (e) => {
   }
   if ((el = t.closest('[data-zeyn-branch-more]'))) return G?.moreBranch(el);
   if ((el = t.closest('[data-zeyn-bulk-run]'))) return G?.runBulk(el);
+  if ((el = t.closest('[data-zeyn-grid-add]'))) return G?.addRow(el);
+  if ((el = t.closest('[data-zeyn-filter-builder]'))) return G?.openBuilder(el);
+  if ((el = t.closest('[data-zeyn-ungroup]'))) return G?.ungroup(el);
+  if ((el = t.closest('[data-zeyn-batch-save]'))) return G?.saveBatch(el);
+  if ((el = t.closest('[data-zeyn-batch-discard]'))) return G?.discardBatch(el);
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);
   if ((el = t.closest('button[data-zeyn-run]'))) return G?.runRowItem(el);
   if ((el = t.closest('button.z-sort'))) return G?.toggleSort(el, e.shiftKey);
@@ -39,10 +44,22 @@ document.addEventListener('click', (e) => {
   }
 });
 
+/**
+ * A row of a grid becomes the active one when it or one of its cells takes focus. A focused cell
+ * also marks its row with `z-cell-focus` (until the cell loses focus), which the stylesheet
+ * highlights while focus stays inside the row. A class and `:focus-within` cost nothing while
+ * rows scroll, where a `:has(> td:focus)` rule restyles every cell of every row that changes.
+ */
 document.addEventListener('focusin', (e) => {
   const t = e.target;
   const tr = t instanceof HTMLTableCellElement ? t.parentElement : t;
-  if (tr instanceof HTMLTableRowElement && tr.parentElement?.matches('[data-zeyn-rows]')) G?.activate(tr, false);
+  if (!(tr instanceof HTMLTableRowElement) || !tr.parentElement?.matches('[data-zeyn-rows]')) return;
+  if (tr !== t) tr.classList.add('z-cell-focus');
+  G?.activate(tr, false);
+});
+
+document.addEventListener('focusout', (e) => {
+  if (e.target instanceof HTMLTableCellElement) e.target.parentElement?.classList.remove('z-cell-focus');
 });
 
 document.addEventListener('paste', (e) => {
@@ -55,6 +72,8 @@ document.addEventListener('paste', (e) => {
 });
 
 document.addEventListener('dblclick', (e) => {
+  const handle = e.target instanceof Element ? e.target.closest('[data-zeyn-grid] thead .z-resize') : null;
+  if (handle) return G?.fitColumn(handle.closest('th'));
   const td = e.target instanceof Element ? e.target.closest('[data-zeyn-rows] > tr > td[data-v]') : null;
   if (td && !td.closest('.z-editing') && G?.startEdit(td.parentElement, td)) return;
   if (e.target instanceof Element && e.target.closest('.z-editing')) return;
@@ -102,6 +121,7 @@ document.addEventListener('keydown', (e) => {
   }
   const vg = t instanceof Element ? t.closest('[data-zeyn-grid][data-zeyn-paging="virtual"]') : null;
   if (vg && (t === vg || t.parentElement?.matches('[data-zeyn-rows]')) && G?.virtualKey(e, vg)) return;
+  if (e.key === 'Delete' && t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]') && G?.deleteKey(t)) return e.preventDefault();
   if (t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]') && G?.rowKey(e, t)) return;
   shortcut(e);
 });
@@ -112,70 +132,8 @@ document.addEventListener('pointerdown', (e) => {
   const handle = t.closest('.z-resize');
   if (handle) return G?.startResize(e, handle);
   const sort = t.closest('[data-zeyn-grid] thead th[data-field] .z-sort');
-  if (sort) startColumnDrag(e, sort.closest('th'));
+  if (sort) G?.startColumnDrag(e, sort.closest('th'));
 });
-
-/**
- * Moves a column by dragging its header onto another header of the same pinned group. A press
- * that moves less than a few pixels is still a click and sorts. The column menu (Move left,
- * Move right) does the same from the keyboard.
- */
-function startColumnDrag(e, th) {
-  const grid = th.closest('[data-zeyn-grid]');
-  if (!grids.get(grid)) return;
-  const x0 = e.clientX;
-  const y0 = e.clientY;
-  const rtl = getComputedStyle(grid).direction === 'rtl';
-  const group = () =>
-    [...th.parentElement.cells].filter((h) => h.dataset.field && (h.dataset.pin || '') === (th.dataset.pin || ''));
-  let dragging = false;
-  let target = null;
-  let after = false;
-  const mark = (on) => target?.classList.toggle(after ? 'z-col-drop-end' : 'z-col-drop-start', on);
-  const move = (ev) => {
-    if (!dragging) {
-      if (Math.abs(ev.clientX - x0) < 6 && Math.abs(ev.clientY - y0) < 6) return;
-      dragging = true;
-      th.classList.add('z-col-dragging');
-      document.documentElement.classList.add('z-col-moving');
-    }
-    mark(false);
-    target = group().find((h) => {
-      const r = h.getBoundingClientRect();
-      return ev.clientX >= r.left && ev.clientX <= r.right;
-    }) ?? null;
-    if (target === th) target = null;
-    if (target) {
-      const r = target.getBoundingClientRect();
-      after = ev.clientX > r.left + r.width / 2 !== rtl;
-      mark(true);
-    }
-  };
-  const end = (ev) => {
-    document.removeEventListener('pointermove', move);
-    document.removeEventListener('pointerup', end);
-    document.removeEventListener('pointercancel', end);
-    mark(false);
-    th.classList.remove('z-col-dragging');
-    document.documentElement.classList.remove('z-col-moving');
-    if (!dragging) return;
-    const swallow = (c) => {
-      c.preventDefault();
-      c.stopPropagation();
-    };
-    document.addEventListener('click', swallow, { capture: true, once: true });
-    setTimeout(() => document.removeEventListener('click', swallow, true), 0);
-    if (!target || ev.type === 'pointercancel') return;
-    const shown = G?.shownColumns(grid);
-    const [col] = shown.splice(shown.findIndex((c) => c.field === th.dataset.field), 1);
-    const at = shown.findIndex((c) => c.field === target.dataset.field) + (after ? 1 : 0);
-    shown.splice(at, 0, col);
-    G?.setColumns(grid, shown);
-  };
-  document.addEventListener('pointermove', move);
-  document.addEventListener('pointerup', end);
-  document.addEventListener('pointercancel', end);
-}
 
 /**
  * Right click: our menu where one is defined (a column header, a row with `data-zeyn-menu`, a
@@ -256,6 +214,7 @@ document.addEventListener('input', (e) => {
   const t = e.target;
   if (!(t instanceof Element)) return;
   if (t.closest('.z-filter-cell')) return G?.onFilter(t);
+  if (t.matches('[data-zeyn-grid-search]')) return G?.onSearch(t);
   if (t.getAttribute('aria-invalid') === 'true') {
     t.removeAttribute('aria-invalid');
     const box = t.id && document.getElementById(`${t.id}-error`);
@@ -269,9 +228,11 @@ document.addEventListener('change', (e) => {
   else if (e.target.matches('[data-zeyn-timezone]')) changeTimeZone(e.target);
   else if (e.target.matches('[data-zeyn-theme-picker]')) changeTheme(e.target);
   else if (e.target.matches('[data-zeyn-density]')) changeDensity(e.target);
+  else if (e.target.matches('[data-zeyn-page-size-pick]')) G?.pickPageSize(e.target);
 });
 
 syncTimeZone();
+dropOtherUsers();
 relativeTimes(document);
 setInterval(() => relativeTimes(document), 60_000);
 initGrids(document);
@@ -288,32 +249,40 @@ document.addEventListener('zeyn:content', (e) => {
   initGrids(e.detail);
   if (e.detail instanceof Element) relativeTimes(e.detail);
   syncAgentTools();
+  dropOtherUsers();
 });
 
 /**
- * Filters a grid from another script (the assistant): `detail` is `{ filters, node? }` with
- * filters as the grid query sends them (`{ field, contains }`, `{ field, from, to }`, ...). The
+ * Filters a grid from another script (the assistant): `detail` is `{ filters, filter_groups?,
+ * node? }` as the grid query sends them (`{ field, contains }`, `{ field, from, to }`, ...). The
  * grid of the main screen with that node path (the first one without it) shows the filters in
  * its header and reloads through `POST /_zeyn/grid`, where the server checks them as always.
+ * A screen that just arrived may not have the grid runtime yet; the filters wait for it.
  */
 document.addEventListener('zeyn:filter', (e) => {
-  const { filters, node } = e.detail ?? {};
+  const { filters, filter_groups: groups, node } = e.detail ?? {};
   const all = [...document.querySelectorAll('.z-main [data-zeyn-grid]')];
   const grid = node == null ? all[0] : all.find((g) => nodeOf(g) === String(node));
   if (!grid || !Array.isArray(filters)) return;
+  e.preventDefault();
+  initGrids(grid.parentElement).then(() => filterGrid(grid, filters, groups));
+});
+
+/** Puts `filters` and the filter groups on a set up grid and reloads its first page. */
+function filterGrid(grid, filters, groups) {
   G?.initGrid(grid);
   const s = grids.get(grid);
   if (!s) return;
-  e.preventDefault();
   s.filters = {};
   for (const f of filters) {
     const { field, ...rest } = f ?? {};
     if (typeof field === 'string') s.filters[field] = rest;
   }
-  for (const cell of grid.querySelectorAll('.z-filter-cell[data-field]')) G?.fillFilter(cell, s.filters[cell.dataset.field], s.texts);
+  s.filterGroups = Array.isArray(groups) ? groups : [];
+  G?.showFilters(grid, s);
   s.allMatching = false;
   G?.loadGrid(grid, 'reset');
-});
+}
 
 /**
  * `zeyn:reload` on an element reloads the grids inside it in place (`live.js` and `topics.js`

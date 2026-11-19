@@ -1,0 +1,492 @@
+{
+  "admin": [
+    {
+      "route": "/ui/diff-view",
+      "slug": "diff_view"
+    },
+    {
+      "route": "/ui/code-view",
+      "slug": "code_view"
+    },
+    {
+      "route": "/ui/code-editor",
+      "slug": "code_editor"
+    },
+    {
+      "route": "/ui/barcode",
+      "slug": "barcode"
+    },
+    {
+      "route": "/ui/inbox",
+      "slug": "inbox"
+    },
+    {
+      "route": "/ui/kanban",
+      "slug": "kanban"
+    },
+    {
+      "route": "/ui/calendar",
+      "slug": "calendar"
+    }
+  ],
+  "charts": [
+    {
+      "route": "/ui/chart",
+      "slug": "chart"
+    },
+    {
+      "route": "/ui/kpi",
+      "slug": "kpi"
+    },
+    {
+      "route": "/ui/heatmap",
+      "slug": "heatmap"
+    },
+    {
+      "route": "/ui/funnel",
+      "slug": "funnel"
+    },
+    {
+      "route": "/ui/activity-rings",
+      "slug": "activity_rings"
+    },
+    {
+      "route": "/ui/gantt",
+      "slug": "gantt"
+    },
+    {
+      "route": "/ui/org-chart",
+      "slug": "org_chart"
+    },
+    {
+      "route": "/ui/flow-diagram",
+      "slug": "flow_diagram"
+    }
+  ],
+  "chat": [
+    {
+      "route": "/ui/message-thread",
+      "slug": "message_thread"
+    },
+    {
+      "route": "/ui/composer",
+      "slug": "composer"
+    },
+    {
+      "route": "/ui/typing-indicator",
+      "slug": "typing_indicator"
+    }
+  ],
+  "data": [
+    {
+      "route": "/ui/data-grid",
+      "slug": "data_grid"
+    },
+    {
+      "route": "/ui/table",
+      "slug": "table"
+    },
+    {
+      "route": "/ui/comparison-table",
+      "slug": "comparison_table"
+    },
+    {
+      "route": "/ui/card-grid",
+      "slug": "card_grid"
+    },
+    {
+      "route": "/ui/image-card",
+      "slug": "image_card"
+    },
+    {
+      "route": "/ui/rail",
+      "slug": "rail"
+    },
+    {
+      "route": "/ui/list",
+      "slug": "list"
+    },
+    {
+      "route": "/ui/search-box",
+      "slug": "search_box"
+    },
+    {
+      "route": "/ui/topics",
+      "slug": "topics"
+    },
+    {
+      "route": "/ui/tree",
+      "slug": "tree"
+    },
+    {
+      "route": "/ui/document-viewer",
+      "slug": "document_viewer"
+    },
+    {
+      "route": "/ui/week-schedule",
+      "slug": "week_schedule"
+    }
+  ],
+  "feedback": [
+    {
+      "route": "/ui/alert",
+      "slug": "alert"
+    },
+    {
+      "route": "/ui/progress",
+      "slug": "progress"
+    },
+    {
+      "route": "/ui/progress-ring",
+      "slug": "progress_ring"
+    },
+    {
+      "route": "/ui/meter",
+      "slug": "meter"
+    },
+    {
+      "route": "/ui/indicator",
+      "slug": "indicator"
+    },
+    {
+      "route": "/ui/tour",
+      "slug": "tour"
+    },
+    {
+      "route": "/ui/skeleton",
+      "slug": "skeleton"
+    },
+    {
+      "route": "/ui/empty-state",
+      "slug": "empty_state"
+    },
+    {
+      "route": "/ui/popover",
+      "slug": "popover"
+    },
+    {
+      "route": "/ui/busy",
+      "slug": "busy"
+    },
+    {
+      "route": "/ui/toast",
+      "slug": "toast"
+    },
+    {
+      "route": "/ui/clear-prefs",
+      "slug": "clear_prefs"
+    },
+    {
+      "route": "/ui/reactions",
+      "slug": "reactions"
+    }
+  ],
+  "forms": [
+    {
+      "route": "/ui/form",
+      "slug": "form"
+    },
+    {
+      "route": "/ui/controls",
+      "slug": "controls"
+    },
+    {
+      "route": "/ui/date-pickers",
+      "slug": "date_pickers"
+    },
+    {
+      "route": "/ui/lookup",
+      "slug": "lookup"
+    },
+    {
+      "route": "/ui/line-editor",
+      "slug": "line_editor"
+    },
+    {
+      "route": "/ui/masked-inputs",
+      "slug": "masked_inputs"
+    },
+    {
+      "route": "/ui/rating",
+      "slug": "rating"
+    },
+    {
+      "route": "/ui/color-input",
+      "slug": "color_input"
+    },
+    {
+      "route": "/ui/length-input",
+      "slug": "length_input"
+    },
+    {
+      "route": "/ui/action-button",
+      "slug": "action_button"
+    },
+    {
+      "route": "/ui/file-drop",
+      "slug": "file_drop"
+    }
+  ],
+  "layout": [
+    {
+      "route": "/ui/stack",
+      "slug": "stack"
+    },
+    {
+      "route": "/ui/row",
+      "slug": "row"
+    },
+    {
+      "route": "/ui/card",
+      "slug": "card"
+    },
+    {
+      "route": "/ui/panel",
+      "slug": "panel"
+    },
+    {
+      "route": "/ui/tabs",
+      "slug": "tabs"
+    },
+    {
+      "route": "/ui/split",
+      "slug": "split"
+    },
+    {
+      "route": "/ui/accordion",
+      "slug": "accordion"
+    },
+    {
+      "route": "/ui/list-detail",
+      "slug": "list_detail"
+    },
+    {
+      "route": "/ui/deferred",
+      "slug": "deferred"
+    },
+    {
+      "route": "/ui/auto-grid",
+      "slug": "auto_grid"
+    },
+    {
+      "route": "/ui/surface",
+      "slug": "surface"
+    },
+    {
+      "route": "/ui/screen-header",
+      "slug": "screen_header"
+    }
+  ],
+  "media": [
+    {
+      "route": "/ui/image",
+      "slug": "image"
+    },
+    {
+      "route": "/ui/image-compare",
+      "slug": "image_compare"
+    },
+    {
+      "route": "/ui/embed",
+      "slug": "embed"
+    },
+    {
+      "route": "/ui/hero",
+      "slug": "hero"
+    }
+  ],
+  "navigation": [
+    {
+      "route": "/ui/breadcrumb",
+      "slug": "breadcrumb"
+    },
+    {
+      "route": "/ui/link-button",
+      "slug": "link_button"
+    },
+    {
+      "route": "/ui/prev-next",
+      "slug": "prev_next"
+    },
+    {
+      "route": "/ui/pagination",
+      "slug": "pagination"
+    },
+    {
+      "route": "/ui/toc",
+      "slug": "toc"
+    },
+    {
+      "route": "/ui/alpha-index",
+      "slug": "alpha_index"
+    },
+    {
+      "route": "/ui/chips",
+      "slug": "chips"
+    },
+    {
+      "route": "/ui/menu-button",
+      "slug": "menu_button"
+    },
+    {
+      "route": "/ui/menu-bar",
+      "slug": "menu_bar"
+    },
+    {
+      "route": "/ui/side-menu",
+      "slug": "side_menu"
+    },
+    {
+      "route": "/ui/external-link",
+      "slug": "external_link"
+    },
+    {
+      "route": "/ui/share",
+      "slug": "share"
+    },
+    {
+      "route": "/ui/copy-button",
+      "slug": "copy_button"
+    }
+  ],
+  "shell": [
+    {
+      "route": "/ui/toolbox",
+      "slug": "toolbox"
+    },
+    {
+      "route": "/ui/property-inspector",
+      "slug": "property_inspector"
+    },
+    {
+      "route": "/ui/status-bar",
+      "slug": "status_bar"
+    },
+    {
+      "route": "/ui/app-header",
+      "slug": "app_header"
+    },
+    {
+      "route": "/ui/theme-picker",
+      "slug": "theme_picker"
+    }
+  ],
+  "shop": [
+    {
+      "route": "/ui/price",
+      "slug": "price"
+    },
+    {
+      "route": "/ui/range-slider",
+      "slug": "range_slider"
+    },
+    {
+      "route": "/ui/quantity-stepper",
+      "slug": "quantity_stepper"
+    },
+    {
+      "route": "/ui/variant-picker",
+      "slug": "variant_picker"
+    },
+    {
+      "route": "/ui/product-gallery",
+      "slug": "product_gallery"
+    },
+    {
+      "route": "/ui/facet-panel",
+      "slug": "facet_panel"
+    },
+    {
+      "route": "/ui/review-summary",
+      "slug": "review_summary"
+    },
+    {
+      "route": "/ui/countdown",
+      "slug": "countdown"
+    }
+  ],
+  "social": [
+    {
+      "route": "/ui/story-ring",
+      "slug": "story_ring"
+    },
+    {
+      "route": "/ui/lightbox",
+      "slug": "lightbox"
+    },
+    {
+      "route": "/ui/feed",
+      "slug": "feed"
+    }
+  ],
+  "text": [
+    {
+      "route": "/ui/heading",
+      "slug": "heading"
+    },
+    {
+      "route": "/ui/paragraph",
+      "slug": "paragraph"
+    },
+    {
+      "route": "/ui/meta-line",
+      "slug": "meta_line"
+    },
+    {
+      "route": "/ui/badge",
+      "slug": "badge"
+    },
+    {
+      "route": "/ui/avatar",
+      "slug": "avatar"
+    },
+    {
+      "route": "/ui/avatar-group",
+      "slug": "avatar_group"
+    },
+    {
+      "route": "/ui/icon",
+      "slug": "icon"
+    },
+    {
+      "route": "/ui/description-list",
+      "slug": "description_list"
+    },
+    {
+      "route": "/ui/timeline",
+      "slug": "timeline"
+    },
+    {
+      "route": "/ui/markdown",
+      "slug": "markdown"
+    },
+    {
+      "route": "/ui/spoiler",
+      "slug": "spoiler"
+    },
+    {
+      "route": "/ui/quote",
+      "slug": "quote"
+    },
+    {
+      "route": "/ui/highlight",
+      "slug": "highlight"
+    },
+    {
+      "route": "/ui/kbd",
+      "slug": "kbd"
+    },
+    {
+      "route": "/ui/divider",
+      "slug": "divider"
+    },
+    {
+      "route": "/ui/stepper",
+      "slug": "stepper"
+    },
+    {
+      "route": "/ui/relative-time",
+      "slug": "relative_time"
+    }
+  ]
+}

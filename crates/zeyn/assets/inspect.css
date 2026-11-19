@@ -1,0 +1,44 @@
+/* Source inspector of debug builds (inspect.js), linked on first open. */
+.z-inspect-box {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  outline: 2px solid var(--z-focus, var(--z-accent));
+  outline-offset: 1px;
+  background: color-mix(in srgb, var(--z-accent) 10%, transparent);
+}
+
+.z-inspect {
+  position: fixed;
+  z-index: 2147483647;
+  inset-block-end: var(--z-space, 1rem);
+  inset-inline-end: var(--z-space, 1rem);
+  max-inline-size: min(36rem, calc(100vw - 2rem));
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--z-border-strong, var(--z-border));
+  border-radius: var(--z-radius, 6px);
+  background: var(--z-surface);
+  color: var(--z-text);
+  box-shadow: var(--z-shadow-2);
+  font-size: var(--z-font-size-sm, 0.875rem);
+}
+
+.z-inspect ol {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+.z-inspect li + li {
+  color: var(--z-text-muted);
+}
+
+.z-inspect code {
+  font-family: var(--z-font-mono, monospace);
+  overflow-wrap: anywhere;
+}
+
+.z-inspect-hint {
+  margin: 0.25rem 0 0;
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs, 0.75rem);
+}

@@ -23,6 +23,7 @@ Deja el nombre vacío o escribe un correo incorrecto y pulsa *Send*: el navegado
 | `.field(M::f)` | Un campo en su propia línea |
 | `.row(\|r\| r.field(a).field(b))` | Campos uno al lado de otro; se apilan en pantallas estrechas |
 | `.section(title)` | Un grupo con título de los campos que siguen |
+| `.settings()` | Diseño de ajustes: etiqueta y ayuda junto a cada control, y una barra de guardado fija abajo en cuanto algo cambia |
 | `.step(title)` | Un paso de asistente; el formulario muestra un paso cada vez |
 | `.range(M::from, M::to)` | Dos fechas como un selector de rango |
 | `Form::auto(value)` | Todos los campos, en el orden de declaración |
@@ -112,10 +113,13 @@ Un nombre de permiso permite a los mismos usuarios subir y descargar. Para que l
 
 El control es una entrada de archivo nativa dentro de una zona de arrastre. Cada archivo se sube por separado con una barra de progreso, se puede cancelar mientras se ejecuta, reintentar si falló y quitar cuando termina. Las imágenes muestran una vista previa hecha a partir de una URL de objeto del archivo elegido. El progreso y los resultados se anuncian en una región en vivo educada. El showcase tiene un ejemplo funcional en `/uploads`; este sitio de documentación no tiene ningún usuario con sesión iniciada, así que no muestra ninguna subida en vivo.
 
+Una carpeta soltada añade los archivos que contiene y los de sus subcarpetas, leídos en páginas de como mucho 100 entradas hasta terminar la carpeta; los archivos de un tipo que el campo no admite se omiten y se cuentan en la región en vivo. También se suben los archivos pegados mientras el campo tiene el foco. Un archivo cuya extensión o tipo no está en `accept` se rechaza en el navegador antes de enviar ningún byte, y el servidor vuelve a comprobar el contenido. Como mucho tres archivos de un campo se suben a la vez; los demás esperan en fila con una barra de progreso ocupada.
+
 | Tecla | Qué hace |
 |---|---|
 | Tab | Pasa a la entrada de archivo, y después al enlace de descarga de cada archivo y a su botón Cancel, Retry o Remove |
 | Enter o Espacio en la entrada de archivo | Abre el selector de archivos del sistema (el camino con teclado para arrastrar y soltar) |
+| Ctrl+V o Cmd+V en la entrada de archivo | Sube los archivos del portapapeles, como una captura de pantalla |
 | Enter o Espacio en Cancel, Retry, Remove | Lo ejecuta; tras Cancel el foco pasa a Retry, tras Remove al siguiente archivo o de vuelta a la entrada |
 
 Lo que hace el servidor para `POST /_zeyn/files/{store}`:
@@ -126,8 +130,60 @@ Lo que hace el servidor para `POST /_zeyn/files/{store}`:
 4. ejecuta el `FileScanner` de la feature; un archivo rechazado, o un escáner que falla, se elimina y la respuesta es `422`;
 5. responde `201` con `{id, name, size, type}`. El id son 128 bits aleatorios del servidor; los nombres se limpian de rutas y caracteres de control.
 
+Con la característica `image`, `FileRules::clean_images()` añade un paso cuando el almacén ya tiene el archivo: las subidas PNG, JPEG y WebP se decodifican y se vuelven a codificar en el mismo formato, así que EXIF (con GPS), XMP, perfiles ICC, fragmentos de texto y bytes ocultos tras los datos de la imagen nunca se quedan en el servidor. Primero se aplica la orientación EXIF a los píxeles; JPEG se escribe con calidad 90 y PNG y WebP sin pérdida. La decodificación se detiene en `MAX_IMAGE_SIDE` (12.000) píxeles por lado y en `MAX_IMAGE_MEMORY` (256 MiB); una imagen que no se decodifica se borra y la respuesta es `422`. Ambos límites se comprueban con el tamaño de la cabecera de la imagen antes de decodificar ningún píxel, así que un archivo pequeño que declara una imagen enorme se rechaza sin ocupar esa memoria, y de una imagen animada solo queda el primer fotograma. El archivo limpio sustituye al original con un id nuevo, y el analizador revisa después el archivo limpio. Sin la característica el método no existe, así que un almacén no puede creer que limpia cuando no lo hace.
+
 Las descargas (`GET /_zeyn/files/{store}/{id}`) comprueban la forma del id, el permiso, los guards y el tenant, y pasan por el servicio de medios (consulta `docs/media.md`): rangos, etiquetas de entidad y `nosniff`. Solo las imágenes ráster, el audio y el vídeo se muestran en línea; todo lo demás se envía como `application/octet-stream` con `Content-Disposition: attachment`, un nombre ASCII entre comillas más el nombre UTF-8, bajo `Content-Security-Policy: sandbox`.
 
 `DiskStore` guarda `{id}.bin` y `{id}.json` en una carpeta y escribe primero las subidas en `{id}.part`. `MemoryStore` guarda los archivos en memoria con un límite de bytes, para pruebas y demostraciones. El valor del formulario solo nombra archivos: una acción de guardado que deba estar segura de que un archivo existe llama a `store.meta(id)`, como hace el showcase.
 
-Presupuesto: una subida de 256 MiB hace crecer el heap del servidor unos 0,4 MiB (`tests/files_memory.rs`); el control renderiza 10 nodos DOM más 5 por archivo; `files.js` añade 12 KB sin comprimir y 4 KB con gzip, `files.css` 3 KB sin comprimir y 1 KB con gzip.
+`FileRules::quota(bytes, window)` limita lo que un usuario sube a un almacén por ventana, contado con el rate store de la aplicación; la subida que lo supera se guarda igualmente y la siguiente responde `429`. `DiskStore` elimina los archivos `.part` de más de una hora (subidas detenidas por una caída) como mucho una vez por hora. `ZipGuard` es un escáner para subidas basadas en ZIP (ZIP, Word, Excel, PowerPoint): rechaza archivos cuyo directorio central declara más de 10.000 entradas, más de 1 GiB en total o más de 200 veces el tamaño del archivo, y los archivos ZIP64; el código que descomprime un archivo aceptado debe detenerse igualmente en esos límites.
+
+Presupuesto: una subida de 256 MiB hace crecer el heap del servidor unos 0,4 MiB (`tests/files_memory.rs`); el control renderiza 10 nodos DOM más 5 por archivo; `files.js` añade 21 KB sin comprimir y 7 KB con gzip, `files.css` 3 KB sin comprimir y 1 KB con gzip.
+
+### Subidas reanudables
+
+Con la característica de Cargo `resumable`, el campo de subida y `FileDrop` envían los archivos mediante un subconjunto del protocolo tus 1.0, de modo que una subida que pierde la red continúa donde se detuvo en lugar de empezar de nuevo. El control no necesita cambios:
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+Sin `resumable_uploads`, las subidas sin terminar van a la carpeta temporal del sistema, se guardan 24 horas después de sus últimos bytes y puede haber como máximo 5 abiertas por usuario y 1000 en total.
+
+| Solicitud | Respuesta |
+|---|---|
+| `POST /_zeyn/uploads/{store}` con `Upload-Length` y `Upload-Metadata: filename <base64>` | `201` con `Location`, `Upload-Offset: 0` y `Upload-Expires`; `413` por encima del límite del almacén, `422` para un archivo vacío, `429` por encima de la cuota o de los límites de subidas abiertas |
+| `HEAD` en la ubicación | `200` con `Upload-Offset` y `Upload-Length` |
+| `PATCH` con `Content-Type: application/offset+octet-stream` y `Upload-Offset` | `204` con el nuevo `Upload-Offset`; `409` cuando el desplazamiento no es el del servidor, `423` mientras otro `PATCH` de la misma subida sigue en curso, `413` para más bytes de los declarados |
+| el `PATCH` que trae el último byte | `200` con `{id, name, size, type}`, como una subida normal |
+| `DELETE` en la ubicación | `204`; se eliminan la subida y sus bytes |
+
+Cada solicitud necesita `Tus-Resumable: 1.0.0` (si no, `412`), el permiso de escritura del almacén y los guards de la feature; `POST`, `PATCH` y `DELETE` también necesitan la cabecera CSRF. Solo el usuario y el tenant que crearon una subida pueden encontrarla; cualquier otro recibe `404`. Crear una subida cuenta contra el límite de escritura como una subida normal; sus `PATCH` no, porque no pueden llevar más de la longitud declarada. El navegador envía el archivo en `PATCH` de 1 MiB, el límite de cuerpo por defecto de los proxies inversos habituales, así que una conexión cortada cuesta como mucho eso de nuevo.
+
+Los bytes se escriben en `{id}.part` en la carpeta de subidas a medida que llegan, así que los bytes que llegaron al servidor antes de que se cortara la conexión se conservan y `HEAD` los informa. Cuando llega el último byte, el archivo pasa por los mismos pasos que `POST /_zeyn/files/{store}`: el tipo encontrado en el contenido, el límite de tamaño, la cuota, el almacén, el escáner y los interceptores (`CallKind::Upload`). Después se elimina el archivo parcial, también cuando una comprobación rechaza el archivo. Una subida sin bytes nuevos durante el tiempo de expiración se elimina la próxima vez que se consulta o cuando se crea la siguiente subida; los archivos parciales que dejó un reinicio se barren una vez por tiempo de expiración.
+
+En el navegador, una solicitud fallida (red perdida, `409`, `423`, `429` o un error del servidor) se reintenta tras 1, 2, 4, 8 y luego cada 15 segundos, después de que el navegador vuelva a estar en línea, hasta 12 veces seguidas; cada intento pregunta primero el desplazamiento y envía solo el resto. Cancelar detiene la solicitud y elimina la subida en el servidor. Reintentar tras un fallo final reanuda la misma subida mientras el servidor aún la tenga.
+
+Diferencias con tus 1.0: solo las extensiones creation, expiration y termination; sin descubrimiento por `OPTIONS`, sin sumas de verificación, sin longitud diferida y sin concatenación; y el último `PATCH` responde `200` con el archivo guardado en lugar de `204`, para que el campo obtenga el id del archivo sin otra solicitud. Las subidas abiertas solo las conoce el proceso que las creó, así que detrás de un balanceador de carga con varias instancias las rutas `/_zeyn/uploads/` necesitan sesiones persistentes (sticky sessions).
+
+## File drop
+
+`FileDrop::new(label, rules)` es el mismo control de subida por sí solo, fuera de un formulario, para pantallas donde los archivos son toda la tarea, como una bandeja de documentos. Acepta carpetas, archivos pegados y la lista de tipos como el campo del formulario, y sube al almacén de `rules`, que `Feature::files` registra con su permiso. `.single()` toma un archivo cada vez. `.on_upload(action)` ejecuta una acción con cada `File` guardado; el servidor comprueba antes que el id tiene la forma que genera, vuelve a limpiar el nombre y solo conserva un tipo de contenido de las reglas, así que la acción no recibe nada inventado por el navegador. Si la acción lo rechaza, el elemento muestra el motivo. El selector de archivos dentro de la zona es el camino de teclado y de puntero único.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

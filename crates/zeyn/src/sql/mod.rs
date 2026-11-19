@@ -252,11 +252,72 @@ impl Db {
 
     /// One page of entities matching the query: filters, sort, offset or keyset paging, a capped
     /// total when asked, totals and groups. See [`Page`].
+    ///
+    /// When the query asks for a total or column totals and the pool has idle connections for
+    /// them, the rows, the count and the totals run at the same time on separate connections, so
+    /// the page waits for the slowest query instead of their sum. Otherwise they run one after
+    /// the other on one connection.
     pub async fn find<E: Entity>(&self, q: &DataQuery) -> Result<Page<E>> {
-        self.link()
-            .await?
-            .find(self.dialect(), q, self.inner.count_cap)
-            .await
+        let d = self.dialect();
+        let plan = build::plan_find::<E>(d, q, self.inner.count_cap)?;
+        let extra = usize::from(plan.count.is_some()) + usize::from(plan.totals.is_some());
+        if extra == 0 || self.idle() < extra {
+            return self
+                .link()
+                .await?
+                .run_find::<E>(d, plan)
+                .await;
+        }
+        let FindPlan {
+            main,
+            limit,
+            skip,
+            shape,
+            count,
+            totals,
+        } = plan;
+        let rows = async {
+            self.link()
+                .await?
+                .find_rows::<E>(d, main, limit, skip, shape)
+                .await
+        };
+        let total = async {
+            match count {
+                Some(sql) => self
+                    .link()
+                    .await?
+                    .count::<E>(sql)
+                    .await
+                    .map(Some),
+                None => Ok(None),
+            }
+        };
+        let sums = async {
+            match totals {
+                Some((sql, aggs)) => {
+                    self.link()
+                        .await?
+                        .totals::<E>(sql, &aggs)
+                        .await
+                }
+                None => Ok(Vec::new()),
+            }
+        };
+        let (mut page, total, sums) = tokio::try_join!(rows, total, sums)?;
+        page.total = total;
+        page.totals = sums;
+        Ok(page)
+    }
+
+    /// Connections the pool holds open and unused right now; 0 where the driver does not say.
+    fn idle(&self) -> usize {
+        match &self.inner.backend {
+            #[cfg(feature = "postgres")]
+            Backend::Postgres(pool) => pool.num_idle(),
+            #[cfg(feature = "oracle")]
+            Backend::Oracle(..) => 0,
+        }
     }
 
     /// The entity with this key, or [`Error::NotFound`].
@@ -448,14 +509,20 @@ impl Db {
     }
 
     /// Runs pending migrations, such as the ones `sqlx::migrate!("./migrations")` embeds.
-    /// PostgreSQL only.
+    /// PostgreSQL only. Checksums ignore line endings, so a migration checked out with CRLF on
+    /// one machine and LF on another still validates. A checksum stored the old way (computed
+    /// with the `\r` bytes) is accepted as it is.
     #[cfg(feature = "postgres")]
     pub async fn migrate(&self, migrator: &sqlx::migrate::Migrator) -> Result<()> {
         match &self.inner.backend {
-            Backend::Postgres(pool) => migrator
-                .run(pool)
-                .await
-                .map_err(|e| Error::Internal(format!("migration: {e}"))),
+            Backend::Postgres(pool) => {
+                let applied = pg::applied_checksums(pool, &migrator.table_name).await;
+                let migrator = reconcile_migrator(migrator, &applied);
+                migrator
+                    .run(pool)
+                    .await
+                    .map_err(|e| Error::Internal(format!("migration: {e}")))
+            }
             #[cfg(feature = "oracle")]
             Backend::Oracle(..) => Err(Error::Internal(
                 "sqlx migrations run on PostgreSQL only".into(),
@@ -471,6 +538,59 @@ impl Db {
             .map_err(|e| Error::Internal(format!("migration: {e}")))?;
         self.migrate(&migrator).await
     }
+}
+
+/// Checksum of a migration with every `\r` left out, so CRLF and LF files agree.
+#[cfg(feature = "postgres")]
+pub(crate) fn line_ending_checksum(m: &sqlx::migrate::Migration) -> Vec<u8> {
+    let sql: String = m
+        .sql
+        .as_str()
+        .chars()
+        .filter(|c| *c != '\r')
+        .collect();
+    use sqlx::SqlSafeStr;
+    sqlx::migrate::Migration::new(
+        m.version,
+        m.description.clone(),
+        m.migration_type,
+        sqlx::AssertSqlSafe(sql).into_sql_str(),
+        m.no_tx,
+    )
+    .checksum
+    .into_owned()
+}
+
+/// Copy of a migrator whose checksums ignore line endings. A migration whose stored checksum
+/// equals the checksum it was built with (the old way, `\r` included) keeps that checksum, so
+/// migrations applied before this rule still validate. `applied` maps version to the stored
+/// checksum.
+#[cfg(feature = "postgres")]
+pub(crate) fn reconcile_migrator(
+    migrator: &sqlx::migrate::Migrator,
+    applied: &std::collections::HashMap<i64, Vec<u8>>,
+) -> sqlx::migrate::Migrator {
+    let migrations = migrator
+        .migrations
+        .iter()
+        .map(|m| {
+            let mut m = m.clone();
+            let old = applied
+                .get(&m.version)
+                .is_some_and(|c| c[..] == m.checksum[..]);
+            if !old {
+                m.checksum = line_ending_checksum(&m).into();
+            }
+            m
+        })
+        .collect();
+    let mut copy = sqlx::migrate::Migrator::with_migrations(migrations);
+    copy.ignore_missing = migrator.ignore_missing;
+    copy.locking = migrator.locking;
+    copy.no_tx = migrator.no_tx;
+    copy.table_name = migrator.table_name.clone();
+    copy.create_schemas = migrator.create_schemas.clone();
+    copy
 }
 
 /// Checks a table prefix for the crate's own tables: lower case letters, digits and `_`, at most
@@ -657,6 +777,12 @@ impl Link {
         q: &DataQuery,
         cap: u64,
     ) -> Result<Page<E>> {
+        let plan = build::plan_find::<E>(d, q, cap)?;
+        self.run_find::<E>(d, plan).await
+    }
+
+    /// Runs a planned find on this one connection: rows, then the count, then the totals.
+    async fn run_find<E: Entity>(&mut self, d: &dyn Dialect, plan: FindPlan) -> Result<Page<E>> {
         let FindPlan {
             main,
             limit,
@@ -664,7 +790,28 @@ impl Link {
             shape,
             count,
             totals,
-        } = build::plan_find::<E>(d, q, cap)?;
+        } = plan;
+        let mut page = self
+            .find_rows::<E>(d, main, limit, skip, shape)
+            .await?;
+        if let Some(sql) = count {
+            page.total = Some(self.count::<E>(sql).await?);
+        }
+        if let Some((sql, aggs)) = totals {
+            page.totals = self.totals::<E>(sql, &aggs).await?;
+        }
+        Ok(page)
+    }
+
+    /// The rows or groups of a page and its next cursor.
+    async fn find_rows<E: Entity>(
+        &mut self,
+        d: &dyn Dialect,
+        main: Sql,
+        limit: usize,
+        skip: u64,
+        shape: Shape,
+    ) -> Result<Page<E>> {
         let fields = E::fields();
         let mut page = Page::default();
         match shape {
@@ -716,27 +863,36 @@ impl Link {
                 page.groups = groups;
             }
         }
-        if let Some(count) = count {
-            let mut total = 0;
-            self.fetch(count, on_error::<E>, &mut |cells| {
-                if let Some(Cell::Int(n)) = cells.drain(..).next() {
-                    total = u64::try_from(n).unwrap_or(0);
-                }
-                Ok(())
-            })
-            .await?;
-            page.total = Some(total);
-        }
-        if let Some((sql, aggs)) = totals {
-            let mut out = Vec::new();
-            self.fetch(sql, on_error::<E>, &mut |cells| {
-                out = build::read_aggs(fields, &aggs, &mut cells.drain(..));
-                Ok(())
-            })
-            .await?;
-            page.totals = out;
-        }
         Ok(page)
+    }
+
+    /// The capped row count of a find.
+    async fn count<E: Entity>(&mut self, sql: Sql) -> Result<u64> {
+        let mut total = 0;
+        self.fetch(sql, on_error::<E>, &mut |cells| {
+            if let Some(Cell::Int(n)) = cells.drain(..).next() {
+                total = u64::try_from(n).unwrap_or(0);
+            }
+            Ok(())
+        })
+        .await?;
+        Ok(total)
+    }
+
+    /// The column totals of a find over the whole filtered result.
+    async fn totals<E: Entity>(
+        &mut self,
+        sql: Sql,
+        aggs: &[build::Agg],
+    ) -> Result<Vec<crate::action::Total>> {
+        let fields = E::fields();
+        let mut out = Vec::new();
+        self.fetch(sql, on_error::<E>, &mut |cells| {
+            out = build::read_aggs(fields, aggs, &mut cells.drain(..));
+            Ok(())
+        })
+        .await?;
+        Ok(out)
     }
 
     /// Rows of a hand written query as `M`, at most `max`; reading stops at the first row over.
@@ -843,25 +999,41 @@ impl Link {
         err: OnError,
         each: &mut (dyn FnMut(&mut Vec<Cell>) -> Result<()> + Send),
     ) -> Result<()> {
-        match self {
+        #[cfg(all(debug_assertions, feature = "server"))]
+        let traced =
+            crate::server::devtools_on().then(|| (sql.text.clone(), std::time::Instant::now()));
+        let done = match self {
             #[cfg(feature = "postgres")]
             Link::Pg(c) => pg::fetch(c, sql, err, each).await,
             #[cfg(feature = "postgres")]
             Link::PgTx(c) => pg::fetch(c, sql, err, each).await,
             #[cfg(feature = "oracle")]
             Link::Ora(c) => c.fetch(sql, err, each).await,
+        };
+        #[cfg(all(debug_assertions, feature = "server"))]
+        if let Some((text, started)) = traced {
+            crate::server::devtools_query(&text, started.elapsed(), None);
         }
+        done
     }
 
     async fn execute(&mut self, sql: Sql, err: OnError) -> Result<u64> {
-        match self {
+        #[cfg(all(debug_assertions, feature = "server"))]
+        let traced =
+            crate::server::devtools_on().then(|| (sql.text.clone(), std::time::Instant::now()));
+        let done = match self {
             #[cfg(feature = "postgres")]
             Link::Pg(c) => pg::execute(c, sql, err).await,
             #[cfg(feature = "postgres")]
             Link::PgTx(c) => pg::execute(c, sql, err).await,
             #[cfg(feature = "oracle")]
             Link::Ora(c) => c.execute(sql, err).await,
+        };
+        #[cfg(all(debug_assertions, feature = "server"))]
+        if let Some((text, started)) = traced {
+            crate::server::devtools_query(&text, started.elapsed(), done.as_ref().ok().copied());
         }
+        done
     }
 
     async fn commit(self) -> Result<()> {

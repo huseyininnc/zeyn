@@ -117,12 +117,15 @@ tests show it; `part` means some of it is shown and the note in the matrix or be
 missing; `fail` means there is no evidence it meets the bar (it may still work, but nothing shows
 it); `n/a` means the criterion does not apply.
 
-Two columns fail for every component and are listed once here instead of in each row:
+Two criteria are tracked outside the matrix:
 
-- **Screen reader run:** no recorded NVDA or VoiceOver check exists in the repository. ARIA roles
-  are in place (and are counted under "Pattern"), but nobody has recorded a run.
-- **Browser tests:** there is no automated browser test suite. `AGENTS.md` asks for a manual
-  check in the showcase or the docs app.
+- **Screen reader run:** no recorded NVDA or VoiceOver run exists yet. The accessibility tree of
+  every catalog page is checked in as a snapshot (section 4), so a change to roles, names or
+  states shows up in review; the manual run below is still to be recorded.
+- **Browser tests:** the Playwright suite in `e2e/` runs every catalog page in CI (section 4).
+  Components that are not in the catalog (`Dock`, windows, `ContextMenu`, media players, islands,
+  `Live`, `Import`, `Transitions`, `PdfLink`, `AssistantChat`) are still checked by hand in the
+  showcase or the docs app.
 
 Columns: **Pat** pattern and keys, **Foc** focus, **Con** contrast in both themes, **RTL**,
 **i18n**, **Srv** server checks, **CSP** strict CSP and no reload, **Perf** budget measured,
@@ -132,31 +135,31 @@ Columns: **Pat** pattern and keys, **Foc** focus, **Con** contrast in both theme
 | Component | Pat | Foc | Con | RTL | i18n | Srv | CSP | Perf | Tch | DPI | Rs | Doc | Shw | MCP |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `DataGrid` | pass | pass | pass | pass | pass | pass | pass | part | part | pass | pass | pass | pass | pass |
-| `Form` | pass | part | pass | part | pass | pass | pass | fail | fail | pass | pass | pass | pass | pass |
-| `Lines` | pass | part | pass | part | pass | pass | pass | fail | fail | pass | pass | pass | pass | pass |
-| Text, number, money inputs | pass | pass | pass | part | pass | pass | pass | fail | fail | pass | part | pass | pass | pass |
-| Check box, switch, radio, segmented | pass | pass | pass | part | pass | pass | pass | fail | fail | pass | part | pass | pass | pass |
-| Select and listbox | pass | pass | pass | part | pass | pass | pass | fail | fail | pass | part | pass | pass | pass |
-| Lookup and `lookup_many` | pass | part | pass | part | pass | pass | pass | fail | fail | pass | pass | pass | pass | pass |
-| Date, time and range pickers | part | part | pass | part | pass | pass | pass | fail | fail | pass | pass | pass | pass | pass |
-| `Row`, `Stack`, `Card` | n/a | n/a | pass | part | n/a | n/a | pass | fail | part | pass | pass | pass | pass | pass |
-| `Panel` | pass | pass | pass | part | pass | n/a | pass | fail | fail | pass | pass | pass | pass | pass |
-| `Tabs` | pass | pass | pass | part | pass | n/a | pass | fail | fail | pass | pass | pass | pass | pass |
-| `Split` | pass | pass | pass | part | pass | n/a | pass | fail | part | pass | pass | pass | pass | pass |
+| `Form` | pass | part | pass | part | pass | pass | pass | part | part | pass | pass | pass | pass | pass |
+| `Lines` | pass | part | pass | part | pass | pass | pass | part | part | pass | pass | pass | pass | pass |
+| Text, number, money inputs | pass | pass | pass | part | pass | pass | pass | part | part | pass | part | pass | pass | pass |
+| Check box, switch, radio, segmented | pass | pass | pass | part | pass | pass | pass | part | part | pass | part | pass | pass | pass |
+| Select and listbox | pass | pass | pass | part | pass | pass | pass | part | part | pass | part | pass | pass | pass |
+| Lookup and `lookup_many` | pass | part | pass | part | pass | pass | pass | part | part | pass | pass | pass | pass | pass |
+| Date, time and range pickers | part | part | pass | part | pass | pass | pass | part | part | pass | pass | pass | pass | pass |
+| `Row`, `Stack`, `Card` | n/a | n/a | pass | part | n/a | n/a | pass | part | part | pass | pass | pass | pass | pass |
+| `Panel` | pass | pass | pass | part | pass | n/a | pass | part | part | pass | pass | pass | pass | pass |
+| `Tabs` | pass | pass | pass | part | pass | n/a | pass | part | part | pass | pass | pass | pass | pass |
+| `Split` | pass | pass | pass | part | pass | n/a | pass | part | part | pass | pass | pass | pass | pass |
 | `Dock` | part | part | part | part | pass | part | pass | fail | fail | pass | pass | fail | pass | pass |
-| `Tree` | part | pass | pass | part | pass | pass | pass | fail | fail | pass | part | pass | pass | pass |
-| `Chart` | part | n/a | pass | fail | pass | n/a | pass | fail | fail | pass | part | pass | pass | pass |
-| `Alert`, `Badge`, `Progress` | pass | n/a | pass | part | pass | n/a | pass | fail | part | pass | pass | pass | pass | pass |
-| `DescriptionList`, `Timeline` | pass | n/a | pass | part | pass | n/a | pass | fail | part | pass | pass | part | pass | pass |
-| `EmptyState`, `Skeleton` | pass | n/a | pass | part | pass | n/a | pass | fail | part | pass | part | part | pass | pass |
-| `Breadcrumb` | part | n/a | pass | part | pass | pass | pass | fail | part | pass | pass | fail | pass | pass |
-| `ActionButton` | pass | pass | pass | part | pass | pass | pass | fail | part | pass | pass | pass | pass | pass |
+| `Tree` | part | pass | pass | part | pass | pass | pass | part | part | pass | part | pass | pass | pass |
+| `Chart` | part | n/a | pass | fail | pass | n/a | pass | part | part | pass | part | pass | pass | pass |
+| `Alert`, `Badge`, `Progress` | pass | n/a | pass | part | pass | n/a | pass | part | part | pass | pass | pass | pass | pass |
+| `DescriptionList`, `Timeline` | pass | n/a | pass | part | pass | n/a | pass | part | part | pass | pass | part | pass | pass |
+| `EmptyState`, `Skeleton` | pass | n/a | pass | part | pass | n/a | pass | part | part | pass | part | part | pass | pass |
+| `Breadcrumb` | part | n/a | pass | part | pass | pass | pass | part | part | pass | pass | fail | pass | pass |
+| `ActionButton` | pass | pass | pass | part | pass | pass | pass | part | part | pass | pass | pass | pass | pass |
 | Window and confirm | pass | pass | pass | part | pass | pass | pass | fail | fail | pass | part | fail | pass | n/a |
-| Toast | part | n/a | pass | part | pass | n/a | pass | fail | fail | pass | part | fail | pass | n/a |
+| Toast | part | n/a | pass | part | pass | n/a | pass | part | part | pass | part | fail | pass | n/a |
 | Toolbar and `ContextMenu` | pass | pass | pass | part | pass | pass | pass | fail | fail | pass | pass | fail | pass | pass |
-| `MenuBar`, command palette | pass | pass | pass | part | pass | pass | pass | fail | fail | pass | pass | pass | pass | pass |
-| `Toolbox`, `StatusBar` | part | part | part | part | pass | n/a | pass | fail | fail | pass | pass | pass | pass | pass |
-| `PropertyInspector` | pass | part | part | part | pass | pass | pass | fail | fail | pass | pass | fail | pass | pass |
+| `MenuBar`, command palette | pass | pass | pass | part | pass | pass | pass | part | part | pass | pass | pass | pass | pass |
+| `Toolbox`, `StatusBar` | part | part | part | part | pass | n/a | pass | part | part | pass | pass | pass | pass | pass |
+| `PropertyInspector` | pass | part | part | part | pass | pass | pass | part | part | pass | pass | fail | pass | pass |
 | `Video`, `Audio` | pass | pass | part | part | pass | pass | pass | part | part | part | pass | fail | pass | pass |
 | `Island`, `Canvas` | part | part | n/a | part | pass | pass | pass | part | fail | part | pass | fail | pass | pass |
 | `Live` | n/a | part | n/a | n/a | n/a | pass | pass | fail | n/a | n/a | part | fail | pass | pass |
@@ -177,16 +180,20 @@ Evidence behind the scores:
   forms, menus, alerts and focus; `pro.css`, `media.css`, `assistant.css` and the dock were not
   in that measurement, so they score `part`.
 - **RTL.** Arabic pages render `<html dir="rtl">`. The framework stylesheets use logical
-  properties, and `tests/rtl.rs` fails on a new physical side unless it is listed with a reason.
+  properties, and `tests/all/rtl.rs` fails on a new physical side unless it is listed with a reason.
   Arrows that point in reading direction mirror; Left and Right swap in grid cells, tabs, menus,
   trees, calendars, sliders, split panes and docks; popups and menus anchor to the start side.
   Numbers align to the end of the cell (`text-align: end`), so left in a right to left grid.
   `Chart` scores `fail` because its SVG lays axes out with fixed left margins (`chart.rs`).
-- **Performance.** Only the grid (virtual scrolling, column virtualization, export), media serving
-  and the XLSX and PDF exports have published measurements. No component has a stated budget.
-- **Touch.** The grid shows its column menu button on `hover: none` devices and controls keep
-  24 px targets ([theming.md](theming.md#6-other-accessibility-behavior)); nothing else shows a
-  touch check.
+- **Performance.** The grid (virtual scrolling, column virtualization, export), media serving
+  and the XLSX and PDF exports have published measurements. Every catalog page has a budget for
+  its script and stylesheet bytes and its first paint in `e2e/budgets.json`, and
+  `tests/all/size_budgets.rs` caps each module file and each kind of page. DOM size, heap growth and
+  frame times are not measured yet, so the column scores `part`.
+- **Touch.** The browser suite opens every catalog page on an emulated touch phone and fails on a
+  pointer target under 24 by 24 CSS pixels whose spacing does not make up for it (WCAG 2.5.8),
+  and on a page that scrolls sideways at 412 px. Hover only paths and high DPI canvases are not
+  checked, so the column scores `part`.
 - **Rust tests.** Test files per area: `grid.rs` (50 tests), `ui_controls.rs` (4), `ui_data.rs`
   (4, tree and chart), `ui_date.rs` (11), `ui_layout.rs` (8), `ui_lines.rs` (7), `ui_media.rs`
   (12), `ui_pro.rs` (12), `ui_widgets.rs` (5). `EmptyState`, `Live` and `AssistantChat` were not
@@ -198,5 +205,70 @@ Evidence behind the scores:
 
 ## 3. What to harden first
 
-In short: add the browser test suite and recorded screen reader runs, set and enforce performance
-budgets, make RTL real, check touch, and give every component a live docs example.
+In short: record the screen reader runs, extend the budgets to DOM size, heap growth and frame
+times, cover the components that are not in the catalog with browser tests, and give every
+component a live docs example.
+
+## 4. Browser tests
+
+The suite lives in `e2e/` (Playwright with `@axe-core/playwright`) and runs against the
+component catalog app. It starts the app on `ZEYN_E2E_PORT` (3110 by default) unless one already
+runs there:
+
+```
+cd e2e && npm ci && npx playwright install chromium && npm test
+```
+
+There is one spec per catalog category (`e2e/tests/<category>.spec.ts`), and the pages of each
+category come from `e2e/components.json`, which a test of the catalog
+(`examples/components/tests/components.rs`) rewrites when a component is added. Every page runs
+in four projects:
+
+| Project | Checks |
+|---|---|
+| `light` | renders; axe with the WCAG 2.2 A and AA rules has no serious or critical finding; Tab moves through the examples and every stop shows focus; in each composite widget (tabs, menu bar, radio group, toolbar, tree, listbox, grid) the arrow key moves focus and keeps it inside; the accessibility tree matches its snapshot; no console error |
+| `dark` | renders in the dark theme; axe, including contrast; no console error |
+| `rtl` | renders with `dir="rtl"`; the page does not scroll sideways; no console error |
+| `touch` | a touch phone (Pixel 7); pointer targets are 24 by 24 CSS pixels or spaced enough (WCAG 2.5.8); the page does not scroll sideways; no console error |
+
+Requests to other hosts get an empty answer, so the suite needs no network. A finding that is not
+fixed yet goes in `e2e/known-issues.json` as `slug:check` with the reason, and stays listed until
+it is fixed; today that is the kanban board, which widens the page on a phone.
+
+**Budgets.** `e2e/tests/budgets.spec.ts` loads every catalog page in the light project and
+measures the script and stylesheet bytes it loads (as sent, so compressed) and its first
+contentful paint. A page fails when it goes more than 10 percent over its entry in
+`e2e/budgets.json`. First paint budgets are one and a half times the recorded time, at least
+1000 ms, since timing differs between machines. After a change that earns its bytes, record new
+budgets and give the before and after numbers in the commit:
+
+```
+ZEYN_E2E_RECORD_BUDGETS=1 npx playwright test budgets --project light
+```
+
+**Accessibility tree snapshots.** The `light` project compares the accessibility tree of each
+page's main area with `e2e/tests/__snapshots__/<slug>.aria.yml`. When a change to roles, names
+or states is intended, update them with `npm run update` and review the diff like code. Pages
+whose text follows the date or the clock (calendar, week schedule, feed, message thread,
+composer) have no snapshot.
+
+### Manual screen reader check
+
+The snapshots show what the browser exposes, not what a screen reader says. Before a component
+is marked `pass` for the screen reader run, someone records this check and adds a row to the
+log below.
+
+1. Run the catalog (`cargo run -p zeyn-example-components`) and open the component's page.
+2. NVDA on Windows with Firefox and with Chrome; VoiceOver on macOS with Safari.
+3. Reach the component with Tab and with the screen reader's quick keys (headings, landmarks,
+   form fields). Its role, name and state are read once and correctly.
+4. Do the main task with the keyboard only (for a grid: find a row, sort, filter, edit a cell; for
+   a picker: open, choose, close). Every change of state is announced.
+5. Trigger the live text (totals, counts, errors, status). It is announced once, politely unless
+   it is an error.
+6. Open and close every overlay. Focus moves in, stays in while modal, and returns to the opener.
+7. Repeat steps 3 to 5 with the page in Turkish and with `dir="rtl"`.
+
+| Date | Component | Reader and browser | Result | By |
+|---|---|---|---|---|
+| | | | | |

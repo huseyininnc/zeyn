@@ -5,7 +5,7 @@
 Zeyn アプリは、独自の AI アシスタントを備えることができます。すべてのページにチャットが用意され、アプリのデータに基づいて回答し、サインインしているユーザーとしてアプリの Screen と API を操作します。Zeyn で作られたアプリは、自社の顧客向けにこれを有効にし、顧客が望むモデルを接続し、チャット履歴を必要な場所に保存できます。
 
 ```toml
-zeyn = { version = "0.0.10", features = ["assistant"] }
+zeyn = { version = "0.0.11", features = ["assistant"] }
 ```
 
 feature がなければ、アシスタントに関するものは何もコンパイルされません。HTTP クライアントも、追加のルートも、追加のメモリもありません。
@@ -105,7 +105,7 @@ pub trait ChatStore: Send + Sync + 'static {
 
 モデルが見るツールは、MCP および WebMCP と同じです (`docs/runtime-protocol.md` のセクション 9 を参照)。ツールは毎回、サインインしているユーザー向けに構築されます。ユーザーが使えるグリッドの検索、フォームの保存、API の action から、`ai = false` が付いたものをすべて除いたものが対象で、説明は `///` ドキュメントコメントと `ai = "..."` のガイダンスから取られます。さらに 2 つの組み込みツールが追加されます。
 
-- `navigate`: ユーザーが開けるルート付きの Screen を、ページの読み込みなしで開き (`zeyn:navigate`)、そのグリッドをフィルターできます (`zeyn:filter`)。その後グリッドは `POST /_zeyn/grid` を通じて読み込まれ、サーバーは通常の検査を適用します。
+- `navigate`: ユーザーが開けるルート付きの Screen を、ページの読み込みなしで開き (`zeyn:navigate`)、そのグリッドをフィルターできます (`zeyn:filter`)。単純なフィルターと OR グループ (`filter_groups`、`DataQuery::filter_groups` と同じ) を使えます。サーバーは空のフィルターを捨て、`DataQuery::retain_filters` の上限を守ります。その後グリッドは `POST /_zeyn/grid` を通じて読み込まれ、サーバーは通常の検査を適用します。
 - `suggest`: チップとして表示されるフォローアップのプロンプトです。
 
 すべての呼び出しは、コンテキストにエージェントであることを示すマークを付けたうえで、通常の action の経路を通ります。Screen のアクセス、Feature のガード、action のパーミッション、インターセプター、レート制限、時間制限、監査 (アシスタントの呼び出しはすべて `via_agent: true` で記録されます)、マスキングが適用されます。
@@ -150,7 +150,7 @@ pub trait ChatStore: Send + Sync + 'static {
 | `POST /_zeyn/assistant/stt` (音声ボディ) | `{ text }`。サーバー側の音声認識がない場合は `404` |
 | `POST /_zeyn/assistant/tts` `{ text }` | ストリーミングされる音声。サーバー側の音声合成がない場合は `404` |
 
-イベントは 1 行に 1 つの JSON オブジェクトです。`{t:"text",v}`、`{t:"tool",name,id}`、`{t:"navigate",url,screen,filters}`、`{t:"suggest",v}`、`{t:"confirm",id,tool,title,question,details}`、`{t:"resolved",id,approved}`、`{t:"error",message}`、`{t:"done"}`。
+イベントは 1 行に 1 つの JSON オブジェクトです。`{t:"text",v}`、`{t:"tool",name,id}`、`{t:"navigate",url,screen,filters,filter_groups}`、`{t:"suggest",v}`、`{t:"confirm",id,tool,title,question,details}`、`{t:"resolved",id,approved}`、`{t:"error",message}`、`{t:"done"}`。
 
 `assistant.js` と `assistant.css` は、アシスタントを使えるユーザーにだけ読み込まれます。チャットのログは `role="log"` のライブリージョンで (回答のストリーミング中は `aria-busy`)、Enter で送信し、Shift+Enter で改行し、Escape でサイドパネルを閉じてフォーカスをランチャーに戻します。確認カードでは、最初にキャンセルボタンにフォーカスが置かれます。
 

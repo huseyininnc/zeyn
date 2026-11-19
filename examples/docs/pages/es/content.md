@@ -84,11 +84,40 @@ List::of(search_people)
             .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
-    .sort_option(t!("people.by_name"), Person::name, false)
+    .sort_option(t!("people.by_name"), Person::name)
     .paging(Paging::pages(20))
 ```
 
 @live list
+
+### Listas ordenables
+
+`.sortable(action)` permite que las personas pongan las filas de `List::of` o de una `CardGrid` en su propio orden. Cada fila tiene un asa: un ratón o lápiz la arrastra, un toque la arrastra tras mantenerlo un momento, y una línea muestra dónde caerá. En el asa con el foco, Espacio levanta la fila, las flechas la mueven, Espacio la suelta y Escape la devuelve; Alt con Arriba o Abajo la mueve al instante. Un clic o Enter abre un menú de mover (arriba, abajo, al principio, al final), así que basta con un solo puntero. Cada paso se anuncia.
+
+El movimiento se ve al instante y la acción recibe un `ReorderRequest` con la clave de la fila y las claves de sus nuevos vecinos (`after`, `before`), nunca posiciones. `r.rank(lookup)` da el nuevo `Rank` entre los vecinos y rechaza un vecino que la búsqueda no encuentra (`NotFound`) o vecinos que ya no están en ese orden (`Conflict`, otra persona movió filas antes); entonces la fila vuelve y se muestra el motivo. La acción de origen lista las filas por rango, por eso no hay opciones de orden, y mientras queden filas por cargar ninguna fila puede pasar a ser la última. Una fila arrastrada desplaza la lista, o la página, mientras se mantiene cerca de un borde. Una lista con `Paging::virtual_scroll()` sigue siendo virtual: una línea muestra dónde cae la fila, y las filas muestran el nuevo orden cuando el servidor lo ha guardado.
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
+`.connect(group, id)` une las listas ordenables de una pantalla que comparten un grupo: las filas se arrastran de una a otra, o se mueven con "Mover a" en el menú de mover. La acción recibe el id de la lista a la que llegan las filas (`r.list`) y el de la lista que dejan (`r.from`); los dos ids vienen de la pantalla, nunca del navegador, y el servidor comprueba el permiso de las acciones de ambas listas. `.multi_select()` permite seleccionar filas con Control o Comando y un clic en el asa, o con "Seleccionar para mover" en el menú, y mover hasta 100 a la vez: las demás claves están en `r.rest`, y `r.ranks(lookup)` da un rango para cada una de `r.keys()`. Busque las claves movidas en la lista que dejan. Las listas virtuales no participan en ninguna de las dos cosas.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
 
 ## Avatar
 
@@ -108,6 +137,108 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 ```
 
 @live people
+
+## AvatarGroup
+
+Las personas de una cosa, como los asignados de una tarea, en avatares que se solapan en una fila. La etiqueta nombra el grupo para los lectores de pantalla. El grupo muestra los primeros avatares, 5 salvo que `.max(n)` diga otra cosa y nunca más de 12, y después el número de los restantes como "+3", leído como "3 más" en el idioma del usuario. `.size(...)` fija el tamaño de todos los avatares del grupo.
+
+```rust
+AvatarGroup::new(t!("task.assignees"))
+    .add(Avatar::new(a.name.clone()).image(a.photo.clone()))
+    .add(Avatar::new(b.name.clone()))
+    .max(3)
+    .size(AvatarSize::Small)
+```
+
+## Quote
+
+Palabras citadas de una persona o de una obra, como un `blockquote` dentro de un `figure`. `.author(name)` dice quién las dijo y `.source(title)` nombra la obra, escrita como un título (`cite`).
+
+```rust
+Quote::new(review.text.clone()).author(review.name.clone()).source(t!("shop.verified_buyer"))
+```
+
+## Kbd
+
+Teclas que pulsar, escritas como entrada de teclado (`kbd`). `Kbd::new("Ctrl+K")` lee una combinación con `+` entre sus teclas; `Kbd::keys(["Ctrl", "+"])` toma las teclas una a una, para una combinación que contiene la propia tecla más. Los nombres de las teclas se escriben tal como se dan, 6 como máximo. Solo muestra las teclas; un atajo que hace algo se define donde está el comando, como hace `PrevNext::shortcut`.
+
+```rust
+Kbd::new("Alt+Shift+P")
+```
+
+## Divider
+
+Una línea entre dos partes de una página. `Divider::new()` es una separación temática (`hr`). `.label(text)` pone un texto en medio de la línea, como "o" entre dos formas de iniciar sesión; el divisor es entonces un `separator` nombrado por ese texto. `.vertical()` dibuja la línea de arriba abajo, para el espacio entre las columnas de un `Row` compacto.
+
+```rust
+Divider::new().label(t!("signin.or"))
+```
+
+@live pieces
+
+## Highlight
+
+`Highlight::new(text, query)` escribe un texto con las palabras de una búsqueda marcadas en él (`mark`), como el nombre de un producto en una lista de resultados. La consulta se divide por los espacios en blanco, se buscan 8 de sus palabras como máximo, y cada lugar donde aparece una de ellas se marca sin distinguir mayúsculas de minúsculas; una consulta vacía no marca nada. Tanto el texto como la consulta son datos del usuario: el texto se escapa, y la consulta solo se compara, nunca se escribe en la página. Las letras se comparan en minúsculas tal como las define Unicode, por lo que los pares turcos `I ı` e `İ i` no se igualan entre sí.
+
+```rust
+Highlight::new(product.name.clone(), p.q.clone())
+```
+
+## Toc
+
+Una tabla de contenidos: enlaces a los encabezados de la página que se muestra, para páginas largas como un artículo o una política. `Toc::new(label)` es un `nav` nombrado por la etiqueta; `.item(title, id)` enlaza el encabezado que recibió la misma ancla con `Heading::id`, y `.sub(title, id)` añade una entrada un nivel por debajo de la entrada anterior. Las anclas se limpian como las limpia `Heading::id`, de modo que la misma cadena sirve en los dos sitios, y una entrada cuya ancla queda vacía se omite; una tabla de contenidos contiene 100 entradas como máximo. Los enlaces son enlaces simples a `#anchor`, así que funcionan sin script, el navegador se desplaza hasta el encabezado y la dirección se puede compartir. Nada marca la sección que se está leyendo, porque eso necesitaría un script.
+
+```rust
+Toc::new(t!("page.contents"))
+    .item(t!("policy.delivery"), "delivery")
+    .sub(t!("policy.abroad"), "delivery-abroad")
+    .item(t!("policy.returns"), "returns")
+Heading::h2(t!("policy.delivery")).id("delivery")
+```
+
+@live marks
+
+## Stepper
+
+Dónde está un proceso: sus pasos en orden, los hechos, el actual y los que faltan, como el camino de un pedido desde que se hace hasta que se entrega. `.step(title)` añade un paso y `.description(text)` pone una línea bajo el último paso añadido. `.current(index)` cuenta desde 0 y marca como hechos los pasos anteriores; `.finished()` marca todos los pasos como hechos. `.vertical()` pone los pasos uno debajo de otro, que es también como se ven en pantallas estrechas. Un stepper contiene 12 pasos como máximo.
+
+```rust
+Stepper::new(t!("order.progress"))
+    .step(t!("order.placed"))
+    .step(t!("order.packed"))
+    .step(t!("order.shipped"))
+    .description(order.shipped_note.clone())
+    .step(t!("order.delivered"))
+    .current(order.stage as usize)
+```
+
+@live stepper
+
+Los pasos son una lista ordenada nombrada por la etiqueta. El paso actual lleva `aria-current="step"`, y un paso hecho dice "completado" a los lectores de pantalla en el idioma del usuario, de modo que el estado no se da solo con el color. Un stepper solo muestra el estado que le da el servidor y nada en él se puede pulsar; un formulario que se rellena por pasos es un `Form` con sus propios pasos (véase [Formularios](forms.md)).
+
+## Pagination
+
+Enlaces a las páginas de una lista que la propia pantalla pagina, como los artículos de un blog: anterior, los números de página y siguiente. Cada uno es un enlace a la misma pantalla con la página en sus parámetros, de modo que el servidor renderiza la página que se le pide, la dirección se puede compartir y nada se guarda en el navegador. Los enlaces se abren mediante `nav.js` sin recargar la página y funcionan sin script. `DataGrid`, `List` y `CardGrid` se paginan solos con `.paging(...)`; use esto solo donde la pantalla construye su propio contenido.
+
+```rust
+#[screen(route = "/blog", public)]
+pub fn blog(p: BlogParams) -> Screen {
+    Screen::new(t!("blog.title")).body(
+        Pagination::new(blog, |page| BlogParams { page })
+            .pages(page_count)
+            .current(p.page),
+    )
+}
+```
+
+Las páginas se cuentan desde 1. La primera y la última página se muestran siempre, con una página a cada lado de la actual; `.around(n)` muestra más, hasta 4. Las páginas omitidas se convierten en un hueco, y un hueco nunca oculta una sola página. El número de página viene de la dirección, así que la pantalla lo lleva al rango antes de cargar datos; el componente hace lo mismo con lo que marca. Con una página o ninguna no renderiza nada.
+
+Los enlaces son un `nav` llamado "Paginación" en el idioma del usuario. La página actual lleva `aria-current="page"`, cada número se nombra "Página 3" para los lectores de pantalla, anterior y siguiente llevan `rel="prev"` y `rel="next"`, y en los extremos son texto plano marcado con `aria-disabled` en lugar de enlaces que no llevan a ningún sitio.
+
+| Tecla | Qué hace |
+|---|---|
+| `Tab` | Avanza por anterior, los números de página y siguiente |
+| `Enter` | Abre la página; el foco y la posición de desplazamiento siguen a `nav.js` |
 
 ## Chips
 
@@ -189,6 +320,15 @@ Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_artic
 
 @live engage
 
+
+## CopyButton
+
+Un botón que copia un texto al portapapeles: un número de seguimiento, una dirección de API, un enlace de invitación. `.shown()` escribe el texto junto al botón con una fuente de ancho fijo, para que también se pueda leer y seleccionar; sin él, el texto está en la página pero oculto. La etiqueta es "Copiar" en el idioma del usuario salvo que `.label` fije otra, y un toast dice si la copia funcionó. Usa el mismo script pequeño que `Share`, cargado solo en las páginas que contienen uno, y se renderiza oculto y lo muestra ese script, de modo que una página sin script no tiene un botón que no hace nada. El texto se corta a los 4096 bytes y, como forma parte de la página, debe ser uno que el usuario pueda ver, nunca un valor enmascarado.
+
+```rust
+CopyButton::new(order.tracking.clone()).shown()
+CopyButton::new(invite_url).label(t!("team.copy_invitation"))
+```
 
 ## AlphaIndex
 

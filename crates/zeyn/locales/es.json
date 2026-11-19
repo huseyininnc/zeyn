@@ -95,6 +95,23 @@
       "reason_cancel": "Cancelar",
       "reason_invalid": "Escribe un motivo de entre 3 y 300 caracteres."
     },
+    "devtools": {
+      "title": "Herramientas de desarrollo",
+      "refresh": "Actualizar",
+      "close": "Cerrar",
+      "empty": "Aún no hay solicitudes registradas.",
+      "queries": "Consultas",
+      "effects": "Efectos",
+      "topics": "Temas",
+      "build": "Construcción",
+      "render": "Renderizado",
+      "hint": "Alt+Shift+D o Escape cierra el panel."
+    },
+    "inspect": {
+      "title": "Origen del elemento",
+      "none": "Este elemento no tiene línea de código fuente.",
+      "hint": "Alt+Shift+I o Escape cierra el inspector."
+    },
     "validation": {
       "required": "{label} es obligatorio.",
       "min_len": "{label} debe tener al menos {n} caracteres.",
@@ -129,7 +146,10 @@
       "rate_limited": "Demasiadas solicitudes. Inténtalo de nuevo en un momento.",
       "confirmation_required": "Esto requiere tu confirmación en la aplicación antes de ejecutarse.",
       "cursor": "La lista cambió desde que se cargó. Recárgala e inténtalo de nuevo.",
-      "duplicate": "Este registro ya existe."
+      "duplicate": "Este registro ya existe.",
+      "too_large": "La solicitud es demasiado grande.",
+      "bad_request": "No se pudo leer la solicitud.",
+      "socket_only": "Esta acción solo se ejecuta a través de la conexión en vivo."
     },
     "grid": {
       "pagination": "Paginación",
@@ -212,6 +232,14 @@
     "shell": {
       "skip": "Saltar al contenido",
       "menu": "Principal",
+      "menu_filter": "Filtrar el menú",
+      "menu_results": "{n} elementos",
+      "menu_none": "Ningún elemento del menú coincide",
+      "menu_favorites": "Favoritos",
+      "menu_pin": "Fijar {label}",
+      "menu_unpin": "Quitar {label} de fijados",
+      "rail_collapse": "Contraer el menú",
+      "rail_expand": "Expandir el menú",
       "language": "Idioma",
       "time_zone": "Zona horaria",
       "time_zone_auto": "Automática (este dispositivo)",
@@ -482,7 +510,7 @@
         "brand": "Nota"
       },
       "upload": {
-        "drop": "Suelta archivos aquí o elígelos.",
+        "drop": "Suelta archivos o carpetas aquí, pégalos o elígelos.",
         "hint": "{types}, hasta {max}.",
         "hint_many": "{types}, hasta {max} cada uno, máximo {n} archivos.",
         "list": "Archivos",
@@ -494,7 +522,10 @@
         "cancel": "Cancelar",
         "retry": "Reintentar",
         "remove": "Quitar",
-        "remove_name": "Quitar {name}"
+        "remove_name": "Quitar {name}",
+        "waiting": "{name} espera para subirse",
+        "skipped": "Se omitieron {n} archivos de un tipo que este campo no admite.",
+        "not_added": "El archivo se subió, pero no se pudo añadir."
       },
       "kpi": {
         "up": "Sube un {pct}% respecto al periodo anterior",
@@ -934,12 +965,17 @@
     },
     "files": {
       "too_large": "El archivo es demasiado grande. El tamaño máximo permitido es {max}.",
-      "too_many": "{label} admite como máximo {n} archivos.",
+      "quota": "Alcanzaste el límite de subida por ahora. Inténtalo más tarde.",
+      "too_many": "{label} admite como máximo {n, plural, one {# archivo} other {# archivos}}.",
       "type": "Este tipo de archivo no se acepta, o su contenido no coincide con su nombre.",
       "refused": "La comprobación de seguridad rechazó el archivo.",
       "aborted": "La subida se detuvo antes de que llegara todo el archivo. Inténtalo de nuevo.",
       "empty": "El archivo está vacío.",
-      "store_full": "No queda espacio para este archivo."
+      "store_full": "No queda espacio para este archivo.",
+      "open": "Tienes demasiadas subidas sin terminar. Termina o cancela una e inténtalo de nuevo.",
+      "offset": "La subida no coincide con el servidor. Continúa desde donde está el servidor.",
+      "busy": "Esta subida todavía está recibiendo datos. Inténtalo de nuevo en un momento.",
+      "length": "La subida no indicó el tamaño del archivo."
     }
   },
   "AccountLogin": {

@@ -95,7 +95,8 @@ Who saw which personal data, and when, is recorded as well as who changed it.
   its fragments, grid, form and reveal calls until a reason is given. The runtime asks in a
   dialog, sends `POST /_zeyn/reason {screen, reason}` (3 to 300 characters) and repeats the
   request. The reason is kept for 15 minutes in an `HttpOnly`, `SameSite=Strict` cookie, only
-  opens the screen it was given for and is written in `reason` of every audit record of that
+  opens the screen it was given for, only for the user and tenant who gave it (another user of
+  the same browser is asked again), and is written in `reason` of every audit record of that
   screen. Agents and API clients cannot give a reason, so they cannot open such screens.
 - Exports (CSV, XLSX, PDF) of a grid over a sensitive model write one audit record per file with
   `export` set: the model, the format, the number of rows and the sort and filters asked for.
@@ -194,7 +195,9 @@ RFC 3339; `DevAuth` reports every request as freshly signed in).
 - `App::idle_timeout(Duration)` makes the runtime warn the user `idle_warning` before the end
   (one minute by default) in an alert dialog with a countdown and a "stay signed in" button, which
   calls `POST /_zeyn/keepalive` so a proxy in front sees activity. Input in any tab of the app
-  counts. At the end the user goes to `logout_url`, else to `login_url` with `return_to`, else
+  counts. At the end the runtime first posts to the session's own sign out endpoint when there is
+  one (`POST /_zeyn/account/logout` with the `accounts` feature), then the user goes to
+  `logout_url`, else to `login_url` with `return_to`, else
   sees a signed out screen. Form drafts are kept. The idle timeout only closes forgotten screens;
   ending the real session is the identity provider's job.
 - `#[action(permission = "...", reauth)]` needs a sign in within `App::reauth_within` (five
@@ -229,7 +232,9 @@ Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
   language types them (`1.234,56`, `05.12.2026`), the field rules and the model's own `validate`.
 - Import sends only the valid rows to the action; `.all_or_nothing()` imports nothing unless
   every row is valid. On import the server reads and validates the file again; nothing from the
-  preview is trusted. Both steps need the action's permission, and the import is audited.
+  preview is trusted. Both steps need the action's permission and run through the interceptors
+  with the app's time limit (the preview as `CallKind::ImportPreview`, which is not audited, and
+  parsed off the async workers); the import is audited.
 - `.max_rows(n)` limits rows (5000 by default, never more than 50000). The error report defuses
   spreadsheet formulas. Masked fields are shown masked in the preview.
 
@@ -310,3 +315,37 @@ jobs.enqueue("send_invoice", "42").await?;
   `NUMBER(19)` columns.
 - With a store, a scheduled run and a triggered run of the same job may overlap; jobs that must
   not run twice at once should guard themselves (a row lock, for example).
+
+### Metronome
+
+The feature `metronome` adds wall clock schedules on top of these jobs; the full guide is
+`docs/metronome.md`.
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- The operations screen `metronome::ops()` needs the feature `metronome-ops`, which turns on
+  `metronome`; apps that only schedule leave it off and pay for neither its grids nor its texts.
+
+- A `Trigger` queues runs of a registered job: cron with seconds in the Quartz dialect, an IANA
+  time zone with defined behavior in daylight saving gaps and folds, a payload, a priority, a
+  timeout and a misfire policy (`RunOnce`, `RunAll { max }`, `Skip`). A job can have several.
+  Calendars exclude dates, weekdays, yearly dates and daily time ranges.
+- Servers that share a store queue every tick exactly once: the store moves the trigger's next
+  tick with a compare and set in the transaction that inserts the runs.
+- `jobs.pause`, `pause_trigger`, `resume` (`Resume::Skip` or `Resume::Misfire`), `resume_trigger`
+  and `run_now(&ctx, job, payload)` work across servers; the pause is kept in the store.
+- Each finished try is a history row (never the payload or the error text) kept for 30 days and
+  100,000 rows unless `App::job_history` says otherwise, readable with `jobs.history`, at
+  `GET /_zeyn/jobs/runs` and on the operations screen `/ops/jobs` (permissions `zeyn.jobs.read`,
+  `zeyn.jobs.run`, `zeyn.jobs.admin`).
+- With the feature on, `create_job_tables` gives schema version 2 and `migrate_job_tables` the
+  statements from version 1. Mistakes in triggers, calendars and chains stop the app at startup
+  with problem `Z0508`.

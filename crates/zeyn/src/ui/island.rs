@@ -142,8 +142,9 @@ impl Island {
 
     /// Content shown before the island loads and when it cannot load (no JavaScript, an old
     /// browser, a failed download). The loader hides it once the island has mounted.
+    #[track_caller]
     pub fn fallback(mut self, node: impl Into<Node>) -> Self {
-        self.fallback.push(node.into());
+        self.fallback.push(Node::placed(node));
         self
     }
 

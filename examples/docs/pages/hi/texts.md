@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+जो संख्या शब्द बदलती है वह plural प्लेसहोल्डर में जाती है; किसी मान से चुना गया शब्द select प्लेसहोल्डर में। plural स्थिति भाषा के नियमों से आती है (CLDR के नाम `one`, `few`, `many` आदि), `=0` जैसी सटीक स्थिति पहले चुनी जाती है, `#` संख्या है, और हर प्लेसहोल्डर में `other` स्थिति होनी चाहिए। plural तर्क पूर्णांक होना चाहिए: `n = "two"` या दशमलव संख्या कंपाइल नहीं होती।
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## फ़ील्ड और choice के लेबल
 
 फ़ील्ड लेबल कुंजी `<Model>.<field>` इस्तेमाल करते हैं, जैसे `Product.code`। choice लेबल `<Choice>.<Variant>` इस्तेमाल करते हैं। जब कुंजी छूटी हो तो लेबल `#[label("...")]` या नाम के पढ़ने योग्य रूप पर लौटता है। `zeyn check` उन कुंजियों को बताता है जो कुछ भाषाओं में हैं और दूसरों में नहीं।

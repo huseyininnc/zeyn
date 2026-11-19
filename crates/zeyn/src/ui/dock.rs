@@ -230,6 +230,7 @@ impl Dock {
 
     /// Adds a panel. `id` names it in saved layouts: keep it stable, lower case, unique in the
     /// dock.
+    #[track_caller]
     pub fn panel(
         mut self,
         area: DockArea,
@@ -242,22 +243,26 @@ impl Dock {
             title: title.into(),
             area,
         });
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
+    #[track_caller]
     pub fn left(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Left, id, title, node)
     }
 
+    #[track_caller]
     pub fn right(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Right, id, title, node)
     }
 
+    #[track_caller]
     pub fn bottom(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Bottom, id, title, node)
     }
 
+    #[track_caller]
     pub fn center(self, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.panel(DockArea::Center, id, title, node)
     }
@@ -335,7 +340,7 @@ impl Component for Dock {
                 let p = &self.panels[*i];
                 let pid = escape(p.id);
                 out.push_str(&format!(
-                    r#"<button type="button" role="tab" class="z-dock-tab" id="{id}-tab-{pid}" aria-controls="{id}-panel-{pid}" aria-selected="{}" tabindex="{}" draggable="true" data-panel="{pid}" data-testid="{}.dock.{pid}">{}</button>"#,
+                    r#"<button type="button" role="tab" class="z-dock-tab" id="{id}-tab-{pid}" aria-controls="{id}-panel-{pid}" aria-selected="{}" tabindex="{}" data-panel="{pid}" data-testid="{}.dock.{pid}">{}</button>"#,
                     n == 0,
                     if n == 0 { 0 } else { -1 },
                     r.scope,
@@ -398,6 +403,7 @@ impl Dock {
 }
 
 /// Panel ids of a dock from its schema; `None` when the schema is not a dock's.
+#[cfg(feature = "server")]
 pub(crate) fn panel_ids(schema: &Json) -> Option<Vec<String>> {
     if schema.get("type")?.as_str()? != "dock" {
         return None;

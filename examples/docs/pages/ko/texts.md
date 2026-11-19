@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+단어를 바꾸는 수는 plural 자리 표시자에, 값으로 고르는 단어는 select 자리 표시자에 넣습니다. plural 경우는 언어 규칙(CLDR 이름으로 `one`, `few`, `many` 등)에서 정해지고, `=0` 같은 정확한 경우가 우선하며, `#`은 수를 뜻하고, 모든 자리 표시자에는 `other` 경우가 있어야 합니다. plural 인자는 정수여야 하며 `n = "two"`나 소수는 컴파일되지 않습니다.
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## 필드와 choice의 레이블
 
 필드 레이블은 `Product.code`처럼 `<Model>.<field>` 키를 사용합니다. choice 레이블은 `<Choice>.<Variant>`를 사용합니다. 키가 없으면 레이블은 `#[label("...")]` 또는 이름을 읽기 좋게 바꾼 형태로 대체됩니다. `zeyn check`는 일부 언어에는 있고 다른 언어에는 없는 키를 보고합니다.

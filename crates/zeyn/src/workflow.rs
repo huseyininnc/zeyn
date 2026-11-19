@@ -137,19 +137,31 @@ impl<S: WorkflowState> Workflow<S> {
                             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
                 });
             if !valid {
-                problems.push(format!(
-                    "transition `{}` has an invalid permission `{}`",
-                    t.name, t.permission
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0506",
+                        format!("transition `{}` has an invalid permission `{}`", t.name, t.permission),
+                    )
+                    .why("permissions are matched by their dotted lower case name, so this one could never be granted and nobody could make the move")
+                    .fix("use lower case dotted names such as `leave.approve`")
+                    .docs("guides/enterprise#approval-workflows")
+                    .to_string(),
+                );
             }
             if self.transitions[..i]
                 .iter()
                 .any(|o| o.name == t.name && o.from == t.from)
             {
-                problems.push(format!(
-                    "transition `{}` is declared twice from the same state",
-                    t.name
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0507",
+                        format!("transition `{}` is declared twice from the same state", t.name),
+                    )
+                    .why("a move name must lead to one target from each state, so the second declaration makes the move ambiguous")
+                    .fix("remove one of them, or give it another name")
+                    .docs("guides/enterprise#approval-workflows")
+                    .to_string(),
+                );
             }
         }
         if problems.is_empty() {

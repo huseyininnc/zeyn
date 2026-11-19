@@ -845,7 +845,15 @@ impl<E: Model> Component for Calendar<E> {
         }
         check.drives(self.topics[0]);
         if self.start.is_none() {
-            check.problem("a Calendar needs `.start(field)`, when an event starts");
+            check.problem(
+                crate::Problem::new(
+                    "Z0607",
+                    "a Calendar needs `.start(field)`, when an event starts",
+                )
+                .why("without a start time the calendar cannot place any event, so it stays empty")
+                .fix("add `.start(field)` with the model's start date or time field")
+                .docs("components/admin#calendar"),
+            );
         }
     }
 }

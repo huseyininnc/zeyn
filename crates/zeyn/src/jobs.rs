@@ -28,6 +28,8 @@
 mod sql;
 mod store;
 
+#[cfg(all(feature = "metronome", any(feature = "postgres", feature = "oracle")))]
+pub use sql::migrate_job_tables;
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub use sql::{SqlJobStore, create_job_tables};
 pub use store::{
@@ -103,6 +105,12 @@ pub struct JobStatus {
     pub last_finished_ms: Option<i64>,
     pub last_error: Option<&'static str>,
     pub every_ms: Option<u128>,
+    /// Whether the job is paused (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub paused: bool,
+    /// The job's triggers with their next ticks (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub triggers: Vec<crate::metronome::TriggerStatus>,
 }
 
 /// How long a worker holds a claimed run without a heartbeat. It renews the lease every third of
@@ -111,6 +119,9 @@ pub const JOB_LEASE: Duration = Duration::from_secs(60);
 
 /// How often a worker looks for due runs in the store when nothing wakes it earlier.
 pub const JOB_POLL: Duration = Duration::from_secs(1);
+
+/// Error text of a try stopped by its timeout; stored as the error code `timeout`.
+const TIMEOUT: &str = "the run took longer than its timeout";
 
 type JobFn = Arc<dyn Fn(Ctx, String) -> BoxFuture<Result<()>> + Send + Sync>;
 type CtxFn = Arc<dyn Fn(&'static str) -> Ctx + Send + Sync>;
@@ -134,6 +145,8 @@ struct Inner {
     durable: AtomicBool,
     worker: String,
     queued: Notify,
+    #[cfg(feature = "metronome")]
+    metronome: crate::metronome::Scheduler,
 }
 
 /// The app's background jobs. Inject it into actions to trigger jobs or read their status.
@@ -148,7 +161,8 @@ impl Default for Jobs {
     }
 }
 
-fn now_ms() -> i64 {
+#[cfg(not(feature = "metronome"))]
+fn system_now() -> i64 {
     crate::time::DateTime::now().unix_ms()
 }
 
@@ -162,7 +176,7 @@ pub(crate) fn random_id() -> String {
         .collect()
 }
 
-fn ms(d: Duration) -> i64 {
+pub(crate) fn ms(d: Duration) -> i64 {
     i64::try_from(d.as_millis()).unwrap_or(i64::MAX)
 }
 
@@ -181,6 +195,8 @@ impl Jobs {
             durable: AtomicBool::new(false),
             worker: random_id(),
             queued: Notify::new(),
+            #[cfg(feature = "metronome")]
+            metronome: crate::metronome::Scheduler::default(),
         }))
     }
 
@@ -250,7 +266,7 @@ impl Jobs {
         Ok(id)
     }
 
-    fn new_job(&self, name: &str, payload: String, delay: Duration) -> Result<NewJob> {
+    pub(crate) fn new_job(&self, name: &str, payload: String, delay: Duration) -> Result<NewJob> {
         let jobs = self
             .0
             .jobs
@@ -263,10 +279,49 @@ impl Jobs {
         Ok(NewJob {
             name: job.name.to_string(),
             payload,
-            run_at_ms: now_ms().saturating_add(ms(delay)),
+            run_at_ms: self.now().saturating_add(ms(delay)),
             max_attempts: job.schedule.retries.saturating_add(1),
             backoff_ms: ms(job.schedule.backoff),
+            ..NewJob::default()
         })
+    }
+
+    /// Now, from the scheduler's clock (feature `metronome`) or the system clock.
+    fn now(&self) -> i64 {
+        #[cfg(feature = "metronome")]
+        return self.0.metronome.now();
+        #[cfg(not(feature = "metronome"))]
+        system_now()
+    }
+
+    /// Names of the registered jobs, in registration order.
+    #[cfg(feature = "metronome")]
+    pub(crate) fn names(&self) -> Vec<&'static str> {
+        self.0
+            .jobs
+            .lock()
+            .map(|j| j.iter().map(|j| j.name).collect())
+            .unwrap_or_default()
+    }
+
+    #[cfg(feature = "metronome")]
+    pub(crate) fn scheduler(&self) -> &crate::metronome::Scheduler {
+        &self.0.metronome
+    }
+
+    #[cfg(feature = "metronome")]
+    pub(crate) fn store_handle(&self) -> Arc<dyn JobStore> {
+        self.store().clone()
+    }
+
+    #[cfg(feature = "metronome")]
+    pub(crate) fn wake_workers(&self) {
+        self.0.queued.notify_one();
+    }
+
+    #[cfg(feature = "metronome")]
+    pub(crate) fn worker_id(&self) -> &str {
+        &self.0.worker
     }
 
     /// Registers a job. Names must be unique; a second job with the same name is ignored.
@@ -303,6 +358,10 @@ impl Jobs {
                     last_finished_ms: None,
                     last_error: None,
                     every_ms: schedule.every.map(|d| d.as_millis()),
+                    #[cfg(feature = "metronome")]
+                    paused: false,
+                    #[cfg(feature = "metronome")]
+                    triggers: Vec::new(),
                 },
             );
         }
@@ -363,7 +422,20 @@ impl Jobs {
                     .ok()
                     .and_then(|s| s.get(n).cloned())
             })
+            .map(|s| self.with_triggers(s))
             .collect()
+    }
+
+    #[cfg(feature = "metronome")]
+    fn with_triggers(&self, mut s: JobStatus) -> JobStatus {
+        s.paused = self.is_paused(s.name);
+        s.triggers = self.triggers(s.name);
+        s
+    }
+
+    #[cfg(not(feature = "metronome"))]
+    fn with_triggers(&self, s: JobStatus) -> JobStatus {
+        s
     }
 
     fn set(&self, name: &'static str, change: impl FnOnce(&mut JobStatus)) {
@@ -422,7 +494,7 @@ impl Jobs {
         let me = self.clone();
         tokio::spawn(async move {
             for (name, every_ms, schedule) in every {
-                let first = now_ms().saturating_add(every_ms);
+                let first = me.now().saturating_add(every_ms);
                 let retries = schedule.retries.saturating_add(1);
                 if let Err(e) = me
                     .store()
@@ -437,6 +509,77 @@ impl Jobs {
             }
             me.work(names, ctx).await
         });
+        #[cfg(feature = "metronome")]
+        if self.0.metronome.has_triggers() {
+            let me = self.clone();
+            tokio::spawn(async move { me.tick_loop().await });
+        }
+    }
+
+    /// The jobs a worker may claim now: paused jobs are left out (feature `metronome`).
+    fn claimable(&self, names: &[&'static str]) -> Vec<&'static str> {
+        #[cfg(feature = "metronome")]
+        return names
+            .iter()
+            .copied()
+            .filter(|n| !self.0.metronome.is_paused(n))
+            .collect();
+        #[cfg(not(feature = "metronome"))]
+        names.to_vec()
+    }
+
+    /// Runs a scheduler pass every [`JOB_POLL`] until the jobs stop.
+    #[cfg(feature = "metronome")]
+    async fn tick_loop(self) {
+        loop {
+            if let Err(e) = self.run_due().await {
+                tracing::error!("the job scheduler pass failed: {e:?}");
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(JOB_POLL) => {}
+                _ = self.0.stop.notified() => return,
+            }
+            if self.0.stopping.load(Ordering::SeqCst) {
+                return;
+            }
+        }
+    }
+
+    /// After a run of `name` succeeded: queues the jobs chained to it with its payload, and
+    /// tells live screens (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    async fn after_run(&self, name: &str, payload: &str, ctx: &Ctx, succeeded: bool) {
+        if succeeded {
+            for next in self.0.metronome.chained(name) {
+                let queued = self
+                    .new_job(&next, payload.to_string(), Duration::ZERO)
+                    .map(|mut j| {
+                        j.trigger_id = Some("chain".into());
+                        j.started_by = Some(format!("job:{name}"));
+                        j
+                    });
+                match queued {
+                    Ok(j) => match self.store().enqueue(j).await {
+                        Ok(_) => self.0.queued.notify_one(),
+                        Err(e) => tracing::error!(
+                            job = name,
+                            "queueing the chained job `{next}` failed: {e:?}"
+                        ),
+                    },
+                    Err(e) => {
+                        tracing::error!(job = name, "the chained job `{next}` is unknown: {e:?}")
+                    }
+                }
+            }
+        }
+        #[cfg(feature = "realtime")]
+        if self.0.metronome.may_notify(self.now())
+            && let Some(socket) = ctx.service::<crate::server::realtime::Socket>()
+        {
+            socket.notify_tenant(None, "zeyn.jobs");
+        }
+        #[cfg(not(feature = "realtime"))]
+        let _ = ctx;
     }
 
     /// Claims due runs from the store while slots are free, and runs each with a lease.
@@ -457,7 +600,13 @@ impl Jobs {
             let wanted = permits.len();
             let claimed = match self
                 .store()
-                .claim(&self.0.worker, &names, now_ms(), ms(JOB_LEASE), wanted)
+                .claim(
+                    &self.0.worker,
+                    &self.claimable(&names),
+                    self.now(),
+                    ms(JOB_LEASE),
+                    wanted,
+                )
                 .await
             {
                 Ok(c) => c,
@@ -503,27 +652,42 @@ impl Jobs {
         });
         let Some(handler) = found else {
             let _ = store
-                .fail(&job, worker, "not_found", now_ms())
+                .fail(&job, worker, "not_found", self.now())
                 .await;
             return;
         };
         if job.attempts > job.max_attempts {
             let _ = store
-                .fail(&job, worker, "abandoned", now_ms())
+                .fail(&job, worker, "abandoned", self.now())
                 .await;
             return;
         }
         self.set(handler.name, |s| {
             s.state = JobState::Running;
             s.runs += 1;
-            s.last_started_ms = Some(now_ms());
+            s.last_started_ms = Some(self.now());
         });
-        let run = (handler.run)(ctx(handler.name), job.payload.clone());
+        let run_ctx = ctx(handler.name);
+        #[cfg(feature = "metronome")]
+        let run_ctx = run_ctx.with_run(job.trigger_id.as_deref(), job.scheduled_ms);
+        let timeout = job
+            .timeout_ms
+            .filter(|t| *t > 0)
+            .map(|t| Duration::from_millis(t as u64));
+        let work = (handler.run)(run_ctx.clone(), job.payload.clone());
+        let run = async {
+            match timeout {
+                Some(limit) => tokio::time::timeout(limit, work)
+                    .await
+                    .unwrap_or(Err(Error::Internal(TIMEOUT.into()))),
+                None => work.await,
+            }
+        };
         let beat = async {
             loop {
                 tokio::time::sleep(JOB_LEASE / 3).await;
                 match store
-                    .heartbeat(&job.id, worker, now_ms().saturating_add(ms(JOB_LEASE)))
+                    .heartbeat(&job.id, worker, self.now().saturating_add(ms(JOB_LEASE)))
                     .await
                 {
                     Ok(false) => return,
@@ -536,7 +700,7 @@ impl Jobs {
             r = run => Some(r),
             _ = beat => None,
         };
-        let finished = now_ms();
+        let finished = self.now();
         match result {
             None => {
                 tracing::warn!(
@@ -558,8 +722,15 @@ impl Jobs {
                     s.last_finished_ms = Some(finished);
                     s.last_error = None;
                 });
+                #[cfg(feature = "metronome")]
+                self.after_run(handler.name, &job.payload, &run_ctx, true)
+                    .await;
             }
             Some(Err(e)) => {
+                let code = match &e {
+                    Error::Internal(detail) if detail == TIMEOUT => "timeout",
+                    other => other.code(),
+                };
                 if let Error::Internal(detail) = &e {
                     tracing::error!(
                         job = handler.name,
@@ -568,7 +739,7 @@ impl Jobs {
                     );
                 }
                 if let Err(e) = store
-                    .fail(&job, worker, e.code(), finished)
+                    .fail(&job, worker, code, finished)
                     .await
                 {
                     tracing::error!(job = handler.name, "storing a failed job failed: {e:?}");
@@ -577,13 +748,16 @@ impl Jobs {
                 self.set(handler.name, |s| {
                     s.failures += 1;
                     s.last_finished_ms = Some(finished);
-                    s.last_error = Some(e.code());
+                    s.last_error = Some(code);
                     s.state = if retry {
                         JobState::Retrying
                     } else {
                         JobState::Failed
                     };
                 });
+                #[cfg(feature = "metronome")]
+                self.after_run(handler.name, &job.payload, &run_ctx, false)
+                    .await;
             }
         }
     }
@@ -627,10 +801,10 @@ impl Jobs {
             self.set(job.name, |s| {
                 s.state = JobState::Running;
                 s.runs += 1;
-                s.last_started_ms = Some(now_ms());
+                s.last_started_ms = Some(self.now());
             });
             let result = (job.run)(ctx.clone(), String::new()).await;
-            let finished = now_ms();
+            let finished = self.now();
             match result {
                 Ok(()) => {
                     self.set(job.name, |s| {
@@ -638,6 +812,9 @@ impl Jobs {
                         s.last_finished_ms = Some(finished);
                         s.last_error = None;
                     });
+                    #[cfg(feature = "metronome")]
+                    self.after_run(job.name, "", &ctx, true)
+                        .await;
                     return;
                 }
                 Err(e) => {

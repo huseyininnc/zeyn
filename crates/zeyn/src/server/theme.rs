@@ -226,9 +226,13 @@ impl Theme {
                 .bytes()
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
         if !valid || matches!(name, "system" | "light" | "dark") {
-            theme.problems.push(format!(
-                "theme name `{name}` is not allowed\n  = help: use `a` to `z`, digits and `-` (up to 32), and not `system`, `light` or `dark`"
-            ));
+            theme.problems.push(
+                crate::Problem::new("Z0113", format!("theme name `{name}` is not allowed"))
+                    .why("the name goes into a cookie and an HTML attribute, and `system`, `light` and `dark` are the built in choices")
+                    .fix("use `a` to `z`, digits and `-` (up to 32), and not `system`, `light` or `dark`")
+                    .docs("guides/theming#light-dark-and-app-themes")
+                    .to_string(),
+            );
         }
         for (token, value) in tokens {
             theme = theme.token(token, value);
@@ -255,13 +259,27 @@ impl Theme {
             .clone()
             .unwrap_or_else(|| "app".into());
         if !THEME_TOKENS.contains(&name) {
-            self.problems.push(format!(
-                "theme `{owner}`: `{name}` is not a theme token\n  = help: use one of the tokens in docs/theming.md"
-            ));
+            self.problems.push(
+                crate::Problem::new(
+                    "Z0114",
+                    format!("theme `{owner}`: `{name}` is not a theme token"),
+                )
+                .why("only the listed tokens are read by the components, so this value would change nothing")
+                .fix("use one of the tokens in docs/theming.md")
+                .docs("guides/theming#2-base-tokens")
+                .to_string(),
+            );
         } else if !safe_value(value) {
-            self.problems.push(format!(
-                "theme `{owner}`: the value of `{name}` is not allowed\n  = help: use a color, length or font list without `;`, braces, `\\`, `<`, `>` or `url(`"
-            ));
+            self.problems.push(
+                crate::Problem::new(
+                    "Z0115",
+                    format!("theme `{owner}`: the value of `{name}` is not allowed"),
+                )
+                .why("the value is written into the page's style sheet, where these characters could break out of the declaration or load files")
+                .fix("use a color, length or font list without `;`, braces, `\\`, `<`, `>` or `url(`")
+                .docs("guides/theming#2-base-tokens")
+                .to_string(),
+            );
         } else {
             self.tokens.retain(|(n, _)| n != name);
             self.tokens
@@ -406,9 +424,9 @@ impl App {
         self
     }
 
-    /// `false` hides the theme picker: everyone sees the default theme.
-    pub fn theme_picker(mut self, show: bool) -> Self {
-        self.looks.picker = show;
+    /// Hides the theme picker: everyone sees the default theme.
+    pub fn no_theme_picker(mut self) -> Self {
+        self.looks.picker = false;
         self
     }
 
@@ -432,12 +450,27 @@ impl App {
             problems.extend(t.problems.iter().cloned());
             let name = t.name.as_deref().unwrap_or("app");
             if t.name.is_none() {
-                problems.push("`App::themes` got `Theme::new()`, which has no name\n  = help: use `Theme::light()`, `Theme::dark()` or `Theme::named(...)`".into());
+                problems.push(
+                    crate::Problem::new(
+                        "Z0116",
+                        "`App::themes` got `Theme::new()`, which has no name",
+                    )
+                    .why("the theme picker and the theme cookie choose themes by name, so a theme without one cannot be picked")
+                    .fix("use `Theme::light()`, `Theme::dark()` or `Theme::named(...)`")
+                    .docs("guides/theming#light-dark-and-app-themes")
+                    .to_string(),
+                );
             } else if offered[..i]
                 .iter()
                 .any(|o| o.name == t.name)
             {
-                problems.push(format!("theme `{name}` is offered twice"));
+                problems.push(
+                    crate::Problem::new("Z0117", format!("theme `{name}` is offered twice"))
+                        .why("the theme picker would list it twice and only the first one would ever apply")
+                        .fix("remove one of them from `App::themes`, or give it another name")
+                        .docs("guides/theming#light-dark-and-app-themes")
+                        .to_string(),
+                );
             }
             problems.extend(contrast_problems(name, t, &base));
         }
@@ -448,7 +481,16 @@ impl App {
                     .iter()
                     .any(|t| t.name.as_deref() == Some(d))
             {
-                problems.push(format!("default theme `{d}` is not one of the offered themes\n  = help: add it to `App::themes` or use `system`"));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0118",
+                        format!("default theme `{d}` is not one of the offered themes"),
+                    )
+                    .why("a new visitor would start on a theme the picker does not list")
+                    .fix("add it to `App::themes` or use `system`")
+                    .docs("guides/theming#light-dark-and-app-themes")
+                    .to_string(),
+                );
             }
         }
         problems
@@ -667,9 +709,14 @@ fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
         .into_iter()
         .filter(|(_, _, ratio, needed)| ratio + 1e-9 < *needed)
         .map(|(fg, bg, ratio, needed)| {
-            format!(
-                "theme `{name}`: `{fg}` on `{bg}` has contrast {ratio:.2}:1; WCAG 2.2 AA needs {needed}:1\n  = help: change one of the two colors in the theme's tokens"
-            )
+crate::Problem::new(
+    "Z0119",
+    format!("theme `{name}`: `{fg}` on `{bg}` has contrast {ratio:.2}:1; WCAG 2.2 AA needs {needed}:1"),
+)
+.why("text or controls in these colors would be hard to read for many users, and WCAG 2.2 AA is the baseline")
+.fix("change one of the two colors in the theme's tokens")
+.docs("guides/theming#5-verified-contrast")
+.to_string()
         })
         .collect()
 }
@@ -833,7 +880,7 @@ fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
     (x.max(y) + 0.05) / (x.min(y) + 0.05)
 }
 
-/// Key of the saved theme in the app's view store.
+/// Key of the saved look (theme and density) in the app's view store.
 fn store_key(ctx: &Ctx) -> String {
     format!(
         "{}:~theme",
@@ -845,51 +892,166 @@ fn store_key(ctx: &Ctx) -> String {
 
 const STORE_PREFIX: &str = "theme:";
 
-/// On a full page load without a `zeyn_theme` cookie, the signed in user's theme from the view
-/// store, with the cookie to set so later pages do not ask again.
-pub(super) async fn remember(
-    st: &AppState,
-    ctx: Ctx,
-    headers: &HeaderMap,
-) -> (Ctx, Option<String>) {
-    if !st.look.picker || cookie(headers, "zeyn_theme").is_some() {
-        return (ctx, None);
+const DENSITY_PREFIX: &str = "density:";
+
+/// The density a request names: `compact` or `comfortable`, `None` for anything else.
+fn density_value(name: &str) -> Option<&'static str> {
+    match name {
+        "compact" => Some("compact"),
+        "comfortable" => Some("comfortable"),
+        _ => None,
+    }
+}
+
+/// Cookie value that marks a look the store does not hold. No theme can have this name and no
+/// density this value, so every reader ignores it and renders the default.
+const NOTHING_SAVED: &str = "_";
+
+/// On a full page load that lacks the `zeyn_theme` or the `zeyn_density` cookie, the signed in
+/// user's saved look from the view store (one read for both), with the cookies to set so later
+/// pages do not ask again. When the store holds no value for a missing cookie, that cookie is set
+/// to [`NOTHING_SAVED`] for a day, so later pages skip the store until it is read again. Pages
+/// that carry both cookies never touch the store.
+pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (Ctx, Vec<String>) {
+    let want_theme = st.look.picker && cookie(headers, "zeyn_theme").is_none();
+    let want_density = cookie(headers, "zeyn_density").is_none();
+    if !want_theme && !want_density {
+        return (ctx, Vec::new());
     }
     let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) else {
-        return (ctx, None);
+        return (ctx, Vec::new());
     };
     let saved = match st
         .timed(store.load(&user, &store_key(&ctx)))
         .await
     {
-        Ok(v) => v,
+        Ok(v) => v.unwrap_or_default(),
         Err(_) => {
-            eprintln!("warning: the view store failed to load a theme; using the default");
-            return (ctx, None);
+            eprintln!("warning: the view store failed to load the look; using the default");
+            return (ctx, Vec::new());
         }
     };
-    let name = saved.and_then(|v| {
-        v.columns.into_iter().find_map(|c| {
-            c.field
-                .strip_prefix(STORE_PREFIX)
-                .map(str::to_string)
-        })
-    });
-    match name.and_then(|n| st.look.allowed(&n)) {
-        Some(theme) => {
-            let c = theme_cookie(st, &theme);
-            (ctx.with_theme(theme), Some(c))
+    let saved_as = |prefix: &str| {
+        saved
+            .columns
+            .iter()
+            .find_map(|c| c.field.strip_prefix(prefix))
+            .map(str::to_string)
+    };
+    let mut ctx = ctx;
+    let mut cookies = Vec::new();
+    if want_theme {
+        match saved_as(STORE_PREFIX).and_then(|n| st.look.allowed(&n)) {
+            Some(theme) => {
+                cookies.push(look_cookie(st, "zeyn_theme", &theme, YEAR));
+                ctx = ctx.with_theme(theme);
+            }
+            None => cookies.push(look_cookie(st, "zeyn_theme", NOTHING_SAVED, DAY)),
         }
-        None => (ctx, None),
     }
+    if want_density {
+        match saved_as(DENSITY_PREFIX)
+            .as_deref()
+            .and_then(density_value)
+        {
+            Some(density) => {
+                cookies.push(density_cookie(st, density));
+                if density == "compact" {
+                    ctx = ctx.with_compact();
+                }
+            }
+            None => cookies.push(look_cookie(st, "zeyn_density", NOTHING_SAVED, DAY)),
+        }
+    }
+    (ctx, cookies)
+}
+
+const YEAR: u32 = 31_536_000;
+
+const DAY: u32 = 86_400;
+
+/// A look cookie: `zeyn_theme` or `zeyn_density` with its value and lifetime in seconds.
+fn look_cookie(st: &AppState, name: &str, value: &str, max_age: u32) -> String {
+    let secure = if st.secure_cookies { "; Secure" } else { "" };
+    format!(
+        "{name}={value}; Path={}; Max-Age={max_age}; SameSite=Lax{secure}",
+        st.cookie_path()
+    )
 }
 
 fn theme_cookie(st: &AppState, name: &str) -> String {
-    let secure = if st.secure_cookies { "; Secure" } else { "" };
-    format!(
-        "zeyn_theme={name}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
-        st.cookie_path()
-    )
+    look_cookie(st, "zeyn_theme", name, YEAR)
+}
+
+fn density_cookie(st: &AppState, value: &str) -> String {
+    look_cookie(st, "zeyn_density", value, YEAR)
+}
+
+/// Saves a signed in user's look in the view store: the theme and density given, the other one
+/// from the request's cookie or, without that cookie, from what the store holds, so a change to
+/// one never drops the other. Without a store or a user nothing is saved and the cookie alone
+/// keeps the choice.
+async fn save_look(
+    st: &AppState,
+    ctx: &Ctx,
+    headers: &HeaderMap,
+    theme: Option<&str>,
+    density: Option<&str>,
+) {
+    let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) else {
+        return;
+    };
+    let theme = theme.map(str::to_string).or_else(|| {
+        cookie(headers, "zeyn_theme")
+            .and_then(|n| st.look.allowed(n))
+            .map(|t| t.to_string())
+    });
+    let density = density.or_else(|| cookie(headers, "zeyn_density").and_then(density_value));
+    let (theme, density) = if theme.is_none() || density.is_none() {
+        let held = st
+            .timed(store.load(&user, &store_key(ctx)))
+            .await
+            .ok()
+            .flatten()
+            .map(|v| v.columns)
+            .unwrap_or_default();
+        let held_as = |prefix: &str| {
+            held.iter()
+                .find_map(|c| c.field.strip_prefix(prefix))
+                .map(str::to_string)
+        };
+        (
+            theme.or_else(|| held_as(STORE_PREFIX)),
+            density.or_else(|| {
+                held_as(DENSITY_PREFIX)
+                    .as_deref()
+                    .and_then(density_value)
+            }),
+        )
+    } else {
+        (theme, density)
+    };
+    let field = |f: String| ColumnView {
+        field: f,
+        width: None,
+        pin: None,
+    };
+    let columns = theme
+        .map(|t| field(format!("{STORE_PREFIX}{t}")))
+        .into_iter()
+        .chain(density.map(|d| field(format!("{DENSITY_PREFIX}{d}"))))
+        .collect();
+    let view = DataGridView {
+        columns,
+        ..DataGridView::default()
+    };
+    if st
+        .timed(store.save(&user, &store_key(ctx), Some(view)))
+        .await
+        .is_err()
+    {
+        eprintln!("warning: the view store failed to save the look; the cookies still keep it");
+    }
 }
 
 #[derive(Deserialize)]
@@ -916,23 +1078,7 @@ async fn set_theme(
     else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    if let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) {
-        let view = DataGridView {
-            columns: vec![ColumnView {
-                field: format!("{STORE_PREFIX}{theme}"),
-                width: None,
-                pin: None,
-            }],
-            ..DataGridView::default()
-        };
-        if st
-            .timed(store.save(&user, &store_key(&ctx), Some(view)))
-            .await
-            .is_err()
-        {
-            eprintln!("warning: the view store failed to save a theme; the cookie still keeps it");
-        }
-    }
+    save_look(&st, &ctx, &headers, Some(&*theme), None).await;
     with_cookie(
         StatusCode::NO_CONTENT.into_response(),
         Some(theme_cookie(&st, &theme)),
@@ -946,7 +1092,8 @@ struct DensityCall {
 
 /// `POST /_zeyn/density {"density": "compact"}`: stores the density in the `zeyn_density` cookie
 /// (`comfortable` or `compact`), which the server renders on `<html>` and from which it picks the
-/// row height of virtual grids. `404` for any other value.
+/// row height of virtual grids, and, for a signed in user in an app with a view store, in the
+/// store next to the theme, so it follows the user to other devices. `404` for any other value.
 async fn set_density(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -956,16 +1103,42 @@ async fn set_density(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let value = match call.density.as_str() {
-        "compact" => "compact",
-        "comfortable" => "comfortable",
-        _ => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+    let Some(value) = density_value(&call.density) else {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
+    save_look(&st, &ctx, &headers, None, Some(value)).await;
+    with_cookie(
+        StatusCode::NO_CONTENT.into_response(),
+        Some(density_cookie(&st, value)),
+    )
+}
+
+#[derive(Deserialize)]
+struct RailCall {
+    rail: bool,
+}
+
+/// `POST /_zeyn/rail {"rail": true}`: stores whether the side menu is folded to an icon rail in
+/// the `zeyn_rail` cookie, so the next page renders it that way without a jump.
+async fn set_rail(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<RailCall>,
+) -> Response {
+    let ctx = st.ctx(&headers);
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
     let secure = if st.secure_cookies { "; Secure" } else { "" };
+    let (value, age) = if call.rail {
+        ("1", 31_536_000)
+    } else {
+        ("", 0)
+    };
     with_cookie(
         StatusCode::NO_CONTENT.into_response(),
         Some(format!(
-            "zeyn_density={value}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
+            "zeyn_rail={value}; Path={}; Max-Age={age}; SameSite=Lax{secure}",
             st.cookie_path()
         )),
     )
@@ -991,6 +1164,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route("/_zeyn/theme", post(set_theme))
         .route("/_zeyn/density", post(set_density))
+        .route("/_zeyn/rail", post(set_rail))
 }
 
 #[cfg(test)]

@@ -89,6 +89,25 @@ ve gridde bulunmayan sütunlardaki sıralamaları düşürür; ayrıca filtreler
 (200 karakter), seçenekleri (100) ve sıralama anahtarlarını (4) sınırlar. Okunamayan bir değer
 yok sayılır. Tarih filtrelerinin saat dilimi sunucudaki kullanıcı ayarlarından gelir.
 
+`filter_builder()` tablonun üstüne, etkin koşul sayısını gösteren bir "Süz" düğmesi ekler. Düğme
+süzgeç oluşturucuyu açar: her koşul için bir satırı olan bir iletişim kutusu; her satır `filter()`
+taşıyan bir sütun ve o sütunun süzgeç satırındaki giriş kutularıdır. "Koşul ekle", "Tümünü temizle"
+ve "Uygula" listeyi düzenler; Escape ya da Vazgeç listeyi olduğu gibi bırakır ve odak düğmeye döner.
+Koşullar birlikte geçerlidir; aynı sütundaki sonraki koşul öncekinin yerini alır. Uygulamak
+koşulları tablonun süzgeçlerine yazar; böylece süzgeç satırı, kayıtlı görünümler, dışa aktarmalar ve
+bir yapay zekâ ajanının `zeyn:filter` olayı tek bir listeyi paylaşır ve sunucu onu yukarıdaki gibi
+temizler.
+
+Süzgeç oluşturucudaki her koşul grubunda "Tüm koşullar" ya da "Herhangi bir koşul" seçimi vardır;
+"Grup ekle" içine bir grup koyar, üç düzeye kadar. Sorgu grupları `DataQuery::filter_groups` içinde
+`{ "any": true, "filters": [...], "groups": [...] }` olarak gönderir; her satırın yine uyması gereken
+düz `filters` listesinin yanında. `any` taşıyan bir grup, süzgeçlerinden ya da gruplarından biri
+uyduğunda uyar; taşımayan bir grup hepsi uyduğunda uyar. Listedeki ve gruplardaki süzgeçler 32
+sınırına birlikte sayılır, gruplar en çok dört düzey iç içe girer (`MAX_FILTER_DEPTH`) ve sunucu
+grupları liste gibi temizler: `filter()` taşımayan sütunlardaki süzgeçler ve boş kalan gruplar
+düşer. `DataQuery::apply` ile PostgreSQL ve Oracle veri katmanları grupları aynı biçimde okur,
+tablonun yapay zekâ aracı onları sunar, kayıtlı görünümler ve dışa aktarmalar onları korur.
+
 Bir başlığa Shift+tıklamak, o sütunu sıralama anahtarlarına ekler. Başlıktaki bir sayı sırayı gösterir.
 
 ## Sütunlar: sabitleme, yeniden boyutlandırma, gizleme, taşıma
@@ -99,7 +118,40 @@ vardır (düğme, sağ tıklama, Shift+F10 veya bağlam menüsü tuşu); menüde
 sağa taşıma, gizleme, filtre, sütun seçici ve sıfırlama bulunur. Başlığın kenarı sütunu yeniden
 boyutlandırır, sürükleyerek veya ok tuşlarıyla (daha büyük adımlar için Shift). Bir başlığı aynı
 sabitlenmiş gruptaki başka bir başlığın üzerine sürüklemek sütunu taşır; kısa bir basış ise yine
-sıralar. Hepsi sağdan sola yönde de çalışır.
+sıralar. Hepsi sağdan sola yönde de çalışır. Bir başlığın kenarına çift tıklamak, kenardayken Enter ya da sütun menüsündeki "Genişliği içeriğe uydur", sütunu başlığına ve sayfadaki satırlara uydurur; "Tüm sütunları uydur" bunu gösterilen her sütun için yapar. Genişlikler görünümle kaydedilir.
+
+## Arama
+
+`search()` tablonun üstüne bir arama kutusu koyar. Kullanıcının yazdığı metin kısa bir aradan
+sonra tablonun eylemine `DataQuery::q` olarak gider; her sayfa, blok, dal, eşleşen tüm satırlar
+üzerindeki toplu işlem ve dışa aktarma ile birlikte. Yeni bir arama öncekinin isteğini iptal eder.
+`DataQuery::apply` ve SQL veri katmanları metni büyük küçük harf ve aksan farkı gözetmeden metin
+alanlarında arar; maskeli alanlarda asla aramaz. `search()` olmayan tablo, istemcinin gönderdiği
+`q` değerini atar. Sonuç tablonun canlı bölgesinde duyurulur ve arama bir şey bulamazsa
+`empty_filtered` gösterilir. Arama metni kayıtlı görünüme girmez. Yapay zekâ ajanları `q`
+alanını tablonun araç şemasında bulur.
+
+## Bant başlıkları
+
+`band(label, |b| ...)` kapanışın eklediği sütunları, sütun başlıklarının üstündeki bir satırda tek
+bir başlık hücresi altında toplar:
+
+```rust
+DataGrid::of(search_products)
+    .search()
+    .column(Product::code).pin_start()
+    .band(t!("stock.price_and_stock"), |b| b
+        .column(Product::price).avg()
+        .column(Product::stock).sum())
+    .column(Product::active)
+```
+
+Bant, gösterilen sütunları üzerinde `colspan` taşıyan, `scope="colgroup"` bir `th` hücresidir;
+bant dışındaki sütunların üstündeki hücreler boş kalır. Bant satırı kullanıcının düzenine uyar:
+gizlenen sütun bandından çıkar, bant yan yana ve aynı sabitleme tarafında kalan her sütun dizisi
+için bir hücre gösterir (bir sütunu uzağa taşımak bandı böler), sabitlenmiş diziler sütunlarıyla
+birlikte yerinde kalır ve sütun sanallaştırması bant satırını bütün tutar. Dışa aktarma ve
+kopyalama bantları içermez.
 
 ## Kayıtlı görünümler
 
@@ -156,6 +208,39 @@ Sunucu satırı anahtarla yeniden yükler ve yalnızca düzenlenebilir sütunlar
 `Form::read` üzerinden uygular; böylece değerler bir formun yapacağı gibi okunur ve doğrulanır. Başka
 herhangi bir sütun için gelen değer `403` ile reddedilir. Eski bir sürüm `409` olarak döner,
 doğrulama hataları `422` olarak döner ve kendi hücrelerinde gösterilir.
+
+## Satır ekleme, silme ve toplu düzenleme
+
+```rust
+DataGrid::of(search_products)
+    .column(Product::name).editable()
+    .column(Product::price).editable()
+    .edit_with(save_product)
+    .add_with(create_product)
+    .delete_with(delete_products, Product::id)
+    .batch_edit()
+```
+
+`add_with(create)` tablonun üstüne "Satır ekle" düğmesi koyar. Düğme en üstte, her `editable()`
+sütun için bir giriş kutusu olan boş bir satır açar; Enter kaydeder, Escape satırı atar. Sunucu
+modelin varsayılanından başlar, yalnızca düzenlenebilir sütunları bir formun yaptığı gibi okur
+(başka bir alan `403` ile reddedilir, geçersiz değerler `422` ile döner ve hücrelerinde görünür),
+`create` eyleminin iznini denetler ve eylemi çalıştırır; ardından tablo yeniden yüklenir. Sanal
+tablolar satır eklemez.
+Modelin varsayılan değerinde bırakamayacağı alanlar, örneğin isteğe bağlı olmayan bir tarih,
+düzenlenebilir bir sütun ister.
+
+`delete_with(action, Model::key)` seçim çubuğuna çalışmadan önce soran kırmızı bir "Sil" düğmesi
+ekler; bir satırda Delete tuşu seçili satırları, seçim yoksa o satırı siler. Eylem anahtarları
+toplu işlemdeki gibi alır, bu yüzden her kaydı kendisi denetlemelidir.
+
+`batch_edit()` satır içi düzenlemeleri kullanıcı hepsini kaydedene kadar tutar. Enter değişen
+satırı başında bir işaretle düzenleme durumunda bırakır ve tablonun üstündeki çubuk değişen
+satırları sayar, "Değişiklikleri kaydet" ve "Değişiklikleri at" düğmelerini gösterir. Kaydetme
+satırları satır içi düzenleme yolundan tek tek gönderir; böylece her satır ayrı ayrı okunur,
+doğrulanır, sürümü denetlenir. Kaydedilemeyen satırlar değişikliklerini korur ve nedenini
+gösterir. Başka satırlar yüklemek (sayfa, sıralama, süzgeç, arama) kaydedilmemiş değişiklikleri
+atmadan önce sorar.
 
 ## Master detail
 
@@ -224,6 +309,35 @@ veri için yapar; SQL `GROUP BY` kullanır. `group` gridin kendisi tarafından a
 asla okunmaz. İstemci yalnızca açtığı grup değerlerinin yolunu gönderir; sunucu uzunluğunu denetler
 ve her değeri o grubun sütunu üzerinde bir filtreye, kullanıcının filtrelerinin önüne koyarak
 dönüştürür (boş grup için `blank`).
+
+## Kullanıcının gruplaması ve özel özetler
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` kullanıcının satırları bir sütuna göre gruplamasını sağlar: sütun menüsündeki "Bu
+sütuna göre grupla" ile ya da başlığını tablonun üstündeki gruplama alanına sürükleyerek. Alan her
+düzey için onu kaldıran bir düğme gösterir; en çok üç düzey (`MAX_USER_GROUPS`). Gruplar
+kullanıcının görünümünde (`DataGridView::group_by`) taşınır, onunla kaydedilir ve seçili olduğu
+sürece tablonun kendi `group_by` ayarının yerine geçer. Sunucu yalnızca gruplanabilir sütunları
+tutar, maskeli olanları asla; gruplamayı `group_by` ile aynı biçimde yapar, yani eylem
+`DataQuery::group` alanını aynı şekilde yanıtlar. Ağaç ve sanal tablolar gruplanmaz.
+
+`summary(label, |t| ...)` bir sütunun altına, alt bilgide ve her grup satırında kendi değerinizi
+ekler. Değer sunucuda `Totals` üzerinden, yani tablonun bildirdiği toplamlardan
+(`t.get(field, Aggregate::Sum)`) hesaplanır, bu yüzden satırlara hiç ihtiyaç duymaz: iki toplamdan
+bir kâr oranı, bir toplam ve bir sayımdan bir ortalama. `None` hücreyi boş bırakır. Tam sayılar
+gruplanır, para ve ondalıklı sayılar kullanıcının dilinde biçimlenir.
 
 ## Ağaç verisi
 
@@ -294,7 +408,7 @@ sütun sanallaştırmasının değiştirmediği, her sütunu içeren 200 satırl
 `exportable()` (ve isteğe bağlı olarak `export_permission(...)`, `export_limit(n)`) araç çubuğunun
 `Export::Csv` düğmesinin eşleşen her satırı indirmesini sağlar. Sunucu gridin action'ı üzerinden
 sayfaları gezer ve her sayfayı hemen, kullanıcının yerleşiminde ve dilinde akıtır. Formüller etkisiz
-hale getirilir. Varsayılan olarak 100.000 satıra kadar.
+hale getirilir. Varsayılan olarak 100.000 satıra kadar. Satırlar seçiliyken (tek tek; "eşleşen tümü" değil), CSV ve Excel dışa aktarmaları yalnızca o satırları alır, en çok 1.000 satır, yine kullanıcının süzgeçleri içinde; sunucu onları anahtarla bulur.
 
 `xlsx` Cargo özelliği (feature) ile araç çubuğunun `Export::Xlsx` düğmesi aynı satırları bir Excel
 çalışma kitabı olarak indirir (`GET /_zeyn/grid/export?format=xlsx`). Hücreler türlerini korur:

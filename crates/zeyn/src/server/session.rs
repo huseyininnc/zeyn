@@ -111,6 +111,7 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
         "idle": s.idle.map(|d| d.as_secs()),
         "warn": s.warning.as_secs(),
         "logout": s.logout_url.as_ref().or(auth.logout_url.as_ref()),
+        "signout": auth.signout,
         "login": st.login_url,
         "reauth": s.reauth_url.as_ref().or(auth.reauth_url.as_ref()).or(st.login_url.as_ref()).or(auth.mfa_url.as_ref()),
         "mfa": auth.mfa_url,

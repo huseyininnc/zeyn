@@ -46,7 +46,7 @@ Feature::new("catalog").public_media("images", 86_400, ImageFolder::new("data/im
 
 - `open` must return the same bytes for every visitor. Never vary a public file by user, role, tenant or language: a CDN or proxy keeps the first response and hands it to everyone. Files that differ per user belong in a source registered with `Feature::media`.
 - With a long `max_age`, give ids that change with the content, such as a content hash (`poster-3f9a2c.jpg`). A changed file then gets a new address, instead of old copies living on in caches until they expire.
-- Reads of public sources (`GET` and `HEAD`) do not count against `App::rate_limit`: one page can load dozens of posters, and many mobile visitors share one address behind carrier NAT. Private sources still count, and IP allow and deny rules still apply to both. Limiting bandwidth abuse is the job of a CDN or reverse proxy in front of the app.
+- Reads of public sources (`GET` and `HEAD`) do not count against `App::rate_limit`: one page can load dozens of posters, and many mobile visitors share one address behind carrier NAT. A read of an id the source does not have (`404`) does count, so ids cannot be probed without limit, and a client over its limit gets `429` for public files too. Private sources still count, and IP allow and deny rules still apply to both. Limiting bandwidth abuse is the job of a CDN or reverse proxy in front of the app.
 
 ## Players
 

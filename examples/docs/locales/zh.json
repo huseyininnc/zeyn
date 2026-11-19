@@ -78,6 +78,7 @@
       "operations": "运维",
       "assistant": "AI 助手",
       "islands": "WASM Islands",
+      "socket": "ZeynSocket",
       "realtime": "实时通道和 CRDT",
       "desktop": "桌面应用",
       "protocol": "运行时协议",

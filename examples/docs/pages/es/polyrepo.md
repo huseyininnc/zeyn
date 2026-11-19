@@ -122,3 +122,36 @@ Elimínalo, etiqueta la biblioteca y sube la etiqueta en la app cuando el cambio
    Un cambio incompatible requiere una nueva versión minor mientras la biblioteca esté por debajo de 1.0.
 3. Haz commit, etiqueta `v<version>` y sube la etiqueta. El trabajo de CI `tag-matches-version` falla cuando la etiqueta y
    `Cargo.toml` no coinciden.
+
+## Crates de componentes
+
+Un crate puede ofrecer componentes con su propio script, hoja de estilos y textos. Un crate `zeyn-<name>` registra el módulo de navegador `<name>`; sus clases empiezan por `z-<name>-`, sus atributos por `data-zeyn-<name>-` y sus claves de texto por `<name>.`. `examples/widget` es un ejemplo completo, con pruebas.
+
+`zeyn new <name> --component` escribe uno nuevo: el crate `zeyn-<name>` con un componente de ejemplo, su plugin, el script y la hoja de estilos, textos en inglés y turco, una app de ejemplo y pruebas.
+
+```rust
+use zeyn::{App, Module, Plugin};
+
+pub struct RatingPlugin;
+
+impl Plugin for RatingPlugin {
+    fn install(self, app: App) -> App {
+        app.module(
+            Module::new("rating")
+                .js(include_str!("../assets/rating.js"))
+                .css(include_str!("../assets/rating.css"))
+                .marker("data-zeyn-rating-stars")
+                .texts(&[("en", include_str!("../assets/en.json"))]),
+        )
+    }
+}
+```
+
+La aplicación añade `.plugin(RatingPlugin)`. Una página enlaza `/_zeyn/ext/rating.js` y `/_zeyn/ext/rating.css` solo cuando su HTML contiene un marcador, y `zeyn.js` los carga cuando ese contenido llega más tarde. Los archivos llevan la compilación en su URL, así que los navegadores los guardan hasta la siguiente compilación, y nunca van en línea, así que la Content Security Policy sigue siendo estricta. El script es un módulo ES que escucha `zeyn:content` para el contenido posterior; la hoja de estilos toma sus colores y tamaños de las variables del tema (`var(--z-text)`, `var(--z-space)`). Los catálogos propios de la aplicación prevalecen sobre los textos del módulo.
+
+`App::module` detiene la aplicación al arrancar, con la solución en el mensaje, cuando un módulo incumple la regla de nombres, choca con un módulo o marcador del framework o con otro módulo, o trae un catálogo que no es JSON válido. En las pruebas, `TestResponse::links` lista lo que enlaza la cabecera de una página.
+
+| Zeyn | Crates de componentes |
+|---|---|
+| Versiones posteriores a 0.0.10 | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
+| 0.0.10 y anteriores | Solo HTML; sin scripts ni estilos propios |

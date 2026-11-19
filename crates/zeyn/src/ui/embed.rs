@@ -514,8 +514,9 @@ impl<A, S> Image<A, S> {
 
     /// What shows when the image and its fallback both fail: a text or a component. Without it
     /// the alt text is shown with an icon on the placeholder background.
+    #[track_caller]
     pub fn on_error(mut self, content: impl Into<Node>) -> Self {
-        self.loading.on_error = Some(content.into());
+        self.loading.on_error = Some(Node::placed(content));
         self
     }
 

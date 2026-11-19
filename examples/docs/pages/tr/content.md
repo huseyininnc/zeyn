@@ -84,11 +84,40 @@ List::of(search_people)
             .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
-    .sort_option(t!("people.by_name"), Person::name, false)
+    .sort_option(t!("people.by_name"), Person::name)
     .paging(Paging::pages(20))
 ```
 
 @live list
+
+### Sıralanabilir listeler
+
+`.sortable(action)`, `List::of` ya da `CardGrid` satırlarını kullanıcıların kendi sırasına koymasını sağlar. Her satırın bir tutamacı olur: fare ya da kalem sürükler, dokunmada kısa bir basılı tutmadan sonra sürüklenir ve bir çizgi satırın nereye düşeceğini gösterir. Odaktaki tutamaçta Boşluk satırı kaldırır, ok tuşları taşır, Boşluk bırakır, Escape geri koyar; Alt ile Yukarı veya Aşağı satırı hemen taşır. Tıklama ya da Enter bir taşıma menüsü açar (yukarı, aşağı, en başa, en sona), böylece tek işaretçi yeter. Her adım sesli bildirilir.
+
+Taşıma hemen görünür ve eylem, satırın anahtarı ile yeni komşularının anahtarlarını (`after`, `before`) taşıyan bir `ReorderRequest` alır, hiçbir zaman sıra numarası almaz. `r.rank(lookup)` komşuların arasındaki yeni `Rank` değerini verir; aramanın bulamadığı bir komşuyu (`NotFound`) ya da artık bu sırada olmayan komşuları (`Conflict`, satırları önce başkası taşıdı) reddeder. O zaman satır geri döner ve neden gösterilir. Kaynak eylem satırları sıra değerine göre listeler, bu yüzden sıralama seçenekleri gösterilmez; yüklenecek satır varken hiçbir satır en sona geçemez. Sürüklenen satır bir kenara yakın tutulduğunda listeyi ya da sayfayı kaydırır. `Paging::virtual_scroll()` kullanan liste sanal kalır: bir çizgi satırın nereye düşeceğini gösterir, satırlar sunucu taşımayı kaydettikten sonra yeni sırayla görünür.
+
+```rust
+#[action(permission = "tasks.write")]
+pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    let rank = r.rank(|k| db.rank_of(*k))?;
+    db.set_rank(r.key, rank).await
+}
+
+List::of(search_tasks)
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, reorder_tasks)
+```
+
+`.connect(group, id)`, bir ekranda aynı gruptaki sıralanabilir listeleri birleştirir: satırlar birinden diğerine sürüklenir ya da taşıma menüsündeki "Taşı" seçenekleriyle taşınır. Eylem, satırların vardığı listenin kimliğini (`r.list`) ve ayrıldığı listenin kimliğini (`r.from`) alır; iki kimlik de tarayıcıdan değil ekrandan gelir ve sunucu iki listenin eyleminin iznini de denetler. `.multi_select()` ile satırlar Control ya da Command ile tutamağa tıklanarak veya menüdeki "Taşımak için seç" ile seçilir ve en fazla 100 satır birlikte taşınır: diğer anahtarlar `r.rest` içindedir, `r.ranks(lookup)` ise `r.keys()` içindeki her satıra bir sıra verir. Taşınan anahtarları ayrıldıkları listede arayın. Sanal listeler ikisine de katılmaz.
+
+```rust
+List::of(todo_tasks)
+    .title("To do")
+    .item(|t: &Task| ListItem::new(t.title.clone()))
+    .sortable(Task::rank, move_tasks)
+    .connect("tasks", "todo")
+    .multi_select()
+```
 
 ## Avatar
 
@@ -108,6 +137,108 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 ```
 
 @live people
+
+## AvatarGroup
+
+Bir işin kişileri, örneğin bir görevin atananları, bir sırada üst üste binen avatarlar olarak gösterilir. Etiket, grubu ekran okuyucular için adlandırır. Grup ilk avatarları gösterir: `.max(n)` başka bir sayı vermedikçe 5, hiçbir zaman 12'den fazla değil. Kalanların sayısı "+3" olarak yazılır ve kullanıcının dilinde "3 kişi daha" diye okunur. `.size(...)` gruptaki her avatarın boyutunu belirler.
+
+```rust
+AvatarGroup::new(t!("task.assignees"))
+    .add(Avatar::new(a.name.clone()).image(a.photo.clone()))
+    .add(Avatar::new(b.name.clone()))
+    .max(3)
+    .size(AvatarSize::Small)
+```
+
+## Quote
+
+Bir kişiden ya da bir eserden alıntılanan sözler, bir `figure` içindeki `blockquote` olarak. `.author(name)` sözü kimin söylediğini, `.source(title)` ise eseri belirtir; eser bir başlık olarak yazılır (`cite`).
+
+```rust
+Quote::new(review.text.clone()).author(review.name.clone()).source(t!("shop.verified_buyer"))
+```
+
+## Kbd
+
+Basılacak tuşlar, klavye girdisi olarak yazılır (`kbd`). `Kbd::new("Ctrl+K")`, tuşları arasında `+` olan bir birleşimi okur; `Kbd::keys(["Ctrl", "+"])` ise artı tuşunun kendisini içeren birleşimler için tuşları tek tek alır. Tuş adları verildiği gibi yazılır, en fazla 6 tane. Yalnızca tuşları gösterir; bir iş yapan kısayol, `PrevNext::shortcut` gibi, komutun olduğu yerde tanımlanır.
+
+```rust
+Kbd::new("Alt+Shift+P")
+```
+
+## Divider
+
+Bir sayfanın iki bölümü arasındaki çizgi. `Divider::new()` tematik bir aradır (`hr`). `.label(text)` çizginin ortasına bir metin koyar, örneğin iki oturum açma yolu arasındaki "veya"; bu durumda ayırıcı o metinle adlandırılmış bir `separator` olur. `.vertical()` çizgiyi yukarıdan aşağıya çizer; sıkı bir `Row` içindeki sütunların arası içindir.
+
+```rust
+Divider::new().label(t!("signin.or"))
+```
+
+@live pieces
+
+## Highlight
+
+`Highlight::new(text, query)`, bir metni içinde bir aramanın kelimeleri işaretlenmiş olarak yazar (`mark`); örneğin bir sonuç listesindeki ürün adı. Sorgu boşluklardan bölünür, en fazla 8 kelimesi aranır ve bunlardan birinin bulunduğu her yer büyük küçük harf ayrımı yapılmadan işaretlenir; boş bir sorgu hiçbir şeyi işaretlemez. Hem metin hem sorgu kullanıcı verisidir: metin kaçışlanır, sorgu ise yalnızca karşılaştırılır, sayfaya hiç yazılmaz. Harfler Unicode'un tanımladığı küçük harfleriyle karşılaştırılır; bu yüzden Türkçedeki `I ı` ve `İ i` çiftleri birbirine eşlenmez.
+
+```rust
+Highlight::new(product.name.clone(), p.q.clone())
+```
+
+## Toc
+
+İçindekiler: gösterilen sayfanın başlıklarına bağlantılar; bir makale ya da bir politika gibi uzun sayfalar içindir. `Toc::new(label)`, etiketle adlandırılmış bir `nav` öğesidir; `.item(title, id)`, `Heading::id` ile aynı çapa verilmiş başlığa bağlanır, `.sub(title, id)` ise kendinden önceki girdinin bir düzey altına bir girdi ekler. Çapalar `Heading::id`'nin temizlediği gibi temizlenir, böylece aynı dize iki yerde de çalışır ve çapası boş çıkan girdi dışarıda bırakılır; içindekiler en fazla 100 girdi tutar. Bağlantılar `#anchor` biçiminde düz bağlantılardır; bu yüzden script olmadan çalışırlar, tarayıcı başlığa kaydırır ve adres paylaşılabilir. Okunmakta olan bölüm işaretlenmez, çünkü bu bir script gerektirirdi.
+
+```rust
+Toc::new(t!("page.contents"))
+    .item(t!("policy.delivery"), "delivery")
+    .sub(t!("policy.abroad"), "delivery-abroad")
+    .item(t!("policy.returns"), "returns")
+Heading::h2(t!("policy.delivery")).id("delivery")
+```
+
+@live marks
+
+## Stepper
+
+Bir sürecin nerede olduğu: sırayla adımları, tamamlananlar, şimdiki adım ve sıradakiler; örneğin bir siparişin verilmesinden teslimine kadarki yolu. `.step(title)` bir adım ekler, `.description(text)` son eklenen adımın altına bir satır koyar. `.current(index)` 0'dan sayar ve ondan önceki adımları tamamlanmış işaretler; `.finished()` her adımı tamamlanmış işaretler. `.vertical()` adımları alt alta dizer; dar ekranlarda da böyle görünürler. Bir stepper en fazla 12 adım tutar.
+
+```rust
+Stepper::new(t!("order.progress"))
+    .step(t!("order.placed"))
+    .step(t!("order.packed"))
+    .step(t!("order.shipped"))
+    .description(order.shipped_note.clone())
+    .step(t!("order.delivered"))
+    .current(order.stage as usize)
+```
+
+@live stepper
+
+Adımlar, etiketle adlandırılmış sıralı bir listedir. Şimdiki adım `aria-current="step"` taşır, tamamlanan bir adım ise ekran okuyuculara kullanıcının dilinde "tamamlandı" der; böylece durum yalnızca renkle verilmez. Stepper yalnızca sunucunun verdiği durumu gösterir ve içindeki hiçbir şeye basılamaz; adım adım doldurulan bir form, kendi adımları olan bir `Form`'dur (bkz. [Formlar](forms.md)).
+
+## Pagination
+
+Ekranın kendisinin sayfaladığı bir listenin sayfalarına bağlantılar, örneğin bir blogun yazıları: önceki, sayfa numaraları ve sonraki. Her biri, sayfa numarası parametrelerinde olan aynı ekrana giden bir bağlantıdır; böylece sunucu istenen sayfayı render eder, adres paylaşılabilir ve tarayıcıda hiçbir şey tutulmaz. Bağlantılar `nav.js` üzerinden sayfa yenilenmeden açılır ve script olmadan da çalışır. `DataGrid`, `List` ve `CardGrid` kendilerini `.paging(...)` ile sayfalar; bunu yalnızca ekranın kendi içeriğini kurduğu yerde kullanın.
+
+```rust
+#[screen(route = "/blog", public)]
+pub fn blog(p: BlogParams) -> Screen {
+    Screen::new(t!("blog.title")).body(
+        Pagination::new(blog, |page| BlogParams { page })
+            .pages(page_count)
+            .current(p.page),
+    )
+}
+```
+
+Sayfalar 1'den sayılır. İlk ve son sayfa her zaman görünür, şimdiki sayfanın iki yanında birer sayfa ile; `.around(n)` daha fazlasını gösterir, en çok 4. Dışarıda bırakılan sayfalar bir boşluk olur ve bir boşluk hiçbir zaman tek bir sayfayı gizlemez. Sayfa numarası adresten gelir, bu yüzden ekran veri yüklemeden önce onu aralığa çeker; bileşen de işaretlediği sayfa için aynısını yapar. Tek sayfa varsa ya da hiç yoksa hiçbir şey render etmez.
+
+Bağlantılar, kullanıcının dilinde "Sayfalama" adını taşıyan bir `nav` öğesidir. Şimdiki sayfa `aria-current="page"` taşır, her numara ekran okuyucular için "Sayfa 3" diye adlandırılır, önceki ve sonraki `rel="prev"` ve `rel="next"` taşır; uçlarda ise hiçbir yere gitmeyen bağlantılar yerine `aria-disabled` ile işaretlenmiş düz metindirler.
+
+| Tuş | Ne yapar |
+|---|---|
+| `Tab` | Önceki, sayfa numaraları ve sonraki arasında ilerler |
+| `Enter` | Sayfayı açar; odak ve kaydırma konumu `nav.js`'i izler |
 
 ## Chips
 
@@ -189,6 +320,15 @@ Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_artic
 
 @live engage
 
+
+## CopyButton
+
+Bir metni panoya kopyalayan düğme: bir takip numarası, bir API adresi, bir davet bağlantısı. `.shown()` metni düğmenin yanına sabit genişlikli bir yazı tipiyle yazar, böylece okunabilir ve seçilebilir; onsuz metin sayfadadır ama gizlidir. `.label` bir etiket vermedikçe etiket kullanıcının dilinde "Kopyala"dır ve bir toast kopyalamanın başarılı olup olmadığını söyler. `Share` ile aynı küçük script'i kullanır; bu script yalnızca bunlardan birini içeren sayfalarda yüklenir. Düğme gizli render edilir ve o script tarafından gösterilir, böylece script'siz bir sayfada hiçbir şey yapmayan bir düğme olmaz. Metin 4096 baytta kesilir ve sayfanın bir parçası olduğundan kullanıcının görebileceği bir metin olmalıdır, asla maskelenmiş bir değer değil.
+
+```rust
+CopyButton::new(order.tracking.clone()).shown()
+CopyButton::new(invite_url).label(t!("team.copy_invitation"))
+```
 
 ## AlphaIndex
 

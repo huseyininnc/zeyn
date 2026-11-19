@@ -16,8 +16,10 @@ Do not guess an API. Find it in the docs, in this order:
 
 1. **The project's `AGENTS.md`**: commands, structure and a framework index for this app.
 2. **The zeyn MCP server** (set up in `.mcp.json` by `zeyn new`): `zeyn_docs` with topic `rules`,
-   `language` or `protocol`; `zeyn_describe` lists the app's features, screens,
-   routes, access and problems; `zeyn_check` compiles and reports; `zeyn_test` runs the tests;
+   `language` or `protocol`, or `search: "words"` and `page: "/path"` for every docs page; `zeyn_describe` lists the app's features, screens,
+   routes, access and problems; `zeyn_inspect` returns a screen's node tree with the Rust line
+   that placed each node; `zeyn_devtools` reads the request log (screens, actions, times, SQL) of
+   the running debug build; `zeyn_check` compiles and reports; `zeyn_test` runs the tests;
    `zeyn_new_feature` and `zeyn_new_screen` run the generators.
 3. **The documentation site**: run `cargo run -p zeyn-example-docs` in the Zeyn repository and
    open http://127.0.0.1:3008 (Alt+Shift+P searches). The same pages are Markdown files in
@@ -37,7 +39,7 @@ Which page answers what:
 | Texts and translations | `language/texts` (`texts.md`) |
 | Layouts, controls, pickers, lines editor, display, tree, charts | `components/*` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `data.md`) |
 | Command palette, menu bar, dock, status bar, site shell for public pages | `components/shell` (`shell.md`) |
-| Headings, paragraphs, meta lines, previous and next links, auto grids, lists, avatars, spoilers, letter bars, week schedules | `components/content` (`content.md`) |
+| Headings, paragraphs, meta lines, previous and next links, auto grids, lists, avatars and avatar groups, spoilers, quotes, keys, dividers, steppers, pagination, copy buttons, letter bars, week schedules | `components/content` (`content.md`) |
 | Card grids, rails, search boxes, free text search (`DataQuery::q`) | `components/catalog` (`catalog.md`) |
 | Record diffs, code and JSON views, barcodes, inbox and notifications, Kanban boards, calendars | `components/admin` (`admin.md`) |
 | Prices, facets, range sliders, variants, galleries, quantities, reviews, countdowns | `components/commerce` (`commerce.md`) |
@@ -46,15 +48,16 @@ Which page answers what:
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
+| Background jobs, cron triggers with time zones, calendars, pause, run history (feature `metronome`), operations screen (feature `metronome-ops`) | `guides/enterprise` (`docs/enterprise.md`, `docs/metronome.md`) |
 | Public pages: no cookies, HTTP caching, SEO head tags, sitemap, robots.txt | `guides/public-pages` (`public-pages.md`) |
 | Sign in with an identity provider, JWT, MFA | `docs/auth.md` |
 | Own user accounts: registration, passwords, two factor, passkeys | `guides/accounts` (`accounts.md`, `docs/accounts.md`) |
 | Database | `guides/database` (`docs/database.md`) |
 | Themes | `guides/theming` (`docs/theming.md`) |
 | AI assistant, MCP, AI attributes | `guides/mcp` (`mcp.md`), `docs/assistant.md` |
-| Shared libraries in other repositories | `guides/polyrepo` (`docs/polyrepo.md`) |
+| Shared libraries in other repositories; component crates with their own script, stylesheet and texts (`App::module`, `Module`) | `guides/polyrepo` (`docs/polyrepo.md`) |
 | Operations: Docker, tracing, Redis, licenses | `docs/operations.md` |
-| Desktop exe, WASM islands, realtime | `docs/desktop.md`, `docs/islands.md`, `docs/realtime.md` |
+| Desktop exe, WASM islands, live socket | `docs/desktop.md`, `docs/islands.md`, `docs/socket.md`, `docs/realtime.md` |
 
 ## 2. The rules
 
@@ -225,10 +228,20 @@ What to remember:
 - Refresh other parts of a screen with topics, never with JavaScript: mark what shows the data
   with `.listens("sales")` (last call, any component), then name the topic with
   `ui.refresh("sales")` in `on_success`, a filter that `.drives("sales")` (`Chips::filter`,
-  `SearchBox`, a `Form` without submit whose fields are screen params) or `hub.notify`. Listeners
+  `SearchBox`, a `Form` without submit whose fields are screen params) or `socket.notify`. Listeners
   read filters from the screen params. `zeyn check` warns about topics nobody listens to.
+- Push to browsers with the live socket (feature `realtime`, `App::socket(ZeynSocket::new()...)`,
+  guide `docs/socket.md`). Topics refresh screens (`Live::new("orders")`, `socket.notify(&ctx, "orders")`).
+  Data for some users is an event: `#[derive(Serialize, Event)] #[event(name = "chat.message")]`,
+  declared with `.event::<MessageSent>("chat.read")`, sent with `socket.to_user(&ctx, id)`,
+  `.to_group(&ctx, name)` or `.to_tenant(&ctx)` and `.emit(&e)?`; screens react with
+  `.on_event::<MessageSent>(OnEvent::Refresh)` or `OnEvent::Toast(t!(..))`. Groups are joined only in
+  an action that takes `conn: Conn` and checks membership first. Events carry ids, never masked data.
 - A lookup whose options depend on another field: `.depends_on(Address::city, Address::country)`;
   the action filters by `q.parent_id()` and the submit checks the pair again.
+- Empty data: `.empty(EmptyState::new(t!(..)).text(t!(..)).opens(t!(..), new_screen, ()))` and
+  `.empty_filtered(EmptyState::new(t!(..)))` on `DataGrid`, `CardGrid` and `List::of`; the filtered one
+  shows while a filter or a search is on.
 - Rows of another shape: `List::of(action).builder(|row| node)` (or on `CardGrid`, `Rail`), with
   `.separator(node)`; `Repeat::of(items, |item| node)` for in memory data. Virtual lists with a
   builder need `.row_height(px)`. Keep `.item`/`.card` when they fit.
@@ -271,6 +284,17 @@ What to remember:
   ChevronRight, TrendUp, TrendDown, Info, CheckCircle, AlertTriangle, AlertCircle, Clock,
   History, Calendar, Star, Menu, Sidebar, Command, Sun, Moon, Monitor, File, FileText, Folder,
   Image, Paperclip. Menu items take one with `.icon(Icon::...)` after `.item(..)`.
+- Menus nest: `.sub(t!("..."), |m| m.item(..).item(..))` after `.group(..)` adds a collapsible
+  subgroup (at most three levels deep); `.open()` keeps a group open, `.accordion()` closes
+  siblings when a group opens.
+- Menus from a table or an API: `App::menu_source(|ctx: Ctx| async move { Ok(vec![MenuNode::group(..,
+  vec![MenuNode::screen(label, "screen_name"), MenuNode::path(label, "/path")])]) })`. The server
+  drops links the user may not open and caches answers per permission set; call
+  `Menus::invalidate()` from the action that edits the menu.
+- Menu item extras: `.badge(t!("..."))` adds a short fixed text, `.count(action)` a number from an
+  action that takes `()` and returns `Result<u64>` (loaded after the page, hidden without its
+  permission), `.count_listens("topic")` counts again on that topic. The icon rail, the filter
+  box with favorites (10 or more links) and the phone drawer come with the shell; write nothing.
 - Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
   and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
 - Audit history: `DiffView::of(&before, &after)` or `DiffView::changes(entry.changes).model::<M>()`;
@@ -297,8 +321,8 @@ What to remember:
   `.remember(DRAFT)` (a `ClientPref::draft` key registered with `App::client_prefs`) and
   `.send_key(SendKey::CtrlEnter)` for long text; the send action takes `ChatSend` and must check
   membership and mentions itself.
-  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::realtime`
-  with `Realtime::topic("chat", perm)`; without it, it renders nothing.
+  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::socket`
+  with `ZeynSocket::topic("chat", perm)`; without it, it renders nothing.
 - Stories: `StoryRow::new().add(StoryRing::new(name, StoryState::Unseen).image(src).link(screen, params))`;
   the state comes from what the server stored about the viewer, never from the browser.
 - Full screen images: `Image::new(thumb).alt(..).size(w, h).full(large).caption(..)` (or `.lightbox()`);
@@ -316,6 +340,7 @@ What to remember:
 | Mistake | Instead |
 |---|---|
 | `Grid`, `GridQuery`, `GridMode` | `DataGrid`, `DataQuery`, `DataMode` (`zeyn check --fix` rewrites old names) |
+| Fixing an upgrade to a new Zeyn version by hand | `zeyn migrate --dry-run`, then `zeyn migrate` (or the `zeyn_migrate` MCP tool); then handle what it lists for a person |
 | A literal string in the UI | `t!("key")` with the key in every `locales/*.json` |
 | `f64` for prices | `Money` |
 | `DateTime` for a birthday or a due day | `Date` |
@@ -326,14 +351,19 @@ What to remember:
 | Writing JavaScript for a behavior | Effects, components, or a `Component` in Rust |
 | `location.reload()` style refreshes | `ui.close_and_refresh()`, `ui.navigate(...)`, `ui.refresh("topic")` with `.listens("topic")` |
 | A secret in `config/app.json` or code | `config.secret("key")` from the environment or a vault |
+| Polling an action on a timer for changes | A topic (`Live`, `socket.notify`) or an event with `.on_event` |
+| A group joined from a client supplied name without a check | An action with `conn: Conn` that checks membership, then `conn.join(..)` |
 | Forgetting to register | Screens in the feature's `mod.rs`, features and services in `src/app.rs` |
 
 ## 5. Verify before you finish
 
-1. `cargo test`: the app's tests drive it through its router; add a test for new behavior.
+1. `cargo test`: the app's tests drive it in memory with `zeyn::testing::TestApp` (open a
+   screen, submit a form, page a grid, call an action as a given user); add a test for new behavior.
 2. `zeyn check` (or the `zeyn_check` MCP tool): compiles, then reports structural problems and
    missing translations. It must say `ok`. Its warnings name a `#[screen]` or `#[action]` that no
    feature registers and a flat `screens.rs` or `actions.rs` that has grown too large to stay flat.
+   Run `zeyn check --json` to read the result: each error has a stable `code` (`Z01xx` to
+   `Z06xx`, warnings `W01xx`), a `why`, a `fix` to apply and a `docs` link to read first.
 3. `zeyn dev` and open the screen in a browser: the page follows each rebuild without reloading.
    Check that the screen works by keyboard, in both themes, and that the console has no errors.
 4. For a container: `docker build -t <app> .` and `docker run -p 3000:3000 <app>`.

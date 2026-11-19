@@ -3,7 +3,7 @@
 Приложения, которые хранят собственных пользователей, включают Cargo-функцию (feature) `accounts`. Она приносит регистрацию, пароли, подтверждение по e-mail, сброс пароля, блокировку, роли, двухэтапный вход, passkeys, внешние входы, готовые экраны и JSON-конечные точки для мобильных приложений. Приложениям, которые входят через прокси единого входа или провайдер идентификации, она не нужна. Полное описание с таблицей для тех, кто знает ASP.NET Core Identity, находится в `docs/accounts.md`.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["accounts"] }
+zeyn = { version = "0.0.11", features = ["accounts"] }
 ```
 
 ## Включение
@@ -20,7 +20,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - Ключ берётся из конфигурации, имеет длину не менее 32 байт и никогда не меняется.

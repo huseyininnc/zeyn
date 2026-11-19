@@ -6,7 +6,7 @@
 //! move between them goes through effects, never a page load.
 //!
 //! ```ignore
-//! App::new("Shop").accounts(accounts).feature(accounts::ui().registration(false).without("account_passkeys").admin(true).build())
+//! App::new("Shop").accounts(accounts).feature(accounts::ui().no_registration().without("account_passkeys").admin().build())
 //! ```
 
 use super::signin::SESSION;
@@ -51,17 +51,17 @@ pub fn feature() -> Feature {
 }
 
 impl AccountsUi {
-    /// Shows the registration screen (on by default). Also turn off
+    /// Leaves out the registration screen, which is there by default. Also turn off
     /// `AccountOptions::registration` to close the JSON endpoint.
-    pub fn registration(mut self, on: bool) -> Self {
-        self.registration = on;
+    pub fn no_registration(mut self) -> Self {
+        self.registration = false;
         self
     }
 
     /// Adds the user and role administration screens, guarded by [`USERS_READ`],
     /// [`USERS_WRITE`] and [`ROLES_WRITE`].
-    pub fn admin(mut self, on: bool) -> Self {
-        self.admin = on;
+    pub fn admin(mut self) -> Self {
+        self.admin = true;
         self
     }
 

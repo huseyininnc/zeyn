@@ -45,7 +45,7 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | 模块 | 组件 |
 |---|---|
 | `components.js` | 每个控件模块都会导入的共享部分：辅助函数、弹出层和列表框核心、下拉选择（应用外壳中的选择器）、确认对话框、提示和面包屑 |
-| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 面板、标签页和分割面板；日期和时间选择器（也用于 grid 的日期筛选）；列表框、查找和多选；数字、自动增高的文本区、掩码和密码；行编辑器；分步表单；树；工具提示和弹出框；菜单按钮和分割按钮；忙碌遮罩 |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`, `menu.js` | 面板、标签页和分割面板；日期和时间选择器（也用于 grid 的日期筛选）；列表框、查找和多选；数字、自动增高的文本区、掩码和密码；行编辑器；分步表单；树；工具提示和弹出框；菜单按钮和分割按钮；忙碌遮罩；侧边菜单的可折叠分组 |
 | `grid.js` | grid，以 `<link rel="modulepreload">` 链接，因为 `zeyn.js` 会自己导入它 |
 | `palette.js`, `pro.js` | 命令面板和命令按钮；菜单栏、工具箱、状态栏、停靠面板和属性检查器 |
 | `colors.js`, `length.js`, `inspector.js` | 取色器；带单位切换的长度；岛的属性检查器 |
@@ -54,12 +54,19 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 分享按钮、筛选标签、反应、hero 幻灯片、偏好存储、卡片预览（首次悬停）、助手（聊天面板，或首次按下启动按钮） |
 | `topics.js`, `vlist.js` | 监听主题的节点以及驱动它们的控件（`data-zeyn-listens`、`data-zeyn-drives`）；虚拟列表（`data-zeyn-vlist`） |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 收件箱和通知铃铛；看板；日历；不需要脚本的差异视图、代码视图和条码（代码视图的复制按钮在 `share.js` 中） |
+| `sortable.js` | 可排序列表和卡片网格（`data-zeyn-sortable`）：手柄、键盘移动、移动菜单和重排请求；导入 `drag.js` 和 `net.js`；在连接的列表之间（`data-zeyn-sort-group`），请求在 `from` 中给出行离开的节点，服务器检查该节点的组和权限 |
 | `codeedit.js`, `codeedit.css` | 代码编辑器（`data-zeyn-code`）：高亮副本、行号、补全建议和错误标记；只在输入停顿后才向 `/_zeyn/data` 发送请求 |
 | `range.js`、`quantity.js`、`gallery.js`、`countdown.js` 和 `commerce.css` | 范围滑块、数量步进器、商品图库和倒计时；所有商店组件的样式表（价格、规格选择器、分面面板、评价汇总） |
+| `imgcompare.js` | 图片对比（`ImageCompare`）：显示滑块并把它的值写入 `--z-imgcompare` |
+| `tour.js` | 页面导览（`Tour`）：显示开始按钮，并让对话框依次停在页面的各个站点 |
 | `thread.js` 和 `thread.css`, `stream.js`, `composer.js` 和 `composer.css`, `typing.js` 和 `typing.css` | 消息线程；线程和助手共用的流式 Markdown 和 JSON 行；聊天 composer；正在输入指示器 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 帖子信息流；图片和视频的灯箱；故事环及其行，无需脚本 |
+| `surface.js`, `surface.css` | 自由区域（`data-zeyn-surface`）：项目可拖动、用方向键移动，或用两次点击选中并放置，限制在边界内、网格上和各自的轴上；移动发送到区域的 `move` 数据源；导入 `drag.js` 和 `net.js`；可调整大小的项目（`data-min`、`data-max`、`data-aspect`）还可用角上的手柄、`Shift` 加方向键或两次点击在限制内改变尺寸，尺寸随移动一起发送 |
+| `drag.js`, `net.js` | 共享辅助模块，随导入它们的模块一起链接（见下文）；`drag.js` 也随 dock（`data-zeyn-dock`）一起链接，`pro.js` 用它拖动 dock 的标签 |
 
-完整页面在 head 中链接所有页面都用的样式表（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、其 HTML 中出现标记的模块的样式表，以及这些模块的脚本（放在它们导入的模块之后）。`zeyn.js` 带着同一张表（`[name, script selector, style selector]`）提供，并在之后到来的内容中加载缺少的部分：`nav.js` 在替换屏幕前发出带 `{ root, waits }` 的 `zeyn:need` 并等待新的样式表，窗口在打开前同样等待，`zeyn:content`、grid 页和 grid 筛选会加载其内容所需的脚本。浏览器对每个 URL 只保留一个实例，因此模块只运行一次。模块运行时设置它在文档中找到的内容，之后监听 `zeyn:content`；它从不扫描或监听页面上不存在的组件。模块用自身 URL 的 `?v=` 导入共享部分。当页面链接了它不使用的模块，或某个模块的样式表为其标记之外的类设置样式时，`tests/ui_modules.rs` 会失败。
+两个辅助模块收纳了原本会被多个模块复制的代码。`net.js`（由 `kanban.js`、`files.js` 和 `vlist.js` 导入）导出 `BASE`、`csrf()`、`parse(text)` 和 `post(path, body)`；`post` 在页面同源上带 `x-zeyn-csrf` 请求头发送 JSON，并返回 `{ ok, body }`。`drag.js`（由 `grid.js` 用于移动列、由 `catalog.js` 用于拖动滚动轨道导入）是之后可排序列表、看板和画布的拖动核心：`press(e, { threshold, longPress, tolerance, axis, onStart })` 在鼠标或笔移动 6 px，或触摸在 5 px 范围内按住 250 ms 时，把 `pointerdown` 变为拖动（滑动仍然滚动，先滚动会取消按下）；`capture(el, e, move, end)` 用指针捕获跟随拖动，每个动画帧最多调用一次 `move`，在松开、取消或按 Escape 时调用 `end(event, cancelled)`；`swallowClick()` 取消松开后的点击；`announce(text)` 在每页一个 polite 实时区域中朗读本地化文本，最多每 500 ms 一次。`.z-drag-handle`（在 `zeyn.css` 中）只在拖动手柄上关闭触摸平移。每个可拖动的组件也提供用键盘和单指针移动的方式（移动菜单，WCAG 2.5.7）。两个模块都不写入 HTML。
+
+完整页面在 head 中链接所有页面都用的样式表（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、其 HTML 中出现标记的模块的样式表，以及这些模块的脚本（放在它们导入的模块之后）。`zeyn.js` 带着同一张表（`[name, script selector, style selector]`）提供，并在之后到来的内容中加载缺少的部分：`nav.js` 在替换屏幕前发出带 `{ root, waits }` 的 `zeyn:need` 并等待新的样式表，窗口在打开前同样等待，`zeyn:content`、grid 页和 grid 筛选会加载其内容所需的脚本。浏览器对每个 URL 只保留一个实例，因此模块只运行一次。模块运行时设置它在文档中找到的内容，之后监听 `zeyn:content`；它从不扫描或监听页面上不存在的组件。模块用自身 URL 的 `?v=` 导入共享部分。当页面链接了它不使用的模块，或某个模块的样式表为其标记之外的类设置样式时，`tests/all/ui_modules.rs` 会失败。
 
 在 showcase 上测得（未压缩，网络上 gzip 后）：只有文字的页面加载 132 KB 脚本（46 KB），原来是 269 KB（80 KB）；grid 页面 223 KB（74 KB），原来是 357 KB（106 KB）；表单页面 186 KB（65 KB），原来是 269 KB（80 KB）；每个页面的样式为 151 KB（35 KB），原来是 177 KB（44 KB）。包含所有组件的页面（例如组件目录）加载的文件比以前多（68 个请求而不是 41 个，未压缩 836 KB 而不是 774 KB），因为每个模块都是单独的文件。
 
@@ -193,14 +200,14 @@ Effects：
 运行时的行为：
 
 - 把表格主体放进一个滚动容器，其内部占位元素高度为 `total * rowHeight` 像素，上限为 8,000,000 px。超过上限时，滚动位置按比例映射到行索引（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`），因此 1,000,000 行仍然可以滚到末尾。
-- DOM 中只保留可见行以及上下各 20 行，并用 `transform: translateY(...)` 定位。行高固定；过长的文本以省略号截断。
+- DOM 中只保留可见行以及上下各 10 行，并用 `transform: translateY(...)` 定位。行高固定；过长的文本以省略号截断。
 - 以 `POST /_zeyn/grid` 加载每块 `data-zeyn-page-size` 行的数据块，使用 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`，首次调用之后 `with_total: false`。缓存最多保留 20 个块且最多 100,000 个单元格（最近最少使用者先淘汰；63 列的 grid 为 7 个块，但不少于 3 个），为 `reload` 保留的块计入同一上限并最先被丢弃，沿滚动方向预取下一个块，并取消已离开视野的块的请求（`AbortController`）。
 - 块加载期间从不清空可见行。缺失的行显示带有 `aria-busy="true"` 的占位行，直到其块到达，因此界面不会闪烁。
 - 排序和筛选变化会丢弃缓存并滚动到顶部。
 - 键盘：方向键、Page Up、Page Down、Home 和 End 移动活动行并将其滚动到可见位置。表格带有 `aria-rowcount` = total，每一行带有 `aria-rowindex`。
 - 位置文本（`data-zeyn-page-info`）使用 `data-zeyn-text-range-total`。
 
-卡片网格（`zeyn::ui::CardGrid`，不包括 rail 和行列表）在包含 200 张卡片后，会对页面本身的滚动而不是滚动容器进行窗口化：`catalog.js` 给列表加上 `data-zeyn-window`，在其中保留距视口 800 px 以内的行，把上方和下方的行变成内边距，让每一行的高度等于前几张卡片中最高的那张（`grid-auto-rows`），并在每张卡片上设置 `aria-posinset` 和 `aria-setsize`（在可能还有更多页面时为 `-1`）。窗口之外获得焦点的卡片会带着 `z-cards-kept` 留在 DOM 中，并放在它自己的单元格上方。来自“显示更多”或其他页面的卡片会加入同一个窗口。当页面滚动速度超过每 ms 3 px 时，卡片进入时会暂缓加载图片（`data-zeyn-park`，`src` 和 `srcset` 先另存起来），在 120 ms 内没有滚动后再取回图片。
+卡片网格（`zeyn::ui::CardGrid`，不包括 rail 和行列表）在包含 200 张卡片后，会对页面本身的滚动而不是滚动容器进行窗口化：`catalog.js` 给列表加上 `data-zeyn-window`，在其中保留距视口 800 px 以内的行，把上方和下方的行变成内边距，让每一行的高度等于前几张卡片中最高的那张（`grid-auto-rows`），并在每张卡片上设置 `aria-posinset` 和 `aria-setsize`（在可能还有更多页面时为 `-1`）。窗口之外获得焦点的卡片会带着 `z-cards-kept` 留在 DOM 中，并放在它自己的单元格上方。来自“显示更多”或其他页面的卡片会加入同一个窗口。当页面滚动速度超过每 ms 3 px 时，卡片进入时会暂缓加载图片（`data-zeyn-park`，`src` 和 `srcset` 先另存起来），在 120 ms 内没有滚动后再取回图片。当滚动速度降到每 ms 1 px 以下时，暂缓的图片也会立即取回。窗口之外 600 px 以内的行带着 `z-cards-far`（`content-visibility: hidden`）留在 DOM 中，因此保留布局，滚回它们的代价很小；更远的卡片中只有最后离开的 200 张保留图片，更早的卡片以同样方式释放 `src` 和 `srcset`。
 
 ### 4.3 Form submit（表单提交）
 
@@ -350,7 +357,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket；文本帧 `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket；文本帧 `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket；双向的二进制帧 `0x01` + Y update (v1) |
 
 握手在升级之前会检查 origin、与 cookie 比对的 CSRF 令牌、已登录用户以及权限。参见 `docs/realtime.md`。
@@ -420,7 +427,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 | `Mcp::read_only()` | on | on | no |
 | `Mcp::on()` | on | on | 表单保存和执行写入的 API action |
 
-`.server(false)` 和 `.webmcp(false)` 关闭其中一个入口。由 `zeyn new` 创建的新项目以 `Mcp::read_only()` 起步。
+`.no_server()` 和 `.no_webmcp()` 关闭其中一个入口。由 `zeyn new` 创建的新项目以 `Mcp::read_only()` 起步。
 
 为什么默认关闭：该端点允许任何持有有效 `Authorization` 请求头的人通过模型驱动应用，而模型可能被它所读取的数据所操纵。框架让每个应用都为代理做好准备（工具由代码生成，无需编写任何内容），但应用是否打开这个入口，以及代理是否可以写入，应由运行它的人决定。只读模式只需一行即可启用。
 

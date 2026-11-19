@@ -13,30 +13,166 @@ pub struct MenuItem {
     pub screen: &'static str,
     /// The icon before the label in the side menu, set with [`Menu::icon`].
     pub icon: Option<Icon>,
+    /// A short fixed text after the label, set with [`Menu::badge`].
+    pub badge: Option<Text>,
+    /// A number after the label, counted per request, set with [`Menu::count`].
+    #[serde(skip)]
+    pub count: Option<MenuCount>,
+    /// Topics that make the browser count again, set with [`Menu::count_listens`].
+    pub topics: Vec<&'static str>,
 }
 
-/// Menu group.
+/// The action that counts a menu item's number: it takes `()` and returns a `u64`, and runs with
+/// its permission, once per page and again when one of the item's topics is named.
+#[derive(Clone, Copy)]
+pub struct MenuCount {
+    pub action: crate::action::ActionMeta,
+    pub run: fn(crate::Ctx) -> crate::BoxFuture<crate::Result<u64>>,
+}
+
+impl std::fmt::Debug for MenuCount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MenuCount")
+            .field("action", &self.action.name)
+            .finish()
+    }
+}
+
+/// Menu group: a heading over items and, after them, nested groups (see [`Menu::sub`]).
 #[derive(Clone, Debug, Serialize)]
 pub struct MenuGroup {
     pub label: Text,
-    pub icon: Icon,
+    /// The icon before the label. Top level groups have one; nested groups have none.
+    pub icon: Option<Icon>,
     pub items: Vec<MenuItem>,
+    /// Nested groups, drawn after the items, at most [`MENU_DEPTH`] levels below a top level
+    /// group.
+    pub groups: Vec<MenuGroup>,
+    /// Whether the group stays open (no toggle button), set with [`Menu::open`]. Other groups
+    /// are collapsible and start open only when they hold the current screen.
+    pub open: bool,
+}
+
+/// How many levels of nested groups a top level menu group may hold.
+pub const MENU_DEPTH: usize = 3;
+
+impl MenuGroup {
+    /// A group without items.
+    fn new(label: Text, icon: Option<Icon>) -> Self {
+        MenuGroup {
+            label,
+            icon,
+            items: Vec::new(),
+            groups: Vec::new(),
+            open: false,
+        }
+    }
+
+    /// The levels of nested groups below this one: 0 for a group without nested groups.
+    pub fn depth(&self) -> usize {
+        self.groups
+            .iter()
+            .map(|g| g.depth() + 1)
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// The item of `screen` in this group or a nested one, with the labels of the groups from
+    /// this one down to the item's own.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/orders", public)]
+    /// pub fn orders() -> Screen { Screen::new("Orders") }
+    ///
+    /// let feature = Feature::new("shop").screen(orders).menu(|m| {
+    ///     m.group("Commerce", Icon::Cart)
+    ///         .sub("Sales", |m| m.item("Orders", orders))
+    /// });
+    /// let (path, item) = feature.menu_groups()[0].find("orders").unwrap();
+    /// assert_eq!(path.len(), 2);
+    /// assert_eq!(item.screen, "orders");
+    /// ```
+    pub fn find(&self, screen: &str) -> Option<(Vec<&Text>, &MenuItem)> {
+        if let Some(item) = self
+            .items
+            .iter()
+            .find(|i| i.screen == screen)
+        {
+            return Some((vec![&self.label], item));
+        }
+        self.groups.iter().find_map(|g| {
+            let (mut path, item) = g.find(screen)?;
+            path.insert(0, &self.label);
+            Some((path, item))
+        })
+    }
 }
 
 /// Menu builder.
 #[derive(Debug, Default)]
 pub struct Menu {
     groups: Vec<MenuGroup>,
+    accordion: bool,
 }
 
 impl Menu {
     /// Starts a group; following `item` calls add to it.
     pub fn group(mut self, label: impl Into<Text>, icon: Icon) -> Self {
-        self.groups.push(MenuGroup {
-            label: label.into(),
-            icon,
-            items: Vec::new(),
+        self.groups
+            .push(MenuGroup::new(label.into(), Some(icon)));
+        self
+    }
+
+    /// Adds a nested group to the last group. `build` gets a menu whose `item`, `icon`, `open`
+    /// and `sub` calls go to the nested group. Nested groups come after the items of their group
+    /// and may nest [`MENU_DEPTH`] levels deep; `Feature::menu` panics on deeper menus.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/orders", public)]
+    /// pub fn orders() -> Screen { Screen::new("Orders") }
+    /// #[screen(route = "/returns", public)]
+    /// pub fn returns() -> Screen { Screen::new("Returns") }
+    ///
+    /// let feature = Feature::new("shop").screen(orders).screen(returns).menu(|m| {
+    ///     m.group("Commerce", Icon::Cart)
+    ///         .item("Orders", orders)
+    ///         .sub("After sales", |m| m.item("Returns", returns))
+    /// });
+    /// assert_eq!(feature.menu_groups()[0].groups[0].items[0].screen, "returns");
+    /// ```
+    pub fn sub(mut self, label: impl Into<Text>, build: impl FnOnce(Menu) -> Menu) -> Self {
+        let inner = build(Menu {
+            groups: vec![MenuGroup::new(label.into(), None)],
+            accordion: false,
         });
+        let [group]: [MenuGroup; 1] = inner
+            .groups
+            .try_into()
+            .expect("inside `sub`, add items with `item` and nested groups with `sub`; `group` starts a top level group and belongs outside");
+        self.groups
+            .last_mut()
+            .expect("call `group` before `sub`")
+            .groups
+            .push(group);
+        self
+    }
+
+    /// Keeps the last group open: its heading is plain text instead of a toggle button.
+    pub fn open(mut self) -> Self {
+        if let Some(group) = self.groups.last_mut() {
+            group.open = true;
+        }
+        self
+    }
+
+    /// Makes the side menu an accordion: opening a group closes its open siblings. Set on the
+    /// top level menu of any feature in the app shell, it applies to the whole side menu.
+    pub fn accordion(mut self) -> Self {
+        self.accordion = true;
         self
     }
 
@@ -62,6 +198,9 @@ impl Menu {
             label: label.into(),
             screen: S::META.name,
             icon: None,
+            badge: None,
+            count: None,
+            topics: Vec::new(),
         });
         self
     }
@@ -83,14 +222,57 @@ impl Menu {
     /// assert!(feature.menu_groups()[0].items[0].icon.is_some());
     /// ```
     pub fn icon(mut self, icon: Icon) -> Self {
-        if let Some(item) = self
-            .groups
-            .last_mut()
-            .and_then(|g| g.items.last_mut())
-        {
+        if let Some(item) = self.last_item() {
             item.icon = Some(icon);
         }
         self
+    }
+
+    /// A short fixed text after the last item's label, such as "New" or "Beta".
+    pub fn badge(mut self, text: impl Into<Text>) -> Self {
+        if let Some(item) = self.last_item() {
+            item.badge = Some(text.into());
+        }
+        self
+    }
+
+    /// A number after the last item's label, such as unread messages, counted by an action that
+    /// takes `()` and returns `u64`. The page asks for every count of its menu in one request
+    /// after it shows (`GET /_zeyn/menu/counts`), so a slow count never delays the page; users
+    /// without the action's permission see no number; 0 shows nothing and more than 99 shows
+    /// "99+".
+    ///
+    /// ```ignore
+    /// #[action(permission = "mail.read")]
+    /// pub async fn unread(_: (), mail: Mail, ctx: Ctx) -> Result<u64> { mail.unread(&ctx).await }
+    /// m.group(t!("menu.mail"), Icon::Mail).item(t!("menu.inbox"), inbox).count(unread)
+    /// ```
+    pub fn count<A>(mut self, _action: A) -> Self
+    where
+        A: crate::action::Action<Input = (), Output = crate::Result<u64>>,
+    {
+        if let Some(item) = self.last_item() {
+            item.count = Some(MenuCount {
+                action: A::META,
+                run: |ctx| Box::pin(async move { A::call(ctx, ()).await? }),
+            });
+        }
+        self
+    }
+
+    /// Topics that make the page count the last item again, when an action names one with
+    /// `ui.refresh(..)` or the live socket notifies it.
+    pub fn count_listens(mut self, topics: impl crate::ui::Topics) -> Self {
+        if let Some(item) = self.last_item() {
+            item.topics = crate::ui::topic_list(topics);
+        }
+        self
+    }
+
+    fn last_item(&mut self) -> Option<&mut MenuItem> {
+        self.groups
+            .last_mut()
+            .and_then(|g| g.items.last_mut())
     }
 }
 
@@ -201,6 +383,7 @@ pub struct Feature {
     screens: Vec<ScreenEntry>,
     guards: Vec<Arc<dyn Guard>>,
     menu: Vec<MenuGroup>,
+    menu_accordion: bool,
     apis: Vec<ApiEntry>,
     media: Vec<crate::media::MediaEntry>,
     commands: Vec<crate::command::Command>,
@@ -208,6 +391,7 @@ pub struct Feature {
     sitemap: Option<crate::seo::Sitemap>,
     site: Option<crate::site::SiteShell>,
     /// Screens of this feature that open in the sign in shell while the others keep theirs.
+    #[cfg(feature = "server")]
     auth: Option<(crate::site::SiteShell, Vec<&'static str>)>,
     #[cfg(feature = "server")]
     files: Vec<crate::files::FileEntry>,
@@ -223,12 +407,14 @@ impl Feature {
             screens: Vec::new(),
             guards: Vec::new(),
             menu: Vec::new(),
+            menu_accordion: false,
             apis: Vec::new(),
             commands: Vec::new(),
             searches: Vec::new(),
             sitemap: None,
             media: Vec::new(),
             site: None,
+            #[cfg(feature = "server")]
             auth: None,
             #[cfg(feature = "server")]
             files: Vec::new(),
@@ -428,9 +614,26 @@ impl Feature {
         self
     }
 
+    /// The feature's menu. Panics when a group nests deeper than [`MENU_DEPTH`] levels.
     pub fn menu(mut self, build: impl FnOnce(Menu) -> Menu) -> Self {
-        self.menu = build(Menu::default()).groups;
+        let menu = build(Menu::default());
+        for g in &menu.groups {
+            let depth = g.depth();
+            assert!(
+                depth <= MENU_DEPTH,
+                "menu group `{}` of feature `{}` nests groups {depth} levels deep; the side menu allows at most {MENU_DEPTH} levels of `sub` below a `group`",
+                g.label.english(),
+                self.name,
+            );
+        }
+        self.menu = menu.groups;
+        self.menu_accordion = menu.accordion;
         self
+    }
+
+    /// Whether the feature's menu asked for an accordion side menu ([`Menu::accordion`]).
+    pub fn menu_accordion(&self) -> bool {
+        self.menu_accordion
     }
 
     /// Opens the feature's screens in the site shell (a top bar with a horizontal menu built from
@@ -460,6 +663,7 @@ impl Feature {
 
     /// The shell a screen of this feature opens in: its sign in shell, the feature's site shell,
     /// or `None` for the app shell.
+    #[cfg(feature = "server")]
     pub(crate) fn shell_of(&self, screen: &str) -> Option<&crate::site::SiteShell> {
         match &self.auth {
             Some((shell, names)) if names.contains(&screen) => Some(shell),
@@ -518,10 +722,16 @@ impl Feature {
                 .iter()
                 .any(|o| o.path == r.path)
             {
-                problems.push(format!(
-                    "route `{}` is used by more than one screen",
-                    r.path
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0109",
+                        format!("route `{}` is used by more than one screen", r.path),
+                    )
+                    .why("a request to the route can open only one screen, so the others would never be reached")
+                    .fix("give each screen of the feature its own route in `#[screen(route = \"...\")]`")
+                    .docs("language/screens#params-in-the-path")
+                    .to_string(),
+                );
             }
         }
         for (i, s) in self.screens.iter().enumerate() {
@@ -529,21 +739,45 @@ impl Feature {
                 .iter()
                 .any(|o| o.meta.name == s.meta.name)
             {
-                problems.push(format!("screen `{}` is registered twice", s.meta.name));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0110",
+                        format!("screen `{}` is registered twice", s.meta.name),
+                    )
+                    .why("each `.screen(...)` call adds a route and a permission, so the second one only repeats the first")
+                    .fix("remove one of the `.screen(...)` calls")
+                    .docs("start/structure#a-feature")
+                    .to_string(),
+                );
             }
         }
         for (i, m) in self.media.iter().enumerate() {
             if !crate::media::valid_media_id(m.name) {
-                problems.push(format!(
-                    "media source `{}` must use only letters, digits, `-`, `_` and `.`",
-                    m.name
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0502",
+                        format!("media source `{}` must use only letters, digits, `-`, `_` and `.`", m.name),
+                    )
+                    .why("the name is a segment of every media URL, so other characters would break the address or let it point elsewhere")
+                    .fix("rename the source with letters, digits, `-`, `_` and `.`, such as `films`")
+                    .docs("components/media#serving-files")
+                    .to_string(),
+                );
             }
             if self.media[..i]
                 .iter()
                 .any(|o| o.name == m.name)
             {
-                problems.push(format!("media source `{}` is registered twice", m.name));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0503",
+                        format!("media source `{}` is registered twice", m.name),
+                    )
+                    .why("media URLs carry the source name, so only one of the two sources would ever serve files")
+                    .fix("remove one of the `.media(...)` calls, or give it another name")
+                    .docs("components/media#serving-files")
+                    .to_string(),
+                );
             }
         }
         for item in self.menu.iter().flat_map(|g| &g.items) {
@@ -552,18 +786,27 @@ impl Feature {
                 .iter()
                 .find(|s| s.meta.name == item.screen)
             {
-                Some(s) if s.meta.route.is_none() => problems.push(format!(
-                    "menu item `{}` points to screen `{}`, which has no route",
-                    item.label.english(),
-                    item.screen
-                )),
+                Some(s) if s.meta.route.is_none() => problems.push(
+                    crate::Problem::new(
+                        "Z0401",
+                        format!("menu item `{}` points to screen `{}`, which has no route", item.label.english(), item.screen),
+                    )
+                    .why("a menu item is a link, and a screen without a route has no address to link to")
+                    .fix("give the screen `#[screen(route = \"...\")]`, or remove the menu item")
+                    .docs("components/shell#the-menu")
+                    .to_string(),
+                ),
                 Some(_) => {}
-                None => problems.push(format!(
-                    "menu item `{}` points to screen `{}`, which is not registered in feature `{}`",
-                    item.label.english(),
-                    item.screen,
-                    self.name
-                )),
+                None => problems.push(
+                    crate::Problem::new(
+                        "Z0402",
+                        format!("menu item `{}` points to screen `{}`, which is not registered in feature `{}`", item.label.english(), item.screen, self.name),
+                    )
+                    .why("the menu would show a link to a screen the feature does not serve")
+                    .fix("add `.screen(...)` for it to the same feature, or remove the menu item")
+                    .docs("components/shell#the-menu")
+                    .to_string(),
+                ),
             }
         }
         let commands: Vec<(&str, &crate::command::Command)> = self

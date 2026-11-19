@@ -16,31 +16,34 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. Endpoints
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: a collaborative document |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: change notifications for topics |
+| `GET /_zeyn/live/doc/{kind}/{doc}` | WebSocket: a collaborative document |
+| `GET /_zeyn/socket` | WebSocket: change notifications for topics |
 | `GET /_zeyn/live.js` | The topic script, linked only by pages that subscribe |
 
 Every handshake is checked before the upgrade, in this order:
 
 1. The channel is on (`404` otherwise).
 2. **Origin:** the `Origin` header must name the host the request came to, or an origin added with
-   `Realtime::allow_origin`. Browsers always send it on WebSocket handshakes; a missing one is
+   `ZeynSocket::allow_origin`. Browsers always send it on WebSocket handshakes; a missing one is
    refused. This is what stops another site from opening a socket with the user's cookies.
-3. **CSRF token:** browsers cannot set headers on a WebSocket, so the token from
-   `meta[name=zeyn-csrf]` goes in the `csrf` query parameter and is compared in constant time with
-   the `zeyn_csrf` cookie, exactly as `x-zeyn-csrf` is for `POST`s. Failures answer `403`.
+3. **CSRF token:** browsers cannot set headers on a WebSocket, so the client offers the token
+   from `meta[name=zeyn-csrf]` as a subprotocol: `new WebSocket(url, ['zeyn', 'csrf.' + token])`
+   sends `Sec-WebSocket-Protocol: zeyn, csrf.TOKEN`. The server compares it in constant time with
+   the `zeyn_csrf` cookie, exactly as `x-zeyn-csrf` is for `POST`s, and answers with the `zeyn`
+   subprotocol only, so the token never appears in the address, server logs or history. A token
+   in the query string is not accepted. Failures answer `403`.
 4. **Identity:** the same authenticator as every request; the user must be signed in (`403`).
 5. **Per user limit** (`429`).
 6. Documents: a declared kind and a plain id (1 to 64 letters, digits, `-`, `_`, `.`), else `404`;
@@ -73,8 +76,15 @@ Persistence goes through a trait:
 pub trait DocStore: Send + Sync + 'static {
     fn load(&self, key: RoomKey) -> BoxFuture<Result<Option<Vec<u8>>>>;
     fn save(&self, key: RoomKey, state: Vec<u8>) -> BoxFuture<Result<()>>;
+    fn allow(&self, ctx: &Ctx, key: &RoomKey, write: bool) -> BoxFuture<Result<bool>> { /* true */ }
 }
 ```
+
+The kind's `read` and `write` permissions cover every document of the kind. When documents belong
+to people or records, implement `allow`: it runs on every join, also while the room is already
+open for others, first with `write` false (`false` refuses the join with `403`) and then, for
+users with the kind's `write` permission, with `write` true (`false` makes the user a reader whose
+changes close the socket). The default allows everything the permissions allow.
 
 `load` runs when a room opens (an error refuses the connection with `503`, which is also how a
 store limits which documents exist). `save` receives the whole document as one update and runs
@@ -97,9 +107,9 @@ It reconnects after 1 second, doubling up to 30 seconds, and stops after `close`
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -120,7 +130,7 @@ place when a notification names the topic (`live.js` passes it on as `zeyn:topic
 when an action ends with `ui.refresh("orders")` or a filter that `.drives("orders")` changes:
 grids reload their current page, other listeners are rendered again with one `POST /_zeyn/nodes`
 per screen (see Topics in `examples/docs/pages/effects.md`). The socket subscribes only to the
-topics of `Live` nodes, which must be declared with `Realtime::topic`; use `.listens` inside or
+topics of `Live` nodes, which must be declared with `ZeynSocket::topic`; use `.listens` inside or
 next to them for the parts that are not grids.
 
 ## 5. Memory and backpressure
@@ -147,7 +157,7 @@ queue only misses that notification (the next one refreshes it anyway).
 Worst case memory is therefore about `rooms * doc_bytes` for documents plus
 `clients * queue * message_bytes` for queues (an update is shared between queues, not copied). The
 showcase server with two live tabs on the diagram uses about 19 MB in total (debug build).
-`Hub::stats()` reports rooms, clients, subscribers and document bytes for monitoring.
+`Socket::stats()` reports rooms, clients, subscribers and document bytes for monitoring.
 
 ## 6. Security notes
 

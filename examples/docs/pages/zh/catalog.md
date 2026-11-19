@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -49,7 +49,7 @@ CardGrid::of(catalog_products)
     .placeholder(Placeholder::color("--z-surface-2"))
     .priority(4)
 ```
-- **长网格。** 屏幕外的卡片和列表行会跳过布局和绘制（`content-visibility: auto`），并按图片尺寸预留大小，因此长网格在被看到之前几乎没有开销。包含 200 张或更多卡片的卡片网格只在页面中保留视口附近的行，与虚拟 [DataGrid](datagrid.md) 的做法相同：其他行是同样高度的空白，每一行的高度取前几张卡片中最高的那张，每张卡片都会向屏幕阅读器报告自己的位置（`aria-posinset`、`aria-setsize`）。Tab 和 Shift+Tab 可以到达每张卡片，获得焦点的卡片滚出视野时仍会保留，“显示更多”会添加到同一个窗口中。快速滑动时，只是一闪而过的卡片不会获取图片；滚动停下后才会加载。页面内查找只能找到视口附近的卡片；其他卡片请使用网格的搜索。
+- **长网格。** 屏幕外的卡片和列表行会跳过布局和绘制（`content-visibility: auto`），并按图片尺寸预留大小，因此长网格在被看到之前几乎没有开销。包含 200 张或更多卡片的卡片网格只在页面中保留视口附近的行，与虚拟 [DataGrid](datagrid.md) 的做法相同：其他行是同样高度的空白，每一行的高度取前几张卡片中最高的那张，每张卡片都会向屏幕阅读器报告自己的位置（`aria-posinset`、`aria-setsize`）。Tab 和 Shift+Tab 可以到达每张卡片，获得焦点的卡片滚出视野时仍会保留，“显示更多”会添加到同一个窗口中。快速滑动时，只是一闪而过的卡片不会获取图片；滚动停下后才会加载。页面内查找只能找到视口附近的卡片；其他卡片请使用网格的搜索。滚动停下处的卡片图片会在减速期间、停止之前就开始加载。
 - **首页在服务器端渲染。** 第一页（卡片网格 24 张、rail 12 张，或 `paging` 指定的数量）是页面 HTML 的一部分，因此搜索引擎和未启用 JavaScript 的访客也能看到卡片及其链接；图片带有尺寸，加载时页面不会跳动。后续页面由浏览器加载。公开页面对每位访客都是相同的 HTML，因此可以缓存。链接到带路由的 screen 的卡片会直接使用其规范地址（`/items/{slug}`），而不是重定向。
 - **分页。** `Paging::infinite(n)`（默认，24）显示一个“显示更多”按钮，该按钮滚动到视野中时也会触发；按下按钮后，焦点会移到第一张新卡片。`Paging::pages(n)` 显示上一页和下一页按钮以及页码：action 返回总数时为 "Page 2 of 5"，不返回时为 "Page 2"，此时只要 action 返回游标，Next 就可用。页面大小由服务器设置；客户端只说明从哪里继续。
 - **排序。** 每个 `sort_option` 是用户可以从下拉框中选择的一种顺序；第一个是卡片起始的顺序。服务器只接受这些顺序，并丢弃客户端发送的过滤条件和搜索文本。
@@ -92,13 +92,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 rail 是排成一行并可横向滚动的卡片网格，带有滚动吸附，以及按一个视图宽度滚动的上一个和下一个按钮（除非用户要求减少动画，否则为平滑滚动）。当用户滚动到接近末尾时，它每次加载下一批，每批 12 张。卡片是处于 Tab 顺序中的链接，获得焦点时会滚动到视野中。
 
-滚动条默认隐藏；触摸、触控板和 Shift+滚轮仍可滚动，`.scrollbar(true)` 会保留一条细滚动条。可以用鼠标按住并左右拖动 rail。移动超过 5 像素后，松开时的点击会被取消，因此指针下的卡片不会打开，rail 会停在最近的卡片上；更小的移动则是普通点击。拖动期间不会选中文本，图片不会被拖出，也不会打开卡片预览。触摸设备保留浏览器自身的滚动。上一个和下一个按钮始终存在，到达两端时被禁用，因为隐藏的滚动条无法供键盘滚动。没有 JavaScript 时按钮被隐藏，rail 使用浏览器原生滚动。
+滚动条默认隐藏；触摸、触控板和 Shift+滚轮仍可滚动，`.scrollbar()` 会保留一条细滚动条。可以用鼠标按住并左右拖动 rail。移动超过 5 像素后，松开时的点击会被取消，因此指针下的卡片不会打开，rail 会停在最近的卡片上；更小的移动则是普通点击。拖动期间不会选中文本，图片不会被拖出，也不会打开卡片预览。触摸设备保留浏览器自身的滚动。上一个和下一个按钮始终存在，到达两端时被禁用，因为隐藏的滚动条无法供键盘滚动。没有 JavaScript 时按钮被隐藏，rail 使用浏览器原生滚动。
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## Search box

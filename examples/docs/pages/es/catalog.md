@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -49,7 +49,7 @@ CardGrid::of(catalog_products)
     .placeholder(Placeholder::color("--z-surface-2"))
     .priority(4)
 ```
-- **Cuadrículas largas.** Las tarjetas y las filas de lista fuera de la pantalla se saltan el diseño y el pintado (`content-visibility: auto`), con su tamaño reservado a partir del tamaño de la imagen, así que una cuadrícula larga cuesta poco hasta que se ve. Una cuadrícula de tarjetas con 200 tarjetas o más mantiene en la página solo las filas cercanas a la vista, como hace un [DataGrid](datagrid.md) virtual: las demás filas son espacio de la misma altura, cada fila tiene la altura de la más alta de las primeras tarjetas y cada tarjeta indica su posición a los lectores de pantalla (`aria-posinset`, `aria-setsize`). Tab y Shift+Tab llegan a todas las tarjetas, una tarjeta con el foco se queda mientras sale de la vista al desplazarse y "Show more" añade a la misma ventana. Durante un desplazamiento rápido, las tarjetas que solo pasan de largo no descargan imágenes; se cargan cuando el desplazamiento se detiene. Buscar en la página solo ve las tarjetas cercanas a la vista; para las demás, use la búsqueda de la cuadrícula.
+- **Cuadrículas largas.** Las tarjetas y las filas de lista fuera de la pantalla se saltan el diseño y el pintado (`content-visibility: auto`), con su tamaño reservado a partir del tamaño de la imagen, así que una cuadrícula larga cuesta poco hasta que se ve. Una cuadrícula de tarjetas con 200 tarjetas o más mantiene en la página solo las filas cercanas a la vista, como hace un [DataGrid](datagrid.md) virtual: las demás filas son espacio de la misma altura, cada fila tiene la altura de la más alta de las primeras tarjetas y cada tarjeta indica su posición a los lectores de pantalla (`aria-posinset`, `aria-setsize`). Tab y Shift+Tab llegan a todas las tarjetas, una tarjeta con el foco se queda mientras sale de la vista al desplazarse y "Show more" añade a la misma ventana. Durante un desplazamiento rápido, las tarjetas que solo pasan de largo no descargan imágenes; se cargan cuando el desplazamiento se detiene. Buscar en la página solo ve las tarjetas cercanas a la vista; para las demás, use la búsqueda de la cuadrícula. Las imágenes de las tarjetas donde se detiene el desplazamiento empiezan a cargar mientras frena, antes de pararse.
 - **Primera página en el servidor.** La primera página (24 tarjetas en una cuadrícula, 12 en un rail, o el tamaño indicado en `paging`) forma parte del HTML de la página, así que los buscadores y los visitantes sin JavaScript ven las tarjetas y sus enlaces, y las imágenes llevan su tamaño para que nada se mueva al cargarse. Las páginas siguientes llegan desde el navegador. Una página pública es el mismo HTML para todos los visitantes, así que puede almacenarse en caché. Una tarjeta enlazada a una screen con ruta enlaza a su dirección canónica (`/items/{slug}`), nunca a una redirección.
 - **Paginación.** `Paging::infinite(n)` (el valor por defecto, 24) muestra un botón "Show more" que también se activa cuando entra en la vista al desplazarse; el foco pasa a la primera tarjeta nueva cuando se pulsa el botón. `Paging::pages(n)` muestra los botones anterior y siguiente y el número de página: "Page 2 of 5" cuando la action devuelve un total, "Page 2" cuando no, y entonces Siguiente funciona mientras la action devuelva un cursor. El servidor fija el tamaño de página; el cliente solo indica dónde continuar.
 - **Ordenación.** Cada `sort_option` es un orden que los usuarios pueden elegir en un select; el primero es el orden con el que empiezan las tarjetas. El servidor acepta solo estos órdenes y descarta los filtros y el texto de búsqueda que envíe el cliente.
@@ -92,13 +92,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 Un rail es un card grid dispuesto en una sola fila que se desplaza lateralmente, con ajuste al desplazarse y botones anterior y siguiente que se desplazan el ancho de una vista (con suavidad, salvo que el usuario haya pedido movimiento reducido). Carga el siguiente lote, de 12 en 12, cuando el usuario se desplaza cerca del final. Las tarjetas son enlaces en el orden de tabulación y se desplazan hasta quedar a la vista cuando reciben el foco.
 
-La barra de desplazamiento está oculta; la pantalla táctil, el trackpad y Mayús+rueda siguen desplazando, y `.scrollbar(true)` deja una barra fina. Con el ratón se puede pulsar y arrastrar el rail hacia los lados. Tras un movimiento de más de 5 píxeles, el clic al soltar se cancela, así que la tarjeta bajo el puntero no se abre y el rail se detiene en la tarjeta más cercana; un movimiento menor es un clic normal. Mientras se arrastra no se selecciona texto, las imágenes no se arrastran fuera y no se abre la vista previa de la tarjeta. En pantallas táctiles se mantiene el desplazamiento propio del navegador. Los botones anterior y siguiente siempre están y se desactivan en los extremos, porque una barra oculta no sirve para desplazarse con el teclado. Sin JavaScript los botones se ocultan y el rail se desplaza de forma nativa.
+La barra de desplazamiento está oculta; la pantalla táctil, el trackpad y Mayús+rueda siguen desplazando, y `.scrollbar()` deja una barra fina. Con el ratón se puede pulsar y arrastrar el rail hacia los lados. Tras un movimiento de más de 5 píxeles, el clic al soltar se cancela, así que la tarjeta bajo el puntero no se abre y el rail se detiene en la tarjeta más cercana; un movimiento menor es un clic normal. Mientras se arrastra no se selecciona texto, las imágenes no se arrastran fuera y no se abre la vista previa de la tarjeta. En pantallas táctiles se mantiene el desplazamiento propio del navegador. Los botones anterior y siguiente siempre están y se desactivan en los extremos, porque una barra oculta no sirve para desplazarse con el teclado. Sin JavaScript los botones se ocultan y el rail se desplaza de forma nativa.
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## Search box

@@ -682,7 +682,7 @@ fn call_literals<'a>(text: &'a str, call: &str) -> Vec<(&'a str, usize)> {
 /// `ui.refresh`) or driven (`.drives`) but that no node listens to (`.listens`, `Live::new`), and
 /// a topic nodes listen to that nothing refreshes, drives or notifies (`hub.notify`,
 /// `notify_tenant`). Read from the source text, so only topics written as string literals count.
-pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<String> {
+pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<(&'static str, String)> {
     let mut listened: Vec<(&str, String)> = Vec::new();
     let mut sent: Vec<(&str, String, &str)> = Vec::new();
     for (path, text) in files {
@@ -713,16 +713,22 @@ pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<String> {
         if *how != "notified" && !listened.iter().any(|(t, _)| t == topic) && !seen.contains(topic)
         {
             seen.push(topic);
-            out.push(format!(
-                "topic `{topic}` is {how} at {place}, but no node listens to it; add `.listens(\"{topic}\")` to the nodes that show it, or remove the call"
+            out.push((
+                "W0103",
+                format!(
+                    "topic `{topic}` is {how} at {place}, but no node listens to it; add `.listens(\"{topic}\")` to the nodes that show it, or remove the call"
+                ),
             ));
         }
     }
     for (topic, place) in &listened {
         if !sent.iter().any(|(t, _, _)| t == topic) && !seen.contains(topic) {
             seen.push(topic);
-            out.push(format!(
-                "nodes listen to topic `{topic}` at {place}, but nothing refreshes, drives or notifies it; call `ui.refresh(\"{topic}\")` after saving, `.drives(\"{topic}\")` on a filter, or `hub.notify(&ctx, \"{topic}\")`"
+            out.push((
+                "W0104",
+                format!(
+                    "nodes listen to topic `{topic}` at {place}, but nothing refreshes, drives or notifies it; call `ui.refresh(\"{topic}\")` after saving, `.drives(\"{topic}\")` on a filter, or `hub.notify(&ctx, \"{topic}\")`"
+                ),
             ));
         }
     }
@@ -731,7 +737,10 @@ pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<String> {
 
 /// Warnings about the default layout for `zeyn check`, from the source files of an app and the
 /// screens and APIs its features register. Never errors: the layout is a default, not a rule.
-pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Vec<String> {
+pub fn layout_warnings(
+    files: &[(PathBuf, String)],
+    registered: &[String],
+) -> Vec<(&'static str, String)> {
     let mut out = Vec::new();
     let words = |t: &str| -> Vec<String> {
         t.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
@@ -771,8 +780,11 @@ pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Ve
                 } else {
                     format!("use it from a screen or add `.api(actions::{name})` to its feature()")
                 };
-                out.push(format!(
-                    "#[{kind}] `{name}` in {shown} is not registered in any feature; {how}"
+                out.push((
+                    "W0101",
+                    format!(
+                        "#[{kind}] `{name}` in {shown} is not registered in any feature; {how}"
+                    ),
                 ));
             }
         }
@@ -796,11 +808,14 @@ pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Ve
                 && n > 1
                 && lines > 150
             {
-                out.push(format!(
-                    "{shown} has {n} #[{kind}] functions in {lines} lines; {first}move each \
-                     {kind} into {}/<name>.rs and shared parts of screens into \
-                     components/<name>.rs",
-                    file.trim_end_matches(".rs")
+                out.push((
+                    "W0102",
+                    format!(
+                        "{shown} has {n} #[{kind}] functions in {lines} lines; {first}move each \
+                         {kind} into {}/<name>.rs and shared parts of screens into \
+                         components/<name>.rs",
+                        file.trim_end_matches(".rs")
+                    ),
                 ));
             }
         }
@@ -832,4 +847,97 @@ fn attributed_fns(text: &str) -> Vec<(&'static str, String)> {
         }
     }
     out
+}
+
+/// Rule checks on the app's source, as `zeyn check` warnings with the file and line:
+///
+/// - `W0106`: a string holds a `<script` tag or an inline event handler (`onclick=` and the
+///   like); the page's CSP blocks both, and browser code belongs in a module.
+/// - `W0107`: a hand written component (`impl Component for`) writes HTML without
+///   `escape(..)`, `r.text(..)` or `r.value(..)`, so user data may reach the page unescaped.
+/// - `W0108`: an action returns a whole `Vec` without a query that bounds it (a `...Query`,
+///   `...Search` or `SitemapPart` input); lists that grow with data take a `DataQuery` and return
+///   a `Page`.
+/// - `W0109`: a document viewer is `.trusted()`, so its pages reach the browser uncleaned.
+///
+/// Missing access needs no check here: an action or screen without `permission` or `public`
+/// does not compile.
+pub fn rule_warnings(files: &[(PathBuf, String)]) -> Vec<(&'static str, String)> {
+    let mut out = Vec::new();
+    for (path, text) in files {
+        let shown = path
+            .display()
+            .to_string()
+            .replace('\\', "/");
+        let code = text
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or(text);
+        let lines: Vec<&str> = code.lines().collect();
+        let component = text.contains("impl Component for")
+            || text.contains("impl zeyn::Component for")
+            || text.contains("impl ::zeyn::Component for");
+        let escapes =
+            text.contains("escape(") || text.contains(".text(") || text.contains(".value(");
+        for (i, raw) in lines.iter().enumerate() {
+            let line = raw.trim_start();
+            if line.starts_with("//") {
+                continue;
+            }
+            let at = format!("{shown}:{}", i + 1);
+            let lower = line.to_ascii_lowercase();
+            let script = lower.contains("<script") && !lower.contains("src=");
+            if lower.contains('"') && (script || inline_handler(&lower)) {
+                out.push((
+                    "W0106",
+                    format!("{at}: a string holds a script or an inline event handler; the CSP blocks it, put browser code in a module"),
+                ));
+            }
+            if component && !escapes && line.contains("impl") && line.contains("Component for") {
+                out.push((
+                    "W0107",
+                    format!("{at}: this component writes HTML without escape(..), r.text(..) or r.value(..); escape every value that comes from data"),
+                ));
+            }
+            if line.starts_with("#[action") {
+                let joined = lines[i + 1..]
+                    .iter()
+                    .take(8)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let sig = joined.split('{').next().unwrap_or("");
+                let returns = sig.split("->").nth(1).unwrap_or("");
+                let bounded = ["Query", "Search", "query", "SitemapPart"]
+                    .iter()
+                    .any(|w| sig.contains(w));
+                if returns.contains("Vec<") && !bounded {
+                    out.push((
+                        "W0108",
+                        format!("{at}: this action returns a whole Vec; take a DataQuery and return a Page so the list stays bounded"),
+                    ));
+                }
+            }
+            if line.contains(".trusted()") && text.contains("DocumentViewer") {
+                out.push((
+                    "W0109",
+                    format!("{at}: a trusted document reaches the browser uncleaned; keep it only for pages the app renders itself"),
+                ));
+            }
+        }
+    }
+    out
+}
+
+/// Whether a lower case line holds an inline event handler attribute such as ` onclick=`.
+fn inline_handler(line: &str) -> bool {
+    line.match_indices(" on")
+        .any(|(at, _)| {
+            let rest = &line[at + 3..];
+            let name: String = rest
+                .chars()
+                .take_while(char::is_ascii_lowercase)
+                .collect();
+            name.len() >= 3 && rest[name.len()..].starts_with('=')
+        })
 }

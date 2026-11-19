@@ -26,9 +26,21 @@ The tree follows the ARIA tree pattern: arrow keys move between items and open o
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` lets people move items. A mouse or pen drags an item onto the top or the bottom of another row (before or after it) or onto the middle of a branch (inside it), and a mark shows where it lands. The Move button on the focused item opens a menu (up, down, out of its branch, into the branch above), the single pointer way to move and the one touch uses; Alt with an arrow key moves at once. The action gets a `TreeMove` (`id`, `target`, `place`) through `POST /_zeyn/data` with CSRF, the write limit and its permission. Both ids come from the browser, so the action looks them up, and `TreeMove::parent` gives the new parent while it refuses a move into the item itself or below it (`Error::Conflict`, also for a chain of parents longer than `MAX_TREE_DEPTH`). After a move the tree loads the changed levels again and keeps the moved item focused. The move code is part of `treedrag.js` and loads only with a draggable or movable tree.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## Charts
 
-`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` and `funnel` draw SVG on the server. There is no chart library in the browser; a chart is part of the page HTML.
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` and `funnel` draw SVG on the server. There is no chart library in the browser; a chart is part of the page HTML. A donut needs 2 to 5 parts above zero with the largest under 75% of the whole; any other donut is drawn as a bar list (name, a bar as wide as its share, value and percentage) and a debug build logs a warning.
 
 ```rust
 Row::new()
@@ -60,6 +72,110 @@ Every bar, point, slice, stage and gauge value is a mark with its label and valu
 | Escape | Hides the tooltip |
 
 Hover, focus and a tap show the same text in a tooltip, which is hidden from screen readers so nothing is read twice. Without the script the marks are still named and the table stays. Small marks (8 px points) are below the 24 px target size; the table under *Show data* is the equivalent path (WCAG 2.5.8).
+
+## Gantt
+
+Tasks as bars over a span of days, such as the plan of a project. `Gantt::new(label, start, end)` sets the span, at most two years; `.task(title, from, to)` adds a task, `.done(percent)` and `.tone(...)` apply to the task added last, and `.today(day)` draws a line at that day. It is a table that gives the first and last day of every task as text, so the bars only repeat it; bars are cut at the ends of the span.
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+A hierarchy as boxes joined by lines, from one box at the top: the people of a company, the parts of a product. `OrgNode::new(name)` is a box, `.role(text)` a quieter line under the name and `.child(node)` a box below it. It is nested lists, so screen readers get the levels; a chart draws at most 200 boxes on 8 levels and scrolls inside its own box when it is wide.
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## FlowDiagram
+
+The steps of a process as boxes joined by arrows, from the start side to the end side: an order from cart to delivery, an approval with its branches. `.node(id, title)` adds a step, `.tone(...)` colors the step added last, `.edge(from, to)` draws an arrow between two steps by their ids and `.edge_with(from, to, label)` one with a word on it. The server places the steps in columns by how far they are from the first steps, and an arrow to an earlier step runs under the boxes. The steps are an ordered list and each one names the steps it leads to for screen readers; a diagram draws at most 40 steps and 80 arrows and scrolls inside its own box when it is wide.
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
+## Funnel
+
+The stages of a process that loses some at each step, such as visits, carts and orders. `Funnel::new(label)` with `.stage(title, value)` draws each stage as a centered bar as wide as its share of the first stage, with its number and that share as text. A funnel holds at most 10 stages.
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+Up to four shares of a whole as rings inside one another, such as the goals of a day. `.ring(title, value, max, tone)` adds a ring from the outside in, and `.size(px)` sets the diameter. Each name and percent is written next to the rings, so the picture is hidden from screen readers.
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+Plans or products side by side, one column each and one row a feature. `.plan(name)` adds a column and `.featured()` sets the plan added last apart; `.row(feature, cells)` takes a cell for each plan: `true` and `false` become a check and a cross, read as "Included" and "Not included", and a text is written as it is. It holds at most 6 plans and 100 rows.
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
+## Table
+
+A small table of text the screen already holds: the plans of a price list, the opening hours of a shop, the totals of a report. `Table::new(caption)` takes a caption that names the table, `.head([...])` the column headers and `.row([...])` each row; `.row_headers()` makes the first cell of every row its header, so screen readers say the column and the row of each cell, `.numeric(index)` lines a column of numbers up at the end, and `.striped()` shades every second row. A row shorter than the head is filled with empty cells and a longer one is cut; a table holds at most 200 rows and 12 columns. It has no paging, sorting or filters and makes no request: rows that come from an action, or that the user works with, belong in `DataGrid`. On narrow screens it scrolls sideways inside its own box, which takes focus so the arrow keys scroll it.
+
+```rust
+Table::new(t!("shop.opening_hours"))
+    .head([t!("shop.day"), t!("shop.opens"), t!("shop.closes")])
+    .row([t!("shop.weekdays"), "09:00".into(), "18:00".into()])
+    .row([t!("shop.saturday"), "10:00".into(), "14:00".into()])
+    .row_headers()
+```
+
+@live table
+
+## Heatmap
+
+A number for each day of the last weeks, such as orders taken or hours logged, as a calendar of squares: one column a week, one row a weekday, darker for more. `Heatmap::ending(label, end)` ends with the week of `end`, usually today, and days after it stay empty. `.weeks(n)` sets how many weeks show, 17 unless set and at most 53; `.value(day, n)` or `.values(days)` give the numbers, and `.tone(...)` the color. The largest number shown gets the darkest of four shades. The week starts on the day the user's language starts it.
+
+```rust
+Heatmap::ending(t!("sales.orders_a_day"), ctx.today())
+    .weeks(12)
+    .values(orders.iter().map(|o| (o.day, o.count)))
+    .tone(Tone::Success)
+```
+
+@live heatmap
+
+It is a table drawn by the server with no script. Screen readers read the weekday of a row and, for each day, its date and number in the user's language, so the shade only repeats what the text says; pointing at a square shows the same text. The table scrolls sideways inside its own box on narrow screens, and the box takes focus so the arrow keys scroll it. Each day is two elements: the default of 17 weeks stays within the budget of 300 elements for a component, and a full year does not.
 
 ## Key figures, sparklines and bullets
 

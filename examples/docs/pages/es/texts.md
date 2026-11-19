@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+Un número que cambia las palabras va en un marcador plural; una palabra elegida por un valor va en uno select. El caso plural sale de las reglas del idioma (`one`, `few`, `many` y los demás, con los nombres de CLDR), un caso exacto como `=0` tiene prioridad, `#` es el número y cada marcador necesita un caso `other`. Un argumento plural debe ser un entero: `n = "two"` o un decimal no compila.
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## Etiquetas de campos y de choices
 
 Las etiquetas de campo usan la clave `<Model>.<field>`, como `Product.code`. Las etiquetas de choice usan `<Choice>.<Variant>`. Cuando falta una clave, la etiqueta recurre a `#[label("...")]` o a una forma legible del nombre. `zeyn check` informa de las claves que algunos idiomas tienen y otros no.

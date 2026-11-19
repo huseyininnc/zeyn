@@ -16,12 +16,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. Endpoints
@@ -29,14 +29,14 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | Endpoint | Propósito |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: un documento colaborativo |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: notificaciones de cambios para topics |
+| `GET /_zeyn/socket` | WebSocket: notificaciones de cambios para topics |
 | `GET /_zeyn/live.js` | El script de topics, enlazado solo por las páginas que se suscriben |
 
 Cada handshake se comprueba antes de la actualización, en este orden:
 
 1. El canal está activado (`404` en caso contrario).
 2. **Origin:** la cabecera `Origin` debe nombrar el host al que llegó la solicitud, o un origen añadido con
-   `Realtime::allow_origin`. Los navegadores la envían siempre en los handshakes de WebSocket; si falta,
+   `ZeynSocket::allow_origin`. Los navegadores la envían siempre en los handshakes de WebSocket; si falta,
    se rechaza. Esto es lo que impide que otro sitio abra un socket con las cookies del usuario.
 3. **Token CSRF:** los navegadores no pueden establecer cabeceras en un WebSocket, así que el token de
    `meta[name=zeyn-csrf]` va en el parámetro de consulta `csrf` y se compara en tiempo constante con
@@ -97,9 +97,9 @@ Se reconecta tras 1 segundo, duplicando hasta 30 segundos, y se detiene tras `cl
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -115,7 +115,7 @@ Las notificaciones llevan solo el nombre del topic, nunca datos: la actualizaci�
 normal del grid con todas las comprobaciones de permisos. `notify` llega solo al tenant de quien llama;
 `notify_tenant(Some(id), topic)` nombra uno, `None` es la app sin multitenencia.
 
-Los mismos nombres de topic funcionan sin el canal. Los nodos marcados con `.listens("orders")` se refrescan en su sitio cuando una notificación nombra el topic (`live.js` lo pasa como `zeyn:topics`), y también cuando una action termina con `ui.refresh("orders")` o cambia un filtro que `.drives("orders")`: los grids recargan su página actual y los demás listeners se vuelven a renderizar con un `POST /_zeyn/nodes` por pantalla (consulta Topics en `examples/docs/pages/effects.md`). El socket se suscribe solo a los topics de los nodos `Live`, que deben declararse con `Realtime::topic`; usa `.listens` dentro o al lado de ellos para las partes que no son grids.
+Los mismos nombres de topic funcionan sin el canal. Los nodos marcados con `.listens("orders")` se refrescan en su sitio cuando una notificación nombra el topic (`live.js` lo pasa como `zeyn:topics`), y también cuando una action termina con `ui.refresh("orders")` o cambia un filtro que `.drives("orders")`: los grids recargan su página actual y los demás listeners se vuelven a renderizar con un `POST /_zeyn/nodes` por pantalla (consulta Topics en `examples/docs/pages/effects.md`). El socket se suscribe solo a los topics de los nodos `Live`, que deben declararse con `ZeynSocket::topic`; usa `.listens` dentro o al lado de ellos para las partes que no son grids.
 
 ## 5. Memoria y contrapresión
 
@@ -141,7 +141,7 @@ solo se pierde esa notificación (la siguiente lo actualiza de todos modos).
 Por tanto, la memoria en el peor caso es de unos `rooms * doc_bytes` para los documentos más
 `clients * queue * message_bytes` para las colas (una actualización se comparte entre colas, no se copia). El
 servidor del showcase con dos pestañas en vivo sobre el diagrama usa unos 19 MB en total (compilación debug).
-`Hub::stats()` informa de salas, clientes, suscriptores y bytes de documentos para la monitorización.
+`Socket::stats()` informa de salas, clientes, suscriptores y bytes de documentos para la monitorización.
 
 ## 6. Notas de seguridad
 

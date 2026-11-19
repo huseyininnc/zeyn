@@ -44,6 +44,9 @@
       "panel": "A titled section that can collapse.",
       "tabs": "Panels behind a tab list, loaded the first time they open.",
       "split": "Two panes with a handle that resizes them.",
+      "list_detail": "A list and the detail of its selected row, side by side or one at a time on phones.",
+      "deferred": "A part that loads after the screen shows, so a slow block never delays the rest.",
+      "surface": "Items placed freely inside bounds, in steps and on an axis.",
       "auto_grid": "As many columns as fit the width.",
       "heading": "Section headings from h2 to h6.",
       "paragraph": "A paragraph of escaped text, normal or quiet.",
@@ -54,11 +57,35 @@
       "timeline": "Events in order, each with a tone.",
       "markdown": "Safe Markdown rendered on the server.",
       "spoiler": "Content hidden until the reader opens it.",
+      "accordion": "Sections that open and close under their titles.",
+      "avatar_group": "The people of one thing, with a count for the rest.",
+      "quote": "Quoted words with who said them and where.",
+      "kbd": "Keys to press, one or a combination.",
+      "divider": "A line between parts, with an optional label.",
+      "stepper": "Where a process stands, step by step.",
+      "pagination": "Links to the pages of a list.",
+      "copy_button": "Copies a text to the clipboard.",
+      "progress_ring": "Progress as a ring with the percent inside.",
+      "heatmap": "A number for each day as a calendar of shaded squares.",
+      "funnel": "Stages that narrow from the first to the last.",
+      "activity_rings": "Shares of several goals as rings inside one another.",
+      "gantt": "Tasks as bars over a span of days.",
+      "flow_diagram": "The steps of a process as boxes joined by arrows.",
+      "org_chart": "A hierarchy as boxes joined by lines.",
+      "comparison_table": "Plans side by side with a row for each feature.",
+      "tour": "A guided tour of the page.",
+      "image_compare": "Two pictures under a slider.",
+      "table": "A small table of text the screen already holds.",
+      "indicator": "A count or a dot on the corner of another component.",
+      "meter": "A measurement within a range, colored by its thresholds.",
+      "highlight": "The words of a search marked in a text.",
+      "toc": "Links to the headings of the page.",
       "breadcrumb": "The trail of links to the current page.",
       "prev_next": "Links to the previous and the next item.",
       "alpha_index": "A letter bar from the user's alphabet.",
       "menu_button": "Drop down and split buttons with actions.",
       "menu_bar": "A menu bar of commands.",
+      "side_menu": "The app shell menu with badges, counts, filter, icon rail and phone drawer.",
       "external_link": "A link that leaves the app safely.",
       "form": "A form of a model, checked on the server.",
       "controls": "Radio buttons, segmented buttons and switches.",
@@ -67,6 +94,7 @@
       "line_editor": "Rows of a model inside a form, with totals.",
       "masked_inputs": "Masked, decimal, percent and password inputs.",
       "action_button": "A button that runs an action.",
+      "file_drop": "A drop zone outside a form that uploads files, folders and pasted images into a store.",
       "data_grid": "Rows of an action with paging, sorting and filters.",
       "card_grid": "Rows of an action shown as cards.",
       "image_card": "A card with an image, badges and progress.",
@@ -81,7 +109,7 @@
       "embed": "A page of another site in a locked frame.",
       "alert": "A message in a tinted box.",
       "progress": "A labelled progress bar.",
-      "skeleton": "Placeholder lines while content loads.",
+      "skeleton": "A placeholder in the shape of what loads: lines, a KPI tile, table rows, list items or a chart.",
       "empty_state": "What a list shows when it has nothing.",
       "popover": "A button that opens a small panel.",
       "busy": "An overlay while a slow action runs.",
@@ -128,6 +156,100 @@
       "property_inspector": "Edits what an island selects, from a schema the island sends."
     },
     "ex": {
+      "accordion": {
+        "overview": "Example",
+        "one_at_a_time": "One section at a time"
+      },
+      "avatar_group": {
+        "overview": "Example",
+        "small_and_short": "Small, with fewer shown",
+        "with_pictures": "With pictures"
+      },
+      "quote": {
+        "overview": "Example",
+        "text_only": "Text only"
+      },
+      "kbd": {
+        "overview": "Example",
+        "single_keys": "Single keys",
+        "plus_key": "The plus key"
+      },
+      "divider": {
+        "overview": "Example",
+        "plain": "Plain",
+        "between_columns": "Between columns"
+      },
+      "stepper": {
+        "overview": "Example",
+        "vertical": "Vertical",
+        "finished": "Finished"
+      },
+      "pagination": {
+        "overview": "Example",
+        "more_numbers": "More page numbers"
+      },
+      "copy_button": {
+        "overview": "Example",
+        "own_label": "Own label, hidden text"
+      },
+      "table": {
+        "overview": "Example",
+        "numbers_and_stripes": "Numbers and stripes"
+      },
+      "indicator": {
+        "overview": "Example",
+        "tones_and_sizes": "Tones, sizes and zero"
+      },
+      "meter": {
+        "overview": "Example",
+        "a_good_middle": "A good middle"
+      },
+      "highlight": {
+        "overview": "Example",
+        "several_words": "Several words"
+      },
+      "toc": {
+        "overview": "Example"
+      },
+      "funnel": {
+        "overview": "Example",
+        "another_tone": "Another tone"
+      },
+      "activity_rings": {
+        "overview": "Example",
+        "large": "Four rings, larger"
+      },
+      "gantt": {
+        "overview": "Example"
+      },
+      "flow_diagram": {
+        "overview": "Example",
+        "branches": "Branches and a way back"
+      },
+      "org_chart": {
+        "overview": "Example"
+      },
+      "comparison_table": {
+        "overview": "Example"
+      },
+      "tour": {
+        "overview": "Example"
+      },
+      "image_compare": {
+        "overview": "Example"
+      },
+      "heatmap": {
+        "overview": "Example",
+        "a_few_weeks": "A few weeks"
+      },
+      "progress_ring": {
+        "overview": "Example",
+        "sizes": "Sizes"
+      },
+      "file_drop": {
+        "overview": "Example",
+        "single": "One file"
+      },
       "action_button": {
         "overview": "Example"
       },
@@ -137,6 +259,11 @@
       },
       "alpha_index": {
         "overview": "Example"
+      },
+      "surface": {
+        "overview": "Example",
+        "on_one_axis": "On one axis",
+        "resizable": "Resizable, with an aspect ratio"
       },
       "auto_grid": {
         "overview": "Example",
@@ -169,6 +296,7 @@
       "chart": {
         "overview": "Example",
         "donut": "Donut",
+        "bar_list": "A donut with one large part becomes a bar list",
         "gauge": "Gauge",
         "side_by_side": "Side by side, filling the width"
       },
@@ -186,6 +314,9 @@
         "overview": "Example",
         "confirm_actions": "Row and bulk actions that ask first",
         "numbers": "Numbers grouped by locale, a plain year",
+        "search_and_bands": "A search box and columns grouped under a band",
+        "add_delete_batch": "Adding, deleting and batch editing rows (nothing is stored)",
+        "user_grouping": "Grouping by the user, a custom summary and the filter builder",
         "computed_million": "A million computed rows, built a page at a time",
         "dynamic_columns": "Columns that come with the rows: 10,000 rows of 30 columns"
       },
@@ -206,7 +337,8 @@
         "overview": "Example"
       },
       "form": {
-        "overview": "Example"
+        "overview": "Example",
+        "settings": "A settings form whose save bar shows once something changes"
       },
       "heading": {
         "overview": "Example",
@@ -255,6 +387,9 @@
       "list": {
         "overview": "Example",
         "numbered_pages": "Numbered pages without a total",
+        "sortable": "Rows people put in their own order",
+        "sortable_virtual": "A long sortable list that stays virtual",
+        "connected": "Two lists that rows move between, several at once",
         "fixed": "Fixed items",
         "builder": "Rows built with any node, with a separator",
         "virtual_rows": "Virtual scrolling with a fixed row height",
@@ -271,6 +406,9 @@
         "overview": "Example"
       },
       "menu_bar": {
+        "overview": "Example"
+      },
+      "side_menu": {
         "overview": "Example"
       },
       "menu_button": {
@@ -330,10 +468,19 @@
         "another_screen": "Another screen"
       },
       "skeleton": {
-        "overview": "Example"
+        "overview": "Example",
+        "shapes": "A KPI tile, a list, a chart and table rows"
       },
       "split": {
         "overview": "Example"
+      },
+      "list_detail": {
+        "overview": "Example",
+        "nothing_selected": "Nothing selected"
+      },
+      "deferred": {
+        "overview": "Example",
+        "chart": "A chart with a skeleton in its shape"
       },
       "spoiler": {
         "overview": "Example"
@@ -370,7 +517,8 @@
       },
       "tree": {
         "overview": "Example",
-        "draggable": "Leaves that drag onto a drop target, or insert with a button or Control+Enter"
+        "draggable": "Leaves that drag onto a drop target, or insert with a button or Control+Enter",
+        "movable": "Folders people move by drag, a menu or Alt with the arrow keys"
       },
       "week_schedule": {
         "overview": "Example"
@@ -399,7 +547,8 @@
         "bell": "Notification bell"
       },
       "kanban": {
-        "overview": "Example"
+        "overview": "Example",
+        "ordered": "Cards in their own order inside each column"
       },
       "calendar": {
         "overview": "Example"

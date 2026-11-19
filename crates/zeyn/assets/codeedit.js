@@ -40,6 +40,11 @@ const OPERATORS = '+-*/%<>=!&|^';
 /** Letters, digits and `_`, the same set as Rust's `char::is_alphanumeric` and `CodeQuery::word`. */
 const WORD = /[\p{Alphabetic}\p{N}_]/u;
 const WORD_BEFORE = /[\p{Alphabetic}\p{N}_.]*$/u;
+/**
+ * At most this many characters before the cursor are read as the word being completed. Matching
+ * `WORD_BEFORE` against the whole text is quadratic in its length; this slice keeps it bounded.
+ */
+const MAX_WORD = 200;
 
 /** Lines longer than this are shown without highlighting, so one huge line stays cheap. */
 const MAX_HIGHLIGHT_LINE = 10_000;
@@ -339,7 +344,6 @@ function close(ed) {
   ed.list.replaceChildren();
   ed.items = [];
   ed.input.removeAttribute('aria-activedescendant');
-  ed.input.setAttribute('aria-expanded', 'false');
 }
 
 /** Makes option `i` the active one. */
@@ -411,7 +415,6 @@ function show(ed, items, forced) {
   );
   const opened = ed.list.hidden;
   ed.list.hidden = false;
-  ed.input.setAttribute('aria-expanded', 'true');
   place(ed);
   activate(ed, 0);
   if (forced || opened || list.length !== ed.announced) ed.status.textContent = fill(ed.texts.count ?? '', { n: list.length });
@@ -427,7 +430,7 @@ function accept(ed, i) {
     return;
   }
   const at = ta.selectionStart;
-  const word = ta.value.slice(0, at).match(WORD_BEFORE)[0];
+  const word = ta.value.slice(Math.max(0, at - MAX_WORD), at).match(WORD_BEFORE)[0];
   const insert = typeof item.insert === 'string' ? item.insert : item.label;
   close(ed);
   ed.skip = true;
@@ -660,7 +663,6 @@ function setup(root) {
       if (option) accept(ed, [...ed.list.children].indexOf(option));
     });
   }
-  if (ed.list) input.setAttribute('aria-expanded', 'false');
   if (input.dataset.check && input.value) scheduleCheck(ed);
 }
 

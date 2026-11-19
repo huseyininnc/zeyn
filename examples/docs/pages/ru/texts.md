@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+Число, от которого меняются слова, ставится в плейсхолдер plural; слово, выбираемое по значению, в плейсхолдер select. Форма plural берётся из правил языка (`one`, `few`, `many` и другие, как их называет CLDR), точный случай вроде `=0` важнее, `#` обозначает число, и у каждого плейсхолдера должен быть случай `other`. Аргумент plural должен быть целым: `n = "two"` или дробное число не компилируется.
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## Подписи полей и choice
 
 Подписи полей используют ключ `<Model>.<field>`, например `Product.code`. Подписи choice используют `<Choice>.<Variant>`. Если ключа нет, подпись берётся из `#[label("...")]` или из читаемой формы имени. `zeyn check` сообщает о ключах, которые есть в одних языках и отсутствуют в других.

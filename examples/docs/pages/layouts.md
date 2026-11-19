@@ -42,6 +42,27 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `.remember(KEY)` keeps the tab the user opened under a choice key (see [Client preferences](security.md#client-preferences)), so the same tabs open on it on later pages. A tab named in the URL hash wins.
 
+## Accordion
+
+`Accordion::new()` with `.section(title, node)` puts sections one under the other, each opened and closed by its title: the answers of a help page, the parts of a long record. Sections start closed; `.open()` after a section opens it. `.single()` keeps one section open at a time, and then only the first section marked open starts open. An accordion holds at most 50 sections (`MAX_ACCORDION_SECTIONS`).
+
+```rust
+Accordion::new()
+    .section(t!("help.password"), Paragraph::new(t!("help.password_answer")))
+    .open()
+    .section(t!("help.invoices"), Paragraph::new(t!("help.invoices_answer")))
+    .single()
+```
+
+@live accordion
+
+Every section is a native disclosure (`<details>` and `<summary>`), not the ARIA accordion pattern of headings and buttons, because the native element needs no script, keeps closed content out of the reading order, and lets the browser's find in page open the section that holds a match. In single mode the sections share a `name`, and the browser closes the open one when another opens. Unlike `Tabs`, the content of a closed section is in the page from the start.
+
+| Key | What it does |
+|---|---|
+| `Tab` | Moves to the next section title |
+| `Enter` or `Space` | Opens or closes the section; focus stays on its title |
+
 ## Split
 
 `Split::new(start, end)` shows two nodes with a handle between them. `.ratio(percent)` sets the start size. The handle moves with the pointer or the arrow keys.
@@ -49,3 +70,28 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 ## Dock
 
 `Dock` arranges panels around a center area: left, right, bottom and center tabs that users move, resize, close and bring back. Each user's layout is saved per screen. See [Shell and commands](shell.md).
+
+## Surface
+
+`Surface::new(label, width, height)` is an area of a fixed size where people place items freely, such as tables on a floor plan. `.item(Draggable::new(id, node).at(x, y).size(w, h))` adds an item, `.axis(Axis::X)` or `Axis::Y` keeps it on one line, and `.snap(step)` puts every place on a grid. `.on_move(action)` stores each move: the action gets a `SurfaceMove` with the item's id and its new `x` and `y`, after the server has checked that the id belongs to the surface and kept the place inside the bounds, on the grid and on the axis.
+
+`.resizable()` gives an item a handle in its bottom right corner; `.min_size(w, h)`, `.max_size(w, h)` and `.aspect(w, h)` limit the size and make the item resizable as well. The action then also gets the new `w` and `h`, kept inside those limits, the surface and the grid. With an aspect ratio the height follows the width.
+
+```rust
+Surface::new(t!("floor.plan"), 800, 480)
+    .snap(20)
+    .on_move(move_table)
+    .item(
+        Draggable::new("t1", Paragraph::new(t!("floor.table")))
+            .at(40, 60)
+            .size(120, 80),
+    )
+```
+
+A mouse or pen drags an item; a touch drags it after a short hold. With one pointer, a click picks an item and a click on the surface puts it there. A click on the corner handle picks the size, and a click on the surface puts the corner there.
+
+| Key | What it does |
+|---|---|
+| Arrow keys | Move the focused item one grid step (10 pixels without a grid) |
+| `Shift` + arrow keys | Resize a resizable item one grid step |
+| `Escape` | Drops a picked item, or puts a dragged item back |

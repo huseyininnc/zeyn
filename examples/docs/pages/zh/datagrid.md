@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 无论客户端请求多少，服务器都会限制页大小。
 
+`.page_sizes(&[10, 25, 50, 100])` 在编号分页的分页器中加入"每页行数"列表。表格自身的大小始终可选,选择随用户视图保存,服务器只接受表格提供的大小。
+
 ## 列
 
 | 调用 | 结果 |
@@ -79,6 +81,11 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - 紧跟在 `.row_action` 或 `.bulk_action` 之后的 `.confirm(message)` 和 `.tone(Tone::Danger)`：在该操作运行前，用与 `ActionButton::confirm` 相同的对话框询问（焦点先在“取消”上），并把按钮画成红色。
 - `.row_menu(|row| ContextMenu)`：行的右键菜单。
 - `.row_style(|row| Option<RowStyle>)`：危险、警告或成功样式的行。
+- `.add_with(create)`、`.delete_with(action, M::id)`、`.batch_edit()`:"添加行"按钮、删除按钮和
+  按键,以及一起保存的编辑。参见 [DataGrid 参考](grid.md)。
+- 列上的 `.groupable()`、`.summary(label, |t| ...)`:用户可从列菜单或分组面板按该列分组,列下方显示由合计计算出的值。
+- `.filter_builder()`:打开对话框以构建筛选条件的"筛选"按钮;与筛选行、已保存视图和 AI 代理使用同一个列表。
+- `.filter_chips()`:在表格上方以标签显示当前生效的筛选条件,每个都带移除按钮,与筛选行、筛选构建器和已保存视图保持一致。
 - `.exportable()`：将筛选后的行导出为 CSV，由服务器以流方式输出。
 
 ## 运行时才确定的列
@@ -96,6 +103,12 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 ```
 
 分页、虚拟滚动、键盘操作以及按用户语言格式化数字和日期,都与类型化的 grid 相同。名称、标签和单元格都会被转义,服务器会限制列数、行数和文本长度。该 grid 不排序也不筛选,行是只读的。详见 [DataGrid 参考](grid.md)。
+
+## 搜索与分组表头
+
+`.search()` 在表格上方放一个搜索框。动作以 `DataQuery::q` 接收文本,`DataQuery::apply` 用它匹配
+文本字段,但从不匹配掩码字段。`.band(label, |b| b.column(..).column(..))` 把列归到同一个表头单元格下。
+参见 [DataGrid 参考](grid.md)。
 
 ## 就地刷新
 

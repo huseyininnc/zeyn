@@ -88,6 +88,26 @@ forma `{ "field", "contains" }` sigue funcionando. El servidor descarta los filt
 caracteres), las opciones (100) y las claves de orden (4). Un valor que no se puede leer se ignora. La zona horaria
 de los filtros de fecha proviene de los ajustes del usuario en el servidor.
 
+`filter_builder()` añade encima de la cuadrícula un botón "Filtrar", con el número de condiciones
+activas, que abre el generador de filtros: un diálogo con una fila por condición, cada una una
+columna con `filter()` y las entradas de esa columna en la fila de filtros. "Añadir condición",
+"Borrar todo" y "Aplicar" editan la lista; Escape o Cancelar la dejan como estaba y el foco vuelve
+al botón. Las condiciones se cumplen a la vez, y una posterior sobre la misma columna sustituye a
+la anterior. Al aplicar se escriben en los filtros de la cuadrícula, así que la fila de filtros,
+las vistas guardadas, las exportaciones y el evento `zeyn:filter` de un agente de IA comparten una
+sola lista, que el servidor limpia como se explica arriba.
+
+Cada grupo de condiciones del generador tiene un selector, "Todas las condiciones" o "Cualquier
+condición", y "Añadir grupo" pone un grupo dentro de él, hasta tres niveles. La consulta envía los
+grupos en `DataQuery::filter_groups` como `{ "any": true, "filters": [...], "groups": [...] }`, junto a
+la lista plana `filters`, que cada fila debe seguir cumpliendo. Un grupo con `any` coincide cuando
+coincide uno de sus filtros o grupos, y sin él cuando coinciden todos. Los filtros de la lista y de
+los grupos cuentan juntos para el límite de 32, los grupos se anidan como mucho cuatro niveles
+(`MAX_FILTER_DEPTH`) y el servidor limpia los grupos como la lista: se quitan los filtros sobre
+columnas sin `filter()` y los grupos que quedan vacíos. `DataQuery::apply` y las capas de datos de
+PostgreSQL y Oracle leen los grupos de la misma forma, la herramienta de IA de la cuadrícula los
+ofrece y las vistas guardadas y las exportaciones los conservan.
+
 Shift+clic en un encabezado añade esa columna a las claves de orden. Un número en el encabezado muestra el orden.
 
 ## Columnas: fijar, redimensionar, ocultar, mover
@@ -97,7 +117,41 @@ tres por lado). `hidden()` deja una columna fuera hasta que el usuario la muestr
 menú de columna (el botón, un clic derecho, Shift+F10 o la tecla de menú contextual) con orden, fijar, mover
 a la izquierda y a la derecha, ocultar, filtro, un selector de columnas y restablecer. El borde de un encabezado redimensiona la columna,
 arrastrando o con las teclas de flecha (Shift para pasos mayores). Arrastrar un encabezado sobre otro encabezado
-del mismo grupo fijado mueve la columna; una pulsación corta sigue ordenando. Todo funciona de derecha a izquierda.
+del mismo grupo fijado mueve la columna; una pulsación corta sigue ordenando. Todo funciona de derecha a izquierda. Un doble clic en el borde de un encabezado, Intro sobre él o "Ajustar el ancho al contenido" en el menú de la columna ajusta la columna a su encabezado y a las filas de la página; "Ajustar todas las columnas" lo hace con cada columna visible. Los anchos se guardan con la vista.
+
+## Búsqueda
+
+`search()` muestra un cuadro de búsqueda encima de la cuadrícula. Lo que escribe el usuario llega
+a la acción de la cuadrícula como `DataQuery::q` tras una breve pausa, con cada página, bloque,
+rama, acción masiva sobre todas las filas que coinciden y exportación; una búsqueda nueva cancela
+la petición anterior. `DataQuery::apply` y las capas de datos SQL la comparan con los campos de
+texto sin distinguir mayúsculas ni acentos, y nunca buscan en campos enmascarados. Una cuadrícula
+sin `search()` descarta cualquier `q` que envíe el cliente. El resultado se anuncia en la región
+viva de la cuadrícula, y `empty_filtered` aparece cuando una búsqueda no encuentra nada. El texto
+de búsqueda no forma parte de una vista guardada. Los agentes de IA encuentran `q` en el esquema
+de herramienta de la cuadrícula.
+
+## Encabezados de banda
+
+`band(label, |b| ...)` agrupa las columnas que añade el cierre bajo una sola celda de encabezado,
+en una fila encima de los encabezados de columna:
+
+```rust
+DataGrid::of(search_products)
+    .search()
+    .column(Product::code).pin_start()
+    .band(t!("stock.price_and_stock"), |b| b
+        .column(Product::price).avg()
+        .column(Product::stock).sum())
+    .column(Product::active)
+```
+
+Una banda es un `th` con `scope="colgroup"` y un `colspan` sobre sus columnas visibles; las celdas
+encima de columnas fuera de una banda quedan vacías. La fila de bandas sigue la disposición del
+usuario: las columnas ocultas salen de su banda, una banda muestra una celda por cada tramo de sus
+columnas que siguen juntas en el mismo lado fijado (mover una columna lejos la divide), los tramos
+fijados se quedan con sus columnas y la virtualización de columnas mantiene entera la fila de
+bandas. Las exportaciones y las copias no incluyen las bandas.
 
 ## Vistas guardadas
 
@@ -153,6 +207,39 @@ El servidor carga la fila de nuevo por clave y aplica solo las columnas editable
 mediante `Form::read`, de modo que los valores se leen y validan como lo haría un formulario. Un valor para cualquier otra
 columna se rechaza con `403`. Una versión obsoleta devuelve `409`, y los errores de validación devuelven
 `422` y se muestran en sus celdas.
+
+## Añadir, borrar y editar filas por lotes
+
+```rust
+DataGrid::of(search_products)
+    .column(Product::name).editable()
+    .column(Product::price).editable()
+    .edit_with(save_product)
+    .add_with(create_product)
+    .delete_with(delete_products, Product::id)
+    .batch_edit()
+```
+
+`add_with(create)` muestra un botón "Añadir fila" encima de la cuadrícula. Abre una fila vacía
+arriba con una entrada por cada columna `editable()`; Enter la guarda y Escape la descarta. El
+servidor parte del valor por defecto del modelo, lee solo las columnas editables como lo haría un
+formulario (cualquier otro campo se rechaza con `403`, los valores no válidos vuelven como `422`
+y se muestran en sus celdas), comprueba el permiso de `create` y lo ejecuta; después la
+cuadrícula se recarga. Las cuadrículas virtuales no añaden filas.
+Los campos que el modelo no puede dejar con su valor por defecto, como una fecha que no es
+opcional, necesitan una columna editable.
+
+`delete_with(action, Model::key)` añade a la barra de selección un botón rojo "Borrar" que
+pregunta antes de ejecutarse, y la tecla Supr en una fila borra las filas seleccionadas, o esa
+fila si no hay ninguna seleccionada. La acción recibe las claves como una acción masiva, así que
+debe comprobar cada registro.
+
+`batch_edit()` guarda las ediciones en línea hasta que el usuario las guarda todas. Enter deja
+una fila cambiada en modo de edición con una marca al inicio, y una barra encima de la cuadrícula
+cuenta las filas cambiadas con "Guardar cambios" y "Descartar cambios". Al guardar, las filas se
+envían una tras otra por la ruta de edición en línea, así que cada una se lee, valida, versiona y
+comprueba por separado; las que fallan conservan sus cambios y muestran el motivo. Cargar otras
+filas (paginar, ordenar, filtrar, buscar) pregunta antes de descartar cambios sin guardar.
 
 ## Master detail
 
@@ -220,6 +307,35 @@ en memoria; SQL usa `GROUP BY`. `group` lo define el grid y nunca se lee del cli
 cliente envía solo la ruta de valores de grupo que abre; el servidor comprueba su longitud y convierte cada
 valor en un filtro sobre la columna de ese grupo, delante de los filtros del usuario (`blank` para el grupo
 vacío).
+
+## Agrupación por el usuario y resúmenes propios
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` permite al usuario agrupar las filas por una columna: con "Agrupar por esta columna"
+en su menú, o arrastrando su encabezado al panel de grupos encima de la cuadrícula. El panel
+muestra un botón por nivel que lo quita; tres niveles como máximo (`MAX_USER_GROUPS`). Los grupos
+viajan en la vista del usuario (`DataGridView::group_by`), se guardan con ella y sustituyen al
+`group_by` de la cuadrícula mientras existan. El servidor solo acepta columnas agrupables, nunca
+enmascaradas, y agrupa igual que con `group_by`, así que la acción responde a `DataQuery::group`
+de la misma forma. Las cuadrículas de árbol y las virtuales no agrupan.
+
+`summary(label, |t| ...)` añade un valor propio bajo una columna, en el pie y en cada fila de
+grupo. Se calcula en el servidor a partir de `Totals`, los totales que declara la cuadrícula
+(`t.get(field, Aggregate::Sum)`), así que nunca necesita las filas: un margen a partir de dos
+sumas, una media a partir de una suma y un recuento. `None` lo deja vacío. Los enteros se agrupan
+y el dinero y los decimales se formatean en el idioma del usuario.
 
 ## Datos en árbol
 
@@ -292,7 +408,7 @@ el análisis de bloques de 200 filas con todas las columnas, algo que la virtual
 `exportable()` (y opcionalmente `export_permission(...)`, `export_limit(n)`) permite que el botón `Export::Csv`
 de la barra de herramientas descargue todas las filas coincidentes. El servidor pagina a través de la action del grid y
 transmite cada página de inmediato, con la disposición y el idioma del usuario. Las fórmulas se neutralizan. Hasta 100.000
-filas de forma predeterminada.
+filas de forma predeterminada. Mientras haya filas seleccionadas (una a una, no "todas las que coinciden"), las exportaciones CSV y Excel toman solo esas filas, como máximo 1.000, siempre dentro de los filtros del usuario; el servidor las busca por clave.
 
 Con la feature de Cargo `xlsx`, el botón `Export::Xlsx` de la barra de herramientas descarga las mismas filas como un
 libro de Excel (`GET /_zeyn/grid/export?format=xlsx`). Las celdas conservan sus tipos: números, dinero como

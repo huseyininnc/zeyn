@@ -74,7 +74,8 @@ docs/                  design documents and guides
 ```
 cargo build --workspace
 cargo test --workspace
-cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,accounts   tests behind features
+cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,socket-client,redis,xlsx,email,accounts,image,resumable,metronome-ops   tests behind features
+cargo test -p zeyn --test all grid::                                       one test file (module) of the shared test binary
 cargo check -p zeyn --all-features --tests                                      everything compiles
 cargo run -p zeyn-example-showcase      http://127.0.0.1:3002, every component
 cargo run -p zeyn-example-docs          http://127.0.0.1:3008, the documentation
@@ -86,7 +87,13 @@ cargo run -p zeyn-example-components    http://127.0.0.1:3010, the component cat
   how to start the server in Docker.
 - Disk space is limited on shared machines. Use `CARGO_INCREMENTAL=0`, and delete your own target
   directory when you are done. The `pdf` feature links Typst (about 40 MB); do not turn it on for
-  the whole workspace.
+  the whole workspace. `sh scripts/sweep-target.sh` removes a target directory over 20 GB or
+  built by an older toolchain.
+- Start a new worktree with `sh scripts/warm-target.sh` (after `sh scripts/warm-target.sh save` once) instead of a cold
+  build; it copies a built target directory with file times kept.
+- One build queue per target directory. Agents that build at the same time use separate target
+  directories and set `CARGO_BUILD_JOBS` to half the cores; never start a second build in a
+  directory another build is using.
 - `cargo test` does not rebuild a binary you then run by hand; run `cargo build -p <example>` first.
 
 ## The rules
@@ -106,10 +113,14 @@ Performance and a small memory footprint are the most important rule.
   markers of its HTML (`data-zeyn-*` attributes, `z-*` classes); full pages link the modules
   their HTML holds and `zeyn.js` loads missing ones when content arrives. No module scans the
   document for, or listens to, components that are not on the page; the core (`zeyn.js`,
-  `nav.js`, `enterprise.js`) holds only what every page needs. `tests/ui_modules.rs` fails when
+  `nav.js`, `enterprise.js`) holds only what every page needs. `tests/all/ui_modules.rs` fails when
   a page links a module it does not use.
 - When you add something that costs memory, binary size or time, measure it before and after and
   say the numbers in the commit or the report.
+- A change that costs compile time (a new dependency, heavy macro output, a large new module) states the
+  numbers in its commit: the workspace build time, the one line rebuild of `crates/zeyn` and the size of
+  `target/`, before and after, measured as `.github/workflows/ci.yml` does. CI fails over the budgets
+  in `ci/build-budget.txt`; raise one only in the change that needs it and say why.
 
 ### No component reloads the page
 Navigation, effects, language and theme changes go through `nav.js`: `zeyn:navigate`,
@@ -149,11 +160,14 @@ missing. Never call `location.reload()` or `location.assign()` for in-app naviga
   for an AI agent to act on (`#[diagnostic::on_unimplemented]` where it fits).
 - Keep the existing structure and patterns; do not add a second way to do something that already
   has one.
+- A breaking change to a public API adds a `zeyn migrate` step in the same change: a rename, a
+  call shape or a moved path in `crates/zeyn-cli/src/migrate/` (one module per version), or a
+  review pattern with the reason when no rewrite is safe, with a fixture test.
 - Public prose (README, docs, UI text) uses no em dashes or en dashes, and stays neutral: it
   describes the framework, not who might buy it.
 
 ### Tests
-- New logic gets a test in the matching file under `crates/zeyn/tests/`. Security fixes get a
+- New logic gets a test in the matching file under `crates/zeyn/tests/all/` (one module per file, declared in `main.rs`). Security fixes get a
   regression test that fails without the fix.
 - Browser behavior is checked in a real browser (the showcase or the docs app) with no console
   errors, before the work is called done.

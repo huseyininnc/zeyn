@@ -33,7 +33,10 @@ async function csrf() {
   return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
-/** Screen name, params and node of an element, as the server expects them. */
+/**
+ * Screen name, params and node of an element, as the server expects them. The node is its path
+ * as a string (`"2.0.1"`), so forms deep in a screen keep drafts of their own.
+ */
 function address(el) {
   const screen = el.closest('[data-zeyn-screen]');
   let params = null;
@@ -43,7 +46,7 @@ function address(el) {
     params = null;
   }
   const node = el.closest('[data-zeyn-node]');
-  return { screen: screen?.dataset.zeynScreen ?? null, params, node: node ? Number(node.dataset.zeynNode) : null };
+  return { screen: screen?.dataset.zeynScreen ?? null, params, node: node?.dataset.zeynNode ?? null };
 }
 
 /**
@@ -314,8 +317,9 @@ function touch(force = false) {
 }
 
 /**
- * Idle timeout: warns `warn` seconds before the end with a countdown, then sends the user to the
- * sign out or sign in page, or shows a signed out screen. The server's own session rules still
+ * Idle timeout: warns `warn` seconds before the end with a countdown, ends the session with a
+ * `POST` to `signout` when the app has one, then sends the user to the sign out or sign in page,
+ * or shows a signed out screen. The server's own session rules still
  * apply; this only stops a forgotten screen from staying open.
  */
 function startIdle(idle, warn) {
@@ -334,12 +338,13 @@ function startIdle(idle, warn) {
     warning = null;
     await post('/_zeyn/keepalive', {});
   };
-  const end = () => {
+  const end = async () => {
     ended = true;
     saveAllDrafts();
     warning?.dialog.close();
     warning?.dialog.remove();
     warning = null;
+    if (SESSION.signout) await post(SESSION.signout, {});
     const target = SESSION.logout ?? (SESSION.login ? withReturn(SESSION.login) : null);
     if (target) {
       location.assign(target);

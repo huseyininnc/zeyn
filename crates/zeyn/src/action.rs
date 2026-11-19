@@ -319,6 +319,22 @@ pub struct DataQuery {
     pub sort: Vec<Sort>,
     #[serde(default)]
     pub filters: Vec<Filter>,
+    /// Groups of filters joined by `any` or `all`, which every row must match next to
+    /// [`DataQuery::filters`]. Filters in the list and in the groups count together against
+    /// [`MAX_FILTERS`], and groups nest at most [`MAX_FILTER_DEPTH`] deep.
+    ///
+    /// ```
+    /// use zeyn::{DataQuery, Filter, FilterGroup};
+    /// let json = serde_json::json!({ "filter_groups": [{ "any": true, "filters": [
+    ///     { "field": "code", "contains": "tea" },
+    ///     { "field": "active", "is": true }
+    /// ] }] });
+    /// let q: DataQuery = serde_json::from_value(json).unwrap();
+    /// let tea_or_active = FilterGroup::any([Filter::contains("code", "tea"), Filter::is("active", true)]);
+    /// assert_eq!(q.filter_groups, vec![tea_or_active]);
+    /// ```
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filter_groups: Vec<FilterGroup>,
     /// Free text: rows whose text fields contain it, both sides compared in the form of
     /// [`crate::text::fold`] (lower case, `İ` and `ı` as `i`, accents dropped, `ß` as `ss`).
     /// Fields with `#[mask]` are never searched. Text longer than
@@ -376,6 +392,48 @@ impl DataQuery {
         };
         raw.clamp(1, MAX_PAGE_SIZE)
     }
+
+    /// Keeps the filters `keep` accepts, in [`DataQuery::filters`] and in the groups, within the
+    /// caps: at most [`MAX_FILTERS`] in all (the flat list first), groups at most
+    /// [`MAX_FILTER_DEPTH`] deep, and no group left without a filter.
+    ///
+    /// ```
+    /// use zeyn::{DataQuery, Filter, FilterGroup};
+    /// let mut q = DataQuery {
+    ///     filter_groups: vec![FilterGroup::any([Filter::contains("secret", "x")])],
+    ///     ..DataQuery::default()
+    /// };
+    /// q.retain_filters(|f| f.field != "secret");
+    /// assert!(q.filter_groups.is_empty());
+    /// ```
+    pub fn retain_filters(&mut self, mut keep: impl FnMut(&Filter) -> bool) {
+        self.filters.retain(&mut keep);
+        self.filters.truncate(MAX_FILTERS);
+        let mut left = MAX_FILTERS - self.filters.len();
+        prune_groups(&mut self.filter_groups, &mut keep, 1, &mut left);
+    }
+}
+
+fn prune_groups<F: FnMut(&Filter) -> bool>(
+    groups: &mut Vec<FilterGroup>,
+    keep: &mut F,
+    depth: usize,
+    left: &mut usize,
+) {
+    if depth > MAX_FILTER_DEPTH {
+        groups.clear();
+        return;
+    }
+    groups.retain_mut(|g| {
+        g.filters.retain(|f| {
+            *left > 0 && keep(f) && {
+                *left -= 1;
+                true
+            }
+        });
+        prune_groups(&mut g.groups, keep, depth + 1, left);
+        !g.filters.is_empty() || !g.groups.is_empty()
+    });
 }
 
 /// Kind of column total.
@@ -424,8 +482,11 @@ pub struct Sort {
     pub desc: bool,
 }
 
-/// Most filters one query may carry; the rest are dropped.
+/// Most filters one query may carry, in the flat list and in groups together; the rest are dropped.
 pub const MAX_FILTERS: usize = 32;
+/// Deepest nesting of [`FilterGroup`]s: a group in [`DataQuery::filter_groups`] is at depth 1.
+/// Deeper groups are dropped.
+pub const MAX_FILTER_DEPTH: usize = 4;
 /// Longest filter text in characters; longer conditions are ignored.
 pub const MAX_FILTER_TEXT: usize = 200;
 /// Most choices one `any_of` condition may list; the rest are dropped.
@@ -542,5 +603,51 @@ impl Filter {
             && self.any_of.is_empty()
             && self.is.is_none()
             && self.blank.is_none()
+    }
+}
+
+/// Filters and nested groups joined by `any` (at least one matches) or `all` (every one
+/// matches). Inside one [`Filter`] every set condition must still hold. A group none of whose
+/// conditions can be read filters nothing.
+///
+/// ```
+/// use zeyn::{Filter, FilterGroup};
+/// let cheap_tea = FilterGroup::all([Filter::contains("code", "tea"), Filter::range("price", None, Some("5"))]);
+/// let g = FilterGroup::any([Filter::is("active", false)]).group(cheap_tea);
+/// assert!(g.any && !g.groups[0].any);
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct FilterGroup {
+    /// `true`: a row matches when any filter or group matches; `false`: when all of them do.
+    #[serde(default)]
+    pub any: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filters: Vec<Filter>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<FilterGroup>,
+}
+
+impl FilterGroup {
+    /// Rows matching at least one of `filters`.
+    pub fn any(filters: impl IntoIterator<Item = Filter>) -> Self {
+        Self {
+            any: true,
+            filters: filters.into_iter().collect(),
+            groups: Vec::new(),
+        }
+    }
+
+    /// Rows matching every one of `filters`.
+    pub fn all(filters: impl IntoIterator<Item = Filter>) -> Self {
+        Self {
+            any: false,
+            ..Self::any(filters)
+        }
+    }
+
+    /// Adds a nested group.
+    pub fn group(mut self, group: FilterGroup) -> Self {
+        self.groups.push(group);
+        self
     }
 }

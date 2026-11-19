@@ -14,7 +14,7 @@
 डिफ़ॉल्ट बिल्ड में `oidc` और `totp` में से कुछ नहीं है, इसलिए जो ऐप इन्हें इस्तेमाल नहीं करते वे कुछ नहीं चुकाते।
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 परखे गए प्रोवाइडर Keycloak और Authentik हैं। जो भी प्रोवाइडर OpenID Connect discovery, PKCE के साथ authorization code flow और JWKS का पालन करता है, उसे काम करना चाहिए।
@@ -95,7 +95,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | साइन इन शुरू करता है और प्रोवाइडर पर रीडायरेक्ट करता है |
 | `GET /_zeyn/auth/callback` | प्रोवाइडर का वापसी रीडायरेक्ट |
-| `GET /_zeyn/auth/logout` | यहाँ और प्रोवाइडर पर सत्र खत्म करता है |
+| `POST`, फिर `GET /_zeyn/auth/logout` | CSRF टोकन के साथ `POST` यहाँ सत्र खत्म करता है, फिर `GET` प्रोवाइडर पर साइन आउट करता है |
 
 प्रोवाइडर पर `<public url>/_zeyn/auth/callback` को redirect URI और `<public url>/` को post logout redirect URI के रूप में पंजीकृत करें। सार्वजनिक URL कॉन्फ़िगर किया जाता है, अनुरोध के `Host` हेडर से कभी नहीं लिया जाता। बेस या सार्वजनिक पथ के साथ रूट उसके नीचे चले जाते हैं।
 
@@ -127,7 +127,9 @@ CSRF सुरक्षा नहीं बदलती: रनटाइम क�
 
 ### लॉगआउट
 
-`/_zeyn/auth/logout` सत्र कुकी हटाता है और उपयोगकर्ता को `client_id` और `post_logout_redirect_uri` के साथ प्रोवाइडर के `end_session_endpoint` पर भेजता है। उस endpoint के बिना उपयोगकर्ता ऐप के शुरुआती पृष्ठ पर जाता है।
+साइन आउट दो चरणों में होता है, ताकि किसी दूसरी साइट का लिंक या इमेज उपयोगकर्ता को साइन आउट न कर सके। CSRF टोकन के साथ `POST /_zeyn/auth/logout` सत्र कुकी हटाता है और ऐप का ब्राउज़र स्टोरेज साफ़ करता है। फिर `GET /_zeyn/auth/logout` ब्राउज़र को `client_id` और `post_logout_redirect_uri` के साथ प्रोवाइडर के `end_session_endpoint` पर भेजता है; वह एंडपॉइंट न हो तो उपयोगकर्ता ऐप के शुरुआती पेज पर जाता है। जिस ब्राउज़र के पास अभी भी सत्र है, उसका `GET` बस ऐप पर वापस जाता है।
+
+साइट शेल का साइन आउट लिंक और निष्क्रियता पर साइन आउट दोनों चरण करते हैं। आपका अपना लिंक `data-zeyn-signout` के साथ यही करता है: रनटाइम पहले उस पते पर `POST` भेजता है, फिर लिंक खोलता है।
 
 ### उसी ऐप के API और MCP क्लाइंट
 
@@ -184,13 +186,13 @@ App::new("Back office")
 
 ## टेस्टिंग
 
-`crates/zeyn/tests/oidc.rs` हर फ़्लो को टेस्ट में एक छोटे issuer के विरुद्ध चलाता है जो रन के लिए बनाई कुंजी से हस्ताक्षर करता है, और जाँचता है कि समाप्त टोकन, गलत audience और issuer, `alg=none`, सार्वजनिक कुंजी से keyed HMAC टोकन, बदले claim, छेड़ी गई कुकी, दोबारा इस्तेमाल हुआ या बेमेल `state` और गलत `nonce` अस्वीकार होते हैं। `crates/zeyn/tests/totp.rs` नामांकन, सत्यापन, replay, रिकवरी कोड और दर सीमा कवर करता है।
+`crates/zeyn/tests/all/oidc.rs` हर फ़्लो को टेस्ट में एक छोटे issuer के विरुद्ध चलाता है जो रन के लिए बनाई कुंजी से हस्ताक्षर करता है, और जाँचता है कि समाप्त टोकन, गलत audience और issuer, `alg=none`, सार्वजनिक कुंजी से keyed HMAC टोकन, बदले claim, छेड़ी गई कुकी, दोबारा इस्तेमाल हुआ या बेमेल `state` और गलत `nonce` अस्वीकार होते हैं। `crates/zeyn/tests/all/totp.rs` नामांकन, सत्यापन, replay, रिकवरी कोड और दर सीमा कवर करता है।
 
 डेवलपमेंट मोड में Keycloak के साथ वही फ़्लो उसके विरुद्ध भी चलते हैं:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 टेस्ट अपने क्लाइंट और उपयोगकर्ता के साथ `zeyn-test` realm बनाता है और अंत में उसे हटा देता है। `ZEYN_TEST_OIDC` के बिना यह छोड़ा जाता है।

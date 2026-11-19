@@ -78,6 +78,7 @@
       "operations": "Operations",
       "assistant": "AI assistant",
       "islands": "WASM islands",
+      "socket": "ZeynSocket",
       "realtime": "Realtime and CRDT",
       "desktop": "Desktop apps",
       "protocol": "Runtime protocol",

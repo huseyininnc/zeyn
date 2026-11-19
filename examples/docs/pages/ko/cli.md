@@ -8,11 +8,14 @@
 |---|---|
 | `zeyn new <name>` | 표준 Feature 구조의 앱을 만듭니다 |
 | `zeyn new <name> --lib` | 여러 앱이 공유하는 모델, Feature, 텍스트 라이브러리를 만듭니다 |
+| `zeyn new <name> --component` | 브라우저 스크립트, 스타일시트, 텍스트, 예제 앱, 테스트를 갖춘 컴포넌트 크레이트 `zeyn-<name>`을 만듭니다 |
 | `zeyn g feature <name>` | `models`, `services`, `actions`, `screens` 폴더와 동작하는 목록 Screen이 있는 `src/features/<name>`을 추가합니다 |
 | `zeyn g screen <feature> <name>` | feature에 `screens/<name>.rs`를 추가하고 등록한 뒤 제목을 모든 로케일 파일에 추가합니다 |
 | `zeyn routes` | Feature, Screen, 경로, API, 접근 권한을 나열합니다 |
 | `zeyn check` | 컴파일하고 구조적 문제와 누락된 번역을 보고합니다 |
 | `zeyn check --fix` | `src`, `tests`, `examples`에서 이름이 바뀐 Zeyn API를 다시 쓴 다음 검사합니다 |
+| `zeyn check --json` | 안정된 코드, 이유, 해결 방법과 함께 보고서를 JSON으로 출력합니다 |
+| `zeyn doctor` | 프로젝트가 어떻게 빌드되는지 읽고 느리거나 커지는 원인을 보고하며, 각 항목에 한 줄짜리 해결 방법을 붙입니다 |
 | `zeyn mcp` | AI 에이전트를 위한 MCP 서버를 stdio로 실행합니다 |
 
 crates.io에서 설치합니다.
@@ -55,6 +58,7 @@ cargo run
 
   `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`처럼 쓰지 않습니다.
 - `build.rs`와 `Cargo.toml`의 `[package.metadata.zeyn]`에 있는 `max_file_lines = 300`: `src/`의 파일에 비어 있지 않은 줄이 더 많으면 `cargo build`가 멈춥니다. clippy `too_many_lines`(60, `clippy.toml`)는 함수에 같은 일을 합니다. [Project structure](structure.md)를 참고하세요.
+- `Cargo.toml`의 `[profile.dev]`, `.cargo/config.toml`, `.vscode/settings.json`: 빠른 빌드 루프입니다. 의존성은 `opt-level = 1`과 디버그 정보 없이 빌드되고, 내 코드는 줄 테이블만 유지하며(백트레이스에 파일과 줄이 표시됩니다. 지역 변수로 디버깅하려면 `CARGO_PROFILE_DEV_DEBUG=full`을 설정하세요), Windows는 `rust-lld`로 링크하고, rust-analyzer는 자체 target 폴더를 사용하므로 `cargo build`를 기다리지 않습니다.
 - `Dockerfile`과 `.dockerignore`: 작은 컨테이너 이미지입니다.
 - 일반적인 CI 서버용 파이프라인이며, 모두 같은 검사(`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`)를 실행하고 `Cargo.toml`과 일치하지 않는 태그 `vX.Y.Z`를 거부합니다.
   - GitHub Actions용 `.github/workflows/ci.yml`, 그리고 `.github/dependabot.yml`(Cargo와 action의 주간 업데이트)과 pull request 체크리스트
@@ -65,6 +69,23 @@ cargo run
 - git이 설치되어 있고(Windows, macOS, Linux) 폴더가 이미 저장소 안에 있지 않으면 `main` 브랜치의 로컬 git 저장소를 만듭니다. 아무것도 커밋하지 않으므로 첫 커밋에는 사용자 본인의 이름과 이메일이 들어갑니다. `--no-git`을 쓰면 건너뜁니다.
 
 각 폴더에 대해서는 [프로젝트 구조](structure.md)를 참고하십시오.
+
+## 새 컴포넌트 크레이트
+
+`zeyn new <name> --component`는 크레이트 `zeyn-<name>`을 작성합니다(이름 앞의 `zeyn-`은 받아들입니다. 이름은 소문자, 숫자, 단일 하이픈이며 최대 32자입니다). [공유 라이브러리](polyrepo.md)의 확장 모델을 바로 고쳐 쓸 수 있게 만든 것입니다.
+
+- `src/lib.rs`: 예제 컴포넌트(토글 버튼), `App::module`로 브라우저 모듈을 등록하는 `Plugin`, 상수 `CATALOGS`.
+- `assets/<name>.js`와 `assets/<name>.css`: 모듈입니다. 클래스는 `z-<name>-`로, 마커 속성은 `data-zeyn-<name>-`로 시작하며, 스타일시트는 테마 토큰만 사용하므로 두 테마가 모두 동작합니다.
+- `assets/en.json`과 `assets/tr.json`: 텍스트이며 키는 `<name>` 아래에 있습니다.
+- `examples/demo`: 컴포넌트가 없는 시작 페이지와 컴포넌트가 있는 페이지를 가진 앱입니다. `cargo run --example demo`로 실행합니다.
+- `tests/<name>.rs`: 컴포넌트가 있는 페이지는 모듈을 연결하고, 없는 페이지는 절대 참조하지 않습니다. 런타임은 나중에 도착하는 콘텐츠를 위해 모듈을 나열하고, 파일은 URL에 빌드를 담아 제공되며, 앱은 텍스트 문구를 바꿀 수 있습니다.
+- 라이브러리와 같은 프로젝트 파일: GitHub, GitLab, Jenkins용 CI, 린트와 포맷 규칙, `AGENTS.md`와 `CLAUDE.md`.
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## 생성기
 
@@ -89,6 +110,53 @@ Zeyn 릴리스에서 API 이름이 바뀌면 `zeyn check --fix`는 예를 들어
 zeyn check --fix
 ```
 
+모든 문제에는 안정된 코드가 있습니다. 앱, 기능, 경로, 서비스는 `Z01xx`, 보안은 `Z02xx`, 공개 페이지는 `Z03xx`, 메뉴, 명령, 단축키는 `Z04xx`, 데이터는 `Z05xx`, 페이지 검사는 `Z06xx`, 경고는 `W01xx`입니다. 텍스트 출력은 각 문제를 이유(`why`), 해결 방법(`help`), 이 문서로 가는 링크, 코드와 함께 보여 줍니다. `zeyn check --json`은 같은 보고서를 에이전트와 CI를 위한 하나의 JSON 문서로 출력하며, `ok`가 false이면 오류로 끝납니다.
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
+```
+
+`zeyn check`는 앱의 소스도 읽고 파일과 줄을 붙여 다음을 경고합니다. `W0106`은 `src` 없는 `<script>`나 `onclick=` 같은 인라인 이벤트 핸들러를 담은 문자열(CSP가 둘 다 막습니다), `W0107`은 `escape(..)`, `r.text(..)`, `r.value(..)` 없이 HTML을 쓰는 직접 작성한 컴포넌트, `W0108`은 범위를 제한하는 쿼리 없이 `Vec` 전체를 반환하는 action, `W0109`는 `.trusted()`로 표시한 `DocumentViewer`입니다. `permission`이나 `public`이 빠지면 경고할 필요도 없이 컴파일되지 않습니다.
+
+## 새 Zeyn 버전으로 옮기기
+
+`zeyn migrate`는 앱을 더 새로운 Zeyn 버전으로 옮깁니다(`ng update`처럼). 앱이 쓰는 Zeyn 버전을 `Cargo.lock`(또는 `Cargo.toml`)에서 읽고, 그 버전과 대상 버전 사이의 모든 마이그레이션 단계를 순서대로 실행하며, `Cargo.toml`의 Zeyn 의존성을 대상 버전으로 옮기고, 한 일을 출력합니다. 각 변경은 파일과 줄과 함께, 사람이 살펴봐야 할 곳은 이유와 함께 보여 줍니다.
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+단계는 이름과 메서드를 바꾸고(`Hub`를 `Socket`으로, `.realtime(live)`를 `.socket(live)`로), 호출의 모양을 바꾸며(`.sort_by(Order::date, true)`를 `.sort_by_desc(Order::date)`로), `use` 경로를 옮기고, 안전하게 다시 쓸 수 없는 것을 알려 줍니다. 리터럴이 아닌 `bool` 플래그나 제거된 주소로 가는 로그아웃 링크가 그 예입니다. 바꾸는 토큰만 편집하므로 서식과 주석은 그대로 남고, 두 번째 실행은 아무것도 바꾸지 않습니다. `--dry-run`은 아무것도 쓰지 않고 unified diff를 출력하며, `--json`은 보고서를 `changes`, `todos`, `errors`가 있는 하나의 JSON 문서로 출력합니다. 파일을 읽거나 파싱하거나 쓸 수 없을 때가 아니면 종료 코드는 0입니다. `zeyn check --fix`는 모든 단계의 이름 변경을 적용합니다. MCP 도구 `zeyn_migrate`는 에이전트를 위해 같은 일을 합니다.
+
+## 빌드 속도와 디스크 사용량
+
+`zeyn doctor`는 프로젝트가 어떻게 빌드되는지 읽고 느리거나 커지는 원인을 보고합니다. target 폴더의 크기와 가장 큰 폴더, 링커, dev 프로필(디버그 정보와 의존성 최적화), `rust-version`과 비교한 rustc와 cargo, 이전 툴체인이 남긴 산출물, rust-analyzer의 target 폴더, 그리고 Windows에서는 target 폴더와 `~/.cargo`가 Defender 검사 밖에 있는지(제외 항목 또는 Dev Drive, Windows가 읽기를 허용하지 않으면 그렇다고 알려 줍니다)를 다룹니다. 각 항목에는 안정된 코드와 한 줄짜리 해결 방법이 있습니다. `--json`은 이를 하나의 문서로 출력하고, `--target-limit-gb`는 큰 것으로 볼 크기를 정하며(기본 20), 종료 코드는 항상 0입니다. `zeyn doctor --fix`는 빠른 dev 프로필을 `Cargo.toml`에, `rust-lld` 링커를 `.cargo/config.toml`에 추가하고 다른 것은 바꾸지 않으며, 두 번째 실행은 아무것도 바꾸지 않습니다. MCP 도구 `zeyn_doctor`는 에이전트를 위해 같은 일을 합니다.
+
+## DevTools
+
+`cargo run`(또는 `zeyn dev`)으로 서비스하는 디버그 빌드는 각 요청이 한 일을 기록합니다. 실행한 Screen과 Action, 상태와 시간, Screen을 빌드하고 렌더링하는 데 걸린 시간, 각 SQL 문과 그 시간 및 영향받은 행 수, Action이 반환한 효과와 토픽입니다. Alt+Shift+D는 최근 50개 요청을 보여 주는 패널을 열고, 각 요청을 펼치면 SQL 문이 나타납니다. `GET /_zeyn/devtools`는 같은 목록을 JSON으로 반환하고, MCP 도구 `zeyn_devtools`가 에이전트를 위해 이를 읽습니다.
+
+SQL 문은 인수 없이 저장되므로 어떤 값도 패널에 도달하지 않습니다. 릴리스 빌드에는 DevTools가 없습니다. 코드도, 경로도, 그것을 위한 메모리도 없습니다. `App::router`를 직접 서비스하는 앱이나 테스트는 `zeyn::server::devtools(true)`로 켭니다.
+
 ## Docker
 
 생성된 `Dockerfile`은 두 단계로 빌드하며 distroless 이미지에서 루트 권한이 없는 사용자로 실행됩니다. 바이너리는 `<app> health`로 스스로 상태를 확인하며, `HEALTHCHECK`가 이를 사용합니다.
@@ -102,4 +170,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP 서버
 
-`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.
+`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_inspect`(Screen의 노드 트리와 각 노드를 배치한 Rust 줄), `zeyn_devtools`(실행 중인 디버그 빌드의 DevTools 요청 로그: Screen, action, 시간, SQL 문), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_doctor`, `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.

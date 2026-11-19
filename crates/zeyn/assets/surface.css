@@ -1,0 +1,47 @@
+.z-surface-scroll { max-width: 100%; overflow: auto; }
+
+.z-surface {
+  position: relative;
+  box-sizing: content-box;
+  width: var(--z-surface-w);
+  height: var(--z-surface-h);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background-color: var(--z-surface-2);
+  background-image: radial-gradient(var(--z-border) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.z-surface-item {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: calc(var(--z-space) * 2);
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  box-shadow: var(--z-shadow-1);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.z-surface-item:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+
+.z-surface-item[data-dragging] { cursor: grabbing; box-shadow: var(--z-shadow-2); z-index: 1; }
+
+.z-surface-item[data-picked] { outline: 2px dashed var(--z-focus); outline-offset: 2px; }
+
+.z-surface-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 24px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--z-border-strong) 50%, var(--z-border-strong) 60%, transparent 60%, transparent 70%, var(--z-border-strong) 70%, var(--z-border-strong) 80%, transparent 80%);
+}
+
+.z-surface-item[data-picked="size"] .z-surface-resize { background-color: var(--z-focus); }

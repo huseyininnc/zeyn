@@ -10,10 +10,11 @@ readme.workspace = true
 homepage.workspace = true
 keywords = ["web", "framework", "datagrid", "forms", "axum"]
 categories = ["web-programming::http-server", "gui"]
+autotests = false
 
 [features]
 default = ["server"]
-server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:tracing-subscriber", "dep:flate2"]
+server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:tower-service", "dep:futures-core", "dep:futures-util", "futures-util/alloc", "dep:tracing-subscriber", "dep:flate2"]
 signed-licenses = ["dep:ed25519-dalek"]
 redis = ["server", "dep:redis"]
 otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
@@ -29,19 +30,34 @@ oidc = ["server", "dep:reqwest", "dep:rustls", "dep:ring"]
 totp = ["server", "dep:ring", "dep:totp-rs", "dep:qrcodegen"]
 # WASM islands (`ui::Island`, `App::islands`). Pages without an island pay nothing either way.
 islands = ["server", "dep:zeyn-island", "tokio/fs"]
-# WebSocket rooms with Y-CRDT documents and change topics (`realtime::Realtime`, `ui::Live`).
-# Off by default: requests stay stateless unless an app turns this on.
+# The live socket (`realtime::ZeynSocket`): topics, typed events, actions over one WebSocket per
+# page, and Y-CRDT documents. Off by default: requests stay stateless unless an app turns this on.
 realtime = ["server", "axum/ws", "dep:yrs", "dep:futures-util", "futures-util/sink"]
+# A Rust client of the page socket (`realtime::TestSocket`), for tests and services.
+socket-client = ["realtime", "dep:tokio-tungstenite"]
 # Grid export to XLSX and XLSX import.
 xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
 # PDF documents from Typst templates, and grid export to PDF.
 pdf = ["server", "dep:typst", "dep:typst-layout", "dep:typst-pdf"]
+# Uploaded PNG, JPEG and WebP images decoded and encoded again, which drops EXIF, GPS and other
+# metadata and anything hidden after the image data; the EXIF orientation is applied first.
+image = ["server", "dep:image"]
 # E-mail notifications over SMTP, sent from a background job.
 email = ["server", "dep:lettre"]
 # Optional user accounts with the structure of ASP.NET Core Identity: stores, managers, Argon2id
 # passwords, purpose tokens, sealed session cookies, two factor, passkeys and a default UI.
 # Off unless an app asks for it. See docs/accounts.md.
 accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
+# Resumable uploads: a tus 1.0 subset (creation, HEAD, PATCH, expiration, termination) under
+# `/_zeyn/uploads/`, used by the upload field and FileDrop. See examples/docs/pages/forms.md.
+resumable = ["server", "dep:base64"]
+# Wall clock job schedules on top of the job system: cron triggers with seconds and time zones,
+# calendars, misfire policies, pause and resume, chains, run history and an operations screen.
+# See docs/metronome.md.
+metronome = ["server"]
+# The operations screen of Metronome at /ops/jobs (`metronome::ops()`): jobs, triggers and run
+# history in DataGrids, and its texts. About 680 KB of a release build, so it is a feature of its own.
+metronome-ops = ["metronome"]
 # The `ui::Markdown` component: safe Markdown to HTML, with no dependencies.
 markdown = []
 # Framework texts (`zeyn.*`) in more languages. English and Turkish are always built in; each
@@ -57,8 +73,8 @@ lang-ar = []
 lang-all = ["lang-zh", "lang-ru", "lang-es", "lang-ko", "lang-ja", "lang-hi", "lang-ar"]
 
 [dependencies]
-zeyn-macros = { path = "../zeyn-macros", version = "0.0.10" }
-zeyn-island = { path = "../zeyn-island", version = "0.0.10", optional = true }
+zeyn-macros = { path = "../zeyn-macros", version = "0.0.11" }
+zeyn-island = { path = "../zeyn-island", version = "0.0.11", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
@@ -67,11 +83,13 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time",
 futures-core = { version = "0.3", optional = true }
 getrandom = { version = "0.2", optional = true }
 tower-http = { version = "0.6", features = ["cors", "compression-gzip"], optional = true }
+tower-service = { version = "0.3", optional = true }
 flate2 = { version = "1.1", optional = true }
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "json"], optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 ed25519-dalek = { version = "3", default-features = false, optional = true }
 redis = { version = "1", default-features = false, features = ["tokio-comp", "connection-manager", "script"], optional = true }
+tokio-tungstenite = { version = "0.29", optional = true }
 ring = { version = "0.17", optional = true }
 totp-rs = { version = "6", default-features = false, features = ["std", "otpauth"], optional = true }
 qrcodegen = { version = "1.8", optional = true }
@@ -89,6 +107,7 @@ yrs = { version = "0.28", optional = true }
 rust_xlsxwriter = { version = "0.102", default-features = false, features = ["constant_memory"], optional = true }
 calamine = { version = "0.38", default-features = false, optional = true }
 zip = { version = "9", default-features = false, features = ["deflate"], optional = true }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"], optional = true }
 typst = { version = "0.15", optional = true }
 typst-layout = { version = "0.15", optional = true }
 typst-pdf = { version = "0.15", optional = true }
@@ -102,7 +121,7 @@ base64 = "0.22"
 ed25519-dalek = { version = "3", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "registry"] }
@@ -115,57 +134,35 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 flate2 = "1.1"
 
 [[test]]
-name = "assistant"
-required-features = ["assistant"]
+name = "all"
+path = "tests/all/main.rs"
 
 [[test]]
-name = "oidc"
-required-features = ["oidc"]
-
-[[test]]
-name = "totp"
-required-features = ["totp"]
-
-[[test]]
-name = "islands"
-required-features = ["islands"]
-
-[[test]]
-name = "realtime"
+name = "realtime_load"
 required-features = ["realtime"]
-
-[[test]]
-name = "xlsx"
-required-features = ["xlsx"]
 
 [[test]]
 name = "xlsx_memory"
 required-features = ["xlsx"]
 
 [[test]]
-name = "pdf"
-required-features = ["pdf"]
-
-[[test]]
 name = "pdf_measure"
 required-features = ["pdf"]
 
 [[test]]
-name = "accounts"
-required-features = ["accounts"]
+name = "otel"
 
 [[test]]
-name = "ui_markdown"
-required-features = ["markdown"]
+name = "compression_measure"
 
 [[test]]
-name = "accounts_passkeys"
-required-features = ["accounts"]
+name = "files_memory"
 
 [[test]]
-name = "accounts_sql"
-required-features = ["accounts", "postgres"]
+name = "grid_measure"
 
 [[test]]
-name = "mail"
-required-features = ["email"]
+name = "import_memory"
+
+[[test]]
+name = "logging"

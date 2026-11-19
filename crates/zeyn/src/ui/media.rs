@@ -332,8 +332,9 @@ macro_rules! player_builder {
 
             /// What shows in place of the default message when the media cannot play: a text or
             /// a component.
+            #[track_caller]
             pub fn on_error(mut self, content: impl Into<Node>) -> Self {
-                self.0.loading.on_error = Some(content.into());
+                self.0.loading.on_error = Some(Node::placed(content));
                 self
             }
 

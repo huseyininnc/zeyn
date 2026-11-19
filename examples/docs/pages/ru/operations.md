@@ -77,7 +77,7 @@ App::new("Billing")
 
   ```
   docker run -d --rm --name zeyn-redis -p 6379:6379 redis:7-alpine
-  ZEYN_TEST_REDIS=redis://127.0.0.1:6379 cargo test -p zeyn --features redis --test redis
+  ZEYN_TEST_REDIS=redis://127.0.0.1:6379 cargo test -p zeyn --features redis --test all redis::
   docker stop zeyn-redis
   ```
 

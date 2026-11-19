@@ -1,0 +1,36 @@
+/* Toggle buttons of the {{name}} crate. Colors and sizes come from theme tokens, so the light
+   and the dark theme both work. */
+.z-{{component}} {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--z-space);
+}
+
+.z-{{component}}-toggle {
+  font: inherit;
+  color: var(--z-text);
+  background: var(--z-surface);
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  padding: calc(var(--z-space) / 2) var(--z-space);
+  cursor: pointer;
+}
+
+.z-{{component}}-toggle:hover {
+  background: var(--z-hover);
+}
+
+.z-{{component}}-toggle:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 2px;
+}
+
+.z-{{component}}-toggle[aria-pressed="true"] {
+  background: var(--z-primary);
+  border-color: var(--z-primary);
+  color: var(--z-on-primary);
+}
+
+.z-{{component}}-status {
+  color: var(--z-text-muted);
+}

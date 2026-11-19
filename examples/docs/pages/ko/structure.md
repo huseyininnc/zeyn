@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## 테스트
 
-테스트는 라우터를 만들고 메모리에서 호출합니다.
+`zeyn::testing::TestApp`은 앱을 메모리에서 실행합니다. 서비스 중인 앱과 같은 라우터, 같은 검사, 같은 접근 규칙을 쓰며 포트를 열지 않습니다. Angular의 `TestBed`나 Flutter의 위젯 테스터 역할을 합니다. 앱을 만들고, 사용자로 로그인하고, Screen을 열고, 폼을 제출하고, 그리드 페이지를 불러오거나 Action을 호출한 뒤 상태, HTML 또는 JSON을 확인합니다. CSRF 토큰은 대신 보내 줍니다. `zeyn new`는 이 방식으로 `tests/app.rs`를 작성합니다.
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| 호출 | 하는 일 |
+|---|---|
+| `TestApp::new(app)` | 앱 자체의 로그인 방식을 그대로 쓰는 앱. `App::check`가 문제를 찾으면 그 문제와 함께 panic합니다 |
+| `TestApp::signed_in(app, identity)` | 모든 요청을 `identity`로 로그인시켜 각 권한이 무엇을 허용하는지 확인합니다 |
+| `.header(name, value)` | 모든 요청에 붙는 헤더. 예: `accept-language` |
+| `get(path)` | 페이지, 파일 또는 엔드포인트 |
+| `submit(screen, params, node, values)` | 브라우저처럼 폼을 제출합니다. 성공하면 `effects()`와 함께 `200`, 규칙 위반이면 필드별 `errors`와 함께 `422`, 권한이 없으면 `403` |
+| `grid(screen, params, node, query)` | JSON `DataQuery`로 그리드의 한 페이지를 불러옵니다. HTML `rows`와 `total` |
+| `api(feature, action, input)` | `Feature::api`로 공개한 Action을 호출합니다 |
+| `send(request)` | 그 밖의 모든 요청 |
+
+모든 호출은 `status`, `headers`, `body`, `json()`, `effects()`를 가진 `TestResponse`를 반환합니다.
+
+Screen은 서버 없이도 동작합니다. 인수 없는 `#[screen]`에는 `run()`이 있고, `screen.html(&META)`로 렌더링하고, `screen.schema(&META)`로 설명을 얻고, `App::check_page(&screen)`로 페이지 검사를 실행합니다. 정확한 HTML보다 사용자가 할 수 있는 일(상태, 효과, 그리드의 행)을 테스트하고, 변경할 때마다 `cargo test`를 실행하십시오.

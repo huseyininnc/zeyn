@@ -15,7 +15,7 @@ ister. Varsayılan derlemede `oidc` ve `totp` yoktur, bu yüzden bunları kullan
 bunun bedelini ödemez.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 Test edilen sağlayıcılar Keycloak ve Authentik'tir. OpenID Connect keşfini (discovery), PKCE ile
@@ -118,7 +118,7 @@ adresi yapar. Üç route ekler:
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | bir oturum açma başlatır ve sağlayıcıya yönlendirir |
 | `GET /_zeyn/auth/callback` | sağlayıcının geri yönlendirmesi |
-| `GET /_zeyn/auth/logout` | oturumu burada ve sağlayıcıda sonlandırır |
+| `POST`, sonra `GET /_zeyn/auth/logout` | CSRF token'lı `POST` oturumu burada sonlandırır, ardından `GET` sağlayıcıda oturumu kapatır |
 
 Sağlayıcıda, `<public url>/_zeyn/auth/callback` adresini yönlendirme URI'si (redirect URI) olarak ve
 `<public url>/` adresini oturum kapatma sonrası yönlendirme URI'si olarak kaydedin. Genel URL
@@ -175,9 +175,16 @@ yeniden kullanıma izin verin.
 
 ### Oturum kapatma
 
-`/_zeyn/auth/logout` oturum cookie'sini siler ve kullanıcıyı `client_id` ve
-`post_logout_redirect_uri` ile sağlayıcının `end_session_endpoint` adresine gönderir. Bu uç nokta
-yoksa kullanıcı uygulamanın başlangıç sayfasına gider.
+Oturum kapatma iki adımdır; böylece başka bir sitedeki link veya resim kullanıcının oturumunu
+kapatamaz. CSRF token'lı `POST /_zeyn/auth/logout` oturum cookie'sini siler ve uygulamanın
+tarayıcı depolamasını temizler. Ardından `GET /_zeyn/auth/logout` tarayıcıyı `client_id` ve
+`post_logout_redirect_uri` ile sağlayıcının `end_session_endpoint` adresine gönderir; bu uç nokta
+yoksa kullanıcı uygulamanın başlangıç sayfasına gider. Hâlâ oturumu olan bir tarayıcının `GET`
+isteği yalnızca uygulamaya geri döner.
+
+Site kabuğundaki oturum kapatma linki ve boşta kalma ile oturum kapatma iki adımı da yapar. Kendi
+linkiniz de `data-zeyn-signout` ile aynısını yapar: runtime önce o adrese `POST` gönderir, sonra
+linki izler.
 
 ### Aynı uygulamanın API ve MCP client'ları
 
@@ -260,18 +267,18 @@ içindir. TOTP anahtarını sabit tutun: başka bir anahtarla mühürlenen kayı
 
 ## Test
 
-`crates/zeyn/tests/oidc.rs` her akışı, testin içinde çalışmak için üretilmiş bir anahtarla imzalayan
+`crates/zeyn/tests/all/oidc.rs` her akışı, testin içinde çalışmak için üretilmiş bir anahtarla imzalayan
 küçük bir issuer'a karşı çalıştırır ve süresi dolmuş token'ların, yanlış audience ve issuer'ların,
 `alg=none`'ın, genel anahtarla anahtarlanmış bir HMAC token'ın, değiştirilmiş claim'lerin,
 kurcalanmış cookie'lerin, yeniden kullanılmış veya uyuşmayan `state` değerinin ve yanlış bir `nonce`
-değerinin reddedildiğini denetler. `crates/zeyn/tests/totp.rs` kaydı, doğrulamayı, tekrar oynatmayı
+değerinin reddedildiğini denetler. `crates/zeyn/tests/all/totp.rs` kaydı, doğrulamayı, tekrar oynatmayı
 (replay), kurtarma kodlarını ve rate limit'i kapsar.
 
 Geliştirme kipinde bir Keycloak ile aynı akışlar ona karşı da çalışır:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 Test kendi client'ı ve kullanıcısıyla bir `zeyn-test` realm'i oluşturur ve sonunda siler.

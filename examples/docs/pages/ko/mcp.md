@@ -11,9 +11,13 @@ Zeyn은 두 가지 에이전트를 위해 만들어졌습니다. Zeyn 앱을 작
 
 | 도구 | 기능 |
 |---|---|
-| `zeyn_docs` | 주제별 프레임워크 레퍼런스: `rules`, `language`, `protocol` |
+| `zeyn_docs` | 주제별 프레임워크 레퍼런스: `rules`, `language`, `protocol`; `search: "단어"`는 이 버전의 문서 페이지에 순위를 매기고, `page: "/language/forms"`는 한 페이지를 Markdown으로 돌려줍니다 |
 | `zeyn_describe` | 앱의 Feature, Screen, 경로, 접근 권한, API, 문제, 누락된 번역 |
+| `zeyn_inspect` | 한 Screen의 노드 트리: 경로, 컴포넌트 유형, 각 노드를 배치한 Rust `file:line:column` |
+| `zeyn_devtools` | 디버그 모드로 실행 중인 앱의 DevTools 요청 로그: 최신 요청부터, 각 요청의 Screen, action, 상태, 시간, SQL 문(문장과 시간, 값 없음). `addr`와 `limit`는 선택 사항 |
 | `zeyn_check` | 컴파일하고 문제를 보고합니다. `fix: true`는 먼저 이름이 바뀐 API를 다시 씁니다 |
+| `zeyn_doctor` | 프로젝트의 빌드 방식을 읽습니다: target 크기, 링커, dev 프로필, 툴체인, Windows 검사 제외 항목. `fix: true`는 빠른 dev 프로필과 링커를 추가합니다(`Cargo.toml`과 `.cargo/config.toml`만) |
+| `zeyn_migrate` | 앱을 단계별로 더 새로운 Zeyn 버전으로 옮깁니다(이름 변경, 바뀐 호출, 옮겨진 경로). 서식은 유지됩니다. 각 변경을 파일과 줄과 함께, 사람이 살펴봐야 할 것과 함께 돌려줍니다. `dry_run: true`는 diff를 돌려주고 아무것도 쓰지 않습니다 |
 | `zeyn_test` | `cargo test`를 실행하고 출력의 끝부분을 반환합니다 |
 | `zeyn_new_feature` | Feature 폴더를 만들고 등록합니다 |
 | `zeyn_new_screen` | Feature에 화면 파일을 추가하고 등록합니다 |
@@ -26,6 +30,12 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ```
 
 `ZEYN_DESCRIBE=1 cargo run`은 `zeyn_describe`가 반환하는 것과 같은 설명을 출력하고 종료합니다.
+
+### Source inspector
+
+디버그 빌드는 각 노드를 Screen에 배치한 Rust 줄(`Screen::body`, `Stack::add`, `Tabs::tab` 및 다른 컨테이너 메서드)을 기억합니다. `ZEYN_INSPECT=<screen> cargo run`은 `zeyn_inspect`가 반환하는 노드 트리를 출력하고 종료합니다.
+
+`cargo run`으로 서비스하는 디버그 빌드는 그 줄을 각 노드의 첫 요소에 `data-zeyn-src`로 페이지에 씁니다. Alt+Shift+I는 포인터 아래의 노드나 포커스가 있는 요소를 표시하고 그 줄과 그것을 담은 노드들의 줄을 보여 주는 오버레이를 엽니다. Alt+Shift+I 또는 Escape로 닫습니다. 릴리스 빌드는 줄을 보관하지 않습니다. 노드는 박스에 담긴 포인터 하나로 남고, 페이지에는 속성이 없으며, 검사기 스크립트는 바이너리에 들어가지 않습니다.
 
 ## 앱을 사용하는 에이전트
 

@@ -6,7 +6,7 @@ detrás de la feature de Cargo `postgres` y Oracle detrás de `oracle`, de modo 
 no compila nada de esto.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.11", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Configuración
@@ -158,6 +158,7 @@ igual con datos en memoria y en SQL:
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | cada grupo entre paréntesis, sus filtros y grupos unidos por `OR` (`any`) o `AND` |
 
 `contains` sobre columnas de dinero y de sí/no se ignora en SQL. El texto se ordena según la collation de la base de datos
 (Oracle: `NLS_SORT`).
@@ -332,11 +333,11 @@ contiene una o más URL (separadas por espacios) y, en caso contrario, indican q
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test all postgres::
 
 docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 ```
 
 Los contenedores de Oracle tardan unos minutos en arrancar; espera a ver `DATABASE IS READY TO USE!` en

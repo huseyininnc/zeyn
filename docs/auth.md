@@ -14,7 +14,7 @@ Who is calling, and how sure the app is about it. Zeyn has four ways in:
 The default build has none of `oidc` and `totp`, so apps that do not use them pay nothing.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 The providers tested are Keycloak and Authentik. Any provider that follows OpenID Connect
@@ -115,7 +115,7 @@ re authentication address. It adds three routes:
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | starts a sign in and redirects to the provider |
 | `GET /_zeyn/auth/callback` | the provider's redirect back |
-| `GET /_zeyn/auth/logout` | ends the session here and at the provider |
+| `POST`, then `GET /_zeyn/auth/logout` | `POST` with the CSRF token ends the session here, `GET` then signs out at the provider |
 
 At the provider, register `<public url>/_zeyn/auth/callback` as the redirect URI and
 `<public url>/` as the post logout redirect URI. The public URL is configured, never taken from
@@ -169,9 +169,16 @@ at the same moment can sign the user out. Keep rotation off or allow reuse for a
 
 ### Logout
 
-`/_zeyn/auth/logout` deletes the session cookie and sends the user to the provider's
-`end_session_endpoint` with `client_id` and `post_logout_redirect_uri`. Without that endpoint
-the user goes to the app's start page.
+Signing out takes two steps, so a link or an image on another site cannot sign a user out.
+`POST /_zeyn/auth/logout` with the CSRF token deletes the session cookie and clears the app's
+browser storage. Then `GET /_zeyn/auth/logout` sends the browser to the provider's
+`end_session_endpoint` with `client_id` and `post_logout_redirect_uri`; without that endpoint the
+user goes to the app's start page. A `GET` from a browser that still holds a session only goes
+back to the app.
+
+The sign out link of the site shell and the idle sign out do both steps. A sign out link of your
+own does the same with `data-zeyn-signout`: the runtime posts to that address, then follows the
+link.
 
 ### API and MCP clients of the same app
 
@@ -252,17 +259,17 @@ tests. Keep the TOTP key stable: records sealed with another key no longer open.
 
 ## Testing
 
-`crates/zeyn/tests/oidc.rs` runs every flow against a small issuer in the test that signs with a
+`crates/zeyn/tests/all/oidc.rs` runs every flow against a small issuer in the test that signs with a
 key made for the run, and checks that expired tokens, wrong audiences and issuers, `alg=none`, an
 HMAC token keyed with the public key, changed claims, tampered cookies, reused or mismatched
-`state` and a wrong `nonce` are refused. `crates/zeyn/tests/totp.rs` covers enrollment,
+`state` and a wrong `nonce` are refused. `crates/zeyn/tests/all/totp.rs` covers enrollment,
 verification, replay, recovery codes and the rate limit.
 
 With a Keycloak in development mode, the same flows also run against it:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 The test creates a `zeyn-test` realm with its own client and user and deletes it at the end.

@@ -14,7 +14,7 @@ Quién llama, y qué tan segura está la aplicación de ello. Zeyn tiene cuatro 
 La compilación predeterminada no incluye ni `oidc` ni `totp`, de modo que las aplicaciones que no los usan no pagan nada.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 Los proveedores probados son Keycloak y Authentik. Cualquier proveedor que siga el descubrimiento de OpenID Connect,
@@ -115,7 +115,7 @@ dirección de reautenticación. Añade tres rutas:
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | inicia un inicio de sesión y redirige al proveedor |
 | `GET /_zeyn/auth/callback` | la redirección de vuelta del proveedor |
-| `GET /_zeyn/auth/logout` | termina la sesión aquí y en el proveedor |
+| `POST`, luego `GET /_zeyn/auth/logout` | `POST` con el token CSRF termina la sesión aquí, y luego `GET` cierra la sesión en el proveedor |
 
 En el proveedor, registra `<public url>/_zeyn/auth/callback` como URI de redirección y
 `<public url>/` como URI de redirección tras el cierre de sesión. La URL pública se configura, nunca se toma
@@ -168,9 +168,16 @@ en el mismo momento pueden cerrar la sesión del usuario. Mantén la rotación d
 
 ### Cierre de sesión
 
-`/_zeyn/auth/logout` elimina la cookie de sesión y envía al usuario al
-`end_session_endpoint` del proveedor con `client_id` y `post_logout_redirect_uri`. Sin ese endpoint
-el usuario va a la página de inicio de la aplicación.
+Cerrar la sesión tiene dos pasos, para que un enlace o una imagen de otro sitio no pueda cerrar
+la sesión de un usuario. `POST /_zeyn/auth/logout` con el token CSRF elimina la cookie de sesión y
+borra el almacenamiento del navegador de la aplicación. Después, `GET /_zeyn/auth/logout` envía
+el navegador al `end_session_endpoint` del proveedor con `client_id` y
+`post_logout_redirect_uri`; sin ese endpoint el usuario va a la página de inicio de la
+aplicación. Un `GET` de un navegador que aún tiene sesión solo vuelve a la aplicación.
+
+El enlace de cierre de sesión del site shell y el cierre por inactividad hacen los dos pasos. Un
+enlace propio hace lo mismo con `data-zeyn-signout`: el runtime envía un `POST` a esa dirección y
+luego sigue el enlace.
 
 ### Clientes de API y MCP de la misma aplicación
 
@@ -251,17 +258,17 @@ pruebas. Mantén estable la clave TOTP: los registros sellados con otra clave de
 
 ## Pruebas
 
-`crates/zeyn/tests/oidc.rs` ejecuta cada flujo contra un pequeño emisor dentro de la prueba que firma con una
+`crates/zeyn/tests/all/oidc.rs` ejecuta cada flujo contra un pequeño emisor dentro de la prueba que firma con una
 clave creada para la ejecución, y comprueba que se rechazan los tokens caducados, las audiencias y emisores incorrectos, `alg=none`, un
 token HMAC con la clave pública como clave, los claims modificados, las cookies manipuladas, un `state` reutilizado o que no coincide
-y un `nonce` incorrecto. `crates/zeyn/tests/totp.rs` cubre el registro,
+y un `nonce` incorrecto. `crates/zeyn/tests/all/totp.rs` cubre el registro,
 la verificación, la repetición, los códigos de recuperación y el límite de frecuencia.
 
 Con un Keycloak en modo de desarrollo, los mismos flujos también se ejecutan contra él:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 La prueba crea un realm `zeyn-test` con su propio cliente y usuario y lo elimina al final.

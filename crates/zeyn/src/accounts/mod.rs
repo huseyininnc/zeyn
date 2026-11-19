@@ -672,10 +672,16 @@ impl Accounts {
     pub(crate) fn problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
         if self.0.sealer.is_none() {
-            problems.push(format!(
-                "Accounts: the key must be at least {} bytes",
-                crate::auth::seal::MIN_SECRET
-            ));
+            problems.push(
+                crate::Problem::new(
+                    "Z0207",
+                    format!("Accounts: the key must be at least {} bytes", crate::auth::seal::MIN_SECRET),
+                )
+                .why("the key seals the session cookies and tokens, and a short key could be guessed, which would let anyone sign in as any user")
+                .fix("read a random key of at least 32 bytes from configuration (never from code), such as `openssl rand -base64 48`")
+                .docs("guides/accounts#turn-it-on")
+                .to_string(),
+            );
         }
         if self
             .0
@@ -683,8 +689,16 @@ impl Accounts {
             .as_deref()
             .is_some_and(|u| !(u.starts_with("https://") || u.starts_with("http://")))
         {
-            problems
-                .push("Accounts: the public URL must start with https:// (or http:// for local development)".into());
+            problems.push(
+                crate::Problem::new(
+                    "Z0208",
+                    "Accounts: the public URL must start with https:// (or http:// for local development)",
+                )
+                .why("links in e-mails and passkey checks are built from this URL, so without a scheme they would not work")
+                .fix("pass the address users open, such as `https://app.example`")
+                .docs("guides/accounts#turn-it-on")
+                .to_string(),
+            );
         }
         problems
     }

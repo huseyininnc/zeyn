@@ -3,7 +3,7 @@
 `zeyn::sql` は、エンティティを SQL データベースに保持します。グリッドが送る `DataQuery`（フィルター、並べ替え、ページ、合計、グループ）から一覧を取得し、行バージョンのチェック付きで保存します。PostgreSQL は `postgres` Cargo feature、Oracle は `oracle` の背後にあるため、データベースを使わないアプリには、これらは一切コンパイルされません。
 
 ```toml
-zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.11", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## セットアップ
@@ -123,6 +123,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`、`col IS NOT NULL` |
+| `filter_groups` | 各グループを括弧で囲み、そのフィルターとグループを `OR`(`any`)か `AND` で結ぶ |
 
 金額と、はい/いいえの列に対する `contains` は、SQL では無視されます。テキストはデータベースの照合順序（Oracle では `NLS_SORT`）で並べ替えられます。
 
@@ -243,11 +244,11 @@ SQL ビルダーには、データベースを必要としない、両方の Dia
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test all postgres::
 
 docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 ```
 
 Oracle のコンテナは起動に数分かかります。`docker logs` に `DATABASE IS READY TO USE!` と表示されるまで待ってください。

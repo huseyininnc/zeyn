@@ -45,7 +45,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | 모듈 | 컴포넌트 |
 |---|---|
 | `components.js` | 모든 컨트롤 모듈이 import하는 공유 부분: 도우미, 팝업과 리스트박스 코어, 셀렉트(앱 셸의 선택기), 확인 대화상자, 알림, 이동 경로 |
-| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 패널, 탭, 분할 창; 날짜와 시간 선택기(grid 날짜 필터 포함); 리스트박스, 조회, 다중 선택; 숫자, 늘어나는 텍스트 영역, 마스크, 비밀번호; 줄 편집기; 단계별 폼; 트리; 툴팁과 팝오버; 메뉴 버튼과 분할 버튼; 처리 중 오버레이 |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`, `menu.js` | 패널, 탭, 분할 창; 날짜와 시간 선택기(grid 날짜 필터 포함); 리스트박스, 조회, 다중 선택; 숫자, 늘어나는 텍스트 영역, 마스크, 비밀번호; 줄 편집기; 단계별 폼; 트리; 툴팁과 팝오버; 메뉴 버튼과 분할 버튼; 처리 중 오버레이; 사이드 메뉴의 접을 수 있는 그룹 |
 | `grid.js` | grid. `zeyn.js`가 직접 import하므로 `<link rel="modulepreload">`로 링크됩니다 |
 | `palette.js`, `pro.js` | 명령 팔레트와 명령 버튼; 메뉴 막대, 도구 상자, 상태 표시줄, 도킹 패널, 속성 검사기 |
 | `colors.js`, `length.js`, `inspector.js` | 색 선택기, 단위 전환이 있는 길이, 아일랜드의 속성 인스펙터 |
@@ -54,12 +54,19 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 공유 버튼, 필터 칩, 반응, 히어로 슬라이드, 환경 설정 저장소, 카드 미리보기(처음 마우스를 올릴 때), 어시스턴트(채팅 패널 또는 런처를 처음 누를 때) |
 | `topics.js`, `vlist.js` | 토픽을 listen하는 노드와 이를 drive하는 컨트롤(`data-zeyn-listens`, `data-zeyn-drives`), 가상 목록(`data-zeyn-vlist`) |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 받은 편지함과 알림 종; Kanban 보드; 달력; 스크립트가 필요 없는 비교, 코드 보기, 바코드(코드 보기의 복사 버튼은 `share.js`에 있음) |
+| `sortable.js` | 순서를 바꿀 수 있는 목록과 카드 그리드(`data-zeyn-sortable`): 핸들, 키보드 이동, 이동 메뉴, 재정렬 요청; `drag.js`와 `net.js`를 가져옴. 연결된 목록 사이(`data-zeyn-sort-group`)에서는 요청이 행이 떠난 노드를 `from`에 담고, 서버가 그 노드의 그룹과 권한을 확인합니다 |
 | `codeedit.js`, `codeedit.css` | 코드 편집기(`data-zeyn-code`): 강조 표시한 사본, 줄 번호, 제안, 오류 표시. `/_zeyn/data`에는 입력이 멈춘 뒤에만 보냅니다 |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js`, `commerce.css` | 범위 슬라이더, 수량 선택기, 상품 갤러리, 카운트다운; 모든 쇼핑 컴포넌트의 스타일시트(가격, 옵션 선택기, 패싯 패널, 리뷰 요약) |
+| `imgcompare.js` | 그림 비교(`ImageCompare`): 슬라이더를 보여 주고 그 값을 `--z-imgcompare`에 기록합니다 |
+| `tour.js` | 페이지 둘러보기(`Tour`): 시작 버튼을 보여 주고 대화 상자를 페이지의 정류장마다 옮깁니다 |
 | `thread.js` 및 `thread.css`, `stream.js`, `composer.js` 및 `composer.css`, `typing.js` 및 `typing.css` | 메시지 스레드; 스레드와 어시스턴트가 함께 쓰는 스트리밍 Markdown과 JSON 줄; 채팅 composer; 입력 중 표시기 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 게시물 피드; 이미지와 동영상 라이트박스; 스토리 링과 그 행, 스크립트 필요 없음 |
+| `surface.js`, `surface.css` | 자유 배치 영역(`data-zeyn-surface`): 항목을 끌거나 화살표 키로 옮기거나 두 번 클릭해 골라 놓으며, 경계 안, 격자 위, 각 항목의 축 위에 머문다. 이동은 영역의 `move` 소스로 간다. `drag.js`와 `net.js`를 가져온다; 크기 조절 가능한 항목(`data-min`, `data-max`, `data-aspect`)은 모서리 핸들, `Shift`와 화살표 키, 또는 두 번의 클릭으로 제한 안에서 크기도 바꾸며, 크기는 이동과 함께 보내집니다 |
+| `drag.js`, `net.js` | 공유 도우미로, 이를 가져오는 모듈과 함께 연결됨(아래). `drag.js`는 dock(`data-zeyn-dock`)과도 함께 오며, `pro.js`가 그 탭을 끈다 |
 
-전체 페이지는 head에 모든 페이지가 쓰는 스타일시트(`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), HTML에 표식이 있는 모듈의 스타일시트, 그리고 그 스크립트를 import하는 모듈 뒤에 링크합니다. `zeyn.js`는 같은 표(`[name, script selector, style selector]`)와 함께 제공되며 나중에 도착하는 콘텐츠에 빠진 것을 불러옵니다: `nav.js`는 화면을 바꾸기 전에 `{ root, waits }`와 함께 `zeyn:need`를 보내고 새 스타일시트를 기다리며, 창도 열리기 전에 같은 방식으로 기다리고, `zeyn:content`, grid 페이지, grid 필터는 담고 있는 것의 스크립트를 불러옵니다. 브라우저는 URL마다 인스턴스를 하나만 유지하므로 모듈은 한 번만 실행됩니다. 모듈은 실행될 때 문서에서 찾은 것을 설정하고 그 뒤에는 `zeyn:content`를 듣습니다. 페이지에 없는 컴포넌트를 찾거나 듣지 않습니다. 모듈은 자신의 URL에 있는 `?v=`로 공유 부분을 import합니다. `tests/ui_modules.rs`는 페이지가 쓰지 않는 모듈을 링크하거나 모듈 스타일시트가 표식 밖의 클래스를 꾸밀 때 실패합니다.
+두 도우미 모듈은 여러 모듈이 각자 복사했을 코드를 담습니다. `net.js`(`kanban.js`, `files.js`, `vlist.js`가 가져옴)는 `BASE`, `csrf()`, `parse(text)`, `post(path, body)`를 내보냅니다. `post`는 페이지의 출처에서 `x-zeyn-csrf` 헤더와 함께 JSON을 보내고 `{ ok, body }`를 돌려줍니다. `drag.js`(열 이동에 `grid.js`, 레일 드래그 스크롤에 `catalog.js`가 가져옴)는 앞으로 정렬 가능한 목록, 보드, 표면이 기반으로 삼을 드래그 코어입니다. `press(e, { threshold, longPress, tolerance, axis, onStart })`는 마우스나 펜이 6 px 움직이거나 터치가 5 px 안에서 250 ms 유지될 때 `pointerdown`을 드래그로 바꿉니다(스와이프는 계속 스크롤하고, 먼저 스크롤하면 누름이 취소됩니다). `capture(el, e, move, end)`는 포인터 캡처로 드래그를 따라가며 `move`를 애니메이션 프레임마다 최대 한 번, 놓을 때나 취소 또는 Escape 시 `end(event, cancelled)`를 호출합니다. `swallowClick()`은 놓은 뒤의 클릭을 취소합니다. `announce(text)`는 현지화된 텍스트를 페이지마다 하나인 polite 라이브 영역에서 최대 500 ms마다 한 번 읽습니다. `.z-drag-handle`(`zeyn.css`에 있음)은 드래그 핸들에서만 터치 패닝을 끕니다. 드래그하는 모든 컴포넌트는 키보드와 단일 포인터로 옮기는 방법(이동 메뉴, WCAG 2.5.7)도 제공합니다. 두 모듈 모두 HTML을 쓰지 않습니다.
+
+전체 페이지는 head에 모든 페이지가 쓰는 스타일시트(`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), HTML에 표식이 있는 모듈의 스타일시트, 그리고 그 스크립트를 import하는 모듈 뒤에 링크합니다. `zeyn.js`는 같은 표(`[name, script selector, style selector]`)와 함께 제공되며 나중에 도착하는 콘텐츠에 빠진 것을 불러옵니다: `nav.js`는 화면을 바꾸기 전에 `{ root, waits }`와 함께 `zeyn:need`를 보내고 새 스타일시트를 기다리며, 창도 열리기 전에 같은 방식으로 기다리고, `zeyn:content`, grid 페이지, grid 필터는 담고 있는 것의 스크립트를 불러옵니다. 브라우저는 URL마다 인스턴스를 하나만 유지하므로 모듈은 한 번만 실행됩니다. 모듈은 실행될 때 문서에서 찾은 것을 설정하고 그 뒤에는 `zeyn:content`를 듣습니다. 페이지에 없는 컴포넌트를 찾거나 듣지 않습니다. 모듈은 자신의 URL에 있는 `?v=`로 공유 부분을 import합니다. `tests/all/ui_modules.rs`는 페이지가 쓰지 않는 모듈을 링크하거나 모듈 스타일시트가 표식 밖의 클래스를 꾸밀 때 실패합니다.
 
 showcase에서 측정(원본, gzip 전송량): 텍스트만 있는 페이지는 스크립트를 269 KB(80 KB) 대신 132 KB(46 KB), grid 페이지는 357 KB(106 KB) 대신 223 KB(74 KB), 폼 페이지는 269 KB(80 KB) 대신 186 KB(65 KB) 불러오고, 모든 페이지의 스타일은 177 KB(44 KB) 대신 151 KB(35 KB)입니다. 컴포넌트 카탈로그처럼 모든 컴포넌트를 담은 페이지는 모듈마다 파일이 따로 있으므로 이전보다 많은 파일을 불러옵니다(요청 41개 대신 68개, 원본 774 KB 대신 836 KB).
 
@@ -193,14 +200,14 @@ Effect:
 런타임은 다음을 합니다.
 
 - 테이블 본문을 스크롤 컨테이너에 넣으며, 그 내부 스페이서의 높이는 `total * rowHeight` 픽셀이고 8,000,000 px로 제한됩니다. 상한을 넘으면 스크롤 위치가 비율로 행 인덱스에 매핑되므로(`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`) 1,000,000행도 끝까지 도달합니다.
-- 보이는 행과 위아래 20행만 DOM에 유지하며 `transform: translateY(...)`로 배치합니다. 행의 높이는 고정이며 긴 텍스트는 줄임표로 잘립니다.
+- 보이는 행과 위아래 10행만 DOM에 유지하며 `transform: translateY(...)`로 배치합니다. 행의 높이는 고정이며 긴 텍스트는 줄임표로 잘립니다.
 - `POST /_zeyn/grid`와 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`로 `data-zeyn-page-size`행의 블록을 불러오며, 첫 호출 이후에는 `with_total: false`입니다. 최대 20개 블록과 최대 100,000개 셀을 캐시에 유지하고(가장 오래 사용하지 않은 것부터 제거. 63개 열 그리드는 7개 블록이며 3개보다 적지 않음), `reload`를 위해 보관하는 블록도 같은 상한에 포함되며 가장 먼저 버려지고, 스크롤 방향의 다음 블록을 미리 가져오며, 뷰를 벗어난 블록의 요청은 취소합니다(`AbortController`).
 - 블록을 불러오는 동안 보이는 행을 절대 지우지 않습니다. 없는 행은 해당 블록이 도착할 때까지 `aria-busy="true"`가 있는 자리 표시자 행을 표시하므로 화면이 깜박이지 않습니다.
 - 정렬과 필터가 바뀌면 캐시를 버리고 맨 위로 스크롤합니다.
 - 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
 - 위치 텍스트(`data-zeyn-page-info`)는 `data-zeyn-text-range-total`을 사용합니다.
 
-카드 그리드(`zeyn::ui::CardGrid`이며 rail이나 행 목록은 해당하지 않음)는 카드가 200개가 되면 스크롤 컨테이너 대신 페이지 자체의 스크롤에 윈도우를 적용합니다. `catalog.js`는 목록에 `data-zeyn-window`를 표시하고, 뷰포트에서 800 px 이내의 행을 그 안에 유지하며 위아래 행은 패딩으로 바꾸고, 모든 행에 처음 카드들 중 가장 높은 카드의 높이를 주며(`grid-auto-rows`), 각 카드에 `aria-posinset`과 `aria-setsize`(페이지가 더 올 수 있는 동안은 `-1`)를 설정합니다. 윈도우 밖에 있는 포커스된 카드는 `z-cards-kept`와 함께 DOM에 남아 자기 셀 위에 배치됩니다. "더 보기"나 다른 페이지에서 온 카드도 같은 윈도우에 합류합니다. 페이지가 ms당 3 px보다 빠르게 스크롤되는 동안 카드는 이미지를 보류한 채 들어오고(`data-zeyn-park`, `src`와 `srcset`은 따로 보관) 120 ms 동안 스크롤이 없으면 이미지를 되찾습니다.
+카드 그리드(`zeyn::ui::CardGrid`이며 rail이나 행 목록은 해당하지 않음)는 카드가 200개가 되면 스크롤 컨테이너 대신 페이지 자체의 스크롤에 윈도우를 적용합니다. `catalog.js`는 목록에 `data-zeyn-window`를 표시하고, 뷰포트에서 800 px 이내의 행을 그 안에 유지하며 위아래 행은 패딩으로 바꾸고, 모든 행에 처음 카드들 중 가장 높은 카드의 높이를 주며(`grid-auto-rows`), 각 카드에 `aria-posinset`과 `aria-setsize`(페이지가 더 올 수 있는 동안은 `-1`)를 설정합니다. 윈도우 밖에 있는 포커스된 카드는 `z-cards-kept`와 함께 DOM에 남아 자기 셀 위에 배치됩니다. "더 보기"나 다른 페이지에서 온 카드도 같은 윈도우에 합류합니다. 페이지가 ms당 3 px보다 빠르게 스크롤되는 동안 카드는 이미지를 보류한 채 들어오고(`data-zeyn-park`, `src`와 `srcset`은 따로 보관) 120 ms 동안 스크롤이 없으면 이미지를 되찾습니다. 보류된 이미지는 스크롤이 ms당 1 px 아래로 느려지는 즉시 돌아오기도 합니다. 윈도우 너머 600 px까지의 행은 `z-cards-far`(`content-visibility: hidden`)와 함께 DOM에 남아 레이아웃을 유지하므로 다시 스크롤해 돌아가는 비용이 적습니다. 더 먼 카드 중에서는 마지막으로 빠진 200장만 이미지를 유지하고, 더 오래된 카드는 같은 방식으로 `src`와 `srcset`을 놓습니다.
 
 ### 4.3 폼 제출
 
@@ -350,7 +357,7 @@ Effect `{"effect":"refresh","topics":["sales"]}`는 토픽의 리스너를 새�
 
 | 엔드포인트 | 기능 |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket. 텍스트 프레임 `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket. 텍스트 프레임 `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket. 바이너리 프레임 `0x01` + Y 업데이트(v1)가 양방향으로 오갑니다 |
 
 핸드셰이크는 업그레이드하기 전에 출처, 쿠키에 대한 CSRF 토큰, 로그인한 사용자, 권한을 검사합니다. `docs/realtime.md`를 참고하십시오.
@@ -420,7 +427,7 @@ Effect `{"effect":"refresh","topics":["sales"]}`는 토픽의 리스너를 새�
 | `Mcp::read_only()` | 켜짐 | 켜짐 | 아니요 |
 | `Mcp::on()` | 켜짐 | 켜짐 | 폼 저장과 쓰는 API action |
 
-`.server(false)`와 `.webmcp(false)`는 문 하나를 끕니다. `zeyn new`로 만든 새 프로젝트는 `Mcp::read_only()`로 시작합니다.
+`.no_server()`와 `.no_webmcp()`는 문 하나를 끕니다. `zeyn new`로 만든 새 프로젝트는 `Mcp::read_only()`로 시작합니다.
 
 꺼져 있는 이유: 엔드포인트는 유효한 `Authorization` 헤더를 가진 누구나 모델을 통해 앱을 조작할 수 있게 하며, 모델은 읽는 데이터에 의해 조종될 수 있습니다. 프레임워크는 모든 앱이 에이전트를 맞이할 준비가 되게 하지만(도구는 코드에서 생성되며 작성할 것이 없습니다), 앱이 그 문을 열지, 에이전트가 쓸 수 있게 할지는 이를 운영하는 사람들의 결정입니다. 읽기 전용은 한 줄이면 됩니다.
 

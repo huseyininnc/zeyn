@@ -100,3 +100,36 @@ Değişiklik bittiğinde bunu kaldırın, kütüphaneyi etiketleyin ve uygulamad
 1. `Cargo.toml` içindeki `version` değerini yükseltin.
 2. Kuruluysa `cargo semver-checks` çalıştırın. Çağıranları bozan genel API değişikliklerini bildirir. Kütüphane 1.0'ın altındayken kırıcı bir değişiklik yeni bir minor sürüm gerektirir.
 3. Commit'leyin, `v<version>` etiketini oluşturun, etiketi gönderin. Etiket ile `Cargo.toml` uyuşmadığında CI işi `tag-matches-version` başarısız olur.
+
+## Bileşen crate'leri
+
+Bir crate, kendi betiği, stil dosyası ve metinleri olan bileşenler sunabilir. `zeyn-<name>` adlı bir crate `<name>` tarayıcı modülünü kaydeder; sınıfları `z-<name>-`, öznitelikleri `data-zeyn-<name>-`, metin anahtarları `<name>.` ile başlar. `examples/widget` testleriyle birlikte eksiksiz bir örnektir.
+
+`zeyn new <name> --component` yenisini yazar: örnek bir bileşen, eklentisi, betik ve stil dosyası, İngilizce ve Türkçe metinler, bir örnek uygulama ve testleri olan `zeyn-<name>` crate’i.
+
+```rust
+use zeyn::{App, Module, Plugin};
+
+pub struct RatingPlugin;
+
+impl Plugin for RatingPlugin {
+    fn install(self, app: App) -> App {
+        app.module(
+            Module::new("rating")
+                .js(include_str!("../assets/rating.js"))
+                .css(include_str!("../assets/rating.css"))
+                .marker("data-zeyn-rating-stars")
+                .texts(&[("en", include_str!("../assets/en.json"))]),
+        )
+    }
+}
+```
+
+Uygulama `.plugin(RatingPlugin)` ekler. Bir sayfa `/_zeyn/ext/rating.js` ve `/_zeyn/ext/rating.css` dosyalarını yalnızca HTML'i bir işaret taşıdığında bağlar; `zeyn.js` de böyle içerik sonradan geldiğinde onları yükler. Dosyaların adresinde derleme bulunur, bu yüzden tarayıcılar onları bir sonraki derlemeye kadar saklar; hiçbir zaman satır içi değildir, bu yüzden Content Security Policy sıkı kalır. Betik, sonradan gelen içerik için `zeyn:content` olayını dinleyen bir ES modülüdür; stil dosyası renklerini ve ölçülerini tema değişkenlerinden (`var(--z-text)`, `var(--z-space)`) alır. Uygulamanın kendi katalogları modülün metinlerinden önce gelir.
+
+`App::module`, bir modül adlandırma kuralını bozduğunda, bir çatı modülü ya da işaretiyle veya başka bir modülle çakıştığında ya da geçerli JSON olmayan bir katalog taşıdığında uygulamayı açılışta durdurur ve iletide çözümü yazar. Testlerde `TestResponse::links` bir sayfanın başlığının bağladığı dosyaları listeler.
+
+| Zeyn | Bileşen crate'leri |
+|---|---|
+| 0.0.10'dan sonraki sürümler | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
+| 0.0.10 ve öncesi | Yalnızca HTML; kendi betikleri ya da stilleri yok |

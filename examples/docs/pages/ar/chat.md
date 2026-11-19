@@ -30,7 +30,7 @@ MessageThread::of(conversation_messages)
 
 لـ `Delivery` الحالات `Sending` و`Sent` و`Delivered` و`Read` (إشعار القراءة) و`Failed`، وتُعرض كل منها بأيقونة ونص لقارئات الشاشة. يعرض `.attachments(field, rules)` ملفات الرسالة (حقل `Vec<File>` وقواعد مخزن مسجّل بـ `Feature::files`): الصور في مربع ثابت يُحمّل كسولًا فوق عنصر نائب، والملفات الأخرى روابط تنزيل تمر عبر إذن القراءة في المخزن.
 
-تُجلب الرسائل الجديدة حين يُذكر أحد topics السلسلة، وهو `"chat"` ما لم يحدد `.topic(..)` غير ذلك: بعد أن يرسل `Composer`، وبعد أن ينتهي action بـ `ui.refresh("chat")`، أو مع `.live()` وميزة `realtime` حين يُنفَّذ `hub.notify(&ctx, "chat")` في أي مكان. وتُعلن رسائل الآخرين في منطقة حية مهذبة (polite).
+تُجلب الرسائل الجديدة حين يُذكر أحد topics السلسلة، وهو `"chat"` ما لم يحدد `.topic(..)` غير ذلك: بعد أن يرسل `Composer`، وبعد أن ينتهي action بـ `ui.refresh("chat")`، أو مع `.live()` وميزة `realtime` حين يُنفَّذ `socket.notify(&ctx, "chat")` في أي مكان. وتُعلن رسائل الآخرين في منطقة حية مهذبة (polite).
 
 ### ردود الذكاء الاصطناعي
 
@@ -70,10 +70,10 @@ MessageThread::of(conversation_messages)
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ Composer::of(send_message)
 يعرض `TypingIndicator` من غير المستخدم يكتب الآن في المحادثة: "Ada تكتب"، "Ada وGrace يكتبان"، "3 أشخاص يكتبون"، في منطقة حية مهذبة (polite).
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-يعمل عبر قناة الزمن الحقيقي (ميزة `realtime`، انظر `realtime.md`) على topic مُعلن بـ `Realtime::topic`. بينما يكتب المستخدم في `Composer` للمحادثة نفسها، يرسل المتصفح إشارة صغيرة عبر المقبس الحي للصفحة مرة كل 3 ثوانٍ على الأكثر؛ ويُسقط الخادم الإشارات الأسرع لكل مستخدم ويمرر الإشارة إلى المشتركين الآخرين في الـ topic داخل المستأجر، ولا يعيدها أبدًا إلى المستخدم نفسه. تحمل الإشارة معرّف المحادثة ومفتاحًا للمستخدم لا يستطيع إنشاءه إلا هذا الخادم، ولا تحمل أبدًا معرّف المستخدم أو أي نص. يظهر الاسم مدة 6 ثوانٍ بعد آخر إشارة؛ ويظهر الأشخاص الذين لم يُعطَوا بـ `.person(user, name)` باسم "شخص ما".
+يعمل عبر قناة الزمن الحقيقي (ميزة `realtime`، انظر `realtime.md`) على topic مُعلن بـ `ZeynSocket::topic`. بينما يكتب المستخدم في `Composer` للمحادثة نفسها، يرسل المتصفح إشارة صغيرة عبر المقبس الحي للصفحة مرة كل 3 ثوانٍ على الأكثر؛ ويُسقط الخادم الإشارات الأسرع لكل مستخدم ويمرر الإشارة إلى المشتركين الآخرين في الـ topic داخل المستأجر، ولا يعيدها أبدًا إلى المستخدم نفسه. تحمل الإشارة معرّف المحادثة ومفتاحًا للمستخدم لا يستطيع إنشاءه إلا هذا الخادم، ولا تحمل أبدًا معرّف المستخدم أو أي نص. يظهر الاسم مدة 6 ثوانٍ بعد آخر إشارة؛ ويظهر الأشخاص الذين لم يُعطَوا بـ `.person(user, name)` باسم "شخص ما".
 
 من دون ميزة `realtime`، أو حين لا تكون للتطبيق قناة زمن حقيقي، لا يرسم المؤشر شيئًا، ولا يُحمّل نصه البرمجي أبدًا، ولا يُرسل شيء. تصل الإشارات إلى كل مشترك في الـ topic داخل المستأجر، فيكون معرّف المحادثة مرئيًا لهم: استخدم معرّفات معتمة، أو topic لكل جمهور.

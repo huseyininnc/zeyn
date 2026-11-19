@@ -1,0 +1,36 @@
+- main:
+  - region "Pagination":
+    - heading "Pagination" [level=1]
+    - paragraph: Links to the pages of a list.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#pagination
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Pagination
+    - tablist "Pagination sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - paragraph: /Articles of page 1 of \d+/
+      - navigation "Pagination":
+        - list:
+          - listitem: Previous
+          - listitem:
+            - link "Page 1":
+              - /url: /ui/pagination?params=%7B%22color%22%3Anull%2C%22date%22%3Anull%2C%22from%22%3Anull%2C%22kind%22%3Anull%2C%22kinds%22%3A%5B%5D%2C%22max_price%22%3Anull%2C%22min_price%22%3Anull%2C%22page%22%3A1%2C%22q%22%3Anull%2C%22room%22%3Anull%2C%22size%22%3Anull%2C%22to%22%3Anull%2C%22view%22%3Anull%7D
+              - text: ""
+          - listitem:
+            - link "Page 2":
+              - /url: /ui/pagination?params=%7B%22color%22%3Anull%2C%22date%22%3Anull%2C%22from%22%3Anull%2C%22kind%22%3Anull%2C%22kinds%22%3A%5B%5D%2C%22max_price%22%3Anull%2C%22min_price%22%3Anull%2C%22page%22%3A2%2C%22q%22%3Anull%2C%22room%22%3Anull%2C%22size%22%3Anull%2C%22to%22%3Anull%2C%22view%22%3Anull%7D
+              - text: ""
+          - listitem:
+            - link /Page \d+/:
+              - /url: /ui/pagination?params=%7B%22color%22%3Anull%2C%22date%22%3Anull%2C%22from%22%3Anull%2C%22kind%22%3Anull%2C%22kinds%22%3A%5B%5D%2C%22max_price%22%3Anull%2C%22min_price%22%3Anull%2C%22page%22%3A12%2C%22q%22%3Anull%2C%22room%22%3Anull%2C%22size%22%3Anull%2C%22to%22%3Anull%2C%22view%22%3Anull%7D
+              - text: ""
+          - listitem:
+            - link "Next":
+              - /url: /ui/pagination?params=%7B%22color%22%3Anull%2C%22date%22%3Anull%2C%22from%22%3Anull%2C%22kind%22%3Anull%2C%22kinds%22%3A%5B%5D%2C%22max_price%22%3Anull%2C%22min_price%22%3Anull%2C%22page%22%3A2%2C%22q%22%3Anull%2C%22room%22%3Anull%2C%22size%22%3Anull%2C%22to%22%3Anull%2C%22view%22%3Anull%7D
+      - group: Show code
+      - button "Copy"
+      - status

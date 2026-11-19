@@ -121,9 +121,16 @@ impl Csp {
                         list.push(s);
                     }
                 }
-                Err(help) => self.problems.push(format!(
-                    "csp {directive}: `{value}` is not accepted\n  = help: {help}"
-                )),
+                Err(help) => self.problems.push(
+                    crate::Problem::new(
+                        "Z0202",
+                        format!("csp {directive}: `{value}` is not accepted"),
+                    )
+                    .why("the value would weaken the Content Security Policy or could not be written into the header, so it is left out")
+                    .fix(help)
+                    .docs("guides/security#csrf-csp-and-headers")
+                    .to_string(),
+                ),
             }
         }
         self

@@ -1,0 +1,23 @@
+- main:
+  - region "CodeEditor":
+    - heading "CodeEditor" [level=1]
+    - paragraph: Editable SQL and expressions with highlighting, line numbers, completion and error markers.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/controls#code-editor
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=CodeEditor
+    - tablist "CodeEditor sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Expression with completion and checks" [level=3]
+      - text: Total with tax
+      - textbox "Total with tax" [invalid]: /Round\(\[Orders\.Total\] \* [\d,.]+[bkmBKM]+, 2\) - \[Orders\.Discont\]/
+      - list:
+        - listitem:
+          - 'button "Line 2, column 5: Unknown field [Orders.Discont]"'
+      - status
+      - group: Show code
+      - button "Copy"
+      - status

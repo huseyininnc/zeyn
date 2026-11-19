@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 El servidor limita el tamaño de página pida lo que pida el cliente.
 
+`.page_sizes(&[10, 25, 50, 100])` añade una lista "Filas por página" al paginador de páginas numeradas. El tamaño propio de la cuadrícula siempre se ofrece, la elección se guarda con la vista del usuario y el servidor solo acepta los tamaños que ofrece la cuadrícula.
+
 ## Columnas
 
 | Llamada | Resultado |
@@ -79,6 +81,11 @@ Los números y los importes se alinean a la derecha con cifras tabulares. Los en
 - `.confirm(message)` y `.tone(Tone::Danger)` justo después de `.row_action` o `.bulk_action`: pregunta antes de que esa acción se ejecute, en el mismo diálogo que `ActionButton::confirm` (el foco empieza en Cancelar), y dibuja su botón en rojo.
 - `.row_menu(|row| ContextMenu)`: el menú contextual de una fila.
 - `.row_style(|row| Option<RowStyle>)`: filas de peligro, advertencia o éxito.
+- `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: un botón "Añadir fila", un
+  botón y una tecla para borrar, y ediciones guardadas juntas. Consulta la [referencia de DataGrid](grid.md).
+- `.groupable()`, `.summary(label, |t| ...)` en una columna: el usuario agrupa por ella desde su menú o el panel de grupos, y bajo ella aparece un valor calculado a partir de los totales.
+- `.filter_builder()`: un botón "Filtrar" que abre un diálogo para crear las condiciones del filtro; la misma lista que usan la fila de filtros, las vistas guardadas y los agentes de IA.
+- `.filter_chips()`: los filtros activos como chips sobre la tabla, cada uno con un botón para quitarlo, sincronizados con la fila de filtros, el constructor de filtros y las vistas guardadas.
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.
 
 ## Columnas conocidas en tiempo de ejecución
@@ -96,6 +103,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 ```
 
 La paginación, el desplazamiento virtual, el uso del teclado y el formato de números y fechas en el idioma del usuario funcionan como en un grid tipado. Los nombres, etiquetas y celdas se escapan, y el servidor limita las columnas, las filas y la longitud del texto. El grid no ordena ni filtra, y sus filas son de solo lectura. Consulta la [referencia del DataGrid](grid.md).
+
+## Búsqueda y bandas
+
+`.search()` pone un cuadro de búsqueda encima de la cuadrícula. La acción recibe el texto como
+`DataQuery::q`, que `DataQuery::apply` compara con los campos de texto, nunca con los enmascarados.
+`.band(label, |b| b.column(..).column(..))` agrupa columnas bajo una celda de encabezado. Consulta la
+[referencia de DataGrid](grid.md).
 
 ## Refrescar en su sitio
 

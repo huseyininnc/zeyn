@@ -14,7 +14,7 @@
 デフォルトのビルドには `oidc` も `totp` も含まれないため、これらを使わないアプリは何も負担しません。
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 動作確認済みのプロバイダーは Keycloak と Authentik です。OpenID Connect の discovery、PKCE を使う認可コードフロー、JWKS に従うプロバイダーであれば動作するはずです。
@@ -96,7 +96,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | サインインを開始し、プロバイダーへリダイレクトする |
 | `GET /_zeyn/auth/callback` | プロバイダーからのリダイレクト先 |
-| `GET /_zeyn/auth/logout` | こことプロバイダーの両方でセッションを終了する |
+| `POST`、続いて `GET /_zeyn/auth/logout` | CSRF トークン付きの `POST` がここでセッションを終了し、続く `GET` がプロバイダーでサインアウトする |
 
 プロバイダー側では、リダイレクト URI として `<public url>/_zeyn/auth/callback` を、ログアウト後のリダイレクト URI として `<public url>/` を登録します。公開 URL は設定で指定するもので、リクエストの `Host` ヘッダーから取得することはありません。ベースパスまたは公開パスがある場合、ルートはその下に移動します。
 
@@ -128,7 +128,9 @@ CSRF 保護は変わりません。どの cookie でユーザーがサインイ�
 
 ### ログアウト
 
-`/_zeyn/auth/logout` はセッション cookie を削除し、`client_id` と `post_logout_redirect_uri` を付けて、ユーザーをプロバイダーの `end_session_endpoint` に移動させます。このエンドポイントがない場合、ユーザーはアプリのスタートページに移動します。
+サインアウトは 2 段階です。これにより、他のサイトのリンクや画像がユーザーをサインアウトさせることはできません。CSRF トークン付きの `POST /_zeyn/auth/logout` がセッション cookie を削除し、アプリのブラウザーストレージを消去します。続いて `GET /_zeyn/auth/logout` が `client_id` と `post_logout_redirect_uri` を付けてブラウザーをプロバイダーの `end_session_endpoint` に送ります。このエンドポイントがない場合、ユーザーはアプリのスタートページに移動します。まだセッションを持つブラウザーからの `GET` は、アプリに戻るだけです。
+
+サイトシェルのサインアウトリンクとアイドル時のサインアウトは両方の段階を行います。独自のリンクも `data-zeyn-signout` で同じことができます。ランタイムはまずそのアドレスに `POST` を送り、それからリンクをたどります。
 
 ### 同じアプリの API と MCP クライアント
 
@@ -186,13 +188,13 @@ App::new("Back office")
 
 ## テスト
 
-`crates/zeyn/tests/oidc.rs` は、テスト内の小さな issuer に対してすべてのフローを実行します。この issuer は実行用に作られた鍵で署名します。そして、期限切れのトークン、誤った audience と issuer、`alg=none`、公開鍵を鍵とした HMAC トークン、改ざんされたクレーム、改ざんされた cookie、再利用された、または一致しない `state`、誤った `nonce` が拒否されることを確認します。`crates/zeyn/tests/totp.rs` は、登録、検証、リプレイ、リカバリーコード、レート制限をカバーします。
+`crates/zeyn/tests/all/oidc.rs` は、テスト内の小さな issuer に対してすべてのフローを実行します。この issuer は実行用に作られた鍵で署名します。そして、期限切れのトークン、誤った audience と issuer、`alg=none`、公開鍵を鍵とした HMAC トークン、改ざんされたクレーム、改ざんされた cookie、再利用された、または一致しない `state`、誤った `nonce` が拒否されることを確認します。`crates/zeyn/tests/all/totp.rs` は、登録、検証、リプレイ、リカバリーコード、レート制限をカバーします。
 
 開発モードの Keycloak があれば、同じフローを Keycloak に対しても実行できます。
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 テストは独自のクライアントとユーザーを持つ `zeyn-test` realm を作成し、終了時に削除します。

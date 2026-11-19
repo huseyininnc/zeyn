@@ -201,6 +201,35 @@ fn unknown_fields_and_injection_attempts_never_reach_the_sql() {
 }
 
 #[test]
+fn filter_groups_write_or_and_and_in_parentheses() {
+    use crate::action::FilterGroup;
+    let q = DataQuery {
+        filters: vec![Filter::is("active", true)],
+        filter_groups: vec![
+            FilterGroup::any([
+                Filter::range("stock", Some("1"), Some("9")),
+                Filter::contains("price", "12"),
+                Filter::blank("note", true),
+            ])
+            .group(FilterGroup::all([
+                Filter::contains("code", "a"),
+                Filter::contains("nope", "x"),
+            ])),
+            FilterGroup::any([Filter::contains("price", "1")]),
+        ],
+        ..DataQuery::default()
+    };
+    let sql = rows(&q);
+    assert!(
+        sql.text.contains(
+            r#" WHERE "active" = $1 AND (("stock" >= $2 AND "stock" <= $3) OR ("note" IS NULL) OR ((LOWER("code") LIKE $4 ESCAPE '\'))) ORDER BY"#
+        ),
+        "{}",
+        sql.text
+    );
+}
+
+#[test]
 fn bad_table_names_are_refused() {
     struct Bad;
     let d: &dyn Dialect = &Postgres;
@@ -318,6 +347,50 @@ fn keyset_cursor_continues_after_the_last_row() {
             Arg::Int(21),
             Arg::Int(0)
         ]
+    );
+}
+
+#[test]
+fn postgres_seeks_by_row_comparison_when_keys_share_a_direction() {
+    let base = DataQuery {
+        sort: vec![Sort {
+            field: "code".into(),
+            desc: false,
+        }],
+        ..DataQuery::default()
+    };
+    let cursor = build::row_cursor(&Postgres, &keys(&base), &product(7, "P-7", None));
+    let q = DataQuery {
+        page: PageRequest::After {
+            cursor: Some(cursor.clone()),
+            limit: 20,
+        },
+        ..base.clone()
+    };
+    let sql = rows(&q);
+    assert!(
+        sql.text.contains(
+            r#" WHERE ("code", "id") > ($1, $2) ORDER BY "code" ASC, "id" ASC LIMIT $3 OFFSET $4"#
+        ),
+        "{}",
+        sql.text
+    );
+    assert_eq!(
+        sql.args,
+        vec![
+            Arg::Text("P-7".into()),
+            Arg::Int(7),
+            Arg::Int(21),
+            Arg::Int(0)
+        ]
+    );
+    let oracle = build::plan_find::<Product>(&V12, &q, 100)
+        .unwrap()
+        .main;
+    assert!(
+        oracle.text.contains(" OR ("),
+        "Oracle has no ordered row comparison: {}",
+        oracle.text
     );
 }
 
@@ -717,7 +790,7 @@ fn oracle_11g_pages_with_rownum() {
     .unwrap();
     assert_eq!(
         count.text,
-        r#"SELECT COUNT(*) AS c0 FROM (SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT 1 AS c0 FROM "SHOP"."PRODUCTS") zq WHERE ROWNUM <= :1) WHERE zeyn_rn > :2 ORDER BY zeyn_rn) zc"#
+        r#"SELECT COUNT(*) AS c0 FROM (SELECT * FROM (SELECT 1 AS c0 FROM "SHOP"."PRODUCTS") WHERE ROWNUM <= :1) zc"#
     );
 }
 
@@ -1146,14 +1219,13 @@ fn hand_written_query_uses_oracle_placeholders_and_rownum_on_11g() {
     .unwrap();
     assert!(
         sql.text
-            .starts_with("SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT \"ID\" AS c0"),
+            .starts_with("SELECT * FROM (SELECT \"ID\" AS c0"),
         "{}",
         sql.text
     );
     assert!(
-        sql.text.contains(
-            " FROM (SELECT * FROM products WHERE code = :1) zeyn_q) zq WHERE ROWNUM <= :2) WHERE zeyn_rn > :3"
-        ),
+        sql.text
+            .contains(" FROM (SELECT * FROM products WHERE code = :1) zeyn_q) WHERE ROWNUM <= :2"),
         "{}",
         sql.text
     );
@@ -1229,7 +1301,8 @@ fn rank_columns_compare_by_bytes_on_postgres() {
     );
     let sql = rank_page(&Postgres);
     assert!(
-        sql.text.contains(r#"WHERE "rank" >= $1 AND (("rank" > $2) OR ("rank" = $3 AND "id" > $4)) ORDER BY "rank" ASC, "id" ASC"#),
+        sql.text
+            .contains(r#"WHERE ("rank", "id") > ($1, $2) ORDER BY "rank" ASC, "id" ASC"#),
         "{}",
         sql.text
     );
@@ -1286,4 +1359,66 @@ fn rank_cursor_values_are_checked() {
         ..base
     };
     assert!(build::plan_find::<Card>(&Postgres, &q, 10).is_err());
+}
+
+#[cfg(feature = "postgres")]
+mod migration_checksums {
+    use super::super::{line_ending_checksum, reconcile_migrator};
+    use sqlx::migrate::{Migration, MigrationType, Migrator};
+    use sqlx::{AssertSqlSafe, SqlSafeStr};
+    use std::collections::HashMap;
+
+    fn migration(sql: &str) -> Migration {
+        Migration::new(
+            1,
+            "create".into(),
+            MigrationType::Simple,
+            AssertSqlSafe(sql.to_string()).into_sql_str(),
+            false,
+        )
+    }
+
+    fn checksum_after(sql: &str, applied: &HashMap<i64, Vec<u8>>) -> Vec<u8> {
+        let migrator = Migrator::with_migrations(vec![migration(sql)]);
+        let migrator = reconcile_migrator(&migrator, applied);
+        migrator.migrations[0].checksum.to_vec()
+    }
+
+    #[test]
+    fn crlf_and_lf_give_the_same_checksum() {
+        let none = HashMap::new();
+        let lf = checksum_after("CREATE TABLE a (id INT);\nSELECT 1;\n", &none);
+        let crlf = checksum_after("CREATE TABLE a (id INT);\r\nSELECT 1;\r\n", &none);
+        assert_eq!(lf, crlf);
+    }
+
+    #[test]
+    fn a_checksum_stored_with_carriage_returns_still_validates() {
+        let sql = "CREATE TABLE a (id INT);\r\nSELECT 1;\r\n";
+        let stored = migration(sql).checksum.to_vec();
+        let applied = HashMap::from([(1, stored.clone())]);
+        assert_eq!(checksum_after(sql, &applied), stored);
+    }
+
+    #[test]
+    fn a_checksum_stored_without_carriage_returns_validates_a_crlf_file() {
+        let lf = migration("CREATE TABLE a (id INT);\n");
+        let applied = HashMap::from([(1, lf.checksum.to_vec())]);
+        let crlf = checksum_after("CREATE TABLE a (id INT);\r\n", &applied);
+        assert_eq!(crlf, lf.checksum.to_vec());
+    }
+
+    #[test]
+    fn a_real_content_change_still_differs() {
+        let stored = migration("CREATE TABLE a (id INT);\n")
+            .checksum
+            .to_vec();
+        let applied = HashMap::from([(1, stored.clone())]);
+        let changed = checksum_after("CREATE TABLE b (id INT);\r\n", &applied);
+        assert_ne!(changed, stored);
+        assert_eq!(
+            changed,
+            line_ending_checksum(&migration("CREATE TABLE b (id INT);\n"))
+        );
+    }
 }

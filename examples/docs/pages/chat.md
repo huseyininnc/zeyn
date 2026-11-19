@@ -30,7 +30,7 @@ The first 50 messages (`THREAD_PAGE`) are rendered with the screen. Scrolling up
 
 `Delivery` has the states `Sending`, `Sent`, `Delivered`, `Read` (the read receipt) and `Failed`, each shown with an icon and a text for screen readers. `.attachments(field, rules)` shows the files of a message (a `Vec<File>` field and the rules of a store registered with `Feature::files`): images in a fixed box that loads lazily over a placeholder, other files as download links that go through the store's read permission.
 
-New messages are fetched when one of the thread's topics is named, `"chat"` unless `.topic(..)` says otherwise: after a `Composer` sends, after an action ends with `ui.refresh("chat")`, or with `.live()` and the `realtime` feature, when `hub.notify(&ctx, "chat")` runs anywhere. Messages of others are announced in a polite live region.
+New messages are fetched when one of the thread's topics is named, `"chat"` unless `.topic(..)` says otherwise: after a `Composer` sends, after an action ends with `ui.refresh("chat")`, or with `.live()` and the `realtime` feature, when `socket.notify(&ctx, "chat")` runs anywhere. Messages of others are announced in a polite live region.
 
 ### AI replies
 
@@ -70,10 +70,10 @@ The reply's key (`Reply::channel(key)`) is the key the stored message will have,
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ The send action takes a `ChatSend`: the conversation, which the server takes fro
 `TypingIndicator` shows who else is typing in a conversation: "Ada is typing", "Ada and Grace are typing", "3 people are typing", in a polite live region.
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-It works over the realtime channel (feature `realtime`, see `realtime.md`) on a topic declared with `Realtime::topic`. While the user types in a `Composer` of the same conversation, the browser sends one small signal on the page's live socket at most every 3 seconds; the server drops faster ones per user and passes the signal to the other subscribers of the topic in the tenant, never back to the same user. A signal holds the conversation id and a key of the user that only this server can make, never the user id or any text. A name shows for 6 seconds after the last signal; people not given with `.person(user, name)` show as "someone".
+It works over the realtime channel (feature `realtime`, see `realtime.md`) on a topic declared with `ZeynSocket::topic`. While the user types in a `Composer` of the same conversation, the browser sends one small signal on the page's live socket at most every 3 seconds; the server drops faster ones per user and passes the signal to the other subscribers of the topic in the tenant, never back to the same user. A signal holds the conversation id and a key of the user that only this server can make, never the user id or any text. A name shows for 6 seconds after the last signal; people not given with `.person(user, name)` show as "someone".
 
 Without the `realtime` feature, or when the app has no realtime channel, the indicator renders nothing, its script never loads and nothing is sent. Signals reach every subscriber of the topic in the tenant, so the conversation id is visible to them: use opaque ids, or a topic per audience.

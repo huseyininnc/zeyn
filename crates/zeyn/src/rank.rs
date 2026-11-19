@@ -264,6 +264,141 @@ pub fn rebalance(n: usize) -> Vec<Rank> {
         .collect()
 }
 
+/// What a sortable list sends to its reorder action when a row moves: the key of the moved row
+/// and the keys of its new neighbors, never positions. `after` is the row the moved one now
+/// follows (`None` at the top), `before` the row it now precedes (`None` at the end). Keys stay
+/// right while other people add or move rows, and with lists that load only some rows (paging,
+/// virtual scrolling); sending the same request twice gives the same order.
+///
+/// The keys come from the browser: [`ReorderRequest::rank`] refuses a neighbor the action's own
+/// lookup does not find, so look neighbors up only in the list the user may change (the same
+/// scope as the list, such as `board_id`).
+///
+/// ```
+/// use zeyn::rank::ReorderRequest;
+/// use zeyn::{Error, Rank};
+/// let ranks = [("a", "F"), ("b", "V"), ("c", "k")];
+/// let rank_of = |k: &&str| {
+///     ranks
+///         .iter()
+///         .find(|(key, _)| key == k)
+///         .and_then(|(_, r)| Rank::parse(r))
+/// };
+/// let request = ReorderRequest::new("c", Some("a"), Some("b"));
+/// let rank = request.rank(rank_of).unwrap();
+/// assert!(rank.as_str() > "F" && rank.as_str() < "V");
+///
+/// let foreign = ReorderRequest::new("c", Some("x"), None);
+/// assert!(matches!(foreign.rank(rank_of), Err(Error::NotFound)));
+/// let stale = ReorderRequest::new("a", Some("c"), Some("b"));
+/// assert!(matches!(stale.rank(rank_of), Err(Error::Conflict)));
+/// ```
+///
+/// # Several rows and connected lists
+///
+/// A list with `multi_select()` moves up to [`ReorderRequest::MAX_ROWS`] selected rows at once:
+/// `key` is the first, `rest` the others in their new order, and [`ReorderRequest::ranks`] gives
+/// one rank for each. Lists joined with `connect(group, id)` move rows between them: `list` is the
+/// id of the list the rows land in and `from` the id of the list they left. Both ids come from
+/// the screen on the server, never from the browser, and the server checks the permission of
+/// both lists' actions before the action runs. The rows' keys come from the browser, so look them
+/// up in `from` (or `list` when `from` is `None`) before moving them.
+///
+/// ```
+/// use zeyn::rank::ReorderRequest;
+/// use zeyn::Rank;
+/// let mut request = ReorderRequest::new(1, None, Some(9));
+/// request.rest = vec![2, 3];
+/// let ranks = request.ranks(|_| Rank::parse("V")).unwrap();
+/// assert_eq!(ranks.len(), 3);
+/// assert!(ranks[0] < ranks[1] && ranks[1] < ranks[2] && ranks[2].as_str() < "V");
+/// assert_eq!(request.keys().copied().collect::<Vec<_>>(), [1, 2, 3]);
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReorderRequest<K> {
+    /// The row that moved.
+    pub key: K,
+    /// The row the moved one now follows; `None` when it is first.
+    pub after: Option<K>,
+    /// The row the moved one now precedes; `None` when it is last.
+    pub before: Option<K>,
+    /// More rows moved with `key`, in their new order after it. Empty unless the list has
+    /// `multi_select()`.
+    #[serde(default = "Vec::new")]
+    pub rest: Vec<K>,
+    /// The id of the list the rows now belong to, for a list with `connect(group, id)`.
+    #[serde(default)]
+    pub list: Option<String>,
+    /// The id of the connected list the rows came from; `None` when they stayed in `list`.
+    #[serde(default)]
+    pub from: Option<String>,
+}
+
+impl<K> ReorderRequest<K> {
+    /// Most rows one move carries: `key` and up to 99 in `rest`.
+    pub const MAX_ROWS: usize = 100;
+
+    /// A move of one row within its list.
+    pub fn new(key: K, after: Option<K>, before: Option<K>) -> Self {
+        ReorderRequest {
+            key,
+            after,
+            before,
+            rest: Vec::new(),
+            list: None,
+            from: None,
+        }
+    }
+
+    /// The moved rows in their new order: `key`, then `rest`.
+    pub fn keys(&self) -> impl Iterator<Item = &K> {
+        std::iter::once(&self.key).chain(&self.rest)
+    }
+
+    /// One new rank for each of [`ReorderRequest::keys`], in order, between the neighbors'
+    /// ranks. Errors as [`ReorderRequest::rank`].
+    pub fn ranks(
+        &self,
+        mut rank_of: impl FnMut(&K) -> Option<Rank>,
+    ) -> crate::action::Result<Vec<Rank>> {
+        let (after, before) = self.bounds(&mut rank_of)?;
+        n_between(after.as_ref(), before.as_ref(), 1 + self.rest.len())
+            .ok_or(crate::action::Error::Conflict)
+    }
+
+    /// The ranks of both neighbors, refused when one is missing or they are out of order.
+    fn bounds(
+        &self,
+        rank_of: &mut impl FnMut(&K) -> Option<Rank>,
+    ) -> crate::action::Result<(Option<Rank>, Option<Rank>)> {
+        let mut find = |key: &Option<K>| match key {
+            Some(k) => rank_of(k)
+                .map(Some)
+                .ok_or(crate::action::Error::NotFound),
+            None => Ok(None),
+        };
+        let after = find(&self.after)?;
+        let before = find(&self.before)?;
+        if let (Some(a), Some(b)) = (&after, &before)
+            && a >= b
+        {
+            return Err(crate::action::Error::Conflict);
+        }
+        Ok((after, before))
+    }
+
+    /// The moved row's new rank, between the ranks `rank_of` finds for its neighbors.
+    /// `Error::NotFound` when a neighbor is not found (a key from another list, or deleted),
+    /// `Error::Conflict` when the neighbors are no longer in this order (someone else moved
+    /// them) or there is no room left between them: the browser then puts the row back and
+    /// loads the list again. Rebalance the list when the saved rank
+    /// [`Rank::needs_rebalance`].
+    pub fn rank(&self, mut rank_of: impl FnMut(&K) -> Option<Rank>) -> crate::action::Result<Rank> {
+        let (after, before) = self.bounds(&mut rank_of)?;
+        between(after.as_ref(), before.as_ref()).ok_or(crate::action::Error::Conflict)
+    }
+}
+
 /// `V`, the middle of the key space, so a new row has a valid rank before it gets a real one.
 impl Default for Rank {
     fn default() -> Self {

@@ -86,13 +86,39 @@ let addr = config.get("server.addr").unwrap_or("127.0.0.1:3000").to_string();
 
 ## टेस्ट
 
-टेस्ट राउटर बनाते हैं और उसे मेमोरी में कॉल करते हैं:
+`zeyn::testing::TestApp` ऐप को मेमोरी में चलाता है: सर्व किए गए ऐप जैसा ही राउटर, वही जाँचें और वही एक्सेस नियम, बिना कोई पोर्ट खोले। यह Angular के `TestBed` या Flutter के widget tester की भूमिका निभाता है: ऐप बनाइए, किसी यूज़र से साइन इन कीजिए, Screen खोलिए, फ़ॉर्म भेजिए, grid के पेज देखिए या कोई Action चलाइए, फिर स्टेटस, HTML या JSON पढ़िए। CSRF टोकन यह आपके लिए भेजता है। `zeyn new` इसी तरह `tests/app.rs` लिखता है।
 
 ```rust
+use zeyn::testing::{TestApp, json};
+use zeyn::Identity;
+
 #[tokio::test]
-async fn notes_open() {
-    let router = app(Config::default()).router().unwrap();
-    let res = router.oneshot(Request::get("/notes").body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
+async fn a_writer_saves_a_note() {
+    let writer = Identity::user("ayse").with_permissions(["notes.note.read", "notes.note.write"]);
+    let app = TestApp::signed_in(app(config).unwrap(), writer);
+
+    assert_eq!(app.get("/notes/").await.status, 200);
+
+    let saved = app.submit("note_editor", json!({ "id": null }), "0", json!({ "title": "Call Ada" })).await;
+    assert_eq!(saved.status, 200);
+    assert!(saved.effects().contains(&"toast".to_string()));
+
+    let rows = app.grid("note_list", json!(null), "0", json!({})).await;
+    assert!(rows.json()["rows"].as_str().unwrap().contains("Call Ada"));
 }
 ```
+
+| कॉल | क्या करता है |
+|---|---|
+| `TestApp::new(app)` | ऐप अपने साइन इन के साथ। `App::check` को समस्याएँ मिलें तो उन्हीं के साथ panic करता है |
+| `TestApp::signed_in(app, identity)` | हर अनुरोध `identity` के रूप में साइन इन, यह देखने के लिए कि हर अनुमति क्या करने देती है |
+| `.header(name, value)` | हर अनुरोध पर एक हेडर, जैसे `accept-language` |
+| `get(path)` | एक पेज, एक फ़ाइल या एक endpoint |
+| `submit(screen, params, node, values)` | फ़ॉर्म को ब्राउज़र की तरह भेजता है: `effects()` के साथ `200`, फ़ील्ड के अनुसार `errors` के साथ `422`, अनुमति न हो तो `403` |
+| `grid(screen, params, node, query)` | JSON में `DataQuery` के साथ grid का एक पेज: HTML के रूप में `rows` और `total` |
+| `api(feature, action, input)` | `Feature::api` से प्रकाशित Action को चलाता है |
+| `send(request)` | कोई भी दूसरा अनुरोध |
+
+हर कॉल एक `TestResponse` लौटाता है जिसमें `status`, `headers`, `body`, `json()` और `effects()` होते हैं।
+
+Screen सर्वर के बिना भी चलती है: बिना आर्ग्युमेंट वाले `#[screen]` के पास `run()` होता है, `screen.html(&META)` उसे रेंडर करता है, `screen.schema(&META)` उसका वर्णन करता है और `App::check_page(&screen)` पेज की जाँचें चलाता है। हूबहू HTML के बजाय यह टेस्ट कीजिए कि यूज़र क्या कर सकता है (एक स्टेटस, एक इफ़ेक्ट, grid की एक पंक्ति), और हर बदलाव के बाद `cargo test` चलाइए।

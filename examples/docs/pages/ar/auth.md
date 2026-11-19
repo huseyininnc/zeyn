@@ -14,7 +14,7 @@
 البناء الافتراضي لا يتضمن `oidc` ولا `totp`، فالتطبيقات التي لا تستخدمهما لا تدفع شيئًا.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 المزوّدان اللذان جرى اختبارهما هما Keycloak وAuthentik. ينبغي أن يعمل أي مزوّد يتبع اكتشاف OpenID Connect (discovery) وتدفق رمز التفويض (authorization code) مع PKCE وJWKS.
@@ -101,7 +101,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | يبدأ تسجيل الدخول ويعيد التوجيه إلى المزوّد |
 | `GET /_zeyn/auth/callback` | إعادة التوجيه الراجعة من المزوّد |
-| `GET /_zeyn/auth/logout` | ينهي الجلسة هنا وعند المزوّد |
+| `POST` ثم `GET /_zeyn/auth/logout` | `POST` مع رمز CSRF ينهي الجلسة هنا، ثم `GET` يسجّل الخروج لدى المزوّد |
 
 عند المزوّد، سجّل `<public url>/_zeyn/auth/callback` كعنوان إعادة التوجيه (redirect URI) و
 `<public url>/` كعنوان إعادة التوجيه بعد تسجيل الخروج. يُضبط العنوان العام بالإعداد، ولا يؤخذ أبدًا من ترويسة `Host` في الطلب. مع وجود مسار أساسي أو عام تنتقل المسارات تحته.
@@ -144,7 +144,9 @@ App::new("Stock").oidc(oidc)
 
 ### تسجيل الخروج
 
-يحذف `/_zeyn/auth/logout` كعكة الجلسة ويرسل المستخدم إلى `end_session_endpoint` لدى المزوّد مع `client_id` و`post_logout_redirect_uri`. دون تلك النقطة يذهب المستخدم إلى صفحة بدء التطبيق.
+يتم تسجيل الخروج على خطوتين، حتى لا يستطيع رابط أو صورة في موقع آخر إخراج المستخدم. يحذف `POST /_zeyn/auth/logout` مع رمز CSRF كعكة الجلسة ويمسح تخزين المتصفح الخاص بالتطبيق. ثم يرسل `GET /_zeyn/auth/logout` المتصفح إلى `end_session_endpoint` لدى المزوّد مع `client_id` و`post_logout_redirect_uri`؛ وبدون تلك النقطة يذهب المستخدم إلى صفحة البداية في التطبيق. أما طلب `GET` من متصفح ما زالت لديه جلسة فيعود إلى التطبيق فقط.
+
+رابط تسجيل الخروج في غلاف الموقع وتسجيل الخروج عند الخمول يقومان بالخطوتين. ورابطك الخاص يفعل الشيء نفسه مع `data-zeyn-signout`: يرسل وقت التشغيل `POST` إلى ذلك العنوان أولًا ثم يتبع الرابط.
 
 ### عملاء API وMCP للتطبيق نفسه
 
@@ -211,13 +213,13 @@ App::new("Back office")
 
 ## الاختبار
 
-يشغّل `crates/zeyn/tests/oidc.rs` كل تدفق مقابل مُصدِر صغير داخل الاختبار يوقّع بمفتاح صُنع لهذا التشغيل، ويتحقق من رفض الرموز المنتهية والجماهير والمُصدِرين الخاطئين و`alg=none` ورمز HMAC موقّع بالمفتاح العام والمطالبات المتغيّرة والكعكات العبث بها و`state` المعاد استخدامه أو غير المطابق و`nonce` الخاطئ. ويغطي `crates/zeyn/tests/totp.rs` التسجيل والتحقق وإعادة التشغيل (replay) ورموز الاسترداد وحد المعدل.
+يشغّل `crates/zeyn/tests/all/oidc.rs` كل تدفق مقابل مُصدِر صغير داخل الاختبار يوقّع بمفتاح صُنع لهذا التشغيل، ويتحقق من رفض الرموز المنتهية والجماهير والمُصدِرين الخاطئين و`alg=none` ورمز HMAC موقّع بالمفتاح العام والمطالبات المتغيّرة والكعكات العبث بها و`state` المعاد استخدامه أو غير المطابق و`nonce` الخاطئ. ويغطي `crates/zeyn/tests/all/totp.rs` التسجيل والتحقق وإعادة التشغيل (replay) ورموز الاسترداد وحد المعدل.
 
 مع Keycloak في وضع التطوير، تعمل التدفقات نفسها مقابله أيضًا:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 ينشئ الاختبار realm باسم `zeyn-test` مع عميله ومستخدمه الخاصين ويحذفه في النهاية.

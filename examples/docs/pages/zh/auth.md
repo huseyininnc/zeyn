@@ -14,7 +14,7 @@
 默认构建不包含 `oidc` 和 `totp`，因此不使用它们的应用无需为此付出任何代价。
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 已测试的提供方是 Keycloak 和 Authentik。任何遵循 OpenID Connect discovery、带 PKCE 的授权码流程以及 JWKS 的提供方，都应该可以使用。
@@ -95,7 +95,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | 发起登录并重定向到提供方 |
 | `GET /_zeyn/auth/callback` | 提供方的回跳 |
-| `GET /_zeyn/auth/logout` | 在本应用和提供方两处结束会话 |
+| 先 `POST` 后 `GET /_zeyn/auth/logout` | 带 CSRF 令牌的 `POST` 在本应用结束会话，随后的 `GET` 在提供方退出登录 |
 
 请在提供方处把 `<public url>/_zeyn/auth/callback` 注册为重定向 URI，把 `<public url>/` 注册为登出后重定向 URI。公开 URL 是配置得到的，绝不取自请求的 `Host` 头。设置了 base 路径或公开路径时，这些路由会移到该路径之下。
 
@@ -127,7 +127,9 @@ CSRF 保护不变：无论由哪个 cookie 让用户登录，运行时的每个 
 
 ### 登出
 
-`/_zeyn/auth/logout` 删除会话 cookie，并带着 `client_id` 和 `post_logout_redirect_uri` 把用户送到提供方的 `end_session_endpoint`。没有该端点时，用户会回到应用的起始页。
+退出登录分两步，这样其他网站上的链接或图片无法让用户退出登录。带 CSRF 令牌的 `POST /_zeyn/auth/logout` 删除会话 cookie 并清除应用的浏览器存储。随后 `GET /_zeyn/auth/logout` 带着 `client_id` 和 `post_logout_redirect_uri` 把浏览器送到提供方的 `end_session_endpoint`；没有该端点时，用户会回到应用的起始页。仍持有会话的浏览器发出的 `GET` 只会回到应用。
+
+站点外壳中的退出链接和空闲退出都会完成这两步。你自己的链接加上 `data-zeyn-signout` 也能做到：运行时先向该地址发送 `POST`，再跟随链接。
 
 ### 同一应用的 API 和 MCP 客户端
 
@@ -183,13 +185,13 @@ App::new("Back office")
 
 ## 测试
 
-`crates/zeyn/tests/oidc.rs` 针对测试内的一个小型签发者运行每个流程，该签发者使用为本次运行生成的密钥签名；并检查以下情况会被拒绝：过期的令牌、错误的受众和签发者、`alg=none`、以公钥为密钥的 HMAC 令牌、被改动的 claims、被篡改的 cookie、被重用或不匹配的 `state`，以及错误的 `nonce`。`crates/zeyn/tests/totp.rs` 涵盖注册、验证、重放、恢复码和速率限制。
+`crates/zeyn/tests/all/oidc.rs` 针对测试内的一个小型签发者运行每个流程，该签发者使用为本次运行生成的密钥签名；并检查以下情况会被拒绝：过期的令牌、错误的受众和签发者、`alg=none`、以公钥为密钥的 HMAC 令牌、被改动的 claims、被篡改的 cookie、被重用或不匹配的 `state`，以及错误的 `nonce`。`crates/zeyn/tests/all/totp.rs` 涵盖注册、验证、重放、恢复码和速率限制。
 
 在开发模式下的 Keycloak 上，同样的流程也可以针对它运行：
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 测试会创建一个带有自己的客户端和用户的 `zeyn-test` realm，并在结束时删除它。没有 `ZEYN_TEST_OIDC` 时会被跳过。

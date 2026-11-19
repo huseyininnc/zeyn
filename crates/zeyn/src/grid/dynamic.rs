@@ -575,7 +575,10 @@ impl GridSource for DynamicGrid {
                 .collect(),
             sort: Vec::new(),
             filters: Vec::new(),
+            filter_groups: Vec::new(),
             shape: view.shape.filter(|s| s.len() <= 32),
+            group_by: Vec::new(),
+            page_size: None,
         }
     }
 
@@ -609,6 +612,8 @@ impl GridSource for DynamicGrid {
     fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
         query.sort.clear();
         query.filters.clear();
+        query.filter_groups.clear();
+        query.q.clear();
         query.aggregates.clear();
         query.group = None;
         query.time_zone = ctx.time_zone();
@@ -667,7 +672,11 @@ impl GridSource for DynamicGrid {
                 count: rows.len(),
                 total: page.total,
                 next: match cut {
-                    true => Some(Cursor((start + rows.len() as u64).to_string())),
+                    true => Some(Cursor(
+                        start
+                            .saturating_add(rows.len() as u64)
+                            .to_string(),
+                    )),
                     false => page.next,
                 },
                 offset,

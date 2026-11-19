@@ -6,7 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-readme.workspace = true
+readme = "README.md"
 homepage.workspace = true
 keywords = ["zeyn", "web", "framework", "scaffolding", "mcp"]
 categories = ["command-line-utilities", "development-tools"]
@@ -19,6 +19,8 @@ path = "src/main.rs"
 serde_json = "1"
 ed25519-dalek = { version = "3", default-features = false, features = ["zeroize"] }
 getrandom = "0.2"
+proc-macro2 = { version = "1", default-features = false, features = ["span-locations"] }
+syn = { version = "2", default-features = false, features = ["full", "parsing", "visit"] }
 
 [dev-dependencies]
 zeyn = { path = "../zeyn", default-features = false, features = ["signed-licenses"] }

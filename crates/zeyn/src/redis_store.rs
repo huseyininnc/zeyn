@@ -20,7 +20,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::OnceCell;
 
-/// Token bucket in one atomic step, the same algorithm as the memory store. Returns how many
+/// Token bucket in one atomic step, the same algorithm as the memory store. `ARGV[4]` is the
+/// cost: 1 for a request, more for a model answer, 0 to only check. Returns how many
 /// milliseconds to wait, 0 when the request may go ahead. Time comes from Redis, so the clocks of
 /// the app servers do not matter.
 const TAKE: &str = r"
@@ -33,10 +34,17 @@ local tokens = tonumber(bucket[1]) or capacity
 local at = tonumber(bucket[2]) or now
 tokens = math.min(capacity, tokens + math.max(0, now - at) * per_ms)
 local wait = 0
-if tokens >= 1 then tokens = tokens - 1 else wait = math.ceil((1 - tokens) / per_ms) end
+if tokens >= 1 then tokens = tokens - tonumber(ARGV[4]) else wait = math.ceil((1 - tokens) / per_ms) end
 redis.call('HSET', KEYS[1], 't', tostring(tokens), 'at', now)
 redis.call('PEXPIRE', KEYS[1], ARGV[3])
 return wait
+";
+
+/// Gives `ARGV[2]` units back to a bucket that still exists, never past the capacity `ARGV[1]`.
+const REFUND: &str = r"
+local t = redis.call('HGET', KEYS[1], 't')
+if t then redis.call('HSET', KEYS[1], 't', tostring(math.min(tonumber(ARGV[1]), tonumber(t) + tonumber(ARGV[2])))) end
+return 0
 ";
 
 /// How long calls skip Redis after it failed, so an outage costs one timeout per five seconds
@@ -81,7 +89,19 @@ impl RedisStore {
         })))
     }
 
-    async fn connection(&self) -> redis::RedisResult<ConnectionManager> {
+    /// The key prefix, `zeyn:<prefix>:`.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn prefix(&self) -> &str {
+        &self.0.prefix
+    }
+
+    /// The client, for connections of their own such as a subscription.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn client(&self) -> &redis::Client {
+        &self.0.client
+    }
+
+    pub(crate) async fn connection(&self) -> redis::RedisResult<ConnectionManager> {
         let config = ConnectionManagerConfig::new()
             .set_connection_timeout(Some(Duration::from_secs(1)))
             .set_response_timeout(Some(Duration::from_millis(500)))
@@ -148,6 +168,15 @@ impl RedisStore {
 
 impl RateStore for RedisStore {
     fn take(&self, key: &str, limit: &RateLimit) -> BoxFuture<std::result::Result<(), Duration>> {
+        self.charge(key, limit, 1)
+    }
+
+    fn charge(
+        &self,
+        key: &str,
+        limit: &RateLimit,
+        amount: u32,
+    ) -> BoxFuture<std::result::Result<(), Duration>> {
         let store = self.clone();
         let key = format!("{}rate:{key}", self.0.prefix);
         let window_ms = limit
@@ -169,6 +198,7 @@ impl RateStore for RedisStore {
                         .arg(capacity)
                         .arg(per_ms)
                         .arg(window_ms)
+                        .arg(amount)
                         .invoke_async::<u64>(&mut con)
                         .await
                 }
@@ -177,6 +207,26 @@ impl RateStore for RedisStore {
             match store.health(result) {
                 Some(0) | None => Ok(()),
                 Some(wait) => Err(Duration::from_millis(wait)),
+            }
+        })
+    }
+
+    fn refund(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<()> {
+        let store = self.clone();
+        let key = format!("{}rate:{key}", self.0.prefix);
+        let capacity = limit.requests;
+        Box::pin(async move {
+            if store.resting() {
+                return;
+            }
+            if let Ok(mut con) = store.connection().await {
+                let done = redis::Script::new(REFUND)
+                    .key(key)
+                    .arg(capacity)
+                    .arg(amount)
+                    .invoke_async::<u64>(&mut con)
+                    .await;
+                let _ = store.health(done);
             }
         })
     }

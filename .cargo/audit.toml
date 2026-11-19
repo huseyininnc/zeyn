@@ -1,0 +1,22 @@
+# cargo audit configuration. Every ignored advisory says why it does not reach a Zeyn app.
+# deny.toml holds the same quick-xml entries for cargo deny.
+
+[advisories]
+ignore = [
+    # quick-xml 0.38 comes only from Typst's bibliography stack (typst-library -> hayagriva ->
+    # citationberg), behind the `pdf` feature. typst 0.15 depends on hayagriva unconditionally
+    # and no release of hayagriva or citationberg uses a fixed quick-xml yet. The PDF world in
+    # crates/zeyn/src/pdf.rs serves only the app's own template and /data.json, so no user
+    # supplied CSL or bibliography XML reaches the parser.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    # libsqlite3-sys 0.37 is in Cargo.lock only because sqlx's weak `sqlx-sqlite?/...` features
+    # make Cargo lock the optional SQLite driver (rust-lang/cargo#10801). Zeyn enables sqlx
+    # without `sqlite`, so it is never built: `cargo tree -p zeyn --all-features -i
+    # libsqlite3-sys` prints nothing. sqlx-sqlite 0.9 caps it below 0.38.
+    "RUSTSEC-2026-0459",
+    # glib 0.18 is unsound in VariantStrIter, which Zeyn never calls. It comes from the Linux
+    # build of zeyn-desktop through wry 0.57 -> webkit2gtk 2.0 -> gtk 0.18; no wry or tao
+    # release moves to a newer gtk yet.
+    "RUSTSEC-2024-0429",
+]

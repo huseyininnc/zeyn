@@ -82,7 +82,7 @@ App::new(t!("app.name"))
     .deny_ips(["203.0.113.7"])
 ```
 
-- `rate_limit` applies to every request except static assets and reads of public media sources (`Feature::public_media`); `write_limit` adds a stricter one for calls that change data: form submits, grid edits, row, bulk and menu actions, commands, imports, saved grid views, dock layouts and themes, API calls, MCP calls and the assistant. Refused requests get `429` with `Retry-After`.
+- `rate_limit` applies to every request except static assets and reads of public media sources (`Feature::public_media`) that find their file (a miss counts); `write_limit` adds a stricter one for calls that change data: form submits, grid edits, row, bulk and menu actions, commands, imports, saved grid views, dock layouts and themes, API calls, MCP calls and the assistant. Refused requests get `429` with `Retry-After`.
 - `X-Forwarded-For` is only believed from `trusted_proxies`. Every line of the header counts, in order, and the address taken is the last one that is not a trusted proxy.
 - Reveals, island and data source calls count as writes too, and so do exports and printed documents (`GET /_zeyn/grid/export`, `GET /_zeyn/pdf`).
 - Page sizes, line counts, query lengths and upload sizes are capped on the server whatever the client sends.

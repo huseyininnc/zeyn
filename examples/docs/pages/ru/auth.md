@@ -15,7 +15,7 @@
 не платят.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["oidc"] }
+zeyn = { version = "0.0.11", features = ["oidc"] }
 ```
 
 Протестированные провайдеры: Keycloak и Authentik. Должен работать любой провайдер, который
@@ -118,7 +118,7 @@ App::new("Stock").oidc(oidc)
 | --- | --- |
 | `GET /_zeyn/auth/login?return_to=/path` | начинает вход и перенаправляет к провайдеру |
 | `GET /_zeyn/auth/callback` | обратное перенаправление от провайдера |
-| `GET /_zeyn/auth/logout` | завершает сессию здесь и у провайдера |
+| `POST`, затем `GET /_zeyn/auth/logout` | `POST` с CSRF-токеном завершает сессию здесь, затем `GET` выполняет выход у провайдера |
 
 У провайдера зарегистрируйте `<public url>/_zeyn/auth/callback` как redirect URI и `<public url>/`
 как post logout redirect URI. Публичный URL задаётся конфигурацией и никогда не берётся из заголовка
@@ -173,9 +173,16 @@ App::new("Stock").oidc(oidc)
 
 ### Выход
 
-`/_zeyn/auth/logout` удаляет cookie сессии и отправляет пользователя на `end_session_endpoint`
-провайдера с `client_id` и `post_logout_redirect_uri`. Без этого endpoint пользователь попадает на
-стартовую страницу приложения.
+Выход выполняется в два шага, чтобы ссылка или изображение на другом сайте не могли завершить
+сессию пользователя. `POST /_zeyn/auth/logout` с CSRF-токеном удаляет cookie сессии и очищает
+хранилище браузера приложения. Затем `GET /_zeyn/auth/logout` отправляет браузер на
+`end_session_endpoint` провайдера с `client_id` и `post_logout_redirect_uri`; без этого endpoint
+пользователь попадает на стартовую страницу приложения. `GET` от браузера, у которого ещё есть
+сессия, просто возвращает его в приложение.
+
+Ссылка выхода в оболочке сайта и выход по бездействию выполняют оба шага. Своя ссылка делает то
+же с `data-zeyn-signout`: runtime сначала отправляет `POST` на этот адрес, затем переходит по
+ссылке.
 
 ### Клиенты API и MCP того же приложения
 
@@ -258,18 +265,18 @@ App::new("Back office")
 
 ## Тестирование
 
-`crates/zeyn/tests/oidc.rs` прогоняет каждый поток против небольшого издателя внутри теста, который
+`crates/zeyn/tests/all/oidc.rs` прогоняет каждый поток против небольшого издателя внутри теста, который
 подписывает ключом, созданным для запуска, и проверяет, что отклоняются истёкшие токены, неверные
 аудитории и издатели, `alg=none`, HMAC-токен с ключом из открытого ключа, изменённые claims,
 подделанные cookie, повторно использованный или не совпавший `state` и неверный `nonce`.
-`crates/zeyn/tests/totp.rs` покрывает регистрацию, проверку, повтор, коды восстановления и лимит
+`crates/zeyn/tests/all/totp.rs` покрывает регистрацию, проверку, повтор, коды восстановления и лимит
 запросов.
 
 С Keycloak в режиме разработки те же потоки прогоняются и против него:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 Тест создаёт realm `zeyn-test` с собственным клиентом и пользователем и удаляет его в конце. Без

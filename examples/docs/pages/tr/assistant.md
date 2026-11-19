@@ -5,7 +5,7 @@ Durum: `zeyn`'in `assistant` Cargo feature'ının arkasında uygulandı.
 Bir Zeyn uygulaması kendi yapay zeka asistanını taşıyabilir: her sayfada, uygulamanın verisiyle cevap veren ve uygulamanın screen'lerini ve API'lerini oturum açmış kullanıcı olarak çalıştıran bir sohbet. Zeyn ile geliştirilen uygulamalar bunu kendi müşterileri için açabilir, müşterilerin istediği modeli bağlayabilir ve sohbet geçmişini ihtiyaç duydukları yerde tutabilir.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["assistant"] }
+zeyn = { version = "0.0.11", features = ["assistant"] }
 ```
 
 Feature olmadan hiçbiri derlenmez: HTTP istemcisi yok, ek route yok, ek bellek yok.
@@ -105,7 +105,7 @@ pub trait ChatStore: Send + Sync + 'static {
 
 Model, MCP ve WebMCP ile aynı araçları görür (bkz. `docs/runtime-protocol.md` 9. bölüm); bunlar her seferinde oturum açmış kullanıcı için oluşturulur: kullanıcının kullanabileceği grid aramaları, form kayıtları ve API action'ları, `ai = false` işaretli her şey hariç; açıklamalar `///` doc yorumlarından ve `ai = "..."` yönlendirmesinden gelir. İki yerleşik araç eklenir:
 
-- `navigate`: kullanıcının açabileceği, route'lu bir screen'i sayfa yüklemeden açar (`zeyn:navigate`) ve grid'ini filtreleyebilir (`zeyn:filter`). Grid sonra `POST /_zeyn/grid` üzerinden yüklenir; sunucu orada her zamanki denetimlerini uygular.
+- `navigate`: kullanıcının açabileceği, route'lu bir screen'i sayfa yüklemeden açar (`zeyn:navigate`) ve grid'ini filtreleyebilir (`zeyn:filter`); düz filtreler ve OR grupları (`filter_groups`, `DataQuery::filter_groups` ile aynı) kullanılabilir. Sunucu boş filtreleri atar ve `DataQuery::retain_filters` sınırlarını korur. Grid sonra `POST /_zeyn/grid` üzerinden yüklenir; sunucu orada her zamanki denetimlerini uygular.
 - `suggest`: çip olarak gösterilen devam istemleri.
 
 Her çağrı, bağlamın bir ajan olarak işaretlendiği normal action yolundan geçer: screen'in erişimi, Feature'ın guard'ları, action'ın izni, interceptor'lar, hız sınırları, zaman sınırı, denetim kaydı (audit; her asistan çağrısı `via_agent: true` ile kaydedilir) ve maskeleme.
@@ -150,7 +150,7 @@ Asistanı kendi müşterilerine satan bir uygulama genellikle şunları ister:
 | `POST /_zeyn/assistant/stt` (ses gövdesi) | `{ text }`; sunucu tarafı konuşmadan metne yoksa `404` |
 | `POST /_zeyn/assistant/tts` `{ text }` | Akışlı ses; sunucu tarafı metinden konuşmaya yoksa `404` |
 
-Olaylar, satır başına bir JSON nesnesi: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters}`, `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`, `{t:"error",message}`, `{t:"done"}`.
+Olaylar, satır başına bir JSON nesnesi: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters,filter_groups}`, `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`, `{t:"error",message}`, `{t:"done"}`.
 
 `assistant.js` ve `assistant.css` yalnızca asistanı kullanabilen kullanıcılar için yüklenir. Sohbet günlüğü bir `role="log"` canlı bölgesidir (cevap akarken `aria-busy`), Enter gönderir, Shift+Enter yeni satır başlatır, Escape yan paneli kapatır ve odağı başlatıcıya döndürür; onay kartı odağı önce İptal'e koyar.
 

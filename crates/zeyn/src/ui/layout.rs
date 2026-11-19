@@ -44,8 +44,9 @@ impl Row {
     }
 
     /// Adds a column with weight 1.
+    #[track_caller]
     pub fn col(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self.weights.push(1);
         self
     }
@@ -117,8 +118,9 @@ impl Stack {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -174,8 +176,9 @@ impl Panel {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -286,16 +289,18 @@ impl Card {
 
     /// One action at the end of the title row, such as a link button or a menu button. Needs a
     /// title.
+    #[track_caller]
     pub fn action(mut self, node: impl Into<Node>) -> Self {
         self.action = Some(self.nodes.len());
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
     /// A footer under a divider, such as a "View all orders" link.
+    #[track_caller]
     pub fn footer(mut self, node: impl Into<Node>) -> Self {
         self.footer = Some(self.nodes.len());
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -303,8 +308,9 @@ impl Card {
         clippy::should_implement_trait,
         reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
     )]
+    #[track_caller]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 }
@@ -403,9 +409,10 @@ impl Tabs {
         }
     }
 
+    #[track_caller]
     pub fn tab(mut self, title: impl Into<Text>, node: impl Into<Node>) -> Self {
         self.titles.push(title.into());
-        self.nodes.push(node.into());
+        self.nodes.push(Node::placed(node));
         self
     }
 
@@ -488,9 +495,10 @@ pub struct Split {
 
 impl Split {
     /// Two panes side by side; the first takes 40 percent.
+    #[track_caller]
     pub fn new(first: impl Into<Node>, second: impl Into<Node>) -> Self {
         Self {
-            nodes: vec![first.into(), second.into()],
+            nodes: vec![Node::placed(first), Node::placed(second)],
             ratio: 40,
             vertical: false,
         }
@@ -539,5 +547,169 @@ impl Component for Split {
 
     fn children(&self) -> &[Node] {
         &self.nodes
+    }
+}
+
+/// A list and the detail of its selected row: side by side on wide screens; on phones and narrow
+/// tablets the list alone, or the detail alone with a back link once a row is selected. The
+/// selection lives in the screen's params, so it is in the URL: the list's rows link to the same
+/// screen with the row's id, and the screen passes the detail of that id (or nothing).
+///
+/// ```ignore
+/// #[screen(route = "/inbox", permission = "mail.read")]
+/// pub fn inbox(p: InboxParams) -> Screen {
+///     let list = List::of(search_mail).item(|m: &Mail| ListItem::link(m.subject.clone(), inbox, InboxParams { id: Some(m.id) }));
+///     Screen::new(t!("mail.inbox")).body(
+///         ListDetail::new(t!("mail.inbox"), list)
+///             .detail(p.id.map(|id| Deferred::new(MailView::of(id))))
+///             .back(LinkButton::new(t!("mail.back"), inbox, InboxParams::default()))
+///             .empty(EmptyState::new(t!("mail.pick"))),
+///     )
+/// }
+/// ```
+pub struct ListDetail {
+    label: Text,
+    nodes: Vec<Node>,
+    has_detail: bool,
+    back: Option<super::LinkButton>,
+}
+
+into_node!(ListDetail);
+
+impl ListDetail {
+    /// The list, with the name of the list region for screen readers.
+    #[track_caller]
+    pub fn new(label: impl Into<Text>, list: impl Into<Node>) -> Self {
+        ListDetail {
+            label: label.into(),
+            nodes: vec![Node::placed(list)],
+            has_detail: false,
+            back: None,
+        }
+    }
+
+    /// The detail of the selected row, `None` when no row is selected.
+    #[track_caller]
+    pub fn detail(mut self, detail: Option<impl Into<Node>>) -> Self {
+        if let Some(d) = detail {
+            self.nodes.truncate(1);
+            self.nodes.push(Node::placed(d));
+            self.has_detail = true;
+        }
+        self
+    }
+
+    /// What the detail pane shows on wide screens while no row is selected.
+    pub fn empty(mut self, state: super::EmptyState) -> Self {
+        if !self.has_detail {
+            self.nodes.truncate(1);
+            self.nodes.push(state.into());
+        }
+        self
+    }
+
+    /// The link back to the list, shown above the detail on narrow screens.
+    pub fn back(mut self, link: super::LinkButton) -> Self {
+        self.back = Some(link);
+        self
+    }
+}
+
+impl Component for ListDetail {
+    fn render(&self, out: &mut String, r: &Render) {
+        let id = dom_id(r, "ld");
+        out.push_str(&format!(
+            r#"<div class="z-list-detail" data-detail="{}"><section class="z-ld-list" aria-labelledby="{id}-label"><h2 class="z-sr-only" id="{id}-label">{}</h2>"#,
+            self.has_detail,
+            r.text(&self.label)
+        ));
+        render_child(out, r, 0, &self.nodes[0]);
+        out.push_str(r#"</section><section class="z-ld-detail">"#);
+        if self.has_detail
+            && let Some(back) = &self.back
+        {
+            out.push_str(r#"<div class="z-ld-back">"#);
+            out.push_str(&back.html(r));
+            out.push_str("</div>");
+        }
+        if let Some(node) = self.nodes.get(1) {
+            render_child(out, r, 1, node);
+        }
+        out.push_str("</section></div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "list_detail", "label": self.label, "detail": self.has_detail, "children": children_schema(&self.nodes) })
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.nodes
+    }
+}
+
+/// A part of a screen that loads after the screen shows: the page carries a placeholder, and the
+/// browser asks for the part by its node path right away, so one slow block (a report, a chart
+/// over a large table) never delays the rest. Grids, forms and actions inside work as anywhere
+/// else; the part goes through the same access checks as the screen.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::Deferred;
+/// let part = Deferred::new(Alert::info("Sales this year")).lines(4);
+/// let chart = Deferred::new(Alert::info("Sales by month")).skeleton(Skeleton::chart());
+/// ```
+pub struct Deferred {
+    node: Vec<Node>,
+    skeleton: super::Skeleton,
+}
+
+into_node!(Deferred);
+
+impl Deferred {
+    #[track_caller]
+    pub fn new(node: impl Into<Node>) -> Self {
+        Deferred {
+            node: vec![Node::placed(node)],
+            skeleton: super::Skeleton::lines(3),
+        }
+    }
+
+    /// How many placeholder lines show while the part loads, 1 to 20 (3 unless set).
+    pub fn lines(mut self, lines: u8) -> Self {
+        self.skeleton = super::Skeleton::lines(lines);
+        self
+    }
+
+    /// The placeholder shown while the part loads, in the shape of the part
+    /// (`Skeleton::kpi()`, `Skeleton::grid(rows)`, `Skeleton::list(items)`, `Skeleton::chart()`),
+    /// so nothing moves when the part arrives.
+    pub fn skeleton(mut self, skeleton: super::Skeleton) -> Self {
+        self.skeleton = skeleton;
+        self
+    }
+}
+
+impl Component for Deferred {
+    fn render(&self, out: &mut String, r: &Render) {
+        let path = if r.path.is_empty() {
+            "0".to_string()
+        } else {
+            format!("{}.0", r.path)
+        };
+        out.push_str(&format!(
+            r#"<div class="z-deferred z-{}-deferred" data-zeyn-defer="{path}" aria-busy="true" data-zeyn-failed="{}">"#,
+            self.skeleton.name(),
+            r.text(&Text::key("zeyn.ui.load_failed"))
+        ));
+        self.skeleton.render(out, r);
+        out.push_str("</div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "deferred", "node": self.node.first().map(Node::schema) })
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.node
     }
 }

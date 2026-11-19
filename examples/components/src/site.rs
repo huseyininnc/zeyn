@@ -123,4 +123,16 @@ pub fn router(app: Router) -> Router {
     .route("/site/img/{file}", get(picture))
     .route("/site/photo/{file}", get(photo))
     .layer(axum::middleware::map_response(with_head))
+    .layer(axum::middleware::map_request(plain_pages))
+}
+
+/// Pages are asked for without compression, so [`with_head`] can add the head tags; the
+/// framework's files and the catalog's own files keep theirs.
+async fn plain_pages(mut req: axum::extract::Request) -> axum::extract::Request {
+    let path = req.uri().path();
+    if !path.starts_with("/_zeyn/") && !path.starts_with("/site/") {
+        req.headers_mut()
+            .remove(header::ACCEPT_ENCODING);
+    }
+    req
 }

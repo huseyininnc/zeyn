@@ -15,12 +15,17 @@
  * and `aria-setsize`; a focused card stays in the DOM while it is out of view; cards that "Show
  * more" or the next page bring are taken in the same way. During a fling (over 3 px per ms) cards
  * come in with their images held back (`data-zeyn-park`) and show their placeholder; the images
- * load once the scroll rests for 120 ms, so files of cards that only flew by are never fetched.
+ * load once the scroll slows below 1 px per ms or rests for 120 ms, so files of cards that only
+ * flew by are never fetched. Rows just past the shown ones stay in the DOM hidden with their
+ * layout, so scrolling back is cheap; of the cards further away only the last 200 to leave keep
+ * their images.
  * @module catalog
  */
 
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+/** The drag core (`drag.js`). */
+const D = await import(new URL(`drag.js${new URL(import.meta.url).search}`, import.meta.url).href);
 
 /** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
 async function csrf() {
@@ -166,7 +171,7 @@ function railScroll(section, step) {
 }
 
 /** Pixels a mouse moves before a press on a rail becomes a drag instead of a click. */
-const DRAG_PX = 5;
+const DRAG_PX = 6;
 
 /** Scrolls a rail so the card whose start is nearest to the rail's start lines up with it. */
 function railSnap(list) {
@@ -183,53 +188,35 @@ function railSnap(list) {
 }
 
 /**
- * Lets a mouse drag a rail sideways. Touch and pen keep the browser's own scrolling. A press that
- * moves more than `DRAG_PX` is a drag: the click on release is cancelled, so the card link does
- * not open, and the rail snaps to the nearest card. A smaller move is a normal click. The
- * dragging class stays until the mouse moves again, so the pointer events that follow the release
- * do not start a card preview.
+ * Lets a mouse drag a rail sideways through the drag core (`drag.js`). Touch and pen keep the
+ * browser's own scrolling. A press that moves `DRAG_PX` sideways is a drag: the click on release
+ * is cancelled, so the card link does not open, and the rail snaps to the nearest card. A smaller
+ * move is a normal click. The dragging class stays until the mouse moves again, so the pointer
+ * events that follow the release do not start a card preview.
  */
 function railDrag(list) {
-  let press = null;
-  let dragged = false;
   list.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
-    press = { id: e.pointerId, x: e.clientX, left: list.scrollLeft, moving: false };
-    dragged = false;
+    const x = e.clientX;
+    const left = list.scrollLeft;
+    D.press(e, {
+      threshold: DRAG_PX,
+      axis: 'x',
+      onStart: (ev) => {
+        list.classList.add('z-rail-dragging');
+        getSelection()?.removeAllRanges();
+        const move = (m) => {
+          list.scrollLeft = left - (m.clientX - x);
+        };
+        move(ev);
+        D.capture(list, ev, move, (_, cancelled) => {
+          if (!cancelled) D.swallowClick();
+          railSnap(list);
+          list.addEventListener('pointermove', () => list.classList.remove('z-rail-dragging'), { once: true });
+        });
+      },
+    });
   });
-  list.addEventListener('pointermove', (e) => {
-    if (!press || e.pointerId !== press.id) return;
-    const dx = e.clientX - press.x;
-    if (!press.moving) {
-      if (Math.abs(dx) <= DRAG_PX) return;
-      press.moving = true;
-      list.setPointerCapture(e.pointerId);
-      list.classList.add('z-rail-dragging');
-      getSelection()?.removeAllRanges();
-    }
-    list.scrollLeft = press.left - dx;
-  });
-  const release = (e) => {
-    if (!press || e.pointerId !== press.id) return;
-    const moving = press.moving;
-    press = null;
-    if (!moving) return;
-    dragged = true;
-    railSnap(list);
-    list.addEventListener('pointermove', () => list.classList.remove('z-rail-dragging'), { once: true });
-  };
-  list.addEventListener('pointerup', release);
-  list.addEventListener('pointercancel', release);
-  list.addEventListener(
-    'click',
-    (e) => {
-      if (!dragged) return;
-      dragged = false;
-      e.preventDefault();
-      e.stopPropagation();
-    },
-    true,
-  );
   list.addEventListener('dragstart', (e) => e.preventDefault());
   list.addEventListener('focusin', (e) => {
     e.target.closest?.('.z-poster')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
@@ -271,16 +258,49 @@ document.addEventListener(
 /** A card grid with at least this many cards keeps only the rows near the viewport in the DOM. */
 const WINDOW_MIN = 200;
 
-/** Pixels above and below the viewport whose rows stay in the DOM. */
+/** Pixels above and below the viewport whose rows are shown. */
 const WINDOW_MARGIN = 800;
+
+/**
+ * Pixels beyond the shown rows whose cards stay in the DOM hidden (`z-cards-far`,
+ * `content-visibility: hidden`): they keep their layout, so a card that scrolls back costs a
+ * style change instead of a new layout (measured at 4x CPU on a phone: 1.7 ms against 22 ms for
+ * a row of two cards). Cards past it leave the DOM.
+ */
+const KEEP_MARGIN = 600;
+
+/**
+ * Cards out of the DOM that keep their images, the ones that left last. Older ones let go of
+ * their images (`park(card, true)`), so the image data held by cards out of the DOM stays bounded
+ * however far the user scrolls, while a short scroll back still finds its images loaded.
+ */
+const DETACHED_IMAGES = 200;
+
+/** Cards out of the DOM that still hold their images, oldest first. */
+const detached = new Set();
+
+/** Notes that a card left the DOM and lets the oldest cards over `DETACHED_IMAGES` drop their images. */
+function detach(card) {
+  card.remove();
+  detached.delete(card);
+  detached.add(card);
+  while (detached.size > DETACHED_IMAGES) {
+    const old = detached.values().next().value;
+    detached.delete(old);
+    park(old, true);
+  }
+}
 
 /** Scroll speed in pixels per millisecond above which cards come in with their images parked. */
 const FLING = 3;
 
+/** Scroll speed in pixels per millisecond below which a fling has settled and parked images load. */
+const CALM = 1;
+
 /** Milliseconds without scrolling after which parked images load, at least two frames on slow devices. */
 const SETTLE_MS = 120;
 
-/** Whether the page scrolls faster than `FLING` in this frame. */
+/** Whether the page is in a fling: faster than `FLING`, until it slows below `CALM`. */
 let flying = false;
 
 /** Windowing state by list element. */
@@ -313,7 +333,7 @@ function measure(w) {
   list.style.gridAutoRows = '';
   let tallest = 0;
   for (const card of [...list.children].slice(0, w.cols * 2)) {
-    if (!card.classList.contains('z-cards-kept')) tallest = Math.max(tallest, card.getBoundingClientRect().height);
+    if (!card.matches('.z-cards-kept, .z-cards-far')) tallest = Math.max(tallest, card.getBoundingClientRect().height);
   }
   if (tallest > 0) w.cardH = tallest;
   list.style.gridAutoRows = `${w.cardH}px`;
@@ -334,11 +354,12 @@ function number(w) {
 /**
  * Holds back the images of a card that comes in during a fling: the files of cards that only
  * pass by are never requested. The card shows its placeholder until the scroll settles. Images
- * that already loaded are left alone.
+ * that already loaded are left alone, unless `all` is set: a card long out of the DOM lets go of
+ * every image (see `DETACHED_IMAGES`).
  */
-function park(card) {
+function park(card, all) {
   for (const img of card.querySelectorAll('img[src]')) {
-    if (img.complete) continue;
+    if (img.complete && !all) continue;
     img.dataset.zeynPark = img.getAttribute('src');
     if (img.hasAttribute('srcset')) img.dataset.zeynParkSet = img.getAttribute('srcset');
     img.removeAttribute('srcset');
@@ -373,37 +394,54 @@ function keepAt(w, card, out) {
 
 /**
  * Shows the rows near the viewport: the cards of those rows are in the list, the rows above and
- * below are padding of their height. Cards that stay are not touched. A focused card that leaves
- * the window stays in the DOM over its own cell, so focus is never lost; the cards around it are
- * inserted next to it, never it next to them.
+ * below are padding of their height. Rows within `KEEP_MARGIN` of the shown ones stay in the list
+ * hidden, so they keep their layout; cards further away leave the DOM and let go of their images.
+ * Cards that stay are not touched. A focused card that leaves the window stays in the DOM over
+ * its own cell, so focus is never lost; the cards around it are inserted next to it, never it
+ * next to them. `at`, `width` and `height` are read by the caller before any list changes.
  */
-function paint(w, at, width) {
+function paint(w, at, width, height) {
   const { list, cards } = w;
   if ((width ?? list.clientWidth) !== w.width) measure(w);
   const rows = Math.ceil(cards.length / w.cols);
   const top = at ?? list.getBoundingClientRect().top;
-  const first = Math.min(rows, Math.max(0, Math.floor((-top - WINDOW_MARGIN) / w.rowH)));
-  const last = Math.min(rows, Math.max(first, Math.ceil((innerHeight - top + WINDOW_MARGIN) / w.rowH)));
+  const row = (y) => Math.min(rows, Math.max(0, Math.floor(y / w.rowH)));
+  const shownFirst = row(-top - WINDOW_MARGIN);
+  const shownLast = Math.max(shownFirst, Math.min(rows, Math.ceil(((height ?? innerHeight) - top + WINDOW_MARGIN) / w.rowH)));
+  const first = Math.max(0, shownFirst - Math.ceil(KEEP_MARGIN / w.rowH));
+  const last = Math.min(rows, shownLast + Math.ceil(KEEP_MARGIN / w.rowH));
   const from = first * w.cols;
   const to = Math.min(cards.length, last * w.cols);
+  const shownFrom = shownFirst * w.cols;
+  const shownTo = Math.min(cards.length, shownLast * w.cols);
   const focused = document.activeElement?.closest?.('[data-zeyn-window] > li');
   const keep = focused && w.index.has(focused) ? focused : null;
-  if (from === w.from && to === w.to && keep === w.kept) return;
+  if (from === w.from && to === w.to && shownFrom === w.shownFrom && shownTo === w.shownTo && keep === w.kept) return;
   const outside = (c) => {
     const i = w.index.get(c);
     return i < from || i >= to;
   };
-  for (let i = w.from; i < w.to; i++) if (cards[i] !== keep && outside(cards[i])) cards[i].remove();
+  for (let i = w.from; i < w.to; i++) {
+    if (cards[i] !== keep && outside(cards[i])) detach(cards[i]);
+  }
   if (w.kept && w.kept !== keep) {
     keepAt(w, w.kept, false);
-    if (outside(w.kept)) w.kept.remove();
+    if (outside(w.kept)) detach(w.kept);
+  }
+  for (let i = from; i < to; i++) {
+    const c = cards[i];
+    const far = c !== keep && (i < shownFrom || i >= shownTo);
+    if (c.classList.contains('z-cards-far') === far) continue;
+    c.classList.toggle('z-cards-far', far);
+    if (!far && !flying && c.isConnected) unpark(c);
   }
   let prev = null;
   let run = [];
   const flush = (before) => {
     if (!run.length) return;
     baseCards(run);
-    for (const card of run) (flying ? park : unpark)(card);
+    for (const card of run) detached.delete(card);
+    for (const card of run) (flying || card.classList.contains('z-cards-far') ? park : unpark)(card);
     if (before) before.before(...run);
     else if (prev) prev.after(...run);
     else if (keep && w.index.get(keep) < from) keep.after(...run);
@@ -425,6 +463,8 @@ function paint(w, at, width) {
   w.kept = keep;
   w.from = from;
   w.to = to;
+  w.shownFrom = shownFrom;
+  w.shownTo = shownTo;
   list.style.paddingBlockStart = `${first * w.rowH}px`;
   list.style.paddingBlockEnd = `${Math.max(0, rows - last) * w.rowH}px`;
 }
@@ -440,24 +480,35 @@ let lastAt = 0;
 let lastGap = 0;
 let settle = 0;
 
+/** Ends a fling: the shown cards of every windowed list load their parked images. */
+function land() {
+  flying = false;
+  for (const card of document.querySelectorAll('[data-zeyn-window] > li:not(.z-cards-far)')) unpark(card);
+}
+
+/**
+ * A fling ends when the scroll slows below `CALM`, while it still moves, so the images of the
+ * cards it lands on start loading before it stops; a scroll that stops at once ends it after
+ * `SETTLE_MS` or two frames.
+ */
 function paintAll() {
   clearTimeout(settle);
-  settle = setTimeout(() => {
-    flying = false;
-    for (const list of document.querySelectorAll('[data-zeyn-window]')) for (const card of list.children) unpark(card);
-  }, Math.max(SETTLE_MS, 2 * lastGap));
+  settle = setTimeout(land, Math.max(SETTLE_MS, 2 * lastGap));
   if (windowFrame) return;
   windowFrame = requestAnimationFrame((now) => {
     windowFrame = 0;
     lastGap = Math.min(1000, now - lastAt);
-    flying = Math.abs(scrollY - lastY) / Math.max(1, now - lastAt) > FLING;
+    const speed = Math.abs(scrollY - lastY) / Math.max(1, now - lastAt);
+    if (speed > FLING) flying = true;
+    else if (flying && speed < CALM) land();
     lastY = scrollY;
     lastAt = now;
     const lists = [...document.querySelectorAll('[data-zeyn-window]')];
     const boxes = lists.map((list) => [list.getBoundingClientRect().top, list.clientWidth]);
+    const height = innerHeight;
     lists.forEach((list, i) => {
       const w = windows.get(list);
-      if (w) paint(w, boxes[i][0], boxes[i][1]);
+      if (w) paint(w, boxes[i][0], boxes[i][1], height);
     });
   });
 }
@@ -478,11 +529,11 @@ document.addEventListener('zeyn:density', () => {
  */
 function windowCards(section, how) {
   const list = section.querySelector('[data-zeyn-rows]');
-  if (!list || !section.matches('.z-cards:not(.z-cards-rows)')) return;
+  if (!list || !section.matches('.z-cards:not(.z-cards-rows):not([data-zeyn-sortable])')) return;
   let w = windows.get(list);
   if (!w) {
     if (list.children.length < WINDOW_MIN || list.querySelector(':scope > .z-separator')) return;
-    w = { list, cards: [], index: new Map(), from: 0, to: 0, kept: null, cols: 1, rowH: 1, cardH: 0, gap: 0, colGap: 0, width: -1 };
+    w = { list, cards: [], index: new Map(), from: 0, to: 0, shownFrom: -1, shownTo: -1, kept: null, cols: 1, rowH: 1, cardH: 0, gap: 0, colGap: 0, width: -1 };
     windows.set(list, w);
     list.dataset.zeynWindow = '';
     list.addEventListener('focusin', () => paint(w));
@@ -499,6 +550,7 @@ function windowCards(section, how) {
     w.index = new Map(w.cards.map((c, i) => [c, i]));
     w.from = 0;
     w.to = w.cards.length;
+    w.shownFrom = w.shownTo = -1;
     w.kept = null;
     measure(w);
   } else {

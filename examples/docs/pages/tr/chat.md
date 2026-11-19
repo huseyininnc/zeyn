@@ -30,7 +30,7 @@ Geçmiş action'ı bir `ThreadQuery` alır: sunucunun bileşenden aldığı konu
 
 `Delivery` durumları `Sending`, `Sent`, `Delivered`, `Read` (okundu bilgisi) ve `Failed` şeklindedir; her biri bir simge ve ekran okuyucular için bir metinle gösterilir. `.attachments(field, rules)` bir mesajın dosyalarını gösterir (bir `Vec<File>` alanı ve `Feature::files` ile kayıtlı bir deponun kuralları): görseller sabit bir kutuda, bir yer tutucunun üzerinde tembel olarak yüklenir; diğer dosyalar deponun okuma izninden geçen indirme bağlantıları olarak gösterilir.
 
-Yeni mesajlar, thread'in topic'lerinden biri anıldığında getirilir; `.topic(..)` başka bir şey söylemedikçe bu `"chat"` olur: bir `Composer` gönderdikten sonra, bir action `ui.refresh("chat")` ile bittikten sonra ya da `.live()` ve `realtime` özelliğiyle herhangi bir yerde `hub.notify(&ctx, "chat")` çalıştığında. Başkalarının mesajları kibar (polite) bir canlı bölgede duyurulur.
+Yeni mesajlar, thread'in topic'lerinden biri anıldığında getirilir; `.topic(..)` başka bir şey söylemedikçe bu `"chat"` olur: bir `Composer` gönderdikten sonra, bir action `ui.refresh("chat")` ile bittikten sonra ya da `.live()` ve `realtime` özelliğiyle herhangi bir yerde `socket.notify(&ctx, "chat")` çalıştığında. Başkalarının mesajları kibar (polite) bir canlı bölgede duyurulur.
 
 ### Yapay zekâ yanıtları
 
@@ -70,10 +70,10 @@ Yanıtın anahtarı (`Reply::channel(key)`), saklanan mesajın sahip olacağı a
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ Varsayılan olan `SendKey::Enter`, Enter ile gönderir ve Shift+Enter ile yeni s
 `TypingIndicator`, bir konuşmada başka kimin yazdığını kibar (polite) bir canlı bölgede gösterir: "Ada yazıyor", "Ada ve Grace yazıyor", "3 kişi yazıyor".
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-Gerçek zamanlı kanal üzerinden (`realtime` özelliği, bkz. `realtime.md`), `Realtime::topic` ile bildirilen bir topic'te çalışır. Kullanıcı aynı konuşmanın bir `Composer`'ında yazarken tarayıcı, sayfanın canlı soketinden en fazla 3 saniyede bir küçük bir sinyal gönderir; sunucu kullanıcı başına daha sık gelenleri atar ve sinyali tenant içinde topic'in diğer abonelerine iletir, aynı kullanıcıya asla geri göndermez. Bir sinyal konuşma kimliğini ve kullanıcının yalnızca bu sunucunun üretebileceği bir anahtarını taşır; kullanıcı kimliğini veya herhangi bir metni asla taşımaz. Bir ad, son sinyalden sonra 6 saniye gösterilir; `.person(user, name)` ile verilmeyen kişiler "biri" olarak görünür.
+Gerçek zamanlı kanal üzerinden (`realtime` özelliği, bkz. `realtime.md`), `ZeynSocket::topic` ile bildirilen bir topic'te çalışır. Kullanıcı aynı konuşmanın bir `Composer`'ında yazarken tarayıcı, sayfanın canlı soketinden en fazla 3 saniyede bir küçük bir sinyal gönderir; sunucu kullanıcı başına daha sık gelenleri atar ve sinyali tenant içinde topic'in diğer abonelerine iletir, aynı kullanıcıya asla geri göndermez. Bir sinyal konuşma kimliğini ve kullanıcının yalnızca bu sunucunun üretebileceği bir anahtarını taşır; kullanıcı kimliğini veya herhangi bir metni asla taşımaz. Bir ad, son sinyalden sonra 6 saniye gösterilir; `.person(user, name)` ile verilmeyen kişiler "biri" olarak görünür.
 
 `realtime` özelliği olmadan ya da uygulamanın gerçek zamanlı kanalı yoksa gösterge hiçbir şey çizmez, betiği hiç yüklenmez ve hiçbir şey gönderilmez. Sinyaller tenant içinde topic'in her abonesine ulaşır, dolayısıyla konuşma kimliği onlara görünür: opak kimlikler ya da her kitle için ayrı bir topic kullanın.

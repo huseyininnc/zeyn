@@ -38,6 +38,9 @@ function initGrid(grid) {
     count: rows(grid).length,
     sort: sorted.length ? sorted.map((th) => ({ field: th.dataset.field, desc: th.getAttribute('aria-sort') === 'descending' })) : defaultSort(grid),
     filters: {},
+    filterGroups: [],
+    groups: [],
+    q: '',
     texts: textsOf(grid),
     columns: null,
     needHead: false,
@@ -59,10 +62,20 @@ function initGrid(grid) {
       const { field, ...rest } = f;
       state.filters[field] = rest;
     }
+    if (Array.isArray(saved.view.filter_groups)) state.filterGroups = saved.view.filter_groups;
     if (saved.view.columns?.length) state.columns = saved.view.columns;
+    if (Array.isArray(saved.view.group_by)) state.groups = saved.view.group_by;
+    const pick = own(grid, '[data-zeyn-page-size-pick]');
+    if (pick && [...pick.options].some((o) => Number(o.value) === saved.view.page_size)) {
+      state.size = saved.view.page_size;
+      pick.value = String(state.size);
+    }
   }
+  state.role = grid.querySelector(':scope > table')?.getAttribute('role');
   setupHead(grid, state);
   initColumns(grid, state);
+  groupChips(grid);
+  showFilters(grid, state);
   if (saved.local) queueMicrotask(() => loadGrid(grid, 'layout'));
   new ResizeObserver(() => {
     const width = grid.clientWidth;
@@ -98,6 +111,10 @@ async function loadGrid(grid, kind) {
   if (!grid) return;
   initGrid(grid);
   const s = grids.get(grid);
+  if (!mayLeave(grid)) {
+    grid.removeAttribute('aria-busy');
+    return;
+  }
   if (s.paging === 'virtual') return resetVirtual(grid, s, kind);
   const infinite = s.paging === 'infinite';
   const append = kind === 'more';
@@ -121,8 +138,8 @@ async function loadGrid(grid, kind) {
     BASE + '/_zeyn/grid',
     {
       ...address(grid),
-      query: { page, sort: s.sort, filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
-      view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
+      query: { page, sort: s.sort, filters, filter_groups: s.filterGroups, q: s.q, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
+      view: viewOf(grid, s),
       head: layout,
       shape: grid.dataset.zeynShape,
     },
@@ -155,7 +172,17 @@ async function loadGrid(grid, kind) {
   applyFoot(grid, r.data.foot);
   gridState(grid, s.count ? null : 'empty');
   roving(grid, hadFocus);
-  updateChrome(grid, append);
+  updateChrome(grid, append || s.searched);
+  s.searched = false;
+}
+
+/**
+ * The user's layout and groups as the server reads them (`DataGridView`), or `null` when the
+ * grid shows its own.
+ */
+function viewOf(grid, s) {
+  if (!s.columns && !s.groups.length) return null;
+  return { columns: s.columns ?? [], shape: grid.dataset.zeynShape, group_by: s.groups };
 }
 
 /**
@@ -190,7 +217,9 @@ function rowControls(tr, on) {
 
 /**
  * Shows the empty or error state of a grid under its header, or hides it (`kind` null). The
- * error state has a retry button that reloads the grid.
+ * error state has a retry button that reloads the grid. A grid with `.empty(..)` shows its own
+ * state from `template[data-zeyn-empty]`, or `template[data-zeyn-empty-filtered]` while a
+ * filter is on.
  */
 function gridState(grid, kind) {
   let box = grid.querySelector(':scope > .z-grid-state');
@@ -205,6 +234,13 @@ function gridState(grid, kind) {
   }
   box.hidden = false;
   box.dataset.kind = kind;
+  const s = grids.get(grid);
+  const filtered = !!s && (hasFilters(s) || !!s.q);
+  const custom = kind === 'empty' && (filtered && grid.querySelector(':scope > template[data-zeyn-empty-filtered]') || grid.querySelector(':scope > template[data-zeyn-empty]'));
+  if (custom) {
+    box.replaceChildren(custom.content.cloneNode(true));
+    return;
+  }
   box.replaceChildren(document.createTextNode(kind === 'error' ? t.error || 'The rows could not be loaded.' : t.empty || 'No records.'));
   if (kind === 'error') {
     const retry = make('button', 'z-button', { type: 'button' });
@@ -282,7 +318,7 @@ function updateChrome(grid, announce = false) {
 function initVirtual(grid, s) {
   const body = grid.querySelector('[data-zeyn-rows]');
   const head = grid.querySelector('thead');
-  const columns = head.rows[0]?.cells.length ?? 1;
+  const columns = head.querySelector('tr:not(.z-band-row)')?.cells.length ?? 1;
   const spacer = document.createElement('tbody');
   spacer.className = 'z-spacer';
   spacer.setAttribute('aria-hidden', 'true');
@@ -490,7 +526,7 @@ function renderVirtual(grid, focusIndex = null, geometry = null) {
  * reload go first, then the least recently used fresh ones.
  */
 function trimCache(s) {
-  const columns = s.colv?.n ?? s.head.rows[0]?.cells.length ?? 1;
+  const columns = s.colv?.n ?? s.head.querySelector('tr:not(.z-band-row)')?.cells.length ?? 1;
   const cap = Math.max(3, Math.min(V_CACHE, Math.floor(V_CACHE_CELLS / (s.size * columns))));
   while (s.stale.size && s.stale.size + s.cache.size > cap) s.stale.delete(s.stale.keys().next().value);
   while (s.cache.size > cap) s.cache.delete(s.cache.keys().next().value);
@@ -511,8 +547,8 @@ async function fetchBlock(grid, s, b) {
     BASE + '/_zeyn/grid',
     {
       ...address(grid),
-      query: { page, sort: s.sort, filters, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
-      view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
+      query: { page, sort: s.sort, filters, filter_groups: s.filterGroups, q: s.q, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
+      view: viewOf(grid, s),
       head,
       shape: grid.dataset.zeynShape,
     },

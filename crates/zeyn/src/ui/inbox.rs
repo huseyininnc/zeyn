@@ -181,7 +181,7 @@ impl<E: Model> Inbox<E> {
     }
 
     /// The topics the inbox listens to and names after a bulk action, `"notifications"` unless
-    /// set. Name the same topic in `hub.notify` when a notification arrives.
+    /// set. Name the same topic in `socket.notify` when a notification arrives.
     pub fn topic(mut self, topics: impl super::Topics) -> Self {
         self.topics = topic_list(topics);
         self
@@ -394,7 +394,7 @@ impl<E: Model> Inbox<E> {
         ));
         if !allowed.is_empty() {
             out.push_str(&format!(
-                r#"<div class="z-inbox-bar" role="toolbar" aria-label="{}"><label class="z-inbox-all"><input type="checkbox" class="z-inbox-check-all"> {}</label>"#,
+                r#"<div class="z-inbox-bar" role="group" aria-label="{}"><label class="z-inbox-all"><input type="checkbox" class="z-inbox-check-all"> {}</label>"#,
                 t("actions"),
                 t("select_all")
             ));
@@ -512,7 +512,15 @@ impl<E: Model> Component for Inbox<E> {
             check.listens(t);
         }
         if self.when.is_none() {
-            check.problem("an Inbox needs `.when(field)`, the time a notification arrived, to sort and group by day");
+            check.problem(
+                crate::Problem::new(
+                    "Z0616",
+                    "an Inbox needs `.when(field)`, the time a notification arrived",
+                )
+                .why("the inbox sorts and groups notifications by day from this field")
+                .fix("add `.when(field)` with the model's time field")
+                .docs("components/admin#inbox-and-notificationcenter"),
+            );
         }
     }
 }
@@ -528,8 +536,10 @@ impl<E: Model> From<Inbox<E>> for Node {
 /// it in the end slot of `App::header`. The count loads with one `POST /_zeyn/data` after the
 /// page shows (the action's permission checked) and again whenever one of its topics is named:
 /// after a bulk action of an [`Inbox`], `ui.refresh("notifications")` or, with
-/// [`NotificationCenter::live`] and the `realtime` feature, `hub.notify(&ctx, "notifications")`.
-/// Above 99 it shows `99+`. The link's name says the count, for screen readers.
+/// [`NotificationCenter::live`] and the `realtime` feature, `socket.notify(&ctx, "notifications")`.
+/// Above 99 it shows `99+`. The link's name says the count, for screen readers. Users without
+/// the count action's permission get no bell at all, so the page never asks for a count the
+/// server would refuse.
 ///
 /// ```ignore
 /// App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
@@ -566,7 +576,7 @@ impl NotificationCenter {
     }
 
     /// Also subscribes to the topics on the realtime hub (feature `realtime`), so a
-    /// `hub.notify` from another user's action updates the count. The topics must be declared
+    /// `socket.notify` from another user's action updates the count. The topics must be declared
     /// with `Realtime::topic`.
     pub fn live(mut self) -> Self {
         self.live = true;
@@ -576,6 +586,9 @@ impl NotificationCenter {
 
 impl Component for NotificationCenter {
     fn render(&self, out: &mut String, r: &Render) {
+        if !r.can(&self.source.action().access) {
+            return;
+        }
         let t = |key: &str| {
             r.i18n
                 .text(r.locale, &Text::key(format!("zeyn.ui.inbox.{key}")))

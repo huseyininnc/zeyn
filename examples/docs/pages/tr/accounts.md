@@ -7,7 +7,7 @@ single sign on proxy'si veya bir kimlik sağlayıcı üzerinden açan uygulamala
 Core Identity bilenler için bir tabloyla birlikte tam başvuru `docs/accounts.md` dosyasındadır.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["accounts"] }
+zeyn = { version = "0.0.11", features = ["accounts"] }
 ```
 
 ## Açmak
@@ -24,7 +24,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - Anahtar yapılandırmadan gelir, en az 32 bayttır ve asla değişmez.

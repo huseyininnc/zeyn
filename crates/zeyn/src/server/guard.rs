@@ -10,16 +10,24 @@ pub(super) const DEFAULT_CSP: &str = "default-src 'self'; script-src 'self'; sty
 /// Framework endpoints whose `POST` changes data or runs an action. They count against the
 /// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
 /// action or costs money goes here. Published API actions and the assistant are matched by prefix,
-/// and file uploads (`POST /_zeyn/files/{store}`) by `files::is_upload`.
-const WRITE_PATHS: [&str; 16] = [
+/// and file uploads (`POST /_zeyn/files/{store}`) by `files::is_upload`. Grid reads (`/_zeyn/grid`)
+/// and search are reads under the general limit; socket frames (`/_zeyn/socket/send`) have the
+/// per connection frame limit.
+const WRITE_PATHS: [&str; 23] = [
     "/_zeyn/form",
+    "/_zeyn/reason",
+    "/_zeyn/socket/open",
+    "/_zeyn/auth/totp/enroll",
     "/_zeyn/reveal",
     "/_zeyn/data",
+    "/_zeyn/node",
+    "/_zeyn/nodes",
     "/_zeyn/stream",
     "/_zeyn/import",
     "/_zeyn/mcp",
     "/_zeyn/menu",
     "/_zeyn/grid/edit",
+    "/_zeyn/grid/add",
     "/_zeyn/grid/run",
     "/_zeyn/grid/bulk",
     "/_zeyn/grid/view",
@@ -27,6 +35,7 @@ const WRITE_PATHS: [&str; 16] = [
     "/_zeyn/dock",
     "/_zeyn/theme",
     "/_zeyn/density",
+    "/_zeyn/rail",
     "/_zeyn/media/position",
 ];
 
@@ -55,6 +64,7 @@ fn is_public_asset(path: &str) -> bool {
         || charts::ASSETS.contains(&path)
         || site::ASSETS.contains(&path)
         || modules::ASSETS.contains(&path)
+        || path.starts_with("/_zeyn/ext/")
         || is_assistant_asset(path)
         || is_island_asset(path)
 }
@@ -107,7 +117,69 @@ pub(super) fn forwarded_for(headers: &HeaderMap) -> Option<std::borrow::Cow<'_, 
     }
 }
 
-/// IP rules and rate limits, before any handler runs.
+tokio::task_local! {
+    /// The caller of the request being handled, authenticated once by [`remember_identity`].
+    pub(super) static IDENTITY: Option<Identity>;
+}
+
+/// Who the guard found the caller to be, with the credentials it looked at, so the handler can
+/// reuse it while the request still carries the same ones.
+#[derive(Clone)]
+pub(super) struct Authenticated {
+    cookie: Option<HeaderValue>,
+    authorization: Option<HeaderValue>,
+    identity: Option<Identity>,
+}
+
+impl Authenticated {
+    fn of(st: &AppState, headers: &HeaderMap) -> Self {
+        Authenticated {
+            cookie: headers.get(header::COOKIE).cloned(),
+            authorization: headers
+                .get(header::AUTHORIZATION)
+                .cloned(),
+            identity: st
+                .auth
+                .as_ref()
+                .and_then(|a| a.authenticate(headers)),
+        }
+    }
+
+    fn same(&self, headers: &HeaderMap) -> bool {
+        self.cookie.as_ref() == headers.get(header::COOKIE)
+            && self.authorization.as_ref() == headers.get(header::AUTHORIZATION)
+    }
+}
+
+/// The innermost layer: authenticates the caller once per request, or takes what the guard found
+/// when no layer in between changed the credentials (an OIDC refresh, an account session), and
+/// keeps it for every `ctx` the handler builds.
+pub(super) async fn remember_identity(
+    State(st): State<Arc<AppState>>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let identity = match req.extensions().get::<Authenticated>() {
+        Some(a) if a.same(req.headers()) => a.identity.clone(),
+        _ => st
+            .auth
+            .as_ref()
+            .and_then(|a| a.authenticate(req.headers())),
+    };
+    #[cfg(debug_assertions)]
+    devtools::user(
+        identity
+            .as_ref()
+            .and_then(|i| i.user.as_deref()),
+    );
+    IDENTITY
+        .scope(identity, next.run(req))
+        .await
+}
+
+/// IP rules and rate limits, before any handler runs. Files of public media sources cost nothing
+/// while the client is within its limit, so a page of images never spends it; a request for an
+/// id the source does not have (`404`) is counted, so ids cannot be probed without limit.
 pub(super) async fn guard_request(
     State(st): State<Arc<AppState>>,
     req: axum::extract::Request,
@@ -134,11 +206,11 @@ pub(super) async fn guard_request(
     let forwarded = forwarded_for(headers);
     let ip = client_ip(peer, forwarded.as_deref(), &st.trusted);
     let probe = ops::is_probe(path);
-    let unlimited = ops::probe_unlimited(&st.extras, path, ip)
-        || (matches!(
-            parts.method,
-            axum::http::Method::GET | axum::http::Method::HEAD
-        ) && media::is_public(&st, path));
+    let unlimited = ops::probe_unlimited(&st.extras, path, ip);
+    let public_media = matches!(
+        parts.method,
+        axum::http::Method::GET | axum::http::Method::HEAD
+    ) && media::is_public(&st, path);
     let blocked = match ip {
         Some(ip) => {
             st.deny.iter().any(|r| r.contains(ip))
@@ -152,8 +224,14 @@ pub(super) async fn guard_request(
         let ctx = st.ctx(headers);
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
-    let is_write = (parts.method == axum::http::Method::GET
-        && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
+    let is_write = (matches!(
+        parts.method,
+        axum::http::Method::GET | axum::http::Method::HEAD
+    ) && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
+        || (matches!(
+            parts.method,
+            axum::http::Method::PUT | axum::http::Method::PATCH | axum::http::Method::DELETE
+        ) && !(parts.method == axum::http::Method::PATCH && files::is_upload_part(path)))
         || parts.method == axum::http::Method::POST
             && (WRITE_PATHS.contains(&path)
                 || files::is_upload(path)
@@ -170,6 +248,8 @@ pub(super) async fn guard_request(
             (if is_write { st.write_rate } else { None }, "write"),
         ]
     };
+    let mut miss = None;
+    let mut seen: Option<Authenticated> = None;
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
         let ip_key = ip
@@ -177,17 +257,24 @@ pub(super) async fn guard_request(
             .unwrap_or_else(|| "unknown".into());
         let key = match limit.key {
             RateKey::Ip => format!("{scope}:ip:{ip_key}"),
-            RateKey::User => match st
-                .auth
+            RateKey::User => match seen
+                .get_or_insert_with(|| Authenticated::of(&st, headers))
+                .identity
                 .as_ref()
-                .and_then(|a| a.authenticate(headers))
-                .and_then(|i| i.user)
+                .and_then(|i| i.user.clone())
             {
                 Some(user) => format!("{scope}:user:{user}"),
                 None => format!("{scope}:ip:{ip_key}"),
             },
         };
-        if let Err(wait) = st.rate_store.take(&key, &limit).await {
+        let taken = if public_media {
+            st.rate_store
+                .charge(&key, &limit, 0)
+                .await
+        } else {
+            st.rate_store.take(&key, &limit).await
+        };
+        if let Err(wait) = taken {
             let ctx = st.ctx(headers);
             let mut response = problem(
                 &ctx,
@@ -208,9 +295,23 @@ pub(super) async fn guard_request(
             }
             return response;
         }
+        if public_media {
+            miss = Some((key, limit));
+        }
     }
-    next.run(axum::extract::Request::from_parts(parts, body))
-        .await
+    let mut parts = parts;
+    if let Some(a) = seen {
+        parts.extensions.insert(a);
+    }
+    let response = next
+        .run(axum::extract::Request::from_parts(parts, body))
+        .await;
+    if let Some((key, limit)) = miss
+        && response.status() == StatusCode::NOT_FOUND
+    {
+        let _ = st.rate_store.take(&key, &limit).await;
+    }
+    response
 }
 
 /// One `request` span per request: method, path without the query string, status and duration,

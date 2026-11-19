@@ -42,6 +42,27 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `.remember(KEY)` guarda la pestaña que abrió el usuario bajo una clave de elección (consulta [Preferencias del cliente](security.md#client-preferences)), de modo que las mismas pestañas se abren en ella en páginas posteriores. Una pestaña indicada en el hash de la URL tiene prioridad.
 
+## Accordion
+
+`Accordion::new()` con `.section(title, node)` pone secciones una debajo de otra, cada una abierta y cerrada por su título: las respuestas de una página de ayuda, las partes de un registro largo. Las secciones empiezan cerradas; `.open()` después de una sección la abre. `.single()` mantiene abierta una sección a la vez, y entonces solo la primera sección marcada como abierta empieza abierta. Un accordion contiene 50 secciones como máximo (`MAX_ACCORDION_SECTIONS`).
+
+```rust
+Accordion::new()
+    .section(t!("help.password"), Paragraph::new(t!("help.password_answer")))
+    .open()
+    .section(t!("help.invoices"), Paragraph::new(t!("help.invoices_answer")))
+    .single()
+```
+
+@live accordion
+
+Cada sección es un elemento nativo de divulgación (`<details>` y `<summary>`), no el patrón ARIA de acordeón con encabezados y botones, porque el elemento nativo no necesita script, mantiene el contenido cerrado fuera del orden de lectura y permite que la búsqueda en la página del navegador abra la sección que contiene una coincidencia. En modo único las secciones comparten un `name`, y el navegador cierra la abierta cuando se abre otra. A diferencia de `Tabs`, el contenido de una sección cerrada está en la página desde el principio.
+
+| Tecla | Qué hace |
+|---|---|
+| `Tab` | Pasa al título de la sección siguiente |
+| `Enter` o `Space` | Abre o cierra la sección; el foco se queda en su título |
+
 ## Split
 
 `Split::new(start, end)` muestra dos nodos con un tirador entre ellos. `.ratio(percent)` fija el tamaño inicial. El tirador se mueve con el puntero o con las teclas de flecha.
@@ -49,3 +70,28 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 ## Dock
 
 `Dock` organiza paneles alrededor de un área central: pestañas a la izquierda, a la derecha, abajo y en el centro que los usuarios mueven, redimensionan, cierran y recuperan. El diseño de cada usuario se guarda por pantalla. Consulta [Shell y comandos](shell.md).
+
+## Surface
+
+`Surface::new(label, width, height)` es un área de tamaño fijo donde las personas colocan elementos libremente, como las mesas de un plano de planta. `.item(Draggable::new(id, node).at(x, y).size(w, h))` añade un elemento, `.axis(Axis::X)` o `Axis::Y` lo mantiene en una línea y `.snap(step)` coloca cada posición en una cuadrícula. `.on_move(action)` guarda cada movimiento: la acción recibe un `SurfaceMove` con el id del elemento y sus nuevos `x` e `y`, después de que el servidor compruebe que el id pertenece a la superficie y mantenga la posición dentro de los límites, en la cuadrícula y en el eje.
+
+`.resizable()` da a un elemento un tirador en su esquina inferior derecha; `.min_size(w, h)`, `.max_size(w, h)` y `.aspect(w, h)` limitan el tamaño y también hacen el elemento redimensionable. La acción recibe entonces también los nuevos `w` y `h`, dentro de esos límites, de la superficie y de la cuadrícula. Con una relación de aspecto, la altura sigue al ancho.
+
+```rust
+Surface::new(t!("floor.plan"), 800, 480)
+    .snap(20)
+    .on_move(move_table)
+    .item(
+        Draggable::new("t1", Paragraph::new(t!("floor.table")))
+            .at(40, 60)
+            .size(120, 80),
+    )
+```
+
+Un ratón o un lápiz arrastra un elemento; un toque lo arrastra tras una pulsación breve. Con un solo puntero, un clic elige un elemento y un clic en la superficie lo coloca allí. Un clic en el tirador de la esquina elige el tamaño, y un clic en la superficie pone la esquina allí.
+
+| Tecla | Qué hace |
+|---|---|
+| Flechas | Mueven el elemento enfocado un paso de la cuadrícula (10 píxeles sin cuadrícula) |
+| `Shift` + flechas | Cambia el tamaño de un elemento redimensionable un paso de la cuadrícula |
+| `Escape` | Suelta un elemento elegido o devuelve a su sitio un elemento arrastrado |

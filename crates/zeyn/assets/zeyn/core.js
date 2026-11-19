@@ -18,7 +18,12 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const UNREACHABLE = 'The server could not be reached.';
 const V_CAP = 8_000_000;
-const V_OVERSCAN = 20;
+/**
+ * Rows a virtual grid keeps above and below the visible ones. Every scroll frame that moves the
+ * window styles and paints all kept rows again, so this stays small: ten rows cover the scroll of
+ * one frame and keep a 60 column grid under 16 ms a frame.
+ */
+const V_OVERSCAN = 10;
 const V_CACHE = 20;
 /** Most cells the parsed blocks of one virtual grid keep, fresh and stale together (8 blocks of 200 rows at 62 columns). */
 const V_CACHE_CELLS = 100_000;
@@ -199,6 +204,11 @@ async function csrf() {
 }
 window.zeynCsrf = csrf;
 
+/** Other scripts of the page show a toast with `zeyn:toast` (`{ message, variant }`). */
+document.addEventListener('zeyn:toast', (e) => {
+  if (typeof e.detail?.message === 'string') toast(e.detail.message, e.detail.variant ?? 'info');
+});
+
 /**
  * Parses a JSON response body; returns `null` for empty or invalid bodies.
  * @param {Response} res
@@ -239,6 +249,18 @@ async function post(url, body, { quiet = false, signal } = {}) {
   if (!res.ok && res.status !== 422 && !quiet) toast(data?.message || `Request failed (${res.status}).`, 'error');
   return { status: res.status, ok: res.ok, data };
 }
+
+/**
+ * Sign out links (`a[data-zeyn-signout]`) first end the session with a `POST` and the CSRF
+ * token, then follow their address (the provider's sign out or the sign in page).
+ */
+document.addEventListener('click', async (e) => {
+  const a = e.target instanceof Element ? e.target.closest('a[data-zeyn-signout]') : null;
+  if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  await post(a.dataset.zeynSignout, {}, { quiet: true });
+  location.assign(a.href);
+});
 
 /** Builds the `?params=` query string; empty when the screen has no params. */
 function paramsQuery(params) {

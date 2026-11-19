@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 İstemci ne isterse istesin, sunucu sayfa boyutunu sınırlar.
 
+`.page_sizes(&[10, 25, 50, 100])` numaralı sayfaların sayfalayıcısına "Sayfa başına satır" listesi ekler. Tablonun kendi boyutu her zaman sunulur, seçim kullanıcının görünümüyle kaydedilir ve sunucu yalnızca tablonun sunduğu boyutları kabul eder.
+
 ## Sütunlar
 
 | Çağrı | Sonuç |
@@ -79,6 +81,11 @@ Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yaz
 - `.row_action` ya da `.bulk_action` hemen ardından `.confirm(message)` ve `.tone(Tone::Danger)`: o işlem çalışmadan önce `ActionButton::confirm` ile aynı pencerede sorar (odak önce İptal'dedir) ve düğmesini kırmızı çizer.
 - `.row_menu(|row| ContextMenu)`: bir satırın sağ tık menüsü.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
+- `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: "Satır ekle" düğmesi, Sil
+  düğmesi ve tuşu, birlikte kaydedilen düzenlemeler. Ayrıntılar [DataGrid başvurusunda](grid.md).
+- Sütunda `.groupable()`, `.summary(label, |t| ...)`: kullanıcı menüsünden ya da gruplama alanından ona göre gruplar, toplamlardan hesaplanan bir değer altında görünür.
+- `.filter_builder()`: süzgeç koşullarını kurmak için bir iletişim kutusu açan "Süz" düğmesi; süzgeç satırı, kayıtlı görünümler ve yapay zekâ ajanları aynı listeyi kullanır.
+- `.filter_chips()`: etkin süzgeçler tablonun üstünde, her biri kaldırma düğmesiyle çip olarak; süzgeç satırı, süzgeç kurucusu ve kayıtlı görünümlerle uyumlu.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
 
 ## Çalışma anında belli olan sütunlar
@@ -96,6 +103,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 ```
 
 Sayfalama, sanal kaydırma, klavye kullanımı ve sayıların ve tarihlerin kullanıcının dilinde biçimlenmesi tipli bir grid'deki gibi çalışır. Adlar, etiketler ve hücreler kaçışlanır; sunucu sütun ve satır sayısını ve metin uzunluğunu sınırlar. Grid sıralamaz ve filtrelemez, satırları salt okunurdur. [DataGrid başvurusu](grid.md) ayrıntıları verir.
+
+## Arama ve bantlar
+
+`.search()` tablonun üstüne bir arama kutusu koyar. Eylem metni `DataQuery::q` olarak alır;
+`DataQuery::apply` onu maskeli olanlar dışındaki metin alanlarında arar.
+`.band(label, |b| b.column(..).column(..))` sütunları tek bir başlık hücresi altında toplar.
+Ayrıntılar [DataGrid başvurusunda](grid.md).
 
 ## Yerinde yenileme
 

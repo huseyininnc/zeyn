@@ -186,9 +186,16 @@ struct CtxInner {
     trail: Arc<Mutex<crate::audit::Trail>>,
     theme: Option<Arc<str>>,
     compact: bool,
+    /// The side menu is folded to an icon rail (`zeyn_rail` cookie).
+    rail: bool,
     reauth_within: std::time::Duration,
     csp: Option<Arc<crate::csp::Csp>>,
     prefetch: bool,
+    /// The live connection an action was called over, when it was (feature `realtime`).
+    conn: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// The trigger and tick of a scheduled job run (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    run: Option<(Arc<str>, Option<i64>)>,
 }
 
 /// How recent a sign in counts as recent unless the app sets another age.
@@ -220,14 +227,19 @@ impl Ctx {
             trail: Arc::default(),
             theme: None,
             compact: false,
+            rail: false,
             reauth_within: REAUTH_WITHIN,
             csp: None,
             prefetch: false,
+            conn: None,
+            #[cfg(feature = "metronome")]
+            run: None,
         }))
     }
 
     /// The context of one request, built in one step.
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "server")]
     pub(crate) fn for_request(
         identity: Identity,
         locale: String,
@@ -254,9 +266,13 @@ impl Ctx {
             trail: Arc::default(),
             theme: Some(theme),
             compact: false,
+            rail: false,
             reauth_within,
             csp: Some(csp),
             prefetch: false,
+            conn: None,
+            #[cfg(feature = "metronome")]
+            run: None,
         }))
     }
 
@@ -280,6 +296,7 @@ impl Ctx {
     }
 
     /// Same context marked as a prefetch.
+    #[cfg(feature = "server")]
     pub(crate) fn as_prefetch(&self) -> Self {
         self.rebuild(|i| i.prefetch = true)
     }
@@ -300,6 +317,7 @@ impl Ctx {
     }
 
     /// Same context in compact density (`zeyn_density=compact`).
+    #[cfg(feature = "server")]
     pub(crate) fn with_compact(&self) -> Self {
         self.rebuild(|i| i.compact = true)
     }
@@ -308,6 +326,17 @@ impl Ctx {
     /// comfortable one (40 px rows, 36 px controls) in the account menu.
     pub fn compact(&self) -> bool {
         self.0.compact
+    }
+
+    /// Same context with the side menu folded to an icon rail.
+    #[cfg(feature = "server")]
+    pub(crate) fn with_rail(&self) -> Self {
+        self.rebuild(|i| i.rail = true)
+    }
+
+    /// Whether the user folded the side menu to an icon rail.
+    pub fn rail(&self) -> bool {
+        self.0.rail
     }
 
     /// The theme the page is shown in: `system`, `light`, `dark` or the name of an app theme.
@@ -347,12 +376,54 @@ impl Ctx {
             trail: i.trail.clone(),
             theme: i.theme.clone(),
             compact: i.compact,
+            rail: i.rail,
             reauth_within: i.reauth_within,
             csp: i.csp.clone(),
             prefetch: i.prefetch,
+            conn: i.conn.clone(),
+            #[cfg(feature = "metronome")]
+            run: i.run.clone(),
         };
         change(&mut inner);
         Ctx(Arc::new(inner))
+    }
+
+    /// Same context for a run of a scheduled job (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub(crate) fn with_run(&self, trigger: Option<&str>, scheduled_ms: Option<i64>) -> Self {
+        match trigger {
+            Some(t) => self.rebuild(|i| i.run = Some((Arc::from(t), scheduled_ms))),
+            None => self.clone(),
+        }
+    }
+
+    /// The tick a scheduled run is for, in UTC; `None` outside a run queued by a trigger
+    /// (feature `metronome`). A daily report run late still knows which day it reports.
+    #[cfg(feature = "metronome")]
+    pub fn scheduled_at(&self) -> Option<DateTime> {
+        self.0
+            .run
+            .as_ref()
+            .and_then(|(_, at)| *at)
+            .map(DateTime::from_unix_ms)
+    }
+
+    /// The trigger that queued this run: its id, `manual` or `chain` (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub fn trigger_id(&self) -> Option<&str> {
+        self.0.run.as_ref().map(|(t, _)| &**t)
+    }
+
+    /// Same context for an action called over a live connection.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn with_conn(&self, conn: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.rebuild(|i| i.conn = Some(conn))
+    }
+
+    /// The live connection the call came over, if any.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(crate) fn conn<T: 'static>(&self) -> Option<&T> {
+        self.0.conn.as_ref()?.downcast_ref()
     }
 
     pub fn with_tenant(&self, tenant: Option<Tenant>) -> Self {

@@ -26,9 +26,21 @@ Tree::of(sample_tree).label("Products by unit")
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` で項目を移動できます。マウスやペンで項目を別の行の上部か下部（その前か後ろ）、またはブランチの中央（その中）にドラッグし、落ちる位置は印で示されます。フォーカスのある項目の「移動」ボタンはメニューを開きます（上へ、下へ、ブランチの外へ、上のブランチの中へ）。これは単一ポインターで移動する手段で、タッチもこれを使います。Alt と矢印キーではすぐに移動します。アクションは `POST /_zeyn/data` を通じて CSRF、書き込み制限、その権限の検査を経て `TreeMove`（`id`、`target`、`place`）を受け取ります。どちらの id もブラウザーから来るのでアクションはそれを検索し、`TreeMove::parent` は新しい親を返し、項目を自分自身やその下へ移すことを拒否します（`Error::Conflict`。親の連鎖が `MAX_TREE_DEPTH` より長い場合も同じ）。移動の後、ツリーは変わった階層を読み込み直し、移動した項目にフォーカスを保ちます。移動のコードは `treedrag.js` の一部で、ドラッグ可能か移動可能なツリーと一緒にだけ読み込まれます。
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## チャート
 
-`Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge`、`funnel` は、サーバー上で SVG を描画します。ブラウザにチャートライブラリはなく、チャートはページの HTML の一部です。
+`Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge`、`funnel` は、サーバー上で SVG を描画します。ブラウザにチャートライブラリはなく、チャートはページの HTML の一部です。 donut には 0 より大きい部分が 2 から 5 個必要で、最大の部分は全体の 75% 未満でなければなりません。それ以外の donut は棒リスト（名前、割合に応じた幅の棒、値と割合）として描かれ、デバッグビルドは警告をログに出します。
 
 ```rust
 Row::new()
@@ -60,6 +72,110 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 | Escape | ツールチップを隠します |
 
 ホバー、フォーカス、タップは同じテキストをツールチップに表示します。ツールチップはスクリーンリーダーからは隠されるため、二重に読み上げられることはありません。スクリプトがなくても、マークには名前が付いたままで、表も残ります。小さなマーク（8 px の点）は 24 px のターゲットサイズを下回りますが、*データを表示* の下の表が同等の手段になります（WCAG 2.5.8）。
+
+## Gantt
+
+プロジェクトの計画のように、タスクを日数の範囲にわたるバーとして表示します。`Gantt::new(label, start, end)` は範囲を設定します。最長 2 年です。`.task(title, from, to)` はタスクを追加し、`.done(percent)` と `.tone(...)` は最後に追加したタスクに適用され、`.today(day)` はその日に線を引きます。各タスクの開始日と終了日をテキストで示す表なので、バーはそれを繰り返しているだけです。バーは範囲の両端で切り詰められます。
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+会社の人員や製品の部品のような階層を、いちばん上の 1 つのボックスから線でつないだボックスとして表示します。`OrgNode::new(name)` はボックス、`.role(text)` は名前の下の控えめな行、`.child(node)` はその下のボックスです。入れ子のリストなので、スクリーンリーダーは階層を読み取れます。図は最大 8 階層、200 個のボックスまで描き、幅が広い場合は自身の枠の中でスクロールします。
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## FlowDiagram
+
+プロセスのステップを、矢印でつないだボックスとして開始側から終了側へ描きます。カートから配達までの注文や、分岐のある承認などです。`.node(id, title)` はステップを追加し、`.tone(...)` は最後に追加したステップに色を付け、`.edge(from, to)` は id で指定した二つのステップの間に矢印を描き、`.edge_with(from, to, label)` は言葉の付いた矢印を描きます。サーバーは最初のステップからの距離に応じてステップを列に配置し、前のステップへ戻る矢印はボックスの下を通ります。ステップは順序付きリストで、それぞれがスクリーンリーダー向けに次のステップを示します。図は最大 40 ステップと 80 本の矢印を描き、幅が広いときは自身のボックス内でスクロールします。
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
+## Funnel
+
+訪問、カート、注文のように、段階ごとに一部が減っていくプロセスの各段階です。`Funnel::new(label)` と `.stage(title, value)` は、各段階を、最初の段階に対する割合の幅を持つ中央寄せのバーとして描き、数値とその割合をテキストで示します。ファネルが持てる段階は最大 10 個です。
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+1 日の目標のように、全体に対する割合を最大 4 つ、入れ子のリングとして表示します。`.ring(title, value, max, tone)` は外側から内側へリングを追加し、`.size(px)` は直径を設定します。それぞれの名前とパーセントはリングの横に書かれるので、図そのものはスクリーンリーダーから隠されます。
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+プランや製品を横に並べます。それぞれが 1 列、機能ごとに 1 行です。`.plan(name)` は列を追加し、`.featured()` は最後に追加したプランを目立たせます。`.row(feature, cells)` はプランごとにセルを受け取ります。`true` と `false` はチェックと × になり、「含まれる」「含まれない」と読み上げられ、テキストはそのまま書かれます。最大 6 プラン、100 行まで持てます。
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
+## Table
+
+画面がすでに持っているテキストによる小さな表です。料金表のプラン、店舗の営業時間、レポートの合計などに使います。`Table::new(caption)` は表の名前になるキャプションを受け取り、`.head([...])` で列見出しを、`.row([...])` で各行を指定します。`.row_headers()` は各行の最初のセルをその行の見出しにするので、スクリーンリーダーは各セルの列と行を読み上げます。`.numeric(index)` は数値の列を末尾側にそろえ、`.striped()` は 1 行おきに背景色を付けます。見出しより短い行は空のセルで埋められ、長い行は切り詰められます。表が持てるのは最大 200 行、12 列です。ページ送り、並べ替え、フィルターはなく、リクエストも送りません。アクションから取得する行や、ユーザーが操作する行は `DataGrid` に置きます。狭い画面では自身の枠の中で横にスクロールし、その枠がフォーカスを受け取るので矢印キーでスクロールできます。
+
+```rust
+Table::new(t!("shop.opening_hours"))
+    .head([t!("shop.day"), t!("shop.opens"), t!("shop.closes")])
+    .row([t!("shop.weekdays"), "09:00".into(), "18:00".into()])
+    .row([t!("shop.saturday"), "10:00".into(), "14:00".into()])
+    .row_headers()
+```
+
+@live table
+
+## Heatmap
+
+受けた注文数や記録した作業時間など、直近の数週間の各日の数値を、四角形のカレンダーとして表示します。1 列が 1 週間、1 行が曜日で、数値が大きいほど濃くなります。`Heatmap::ending(label, end)` は `end`（通常は今日）を含む週で終わり、それより後の日は空のままです。`.weeks(n)` は表示する週の数を設定します。指定しなければ 17 週で、最大 53 週です。`.value(day, n)` または `.values(days)` で数値を、`.tone(...)` で色を指定します。表示されている中で最大の数値が、4 段階のうち最も濃い色になります。週は、ユーザーの言語で週が始まる曜日から始まります。
+
+```rust
+Heatmap::ending(t!("sales.orders_a_day"), ctx.today())
+    .weeks(12)
+    .values(orders.iter().map(|o| (o.day, o.count)))
+    .tone(Tone::Success)
+```
+
+@live heatmap
+
+サーバーが描く表で、スクリプトは不要です。スクリーンリーダーは行の曜日と、各日の日付と数値をユーザーの言語で読み上げるので、濃淡はテキストが伝える内容を繰り返しているだけです。四角形にポインターを合わせると同じテキストが表示されます。狭い画面では表が自身の枠の中で横にスクロールし、その枠がフォーカスを受け取るので矢印キーでスクロールできます。1 日は 2 つの要素です。既定の 17 週はコンポーネント 1 つあたり 300 要素という予算に収まりますが、1 年分は収まりません。
 
 ## 主要指標、スパークライン、ブレット
 

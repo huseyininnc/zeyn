@@ -1,0 +1,23 @@
+- main:
+  - region "ProgressRing":
+    - heading "ProgressRing" [level=1]
+    - paragraph: Progress as a ring with the percent inside.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#progressring
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ProgressRing
+    - tablist "ProgressRing sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - progressbar "Import"
+      - text: Import
+      - progressbar "Storage"
+      - text: Storage
+      - progressbar "Tasks done"
+      - text: Tasks done
+      - group: Show code
+      - button "Copy"
+      - status

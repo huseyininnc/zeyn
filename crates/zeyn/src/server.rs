@@ -31,6 +31,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub(crate) mod accounts;
 mod agent;
 mod auth;
+mod checks;
+#[cfg(debug_assertions)]
+mod devtools;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod charts;
@@ -41,14 +44,22 @@ mod guard;
 mod gzip;
 mod locale;
 mod media;
+mod menus;
 mod modules;
 mod ops;
+#[cfg(feature = "resumable")]
+mod resumable;
 mod seo;
 mod session;
 mod telemetry;
 mod theme;
 pub(crate) use theme::screen_picker as theme_picker;
 
+pub use menus::{
+    MAX_MENU_CACHE, MAX_MENU_LABEL, MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL,
+    MenuNode, MenuSource, Menus,
+};
+pub use modules::{MAX_EXTENSION_MODULES, Module};
 pub use theme::Theme;
 #[cfg(feature = "email")]
 mod mail;
@@ -57,7 +68,19 @@ mod pdf;
 #[cfg(feature = "xlsx")]
 mod xlsx;
 
+pub use checks::render_checks;
+#[cfg(debug_assertions)]
+pub use devtools::devtools;
+#[cfg(all(debug_assertions, any(feature = "postgres", feature = "oracle")))]
+pub(crate) use devtools::{on as devtools_on, query as devtools_query};
 pub use ops::{READY_CACHE, build_id, probe};
+
+/// Sent on sign out with the value `"storage"`: the browser drops what the runtime kept for the
+/// app (form drafts, grid views, palette recents). Browsers apply it on secure origins only; the
+/// per user storage key of the page (`zeyn-storage`) covers the rest.
+#[cfg(any(feature = "oidc", feature = "accounts"))]
+const CLEAR_SITE_DATA: axum::http::HeaderName =
+    axum::http::HeaderName::from_static("clear-site-data");
 
 /// The browser runtime every page loads, served as one module at `/_zeyn/zeyn.js`. The source is
 /// one file per concern under `assets/zeyn/`, joined here in this order (later parts use
@@ -94,7 +117,7 @@ const GRID_JS: &str = concat!(
     include_str!("../assets/zeyn/grid-exports.js"),
 );
 const CSS: &str = include_str!("../assets/zeyn.css");
-/// The icon set as CSS masks, generated from `assets/icons/*.svg` (see `tests/icons.rs`).
+/// The icon set as CSS masks, generated from `assets/icons/*.svg` (see `tests/all/icons.rs`).
 const ICONS: &str = include_str!("../assets/icons.css");
 const NAV: &str = include_str!("../assets/nav.js");
 
@@ -350,6 +373,9 @@ pub enum CallKind {
     Reveal,
     /// Rows imported from a CSV file.
     Import,
+    /// A CSV or XLSX file read and checked for an import without saving anything. Interceptors
+    /// see it with the import action; `AuditLog` does not record it.
+    ImportPreview,
     /// A media file or a saved play position; `screen` holds the media source name.
     Media,
     /// A PDF document rendered from an action's data.
@@ -476,16 +502,17 @@ pub struct AuditLog<S: AuditSink>(pub S);
 impl<S: AuditSink> Interceptor for AuditLog<S> {
     fn after(&self, ctx: &Ctx, call: &Call, outcome: &CallOutcome) {
         let trail = ctx.trail();
-        let audited = call.via_agent
-            || call.kind == CallKind::Form
-            || call.kind == CallKind::Reveal
-            || call.kind == CallKind::Import
-            || call.kind == CallKind::Upload
-            || call.action.is_some_and(|a| a.audit)
-            || !trail.revealed.is_empty()
-            || !trail.reads.is_empty()
-            || trail.transition.is_some()
-            || trail.export.is_some();
+        let audited = call.kind != CallKind::ImportPreview
+            && (call.via_agent
+                || call.kind == CallKind::Form
+                || call.kind == CallKind::Reveal
+                || call.kind == CallKind::Import
+                || call.kind == CallKind::Upload
+                || call.action.is_some_and(|a| a.audit)
+                || !trail.revealed.is_empty()
+                || !trail.reads.is_empty()
+                || trail.transition.is_some()
+                || trail.export.is_some());
         if !audited {
             return;
         }
@@ -526,7 +553,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
 ///
 /// ```ignore
 /// App::new("Shop").mcp(Mcp::read_only())          // agents may read
-/// App::new("Shop").mcp(Mcp::on().webmcp(false))   // read and write, server endpoint only
+/// App::new("Shop").mcp(Mcp::on().no_webmcp())   // read and write, server endpoint only
 /// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mcp {
@@ -564,15 +591,15 @@ impl Mcp {
         Mcp::on()
     }
 
-    /// `false` turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
-    pub fn server(mut self, on: bool) -> Self {
-        self.server = on;
+    /// Turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
+    pub fn no_server(mut self) -> Self {
+        self.server = false;
         self
     }
 
-    /// `false` turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
-    pub fn webmcp(mut self, on: bool) -> Self {
-        self.browser = on;
+    /// Turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
+    pub fn no_webmcp(mut self) -> Self {
+        self.browser = false;
         self
     }
 
@@ -747,6 +774,7 @@ pub struct App {
     llms_txt: Option<&'static str>,
     csp: crate::csp::Csp,
     robots_txt: Option<&'static str>,
+    public: &'static [PublicFile],
     site_url: String,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
@@ -755,6 +783,8 @@ pub struct App {
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
     license: Option<(Arc<dyn LicenseSource>, Duration)>,
+    menu_source: Option<Box<dyn MenuSource>>,
+    menu_per_user: bool,
     login_url: Option<String>,
     cors: Vec<String>,
     api_docs: Option<ApiDocs>,
@@ -784,7 +814,10 @@ pub struct App {
     #[cfg(feature = "islands")]
     islands_dir: Option<std::path::PathBuf>,
     #[cfg(feature = "realtime")]
-    realtime: Option<realtime::Hub>,
+    realtime: Option<realtime::Socket>,
+    #[cfg(feature = "resumable")]
+    resumable: crate::ResumableUploads,
+    modules: Vec<Module>,
 }
 
 impl App {
@@ -804,6 +837,7 @@ impl App {
             llms_txt: None,
             csp: crate::csp::Csp::new(),
             robots_txt: None,
+            public: &[],
             site_url: String::new(),
             time: TimePolicy::User {
                 default: TimeZone::UTC,
@@ -814,6 +848,8 @@ impl App {
             config: Config::default(),
             tenancy: None,
             license: None,
+            menu_source: None,
+            menu_per_user: false,
             login_url: None,
             cors: Vec::new(),
             api_docs: None,
@@ -844,36 +880,50 @@ impl App {
             islands_dir: None,
             #[cfg(feature = "realtime")]
             realtime: None,
+            #[cfg(feature = "resumable")]
+            resumable: crate::ResumableUploads::default(),
+            modules: Vec::new(),
         }
     }
 
-    /// Turns on the realtime channel: collaborative documents and change topics over WebSocket
-    /// (see `docs/realtime.md`). The hub is also registered as a service, so actions can take
-    /// `hub: Hub` and call `hub.notify(&ctx, "topic")`.
+    /// Turns on the live socket: topics, typed events, actions called over one WebSocket per
+    /// page, and collaborative documents (see `docs/zeynsocket.md` and `docs/realtime.md`). The
+    /// [`Socket`](realtime::Socket) is also registered as a service, so actions can take
+    /// `socket: Socket` and call `socket.notify(&ctx, "topic")` or
+    /// `socket.to_user(&ctx, id).emit(&event)`.
     #[cfg(feature = "realtime")]
-    pub fn realtime(mut self, realtime: realtime::Realtime) -> Self {
-        let hub = realtime.install();
-        self.realtime = Some(hub.clone());
-        self.service(hub)
+    pub fn socket(mut self, live: realtime::ZeynSocket) -> Self {
+        let socket = live.install();
+        self.realtime = Some(socket.clone());
+        self.service(socket)
     }
 
     /// Serves the WASM islands that `zeyn build-islands` wrote to `dir` (usually `dist/islands`).
     /// Pages that hold an [`Island`](crate::ui::Island) get the loader and a policy that allows
     /// WebAssembly; other pages are unchanged. When `dir` has no manifest, islands show their
     /// fallback and the server logs a warning.
+    /// Where and how long unfinished resumable uploads are kept, and how many may be open (see
+    /// [`ResumableUploads`](crate::ResumableUploads)). Without this call they go to the system's
+    /// temporary folder with the defaults of [`ResumableUploads::new`](crate::ResumableUploads::new).
+    #[cfg(feature = "resumable")]
+    pub fn resumable_uploads(mut self, settings: crate::ResumableUploads) -> Self {
+        self.resumable = settings;
+        self
+    }
+
     #[cfg(feature = "islands")]
     pub fn islands(mut self, dir: impl Into<std::path::PathBuf>) -> Self {
         self.islands_dir = Some(dir.into());
         self
     }
 
-    /// `false` stops the browser's own context menu everywhere except in text inputs, text areas
-    /// and editable text. This protects nothing (any user can still view the source, use the
+    /// Stops the browser's own context menu everywhere except in text inputs, text areas and
+    /// editable text. This protects nothing (any user can still view the source, use the
     /// developer tools or turn scripts off) and it takes away spell check, copy link, translate
-    /// and accessibility tools. Keep the default (`true`) unless a kiosk or a strict brief asks
-    /// for it; Zeyn's own menus work either way.
-    pub fn browser_context_menu(mut self, allow: bool) -> Self {
-        self.native_menu = allow;
+    /// and accessibility tools. Leave it out unless a kiosk or a strict brief asks for it; Zeyn's
+    /// own menus work either way.
+    pub fn no_browser_context_menu(mut self) -> Self {
+        self.native_menu = false;
         self
     }
 
@@ -1008,7 +1058,11 @@ impl App {
         match &mut self.logo {
             Some(l) => l.dark = Some(path.to_string()),
             None => self.setup_problems.push(
-                "`App::logo_dark` was called without `App::logo`\n  = help: call `.logo(\"/static/logo.svg\")` too".into(),
+                crate::Problem::new("Z0112", "`App::logo_dark` was called without `App::logo`")
+                    .why("the dark logo only replaces the light one in the dark theme, so without `App::logo` there is nothing to replace and the shell draws the letter mark")
+                    .fix("call `.logo(\"/static/logo.svg\")` too")
+                    .docs("components/shell#the-app-header")
+                    .to_string(),
             ),
         }
         self
@@ -1072,8 +1126,13 @@ impl App {
         S: AsRef<str>,
     {
         parse_ranges(ranges).unwrap_or_else(|e| {
-            self.setup_problems
-                .push(format!("{what}: {e}"));
+            self.setup_problems.push(
+                crate::Problem::new("Z0203", format!("{what}: {e}"))
+                    .why("an address or range that cannot be read is dropped, so the proxy, deny or allow list would not be what the app asked for")
+                    .fix("write each entry as an IPv4 or IPv6 address or a CIDR range, such as `10.0.0.0/8` or `2001:db8::/32`")
+                    .docs("guides/security#limits")
+                    .to_string(),
+            );
             Vec::new()
         })
     }
@@ -1177,6 +1236,11 @@ impl App {
         self
     }
 
+    /// The path prefix of API endpoints (see [`App::api_prefix`]).
+    pub(crate) fn api_path(&self) -> &str {
+        &self.api_prefix
+    }
+
     /// Shows a time zone picker in the menu so users can choose a zone by hand. Only under
     /// `TimePolicy::User`.
     pub fn time_zone_picker(mut self) -> Self {
@@ -1262,6 +1326,18 @@ impl App {
         self
     }
 
+    /// Serves the files of the crate's `public/` folder from the site's root, embedded with
+    /// [`public_files!`](crate::public_files): `public/favicon.svg` answers `/favicon.svg`. They
+    /// need no sign in, carry an entity tag and are cached for an hour.
+    ///
+    /// ```ignore
+    /// App::new("Shop").public(zeyn::public_files!())
+    /// ```
+    pub fn public(mut self, files: &'static [PublicFile]) -> Self {
+        self.public = files;
+        self
+    }
+
     /// The `https` origin the site is reached at, such as `https://shop.example`. App paths in
     /// canonical URLs, preview images and the sitemap are written behind it (and the base path),
     /// because search engines need absolute URLs. Without it, head tags keep app paths and the
@@ -1274,10 +1350,16 @@ impl App {
         {
             self.site_url = url.to_string();
         } else {
-            self.setup_problems.push(format!(
-                "site_url `{}` is not an https origin\n  = help: pass only the scheme and host, such as `https://shop.example`",
-                url.chars().take(80).collect::<String>()
-            ));
+            self.setup_problems.push(
+                crate::Problem::new(
+                    "Z0303",
+                    format!("site_url `{}` is not an https origin", url.chars().take(80).collect::<String>()),
+                )
+                .why("search engines and link previews need absolute https URLs; head tags and the sitemap build them from this origin")
+                .fix("pass only the scheme and host, such as `https://shop.example`")
+                .docs("guides/public-pages#search-engines-and-link-previews")
+                .to_string(),
+            );
         }
         self
     }
@@ -1285,6 +1367,19 @@ impl App {
     /// Applies a plugin. Settings made after this line override the plugin's.
     pub fn plugin(self, plugin: impl Plugin) -> Self {
         plugin.install(self)
+    }
+
+    /// Registers the browser module of a component from another crate: its script, stylesheet,
+    /// markers and texts (see [`Module`]). Pages link it only when their HTML holds one of its
+    /// markers. Panics with the fix when the module breaks the naming rule or clashes with the
+    /// framework or a module registered before it, so a wrong module never starts.
+    #[track_caller]
+    pub fn module(mut self, module: Module) -> Self {
+        if let Err(problem) = module.check(&self.modules) {
+            panic!("{problem}");
+        }
+        self.modules.push(module);
+        self
     }
 
     /// Message catalogs and default language.
@@ -1295,6 +1390,25 @@ impl App {
 
     pub fn service<T: Service>(mut self, service: T) -> Self {
         self.services.insert(service);
+        self
+    }
+
+    /// Adds side menu entries built per request, for example from a menu table filtered by the
+    /// user's roles. They come after the static menus of the features; a group with the label of
+    /// a static group is merged into it. Every link is checked again on the server: unknown
+    /// screens, screens the user may not open and unsafe paths are left out. Answers are cached
+    /// for [`MENU_TTL`] per tenant, language and set of permissions (see [`Self::menu_per_user`]);
+    /// an action that edits the menu calls [`Menus::invalidate`] on the injected [`Menus`]. When
+    /// the source fails or takes longer than [`MENU_TIMEOUT`], the page shows the static menu.
+    pub fn menu_source(mut self, source: impl MenuSource) -> Self {
+        self.menu_source = Some(Box::new(source));
+        self
+    }
+
+    /// Caches the menu source's answers per user too, for menus that depend on more than the
+    /// user's tenant, language and permissions. The cache stays capped at [`MAX_MENU_CACHE`].
+    pub fn menu_per_user(mut self) -> Self {
+        self.menu_per_user = true;
         self
     }
 
@@ -1320,9 +1434,9 @@ impl App {
         self
     }
 
-    /// Marks cookies `Secure`. Turn on whenever the app is served over HTTPS.
-    pub fn secure_cookies(mut self, secure: bool) -> Self {
-        self.secure_cookies = secure;
+    /// Marks cookies `Secure`. Call it whenever the app is served over HTTPS.
+    pub fn secure_cookies(mut self) -> Self {
+        self.secure_cookies = true;
         self
     }
 
@@ -1422,9 +1536,12 @@ impl App {
     }
 
     /// Checks routes, screen names, menus and that every service a screen needs is registered.
+    /// Each problem is the text form of a [`crate::Problem`]: a summary line, then its reason,
+    /// fix, documentation link and stable code.
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
         problems.extend(self.dev_auth_check());
+        problems.extend(self.jobs_problems());
         problems.extend(self.csp.problems().iter().cloned());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();
@@ -1438,16 +1555,25 @@ impl App {
             .collect();
         if sitemaps.len() > 1 {
             problems.push(
-                "more than one feature has a sitemap\n  = help: keep one `Feature::sitemap` that lists every URL"
-                    .into(),
+                crate::Problem::new("Z0301", "more than one feature has a sitemap")
+                    .why("`/sitemap.xml` is one document, so only one source can answer it and the others would be lost")
+                    .fix("keep one `Feature::sitemap` that lists every URL")
+                    .docs("guides/public-pages#sitemap")
+                    .to_string(),
             );
         }
         for (feature, s) in &sitemaps {
             if !matches!(s.meta().access, crate::action::Access::Public) {
-                problems.push(format!(
-                    "the sitemap action `{}` of feature `{feature}` is not public\n  = help: `/sitemap.xml` is read by search engines without a session; mark the action `#[action(public)]`",
-                    s.meta().name
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0302",
+                        format!("the sitemap action `{}` of feature `{feature}` is not public", s.meta().name),
+                    )
+                    .why("`/sitemap.xml` is read by search engines without a session, so an action with a permission would refuse them")
+                    .fix("mark the action `#[action(public)]`")
+                    .docs("guides/public-pages#sitemap")
+                    .to_string(),
+                );
             }
         }
         for f in &self.features {
@@ -1461,11 +1587,16 @@ impl App {
                 if let Some(other) = names.insert(s.meta.name, f.name())
                     && other != f.name()
                 {
-                    problems.push(format!(
-                        "screen `{}` is registered in features `{other}` and `{}`",
-                        s.meta.name,
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0102",
+                            format!("screen `{}` is registered in features `{other}` and `{}`", s.meta.name, f.name()),
+                        )
+                        .why("a screen name addresses one screen; two features with the same screen make its route, menu entry and permission ambiguous")
+                        .fix("register the screen in one feature only, and link to it from the other")
+                        .docs("start/structure#a-feature")
+                        .to_string(),
+                    );
                 }
                 if let Some(path) = f.path_of(&s.meta) {
                     let shape: String = path
@@ -1476,18 +1607,30 @@ impl App {
                     if let Some(other) = paths.insert(shape, s.meta.name)
                         && other != s.meta.name
                     {
-                        problems.push(format!(
-                            "route `{path}` is used by screens `{other}` and `{}`",
-                            s.meta.name
-                        ));
+                        problems.push(
+                            crate::Problem::new(
+                                "Z0101",
+                                format!("route `{path}` is used by screens `{other}` and `{}`", s.meta.name),
+                            )
+                            .why("a request to the route can open only one screen, so one of them would never be reached")
+                            .fix("give one of the screens another route in `#[screen(route = \"...\")]`; routes that differ only in the names of their segments count as the same")
+                            .docs("language/screens#params-in-the-path")
+                            .to_string(),
+                        );
                     }
                 }
                 for dep in (s.deps)() {
                     if !self.services.contains(dep.id) {
-                        problems.push(format!(
-                            "screen `{}` needs service `{}`, which is not registered\n  = help: add `.service(...)` to the App",
-                            s.meta.name, dep.name
-                        ));
+                        problems.push(
+                            crate::Problem::new(
+                                "Z0103",
+                                format!("screen `{}` needs service `{}`, which is not registered", s.meta.name, dep.name),
+                            )
+                            .why("the screen takes the service as an argument, so every request to it would fail")
+                            .fix("add `.service(...)` to the App")
+                            .docs("start/structure#services")
+                            .to_string(),
+                        );
                     }
                 }
             }
@@ -1498,18 +1641,29 @@ impl App {
                     .iter()
                     .any(|b| b.meta.name == a.meta.name)
                 {
-                    problems.push(format!(
-                        "api `{}` is published twice in feature `{}`",
-                        a.meta.name,
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0105",
+                            format!("api `{}` is published twice in feature `{}`", a.meta.name, f.name()),
+                        )
+                        .why("an API path is built from the feature and the action name, so both entries would claim the same path")
+                        .fix("remove one of the `.api(...)` calls")
+                        .docs("guides/api")
+                        .to_string(),
+                    );
                 }
                 for dep in (a.deps)() {
                     if !self.services.contains(dep.id) {
-                        problems.push(format!(
-                            "api `{}` needs service `{}`, which is not registered\n  = help: add `.service(...)` to the App",
-                            a.meta.name, dep.name
-                        ));
+                        problems.push(
+                            crate::Problem::new(
+                                "Z0104",
+                                format!("api `{}` needs service `{}`, which is not registered", a.meta.name, dep.name),
+                            )
+                            .why("the action takes the service as an argument, so every call to the API would fail")
+                            .fix("add `.service(...)` to the App")
+                            .docs("start/structure#services")
+                            .to_string(),
+                        );
                     }
                 }
             }
@@ -1520,11 +1674,16 @@ impl App {
                 if let Some(other) = media.insert(m.name, f.name())
                     && other != f.name()
                 {
-                    problems.push(format!(
-                        "media source `{}` is registered in features `{other}` and `{}`",
-                        m.name,
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0501",
+                            format!("media source `{}` is registered in features `{other}` and `{}`", m.name, f.name()),
+                        )
+                        .why("media URLs carry the source name, so a name used twice would serve files from only one of them")
+                        .fix("give one of the sources another name")
+                        .docs("components/media#serving-files")
+                        .to_string(),
+                    );
                 }
             }
         }
@@ -1534,11 +1693,16 @@ impl App {
         {
             for dep in (s.deps)() {
                 if !self.services.contains(dep.id) {
-                    problems.push(format!(
-                        "error screen `{}` needs service `{}`, which is not registered
-  = help: add `.service(...)` to the App",
-                        s.meta.name, dep.name
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0106",
+                            format!("error screen `{}` needs service `{}`, which is not registered", s.meta.name, dep.name),
+                        )
+                        .why("the error page would fail itself, and users would get a bare error instead")
+                        .fix("add `.service(...)` to the App")
+                        .docs("language/screens#error-pages")
+                        .to_string(),
+                    );
                 }
             }
         }
@@ -1548,17 +1712,29 @@ impl App {
             };
             for screen in shell.linked_screens() {
                 if !names.contains_key(screen) {
-                    problems.push(format!(
-                        "feature `{}`: the site footer links to screen `{screen}`, which is not registered",
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0304",
+                            format!("feature `{}`: the site footer links to screen `{screen}`, which is not registered", f.name()),
+                        )
+                        .why("the link has no route to point to, so every visitor would get a broken link")
+                        .fix("register the screen in a feature, or remove the link from the footer")
+                        .docs("components/shell#the-site-shell")
+                        .to_string(),
+                    );
                 }
             }
             for url in shell.bad_urls() {
-                problems.push(format!(
-                    "feature `{}`: the site footer link `{url}` is not a path, https, http or mailto address",
-                    f.name()
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0305",
+                        format!("feature `{}`: the site footer link `{url}` is not a path, https, http or mailto address", f.name()),
+                    )
+                    .why("other schemes, such as `javascript:`, can run code or leave the page in ways the CSP does not allow")
+                    .fix("use a path such as `/about`, or an `https://`, `http://` or `mailto:` address")
+                    .docs("components/shell#the-site-shell")
+                    .to_string(),
+                );
             }
         }
         if let Some(home) = self.home {
@@ -1567,9 +1743,16 @@ impl App {
                     .iter()
                     .any(|s| s.meta.name == home && s.meta.route.is_some())
             }) {
-                problems.push(format!(
-                    "home screen `{home}` is not registered or has no route"
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0107",
+                        format!("home screen `{home}` is not registered or has no route"),
+                    )
+                    .why("`/` opens the home screen, so without a registered screen with a route the start page would be missing")
+                    .fix("register the screen in a feature and give it `#[screen(route = \"...\")]`, or pick another home screen")
+                    .docs("language/screens#features-and-the-menu")
+                    .to_string(),
+                );
             }
             if self
                 .features
@@ -1577,10 +1760,16 @@ impl App {
                 .flat_map(|f| f.screens())
                 .any(|s| s.meta.name == home && crate::screen::route_has_segments(s.meta.route))
             {
-                problems.push(format!(
-                    "home screen `{home}` has path segments in its route
-  = help: `/` cannot fill them; make a screen without segments the home screen"
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0108",
+                        format!("home screen `{home}` has path segments in its route"),
+                    )
+                    .why("`/` has no values for the segments of the route, so the screen could not be opened from it")
+                    .fix("make a screen without segments the home screen")
+                    .docs("language/screens#params-in-the-path")
+                    .to_string(),
+                );
             }
         }
         let commands: Vec<(&str, &crate::command::Command)> = self
@@ -1616,21 +1805,54 @@ impl App {
             ));
         }
         match crate::command::normalize_shortcut(&self.palette_keys) {
-            None => problems.push(format!(
-                "the palette shortcut `{}` cannot be read
-  = help: write modifiers and one key joined by `+`, such as `Alt+Shift+P`",
-                self.palette_keys
-            )),
+            None => problems.push(
+                crate::Problem::new(
+                    "Z0416",
+                    format!("the palette shortcut `{}` cannot be read", self.palette_keys),
+                )
+                .why("the command palette would have no keyboard shortcut, and keyboard users could not open it")
+                .fix("write modifiers and one key joined by `+`, such as `Alt+Shift+P`")
+                .docs("components/shell#the-command-palette")
+                .to_string(),
+            ),
             Some(k)
                 if crate::command::browser_shortcut(&k)
                     == Some(crate::command::BrowserShortcut::Reserved) =>
             {
-                problems.push(format!(
-                    "the palette shortcut `{k}` is kept by the browser and never reaches the page
-  = help: pick a free shortcut such as `Alt+Shift+P`"
-                ))
+                problems.push(
+                    crate::Problem::new(
+                        "Z0417",
+                        format!("the palette shortcut `{k}` is kept by the browser and never reaches the page"),
+                    )
+                    .why("the browser handles these keys itself (such as opening or closing tabs), so the palette would never open from the keyboard")
+                    .fix("pick a free shortcut such as `Alt+Shift+P`")
+                    .docs("components/shell#the-command-palette")
+                    .to_string(),
+                )
             }
             _ => {}
+        }
+        for file in self.public {
+            let taken = file.path.starts_with("/_zeyn/")
+                || file.path == "/sitemap.xml"
+                || (file.path == "/robots.txt" && self.robots_txt.is_some())
+                || (file.path == "/llms.txt" && self.llms_txt.is_some())
+                || paths.contains_key(file.path);
+            if taken {
+                problems.push(
+                    crate::Problem::new(
+                        "Z0306",
+                        format!(
+                            "the public file `{}` answers a path the app already serves",
+                            file.path
+                        ),
+                    )
+                    .why("two handlers on one path stop the router from starting, or one of them is never reached")
+                    .fix("rename or remove the file in `public/`, or drop the other route")
+                    .docs("guides/public-pages#the-public-folder")
+                    .to_string(),
+                );
+            }
         }
         problems.extend(self.theme_problems());
         problems.extend(self.client_prefs.problems());
@@ -1642,8 +1864,12 @@ impl App {
         }
     }
 
-    /// Machine readable description of the app, used by `zeyn mcp` and `zeyn routes`.
+    /// Machine readable description of the app, used by `zeyn mcp`, `zeyn routes` and
+    /// `zeyn check`. `problems` holds the problems of [`App::check`] as text, and
+    /// `problem_details` the same problems as objects with `code`, `summary`, `why`, `fix` and
+    /// `docs` (see [`crate::Problem`]).
     pub fn describe(&self) -> Json {
+        let problems = self.check().err().unwrap_or_default();
         json!({
             "name": self.i18n.text(self.i18n.default_locale(), &self.name),
             "locales": self.i18n.locales(),
@@ -1668,24 +1894,80 @@ impl App {
                     "path": format!("{}/{}/{}", self.api_prefix, f.name(), a.meta.name),
                     "access": a.meta.access,
                 })).collect::<Vec<_>>(),
-                "menu": f.menu_groups().iter().map(|g| json!({
-                    "label": self.i18n.text(self.i18n.default_locale(), &g.label),
-                    "icon": g.icon,
-                    "items": g.items.iter().map(|i| json!({
-                        "label": self.i18n.text(self.i18n.default_locale(), &i.label),
-                        "screen": i.screen,
-                    })).collect::<Vec<_>>(),
-                })).collect::<Vec<_>>(),
+                "menu": f.menu_groups().iter().map(|g| menu_json(&self.i18n, g)).collect::<Vec<_>>(),
+                "menu_accordion": f.menu_accordion(),
                 "commands": f.commands().iter().map(crate::command::Command::schema).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "missing_translations": self.i18n.missing_keys(),
-            "problems": self.check().err().unwrap_or_default(),
+            "problems": problems,
+            "problem_details": problems.iter().map(|p| crate::problem_json(p)).collect::<Vec<_>>(),
         })
+    }
+
+    /// Builds the screen named `name` with an anonymous user in the default language and returns
+    /// its node tree: each node's path, component type, the Rust source line that placed it
+    /// (debug builds) and its children. `ZEYN_INSPECT=<screen> cargo run` prints it, which is
+    /// what the `zeyn_inspect` tool of `zeyn mcp` returns.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/", public)]
+    /// pub fn home() -> Screen {
+    ///     Screen::new("Home").body(
+    ///         Stack::new()
+    ///             .add(Heading::h2("Hello"))
+    ///             .add(Badge::new("New")),
+    ///     )
+    /// }
+    ///
+    /// let app = App::new("Shop").feature(Feature::new("shop").screen(home));
+    /// let tree = tokio::runtime::Runtime::new()
+    ///     .unwrap()
+    ///     .block_on(app.inspect("home"));
+    /// assert_eq!(tree["nodes"][0]["children"][1]["path"], "0.1");
+    /// ```
+    pub async fn inspect(self, name: &str) -> Json {
+        let Some(entry) = self
+            .features
+            .iter()
+            .flat_map(|f| f.screens())
+            .find(|s| s.meta.name == name)
+            .copied()
+        else {
+            let names: Vec<&str> = self
+                .features
+                .iter()
+                .flat_map(|f| f.screens())
+                .map(|s| s.meta.name)
+                .collect();
+            return json!({ "error": format!("no screen named `{name}`"), "screens": names });
+        };
+        let locale = self.i18n.default_locale().to_string();
+        let ctx = Ctx::new(
+            Identity::anonymous(),
+            locale,
+            Arc::new(self.services),
+            Arc::new(self.i18n),
+        );
+        match (entry.build)(ctx, Json::Null).await {
+            Ok(screen) => json!({
+                "screen": name,
+                "nodes": screen
+                    .nodes()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| n.tree(i.to_string()))
+                    .collect::<Vec<_>>(),
+            }),
+            Err(e) => json!({ "error": format!("the screen could not be built: {e}") }),
+        }
     }
 
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
+        ops::warm_build_id();
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self
@@ -1710,6 +1992,17 @@ impl App {
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
         self.services
             .insert(self.client_prefs.clone());
+        if let Some(source) = self.menu_source.take() {
+            self.services
+                .insert(Menus::new(source, self.menu_per_user));
+        }
+        for module in &self.modules {
+            for (locale, json) in module.catalogs() {
+                self.i18n
+                    .defaults(locale, json)
+                    .expect("catalogs are checked when the module is registered");
+            }
+        }
         let look = Arc::new(self.look());
         self.services
             .insert(theme::Looks(look.clone()));
@@ -1742,10 +2035,19 @@ impl App {
             island_csp: HeaderValue::from_str(&self.csp.header(true))
                 .unwrap_or(HeaderValue::from_static(islands::CSP)),
             csp: Arc::new(self.csp),
+            extensions: modules::Extensions::new(std::mem::take(&mut self.modules), JS),
             time: self.time,
             fixed_now: self.fixed_now,
             zone_picker: self.zone_picker,
             api_prefix: self.api_prefix,
+            favicon: ["/favicon.svg", "/favicon.png", "/favicon.ico"]
+                .iter()
+                .find_map(|p| {
+                    self.public
+                        .iter()
+                        .find(|f| f.path == *p)
+                })
+                .map(|f| (f.path, f.content_type)),
             config: self.config,
             tenancy: self.tenancy,
             license: self.license,
@@ -1777,6 +2079,8 @@ impl App {
             islands,
             #[cfg(feature = "realtime")]
             realtime: self.realtime,
+            #[cfg(feature = "resumable")]
+            uploads: resumable::Uploads::new(self.resumable),
         });
         ops::start_jobs(&state);
         let mut router = Router::new();
@@ -1862,11 +2166,35 @@ impl App {
                 get(move || async move { asset(text, "text/plain; charset=utf-8") }),
             );
         }
+        for file in self.public {
+            let tag = format!(
+                "\"p{:016x}\"",
+                file.bytes
+                    .iter()
+                    .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+                        (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3)
+                    })
+            );
+            router = router.route(
+                file.path,
+                get(move |headers: HeaderMap| async move { public_file(file, &tag, &headers) }),
+            );
+        }
+        if !self
+            .public
+            .iter()
+            .any(|f| f.path == "/favicon.ico")
+        {
+            router = router.route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }));
+        }
         let router = seo::routes(router, &state);
-        let router = router
+        let runtime = state.extensions.runtime;
+        let router = state
+            .extensions
+            .routes(router)
             .route(
                 "/_zeyn/zeyn.js",
-                get(|| async { asset(modules::runtime(JS), "text/javascript; charset=utf-8") }),
+                get(move || async move { asset(runtime, "text/javascript; charset=utf-8") }),
             )
             .route(
                 "/_zeyn/grid.js",
@@ -1885,11 +2213,11 @@ impl App {
                 get(|| async { asset(NAV, "text/javascript; charset=utf-8") }),
             )
             .route("/_zeyn/theme.css", get(theme_css))
-            .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
             .route("/_zeyn/csrf", get(csrf_token))
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/menu", post(menu_call))
+            .route("/_zeyn/menu/counts", get(menu_counts))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone));
@@ -1904,11 +2232,19 @@ impl App {
         let router = realtime::routes(router);
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
+        #[cfg(feature = "resumable")]
+        let router = resumable::routes(router);
         let router = modules::routes(site::routes(charts::routes(files::routes(router))));
+        #[cfg(debug_assertions)]
+        let router = devtools::routes(router);
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(
             data::routes(ops::routes(agent::routes(grid::routes(router)))),
         )))))
-        .fallback(not_found);
+        .fallback(not_found)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            guard::remember_identity,
+        ));
         #[cfg(feature = "accounts")]
         let router = if state.sign_in.accounts.is_some() {
             router.layer(axum::middleware::from_fn_with_state(
@@ -1941,6 +2277,8 @@ impl App {
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
             .with_state(state.clone());
+        #[cfg(debug_assertions)]
+        let router = router.layer(axum::middleware::from_fn(devtools::layer));
         let router = if state.locale_paths {
             Router::new()
                 .fallback_service(router)
@@ -1972,7 +2310,8 @@ impl App {
         Ok(router.layer(layer))
     }
 
-    /// Checks the app and serves it. With `ZEYN_DESCRIBE=1` it prints `describe()` and exits instead.
+    /// Checks the app and serves it. With `ZEYN_DESCRIBE=1` it prints `describe()` and exits
+    /// instead; with `ZEYN_INSPECT=<screen>` it prints `inspect(screen)` and exits.
     pub async fn serve(self, addr: &str) -> std::io::Result<()> {
         if std::env::var_os("ZEYN_DESCRIBE").is_some() {
             println!(
@@ -1981,6 +2320,17 @@ impl App {
             );
             return Ok(());
         }
+        if let Ok(screen) = std::env::var("ZEYN_INSPECT") {
+            let tree = self.inspect(&screen).await;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&tree).unwrap_or_default()
+            );
+            return Ok(());
+        }
+        crate::screen::Node::tag_sources(true);
+        #[cfg(debug_assertions)]
+        devtools::devtools(true);
         let flush = self.start_telemetry();
         let router = self.router().map_err(|problems| {
             for p in &problems {
@@ -2064,9 +2414,13 @@ struct AppState {
     #[cfg(feature = "islands")]
     island_csp: HeaderValue,
     csp: Arc<crate::csp::Csp>,
+    /// Browser modules of components from other crates (`App::module`).
+    extensions: modules::Extensions,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
+    /// The icon of the app's `public/` folder the page head links: path and content type.
+    favicon: Option<(&'static str, &'static str)>,
     api_prefix: String,
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
@@ -2099,7 +2453,9 @@ struct AppState {
     #[cfg(feature = "islands")]
     islands: Option<islands::Islands>,
     #[cfg(feature = "realtime")]
-    realtime: Option<realtime::Hub>,
+    realtime: Option<realtime::Socket>,
+    #[cfg(feature = "resumable")]
+    uploads: resumable::Uploads,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -2346,10 +2702,13 @@ impl AppState {
     }
 
     fn ctx(&self, headers: &HeaderMap) -> Ctx {
-        let mut identity = self
-            .auth
-            .as_ref()
-            .and_then(|a| a.authenticate(headers))
+        let mut identity = guard::IDENTITY
+            .try_with(Clone::clone)
+            .unwrap_or_else(|_| {
+                self.auth
+                    .as_ref()
+                    .and_then(|a| a.authenticate(headers))
+            })
             .unwrap_or_default();
         auth::adjust(self, headers, &mut identity);
         let accept = headers
@@ -2420,6 +2779,11 @@ impl AppState {
             self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
+        let ctx = if cookie(headers, "zeyn_rail") == Some("1") {
+            ctx.with_rail()
+        } else {
+            ctx
+        };
         let ctx = if cookie(headers, "zeyn_density") == Some("compact") {
             ctx.with_compact()
         } else {
@@ -2531,6 +2895,8 @@ impl AppState {
         }
         feature.check_guards(ctx)?;
         data::check_reason(ctx, &entry.meta)?;
+        #[cfg(debug_assertions)]
+        let building = Instant::now();
         let only_return_to = params
             .as_object()
             .is_some_and(|o| o.len() == 1 && o.contains_key("return_to"));
@@ -2544,6 +2910,8 @@ impl AppState {
             }
             other => other?,
         };
+        #[cfg(debug_assertions)]
+        devtools::build(building.elapsed());
         if let Some((to, params, permanent)) = screen.take_moved() {
             return Err(Failure::Moved(to, params, permanent));
         }
@@ -2620,6 +2988,14 @@ impl AppState {
             },
             duration: started.elapsed(),
         };
+        #[cfg(debug_assertions)]
+        devtools::call(
+            call.kind,
+            call.screen,
+            call.action.as_ref().map(|a| a.name),
+            outcome.ok,
+            outcome.error,
+        );
         let span = tracing::Span::current();
         if !span.is_disabled() {
             span.record("ok", outcome.ok);
@@ -2677,35 +3053,45 @@ impl AppState {
     }
 
     /// Loads the first page of every grid the user may read, in the user's saved view.
+    /// The grids of a screen load at the same time, so a screen with several grids waits for the
+    /// slowest one, not for their sum.
     async fn preload(
         &self,
         ctx: &Ctx,
         nodes: Vec<(NodePath, &crate::screen::Node)>,
         name: &str,
     ) -> HashMap<String, LoadedPage> {
-        let mut loaded = HashMap::new();
         let saved = self.views.is_some() && ctx.identity().is_signed_in();
-        for (i, node) in nodes {
-            let Some(grid) = node.grid() else { continue };
-            if !ctx
-                .identity()
-                .can(&grid.action().access)
-            {
-                continue;
-            }
-            let view = self
-                .saved_view(ctx, grid, name, &i)
-                .await;
-            if let Ok(mut page) = self
-                .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
-                .await
-            {
+        let loads = nodes
+            .into_iter()
+            .filter_map(|(i, node)| {
+                let grid = node.grid()?;
+                ctx.identity()
+                    .can(&grid.action().access)
+                    .then_some((i, grid))
+            })
+            .map(|(i, grid)| async move {
+                let view = self
+                    .saved_view(ctx, grid, name, &i)
+                    .await;
+                let mut page = self
+                    .timed(grid.fetch_at(
+                        ctx.clone(),
+                        grid.first_query(view.as_ref()),
+                        Vec::new(),
+                        view.as_ref(),
+                    ))
+                    .await
+                    .ok()?;
                 page.view = view;
                 page.saved_views = saved;
-                loaded.insert(i.to_string(), page);
-            }
-        }
-        loaded
+                Some((i.to_string(), page))
+            });
+        futures_util::future::join_all(loads)
+            .await
+            .into_iter()
+            .flatten()
+            .collect()
     }
 
     fn error_response(&self, ctx: &Ctx, failure: Failure) -> Response {
@@ -2815,7 +3201,8 @@ impl AppState {
         let mut response = if partial {
             partial_response(&format!("{title} · {}", ctx.t(&self.name)), body)
         } else {
-            Html(self.shell(ctx, csrf, &title, &body, None)).into_response()
+            let menu = self.dynamic_menu(ctx, None).await;
+            Html(self.shell_menu(ctx, csrf, &title, &body, None, &menu)).into_response()
         };
         *response.status_mut() = status;
         response
@@ -2839,91 +3226,141 @@ impl AppState {
         .ok()
     }
 
-    /// Menu links of the features in one shell (the site shell when `site`) whose guards the user
-    /// passes, per group: the group's icon, its label and its `<li>` links. Groups with the same
-    /// label are merged into the first one, so several features can share one menu heading.
+    /// The menu of the features in one shell (the site shell when `site`) whose guards the user
+    /// passes. Items the user may not open are left out, and so are groups left without items.
+    /// Groups with the same label are merged into the first one at every level, so several
+    /// features can share one menu heading.
     fn menu_links(
         &self,
         ctx: &Ctx,
         r: &Render,
         current: Option<&str>,
         site: bool,
-    ) -> Vec<(String, String, Vec<String>)> {
-        let mut groups: Vec<(String, String, Vec<String>)> = Vec::new();
+    ) -> Vec<NavGroup> {
+        let mut groups: Vec<NavGroup> = Vec::new();
         for f in &self.features {
             if f.site_shell().is_some() != site || f.check_guards(ctx).is_err() {
                 continue;
             }
             for g in f.menu_groups() {
-                let items: Vec<String> = g
-                    .items
-                    .iter()
-                    .filter_map(|item| {
-                        let entry = f
-                            .screens()
-                            .iter()
-                            .find(|s| s.meta.name == item.screen)?;
-                        if !ctx.identity().can(&entry.meta.access) {
-                            return None;
-                        }
-                        let path = f.path_of(&entry.meta)?;
-                        let aria = if current == Some(item.screen) {
-                            r#" aria-current="page""#
-                        } else {
-                            ""
-                        };
-                        let href = escape(&self.url(&locale::path(self, ctx, &path)));
-                        let label = r.text(&item.label);
-                        Some(match item.icon.filter(|_| !site) {
-                            Some(icon) => format!(
-                                r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
-                                icon.html()
-                            ),
-                            None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
-                        })
-                    })
-                    .collect();
-                if items.is_empty() {
-                    continue;
-                }
-                let label = r.text(&g.label);
-                let icon = if g.items.iter().any(|i| i.icon.is_some()) {
-                    String::new()
-                } else {
-                    g.icon.html()
-                };
-                match groups.iter_mut().find(|g| g.1 == label) {
-                    Some(group) => group.2.extend(items),
-                    None => groups.push((icon, label, items)),
+                if let Some(group) = self.nav_group(f, g, ctx, r, current, site) {
+                    NavGroup::merge(&mut groups, group);
                 }
             }
         }
         groups
     }
 
-    /// The breadcrumb of `SiteHeader::breadcrumb`: the menu group of the current screen and the
-    /// screen's menu label. `nav.js` rewrites it from the side menu after each navigation.
-    fn breadcrumb(&self, r: &Render, current: Option<&str>) -> String {
-        let found = current.and_then(|name| {
-            self.features
-                .iter()
-                .flat_map(|f| f.menu_groups())
-                .find_map(|g| {
-                    g.items
-                        .iter()
-                        .find(|i| i.screen == name)
-                        .map(|i| (r.text(&g.label), r.text(&i.label)))
-                })
-        });
-        let items = match found {
-            Some((group, item)) if group == item => {
-                format!(r#"<li><span aria-current="page">{item}</span></li>"#)
-            }
-            Some((group, item)) => {
-                format!(r#"<li>{group}</li><li><span aria-current="page">{item}</span></li>"#)
-            }
-            None => String::new(),
+    /// One group of [`Self::menu_links`] with its nested groups, or `None` when the user may
+    /// open none of its items.
+    fn nav_group(
+        &self,
+        f: &Feature,
+        g: &crate::feature::MenuGroup,
+        ctx: &Ctx,
+        r: &Render,
+        current: Option<&str>,
+        site: bool,
+    ) -> Option<NavGroup> {
+        let mut page = None;
+        let links: Vec<String> = g
+            .items
+            .iter()
+            .filter_map(|item| {
+                let entry = f
+                    .screens()
+                    .iter()
+                    .find(|s| s.meta.name == item.screen)?;
+                if !ctx.identity().can(&entry.meta.access) {
+                    return None;
+                }
+                let path = f.path_of(&entry.meta)?;
+                let label = r.text(&item.label);
+                let current = current == Some(item.screen);
+                if current {
+                    page = Some(label.clone());
+                }
+                let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                let mut extra = String::new();
+                if let Some(badge) = &item.badge {
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-badge">{}</span>"#,
+                        r.text(badge)
+                    ));
+                }
+                if let Some(count) = item
+                    .count
+                    .filter(|c| !site && ctx.identity().can(&c.action.access))
+                {
+                    let topics = if item.topics.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            r#" data-zeyn-menu-count-topics="{}""#,
+                            escape(&item.topics.join(","))
+                        )
+                    };
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-count" data-zeyn-menu-count="{}"{topics} hidden></span>"#,
+                        escape(count.action.name)
+                    ));
+                }
+                Some(nav_link(
+                    &href,
+                    current,
+                    item.icon.filter(|_| !site),
+                    &label,
+                    &extra,
+                ))
+            })
+            .collect();
+        let groups: Vec<NavGroup> = g
+            .groups
+            .iter()
+            .filter_map(|sub| self.nav_group(f, sub, ctx, r, current, site))
+            .collect();
+        if links.is_empty() && groups.is_empty() {
+            return None;
+        }
+        let icon = match g.icon {
+            Some(icon) if !g.items.iter().any(|i| i.icon.is_some()) => icon.html(),
+            _ => String::new(),
         };
+        Some(NavGroup {
+            here: page.is_some() || groups.iter().any(|s| s.here),
+            page,
+            icon,
+            label: r.text(&g.label),
+            open: g.open,
+            links,
+            groups,
+        })
+    }
+
+    /// The breadcrumb of `SiteHeader::breadcrumb`: the side menu groups of the current screen,
+    /// from the top level one down, and the screen's menu label. `nav.js` rewrites it from the
+    /// side menu after each navigation.
+    fn breadcrumb(&self, r: &Render, groups: &[NavGroup]) -> String {
+        let mut path = Vec::new();
+        let mut level = groups;
+        let mut page = None;
+        while let Some(g) = level.iter().find(|g| g.here) {
+            path.push(&g.label);
+            page = g.page.as_ref();
+            if page.is_some() {
+                break;
+            }
+            level = &g.groups;
+        }
+        let mut items = String::new();
+        if let Some(page) = page {
+            for label in path.into_iter().filter(|l| *l != page) {
+                items.push_str(&format!("<li>{label}</li>"));
+            }
+            items.push_str(&format!(
+                r#"<li><span aria-current="page">{page}</span></li>"#
+            ));
+        }
         format!(
             r#"<nav class="z-crumbs" aria-label="{}" data-zeyn-crumbs><ol>{items}</ol></nav>"#,
             r.text(&Text::key("zeyn.shell.breadcrumb"))
@@ -2975,7 +3412,8 @@ impl AppState {
     }
 
     /// Full page around a screen: the app shell (side menu) or, for screens of a feature that
-    /// chose it, the site shell; toasts and assets.
+    /// chose it, the site shell; toasts and assets. The side menu holds only the static menus;
+    /// see [`Self::shell_menu`].
     fn shell(
         &self,
         ctx: &Ctx,
@@ -2983,6 +3421,19 @@ impl AppState {
         title: &str,
         main: &str,
         current: Option<&str>,
+    ) -> String {
+        self.shell_menu(ctx, csrf, title, main, current, &[])
+    }
+
+    /// [`Self::shell`] with the nodes of the app's [`MenuSource`] in the side menu.
+    fn shell_menu(
+        &self,
+        ctx: &Ctx,
+        csrf: &str,
+        title: &str,
+        main: &str,
+        current: Option<&str>,
+        dynamic: &[MenuNode],
     ) -> String {
         let r = Render::new("shell", ctx.locale(), ctx.i18n())
             .with_tz(ctx.time_zone())
@@ -3012,7 +3463,7 @@ impl AppState {
                 site::head(&escape(&self.prefix)),
             ),
             None => (
-                self.app_frame(ctx, &r, theme, &app, &palette, main, current),
+                self.app_frame(ctx, &r, theme, &app, &palette, main, current, dynamic),
                 String::new(),
             ),
         };
@@ -3027,10 +3478,10 @@ impl AppState {
         let base = escape(&self.prefix);
         let mut used = modules::Used::default();
         for part in [&frame, &commands, &ai_launcher] {
-            used.scan(part);
+            used.scan(part, &self.extensions);
         }
         let mut components = String::with_capacity(2048);
-        used.head(&base, &mut components);
+        used.head(&base, &self.extensions, &mut components);
         components.push_str(&site_head);
         components.push_str(&ai_head);
         let native_menu = if self.native_menu {
@@ -3045,7 +3496,7 @@ impl AppState {
         };
         let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title>{icon}<link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -3054,6 +3505,7 @@ impl AppState {
             },
             csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
+            storage = escape(&auth::storage_key(self, ctx.identity().user.as_deref())),
             v = ops::asset_version(),
             theme_link = if self.look.css.is_empty() {
                 String::new()
@@ -3066,6 +3518,12 @@ impl AppState {
             },
             title = escape(title),
             extra = ops::head(self, ctx),
+            icon = self
+                .favicon
+                .map(|(path, kind)| format!(
+                    r#"<link rel="icon" href="{base}{path}" type="{kind}">"#
+                ))
+                .unwrap_or_default(),
             prefetch = if self.prefetch == Prefetch::Moderate {
                 r#"<meta name="zeyn-prefetch" content="moderate">"#
             } else {
@@ -3077,9 +3535,10 @@ impl AppState {
     }
 
     /// The app shell: a side menu with the app's name, the palette button, the menus of the
-    /// features without a site shell and the pickers, beside the screen. Below 800 px the menu
-    /// folds behind a menu button under the app's name (W3C APG disclosure); `nav.js` shows the
-    /// button, so without the script the menu stays open and nothing becomes unreachable.
+    /// features without a site shell and the pickers, beside the screen. Below 1024 px the menu
+    /// folds behind a menu button under the app's name and opens as a drawer over the screen;
+    /// `nav.js` shows the button, so without the script the menu stays open and nothing becomes
+    /// unreachable.
     #[allow(clippy::too_many_arguments)]
     fn app_frame(
         &self,
@@ -3090,15 +3549,36 @@ impl AppState {
         palette: &str,
         main: &str,
         current: Option<&str>,
+        dynamic: &[MenuNode],
     ) -> String {
         let r = *r;
         let mut nav = String::new();
-        for (icon, label, items) in self.menu_links(ctx, &r, current, false) {
-            nav.push_str(&format!(
-                r#"<div class="z-nav-group"><h2>{icon}{label}</h2><ul>{}</ul></div>"#,
-                items.join("")
-            ));
+        let mut groups = self.menu_links(ctx, &r, current, false);
+        for g in self.dynamic_groups(dynamic, ctx, &r, current) {
+            NavGroup::merge(&mut groups, g);
         }
+        let links: usize = groups
+            .iter()
+            .map(NavGroup::link_count)
+            .sum();
+        if links >= MENU_FILTER_FROM {
+            nav.push_str(&menu_filter(&r));
+        }
+        let rail = ctx.rail();
+        for (i, g) in groups.iter().enumerate() {
+            g.render(&mut nav, &format!("z-nav-g{i}"), 2, rail);
+        }
+        let marker = if groups.is_empty() {
+            ""
+        } else if self
+            .features
+            .iter()
+            .any(|f| f.site_shell().is_none() && f.menu_accordion())
+        {
+            " data-zeyn-menu data-zeyn-accordion"
+        } else {
+            " data-zeyn-menu"
+        };
         let account = self
             .header
             .as_ref()
@@ -3130,7 +3610,7 @@ impl AppState {
             .map(|h| {
                 let [mut start, center, end, bottom] = site::header_slots(h, ctx, "app", "z-app-header");
                 if h.breadcrumb {
-                    let crumbs = self.breadcrumb(&r, current);
+                    let crumbs = self.breadcrumb(&r, &groups);
                     match start.find('>') {
                         Some(at) => start.insert_str(at + 1, &crumbs),
                         None => {
@@ -3152,7 +3632,13 @@ impl AppState {
             })
             .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"{rail_attr}><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p>{rail_button}<button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            rail_attr = if rail { " data-zeyn-rail" } else { "" },
+            rail_button = if marker.is_empty() {
+                String::new()
+            } else {
+                rail_toggle(&r, rail)
+            },
             palette = if self
                 .header
                 .as_ref()
@@ -3166,6 +3652,198 @@ impl AppState {
             logo = logo_mark(self.logo.as_ref(), &escape(&self.prefix), app, "z-logo"),
         )
     }
+}
+
+/// A menu group of [`AppState::menu_links`] as one user sees it: rendered links, nested groups
+/// and whether it holds the current screen.
+pub(crate) struct NavGroup {
+    /// The icon's HTML, empty when the items have icons of their own.
+    icon: String,
+    label: String,
+    /// Stays open without a toggle button ([`crate::Menu::open`]).
+    open: bool,
+    /// Holds the link of the current screen, itself or in a nested group.
+    here: bool,
+    /// The label of the current screen's link when the group itself holds it.
+    page: Option<String>,
+    /// The `<li>` links.
+    links: Vec<String>,
+    groups: Vec<NavGroup>,
+}
+
+impl NavGroup {
+    /// An empty group without an icon.
+    fn new(label: String, open: bool) -> Self {
+        NavGroup {
+            icon: String::new(),
+            label,
+            open,
+            here: false,
+            page: None,
+            links: Vec::new(),
+            groups: Vec::new(),
+        }
+    }
+
+    /// Adds `group` to `list`, or merges it into the group with the same label, nested groups
+    /// included.
+    fn merge(list: &mut Vec<NavGroup>, group: NavGroup) {
+        match list
+            .iter_mut()
+            .find(|g| g.label == group.label)
+        {
+            Some(same) => {
+                same.here |= group.here;
+                same.page = same.page.take().or(group.page);
+                same.open |= group.open;
+                same.links.extend(group.links);
+                for sub in group.groups {
+                    NavGroup::merge(&mut same.groups, sub);
+                }
+            }
+            None => list.push(group),
+        }
+    }
+
+    /// The group's label.
+    pub(crate) fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// The links of the group and of its nested groups, in order.
+    pub(crate) fn all_links(self) -> Vec<String> {
+        let mut links = self.links;
+        for g in self.groups {
+            links.extend(g.all_links());
+        }
+        links
+    }
+
+    /// The links of this group and its nested groups.
+    fn link_count(&self) -> usize {
+        self.links.len()
+            + self
+                .groups
+                .iter()
+                .map(NavGroup::link_count)
+                .sum::<usize>()
+    }
+
+    /// Writes the group into the side menu: a `<div>` at the top level, an `<li>` below it, with
+    /// a heading of `level`. A collapsible group's heading holds a button with `aria-expanded`
+    /// and `aria-controls` (W3C APG disclosure); it starts expanded when the group holds the
+    /// current screen. `id` is the id of the group's list.
+    ///
+    /// In the icon rail (`rail`) every top level group is collapsible and starts closed: its
+    /// heading shows the icon (or the label's first letter) and opens the group as a flyout.
+    fn render(&self, out: &mut String, id: &str, level: usize, rail: bool) {
+        let label = &self.label;
+        let top = level == 2;
+        let icon = if top && self.icon.is_empty() {
+            format!(
+                r#"<span class="z-nav-initial" aria-hidden="true">{}</span>"#,
+                self.label
+                    .chars()
+                    .find(|c| c.is_alphanumeric())
+                    .map(|c| c.to_uppercase().to_string())
+                    .unwrap_or_default()
+            )
+        } else {
+            self.icon.clone()
+        };
+        let open = self.open && !(rail && top);
+        let expanded = self.here && !(rail && top);
+        let (open_tag, close_tag) = if level == 2 {
+            (r#"<div class="z-nav-group">"#, "</div>")
+        } else {
+            (r#"<li class="z-nav-group z-nav-sub">"#, "</li>")
+        };
+        out.push_str(open_tag);
+        if open {
+            out.push_str(&format!(
+                "<h{level}>{icon}<span>{label}</span></h{level}><ul>"
+            ));
+        } else {
+            out.push_str(&format!(
+                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{expanded}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#
+            ));
+        }
+        for link in &self.links {
+            out.push_str(link);
+        }
+        for (i, g) in self.groups.iter().enumerate() {
+            g.render(out, &format!("{id}-{i}"), level + 1, rail);
+        }
+        out.push_str("</ul>");
+        out.push_str(close_tag);
+    }
+}
+
+/// Side menus with at least this many links get a filter box and favorites.
+pub const MENU_FILTER_FROM: usize = 10;
+
+/// The filter box of a long side menu, with the texts `menu.js` needs for it and for the pin
+/// buttons and the Favorites group it adds.
+fn menu_filter(r: &Render) -> String {
+    let t = |k: &str| r.text(&Text::key(format!("zeyn.shell.{k}")));
+    format!(
+        r#"<div class="z-nav-filter" data-zeyn-menu-filter data-text-results="{}" data-text-none="{}" data-text-favorites="{}" data-text-pin="{}" data-text-unpin="{}"><input type="search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false"><p class="z-sr-only" role="status" aria-live="polite"></p></div>"#,
+        t("menu_results"),
+        t("menu_none"),
+        t("menu_favorites"),
+        t("menu_pin"),
+        t("menu_unpin"),
+        label = t("menu_filter")
+    )
+}
+
+/// The button that folds the side menu to an icon rail and back, on wide screens. `aria-pressed`
+/// says whether the rail is on; its name says what pressing it does.
+fn rail_toggle(r: &Render, rail: bool) -> String {
+    let collapse = r.text(&Text::key("zeyn.shell.rail_collapse"));
+    let expand = r.text(&Text::key("zeyn.shell.rail_expand"));
+    format!(
+        r#"<button type="button" class="z-nav-rail" data-zeyn-rail-toggle aria-pressed="{rail}" aria-label="{}" data-text-collapse="{collapse}" data-text-expand="{expand}"><span class="z-nav-rail-icon" aria-hidden="true"></span></button>"#,
+        if rail { &expand } else { &collapse }
+    )
+}
+
+/// A side menu link: `href` is escaped, and so is `label`.
+/// `extra` is HTML after the label (a badge or a count), already escaped.
+fn nav_link(
+    href: &str,
+    current: bool,
+    icon: Option<crate::screen::Icon>,
+    label: &str,
+    extra: &str,
+) -> String {
+    let aria = if current {
+        r#" aria-current="page""#
+    } else {
+        ""
+    };
+    match icon {
+        Some(icon) => format!(
+            r#"<li><a href="{href}"{aria}>{}<span>{label}</span>{extra}</a></li>"#,
+            icon.html()
+        ),
+        None if extra.is_empty() => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+        None => format!(r#"<li><a href="{href}"{aria}><span>{label}</span>{extra}</a></li>"#),
+    }
+}
+
+/// A menu group in the app description, nested groups included.
+fn menu_json(i18n: &I18n, g: &crate::feature::MenuGroup) -> Json {
+    json!({
+        "label": i18n.text(i18n.default_locale(), &g.label),
+        "icon": g.icon,
+        "open": g.open,
+        "items": g.items.iter().map(|i| json!({
+            "label": i18n.text(i18n.default_locale(), &i.label),
+            "screen": i.screen,
+        })).collect::<Vec<_>>(),
+        "groups": g.groups.iter().map(|s| menu_json(i18n, s)).collect::<Vec<_>>(),
+    })
 }
 
 /// The logo of `App::logo`: a path on the app's origin, with an optional dark theme variant.
@@ -3184,7 +3862,11 @@ fn logo_problem(path: &str) -> Option<String> {
             .chars()
             .all(|c| c.is_ascii_graphic() && !"\"'<>`\\".contains(c));
     (!ok).then(|| {
-        format!("logo `{path}` is not a path on the app's origin\n  = help: serve the file from the app and pass its path, such as `/static/logo.svg`")
+        crate::Problem::new("Z0111", format!("logo `{path}` is not a path on the app's origin"))
+    .why("the page's CSP loads images from the app only, so a logo from elsewhere would not show")
+    .fix("serve the file from the app and pass its path, such as `/static/logo.svg`")
+    .docs("components/shell#the-app-header")
+    .to_string()
     })
 }
 
@@ -3430,6 +4112,38 @@ async fn identity_for_ranges(mut req: axum::extract::Request) -> axum::extract::
     req
 }
 
+/// A file of the app's `public/` folder, embedded by [`public_files!`](crate::public_files).
+#[derive(Clone, Copy, Debug)]
+pub struct PublicFile {
+    /// The path it answers, such as `/favicon.svg`.
+    pub path: &'static str,
+    pub bytes: &'static [u8],
+    pub content_type: &'static str,
+}
+
+/// Serves a public file: `304` when the browser holds this version, otherwise the bytes,
+/// cached for an hour and `nosniff`.
+fn public_file(file: &PublicFile, tag: &str, headers: &HeaderMap) -> Response {
+    let fresh = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.split(',').any(|t| t.trim() == tag));
+    let mut r = if fresh {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        ([(header::CONTENT_TYPE, file.content_type)], file.bytes).into_response()
+    };
+    let h = r.headers_mut();
+    h.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=3600"),
+    );
+    if let Ok(v) = HeaderValue::from_str(tag) {
+        h.insert(header::ETAG, v);
+    }
+    r
+}
+
 fn asset(body: &'static str, content_type: &'static str) -> Response {
     (
         [
@@ -3481,7 +4195,7 @@ async fn page(
     name: &'static str,
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
-    let (ctx, theme_cookie) = theme::remember(&st, ctx, &headers).await;
+    let (ctx, look_cookies) = theme::remember(&st, ctx, &headers).await;
     let meta = st
         .screens
         .get(name)
@@ -3522,7 +4236,11 @@ async fn page(
             .preload(&ctx, screen.walk(), name)
             .await;
         let r = user_render(name, &ctx);
+        #[cfg(debug_assertions)]
+        let rendering = Instant::now();
         let html = screen.render(&r, &entry.meta, &params, &loaded);
+        #[cfg(debug_assertions)]
+        devtools::render(rendering.elapsed());
         let head = screen.head_html(&r, &st.site_url, &st.prefix);
         Ok::<_, Failure>((ctx.t(screen.title()), html, head))
     }
@@ -3573,7 +4291,9 @@ async fn page(
             }
         }
         Ok((title, html, head)) => {
-            let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
+            checks::log(name, &html);
+            let menu = st.dynamic_menu(&ctx, Some(name)).await;
+            let mut page = st.shell_menu(&ctx, &csrf, &title, &html, Some(name), &menu);
             if !head.is_empty() {
                 page = page.replacen("</head>", &format!("{head}</head>"), 1);
             }
@@ -3642,13 +4362,23 @@ async fn page(
                 .await
         }
     };
-    let mut response = response;
+    let mut response = if open
+        || response
+            .headers()
+            .contains_key(header::CACHE_CONTROL)
+    {
+        response
+    } else {
+        private_page(response)
+    };
     if let Ok(lang) = HeaderValue::from_str(ctx.locale()) {
         response
             .headers_mut()
             .insert(header::CONTENT_LANGUAGE, lang);
     }
-    with_cookie(with_cookie(response, set), theme_cookie)
+    look_cookies
+        .into_iter()
+        .fold(with_cookie(response, set), |r, c| with_cookie(r, Some(c)))
 }
 
 /// Strong ETag over the parts of a rendered body; `kind` keeps full pages and partial screens
@@ -3700,7 +4430,8 @@ fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds:
     response
 }
 
-/// A cacheable screen opened with a session: never stored.
+/// A page or screen fragment of a request with a session (or of a screen that is not public):
+/// never stored, so records do not stay in the browser's disk cache after sign out.
 fn private_page(mut response: Response) -> Response {
     response.headers_mut().insert(
         header::CACHE_CONTROL,
@@ -3759,10 +4490,10 @@ async fn screen_fragment(
     }
     .await;
     st.after(&ctx, &call, started, &result);
-    match result {
+    private_page(match result {
         Ok(html) => Html(html).into_response(),
         Err(f) => st.error_response(&ctx, f),
-    }
+    })
 }
 
 async fn route_redirect(
@@ -3928,9 +4659,61 @@ impl AppState {
             })
             .await;
         let effects = result?;
+        #[cfg(debug_assertions)]
+        devtools::effects(&effects);
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }
+}
+
+/// `GET /_zeyn/menu/counts`: the numbers of the side menu's counted items, by the name of the
+/// action that counts them, for the actions the user may run in features whose guards pass. The
+/// counts run at the same time, each within the app's time limit; one that fails is left out.
+async fn menu_counts(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    fn collect(g: &crate::feature::MenuGroup, ctx: &Ctx, out: &mut Vec<crate::feature::MenuCount>) {
+        for item in &g.items {
+            if let Some(c) = item.count
+                && ctx.identity().can(&c.action.access)
+                && !out
+                    .iter()
+                    .any(|o| o.action.name == c.action.name)
+            {
+                out.push(c);
+            }
+        }
+        for sub in &g.groups {
+            collect(sub, ctx, out);
+        }
+    }
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    let mut counts = Vec::new();
+    for f in &st.features {
+        if f.site_shell().is_some() || f.check_guards(&ctx).is_err() {
+            continue;
+        }
+        for g in f.menu_groups() {
+            collect(g, &ctx, &mut counts);
+        }
+    }
+    let runs = counts.iter().map(|c| {
+        let st = &st;
+        let ctx = ctx.clone();
+        async move {
+            st.timed((c.run)(ctx))
+                .await
+                .ok()
+                .map(|n| (c.action.name.to_string(), json!(n)))
+        }
+    });
+    let found: serde_json::Map<String, Json> = futures_util::future::join_all(runs)
+        .await
+        .into_iter()
+        .flatten()
+        .collect();
+    let mut r = axum::Json(Json::Object(found)).into_response();
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r
 }
 
 async fn menu_call(
@@ -3997,7 +4780,19 @@ async fn set_locale(
 
 /// RFC 9457 problem details response.
 fn problem(ctx: &Ctx, failure: Failure) -> Response {
-    let (status, code, message) = match &failure {
+    let (status, body) = problem_body(ctx, &failure);
+    let mut response = (status, body.to_string()).into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/problem+json"),
+    );
+    response
+}
+
+/// The status and the `application/problem+json` body (RFC 9457) of a failure, in the user's
+/// language. HTTP answers and answers over the live socket share it.
+fn problem_body(ctx: &Ctx, failure: &Failure) -> (StatusCode, Json) {
+    let (status, code, message) = match failure {
         Failure::Timeout => (
             StatusCode::GATEWAY_TIMEOUT,
             "timeout",
@@ -4037,12 +4832,7 @@ fn problem(ctx: &Ctx, failure: Failure) -> Response {
             .map(|e| json!({ "field": e.field, "rule": e.rule, "message": ctx.t(&e.message) }))
             .collect();
     }
-    let mut response = (status, body.to_string()).into_response();
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/problem+json"),
-    );
-    response
+    (status, body)
 }
 
 #[derive(Deserialize)]

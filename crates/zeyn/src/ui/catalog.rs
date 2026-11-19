@@ -337,6 +337,57 @@ impl ImageCard {
     }
 }
 
+/// The id of a sortable list's help text, which every handle points to.
+fn help_id(r: &Render) -> String {
+    dom_id(r, "sort-help")
+}
+
+/// The drag handle of a row of a sortable list: hidden until `sortable.js` runs, which also
+/// names it after its row.
+fn handle(r: &Render) -> String {
+    format!(
+        r#"<button type="button" class="z-sort-handle z-drag-handle" aria-label="{}" aria-describedby="{}" aria-haspopup="menu" aria-expanded="false">{}</button>"#,
+        r.text(&Text::key("zeyn.ui.sortable.handle_plain")),
+        help_id(r),
+        crate::screen::Icon::Grip.html()
+    )
+}
+
+/// The texts `sortable.js` speaks and shows, as JSON for `data-texts`.
+fn sort_texts(r: &Render) -> String {
+    let mut texts = serde_json::Map::new();
+    for key in [
+        "handle",
+        "lifted",
+        "moved",
+        "dropped",
+        "cancelled",
+        "refused",
+        "up",
+        "down",
+        "top",
+        "bottom",
+        "menu",
+        "to_list",
+        "select",
+        "deselect",
+        "selected",
+        "deselected",
+        "too_many",
+        "is_selected",
+        "moved_to",
+    ] {
+        texts.insert(
+            key.into(),
+            Json::String(
+                r.i18n
+                    .text(r.locale, &Text::key(format!("zeyn.ui.sortable.{key}"))),
+            ),
+        );
+    }
+    attr(&Json::Object(texts))
+}
+
 /// Whether an image address may go in a card or list row: a path of the app, an `https:`
 /// address or a `data:image/` URI.
 pub(crate) fn safe_image(src: &str) -> bool {
@@ -377,7 +428,7 @@ pub(crate) fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
 ///     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()).text(p.price.to_string())
 ///         .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
 ///         .link(product_page, ProductParams { id: p.id }))
-///     .sort_option(t!("shop.by_name"), Product::name, false)
+///     .sort_option(t!("shop.by_name"), Product::name)
 ///     .paging(Paging::infinite(24))
 /// ```
 pub struct CardGrid<E: Model> {
@@ -399,6 +450,9 @@ pub struct CardGrid<E: Model> {
     row_height: Option<u32>,
     placeholder: Option<Placeholder>,
     priority: usize,
+    empty: Option<super::EmptyState>,
+    empty_filtered: Option<super::EmptyState>,
+    reorder: Option<super::reorder::Sortable>,
 }
 
 type BuildFn<E> = Box<dyn Fn(&E) -> Node + Send + Sync>;
@@ -462,6 +516,42 @@ impl<E: Model> CardGrid<E> {
             row_height: None,
             placeholder: None,
             priority: 0,
+            empty: None,
+            empty_filtered: None,
+            reorder: None,
+        }
+    }
+
+    /// What shows when there are no rows, in place of the built in "Nothing here": a title, a
+    /// text and an action, such as "No products yet" with "Add a product". With
+    /// [`CardGrid::empty_filtered`] it shows only when there is no search text.
+    pub fn empty(mut self, state: super::EmptyState) -> Self {
+        self.empty = Some(state);
+        self
+    }
+
+    /// What shows when a search leaves no rows, such as "Nothing matches" with a hint.
+    pub fn empty_filtered(mut self, state: super::EmptyState) -> Self {
+        self.empty_filtered = Some(state);
+        self
+    }
+
+    /// The empty state's HTML: the app's own for the case at hand, or the built in text.
+    fn empty_html(&self, r: &Render, fallback: String) -> String {
+        let state = if self.search.is_empty() {
+            self.empty.as_ref()
+        } else {
+            self.empty_filtered
+                .as_ref()
+                .or(self.empty.as_ref())
+        };
+        match state {
+            Some(s) => {
+                let mut out = String::new();
+                s.render(&mut out, r);
+                out
+            }
+            None => fallback,
         }
     }
 
@@ -489,8 +579,9 @@ impl<E: Model> CardGrid<E> {
     /// A node shown between two rows, such as a divider or a dot. It is hidden from screen
     /// readers, which count the rows themselves. Not used with virtual scrolling, where every
     /// row has the same height.
+    #[track_caller]
     pub fn separator(mut self, node: impl Into<Node>) -> Self {
-        self.separator = Some(node.into());
+        self.separator = Some(Node::placed(node));
         self
     }
 
@@ -521,8 +612,84 @@ impl<E: Model> CardGrid<E> {
 
     /// Keeps the scrollbar of a [`Rail`] visible (thin). Rails hide it by default; card grids and
     /// lists do not scroll sideways, so it changes nothing for them.
-    pub fn scrollbar(mut self, show: bool) -> Self {
-        self.scrollbar = show;
+    pub fn scrollbar(mut self) -> Self {
+        self.scrollbar = true;
+        self
+    }
+
+    /// Lets people put the rows in their own order: each row gets a handle that drags it (mouse,
+    /// pen, or a touch held for a quarter second), moves it with the keyboard (Space lifts it,
+    /// the arrow keys move it, Space drops it, Escape puts it back; Alt with Up or Down moves it
+    /// at once) and opens a move menu on click or Enter (up, down, to the top, to the end), the
+    /// single pointer way to move (WCAG 2.5.7). Every step is announced.
+    ///
+    /// A move shows at once and sends `reorder` a [`crate::ReorderRequest`] with the keys of the
+    /// row and its new neighbors through `POST /_zeyn/data`; the action stores the rank from
+    /// [`crate::ReorderRequest::rank`] in the `rank` field, and the list asks the source action
+    /// for its rows rising by that field (on every request, whatever the client sends). When the
+    /// action refuses (no permission, a neighbor from another list, or `Error::Conflict` because
+    /// someone else moved rows first), the row goes back and the reason is shown. Sort options
+    /// are left out and numbered pages load more instead, because the user's order is the order.
+    /// A list with `Paging::virtual_scroll()` stays virtual: a dragged row scrolls the list when
+    /// it is held near its top or bottom edge (as every sortable list and the page do), and the
+    /// rows show the new order once the server has stored it.
+    ///
+    /// ```ignore
+    /// #[action(permission = "tasks.write")]
+    /// pub async fn reorder_tasks(r: ReorderRequest<TaskId>, db: Db) -> Result<()> {
+    ///     let rank = r.rank(|k| db.rank_of(*k))?;
+    ///     db.set_rank(r.key, rank).await
+    /// }
+    ///
+    /// List::of(search_tasks)
+    ///     .item(|t: &Task| ListItem::new(t.title.clone()))
+    ///     .sortable(Task::rank, reorder_tasks)
+    /// ```
+    pub fn sortable<A, K>(mut self, rank: crate::model::Field<E, crate::Rank>, _reorder: A) -> Self
+    where
+        A: crate::action::Action<Input = crate::ReorderRequest<K>>,
+        A::Output: crate::ctx::Outcome,
+        K: serde::de::DeserializeOwned + Send + Sync + 'static,
+    {
+        self.reorder = Some(super::reorder::Sortable::new(
+            rank.meta().name,
+            super::reorder::source::<A, K>,
+        ));
+        self
+    }
+
+    /// Joins this sortable list to the other lists of the screen with the same `group`, so rows
+    /// move between them: dragged onto another list, or with "Move to" in the move menu. `id`
+    /// names this list for the reorder action ([`crate::ReorderRequest::list`] and
+    /// [`crate::ReorderRequest::from`]); it comes from the screen, never from the browser, and
+    /// the server checks the permission of both lists' actions. Give each list a title, which the
+    /// move menu shows. Virtual lists do not take part.
+    /// Call it after [`CardGrid::sortable`]; without it, it does nothing.
+    ///
+    /// ```ignore
+    /// List::of(todo_tasks)
+    ///     .title("To do")
+    ///     .item(|t: &Task| ListItem::new(t.title.clone()))
+    ///     .sortable(Task::rank, move_tasks)
+    ///     .connect("tasks", "todo")
+    /// ```
+    pub fn connect(mut self, group: &'static str, id: impl Into<String>) -> Self {
+        let id = id.into();
+        self.reorder = self
+            .reorder
+            .map(|s| s.with(|setup| setup.link = Some((group, id))));
+        self
+    }
+
+    /// Lets people select several rows of a sortable list (Control or Command with a click on a
+    /// handle, or "Select for moving" in the move menu) and move them together, up to
+    /// [`crate::ReorderRequest::MAX_ROWS`]. The reorder action then gets the other rows in
+    /// [`crate::ReorderRequest::rest`] and stores [`crate::ReorderRequest::ranks`]. Call it after
+    /// [`CardGrid::sortable`].
+    pub fn multi_select(mut self) -> Self {
+        self.reorder = self
+            .reorder
+            .map(|s| s.with(|setup| setup.multi = true));
         self
     }
 
@@ -560,17 +727,26 @@ impl<E: Model> CardGrid<E> {
         self
     }
 
-    /// A sort order users can pick. The first one is the order the cards start in.
-    pub fn sort_option<T>(
-        mut self,
+    /// A sort order users can pick, rising by `field`. The first one is the order the cards
+    /// start in.
+    pub fn sort_option<T>(self, label: impl Into<Text>, field: crate::model::Field<E, T>) -> Self {
+        self.sort_choice(label.into(), field.meta().name, false)
+    }
+
+    /// A sort order users can pick, falling by `field` (newest, dearest first).
+    pub fn sort_option_desc<T>(
+        self,
         label: impl Into<Text>,
         field: crate::model::Field<E, T>,
-        desc: bool,
     ) -> Self {
+        self.sort_choice(label.into(), field.meta().name, true)
+    }
+
+    fn sort_choice(mut self, label: Text, field: &str, desc: bool) -> Self {
         self.sorts.push((
-            label.into(),
+            label,
             Sort {
-                field: field.meta().name.to_string(),
+                field: field.to_string(),
                 desc,
             },
         ));
@@ -659,7 +835,7 @@ impl<E: Model> CardGrid<E> {
     }
 
     fn pages(&self) -> bool {
-        matches!(self.paging, Paging::Pages { .. }) && !self.rail
+        matches!(self.paging, Paging::Pages { .. }) && !self.rail && self.reorder.is_none()
     }
 
     /// The query the server runs: the client's position and one of the offered sort orders; the
@@ -695,6 +871,12 @@ impl<E: Model> CardGrid<E> {
                     .first()
                     .map(|(_, s)| s.clone()),
             );
+        }
+        if let Some(sortable) = &self.reorder {
+            query.sort = vec![Sort {
+                field: sortable.rank.to_string(),
+                desc: false,
+            }];
         }
         query.filters.clone_from(&self.scope);
         query.q = self.search.clone();
@@ -744,7 +926,8 @@ impl<E: Model> CardGrid<E> {
                 ),
                 _ => continue,
             }
-            if self.builder.is_none() && place.is_none() && (self.list || self.rail) {
+            let sortable = self.reorder.is_some();
+            if self.builder.is_none() && place.is_none() && (self.list || self.rail) && !sortable {
                 continue;
             }
             let mut attrs = key
@@ -760,6 +943,9 @@ impl<E: Model> CardGrid<E> {
             }
             if out[start..].starts_with("<li") {
                 out.insert_str(start + 3, &attrs);
+                if let (true, Some(open)) = (sortable, out[start..].find('>')) {
+                    out.insert_str(start + open + 1, &handle(r));
+                }
             }
         }
         out
@@ -795,10 +981,34 @@ impl<E: Model> CardGrid<E> {
             .map(|t| r.text(t))
             .unwrap_or_else(|| t("list"));
         out.push_str(&format!(
-            r#"<section class="z-cards z-cards-rows z-vlist" data-zeyn-vlist data-zeyn-row-height="{height}" data-zeyn-block="{block}" data-zeyn-total="{total}" data-testid="{}.cards" data-text-error="{}">"#,
+            r#"<section class="z-cards z-cards-rows z-vlist{}" data-zeyn-vlist data-zeyn-row-height="{height}" data-zeyn-block="{block}" data-zeyn-total="{total}" data-testid="{}.cards" data-text-error="{}"{}>"#,
+            if self.reorder.is_some() {
+                " z-sortable"
+            } else {
+                ""
+            },
             r.scope,
             t("error"),
+            if self.reorder.is_some() {
+                format!(
+                    r#" data-zeyn-sortable data-texts="{}"{}"#,
+                    sort_texts(r),
+                    self.reorder
+                        .as_ref()
+                        .map(|s| s.attrs())
+                        .unwrap_or_default()
+                )
+            } else {
+                String::new()
+            },
         ));
+        if self.reorder.is_some() {
+            out.push_str(&format!(
+                r#"<p class="z-sr-only" id="{}">{}</p>"#,
+                help_id(r),
+                r.text(&Text::key("zeyn.ui.sortable.help"))
+            ));
+        }
         if self.title.is_some() {
             out.push_str(&format!(
                 r#"<div class="z-cards-head"><h2 class="z-cards-title" id="{id}-title">{title}</h2></div>"#
@@ -811,9 +1021,9 @@ impl<E: Model> CardGrid<E> {
             out.push_str(&self.cards(p, r, true));
         }
         out.push_str(&format!(
-            r#"</ul></div><p class="z-cards-empty" data-zeyn-cards-empty{}>{}</p><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-cards-status></p></section>"#,
+            r#"</ul></div><div class="z-cards-empty" data-zeyn-cards-empty{}>{}</div><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-cards-status></p></section>"#,
             if total == 0 { "" } else { " hidden" },
-            t("empty")
+            self.empty_html(r, t("empty"))
         ));
     }
 
@@ -835,7 +1045,12 @@ impl<E: Model> CardGrid<E> {
             String::new()
         };
         out.push_str(&format!(
-            r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-page-only="{}" data-text-error="{}""#,
+            r#"<section class="{class}{}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-page-only="{}" data-text-error="{}""#,
+            if self.reorder.is_some() {
+                " z-sortable"
+            } else {
+                ""
+            },
             if self.pages() { "pages" } else { "infinite" },
             r.scope,
             t("loaded"),
@@ -861,7 +1076,21 @@ impl<E: Model> CardGrid<E> {
                 out.push_str(&format!(r#" data-zeyn-next="{}""#, escape(next)));
             }
         }
+        if let Some(sortable) = &self.reorder {
+            out.push_str(&format!(
+                r#" data-zeyn-sortable data-texts="{}"{}"#,
+                sort_texts(r),
+                sortable.attrs()
+            ));
+        }
         out.push('>');
+        if self.reorder.is_some() {
+            out.push_str(&format!(
+                r#"<p class="z-sr-only" id="{}">{}</p>"#,
+                help_id(r),
+                r.text(&Text::key("zeyn.ui.sortable.help"))
+            ));
+        }
         let title = self
             .title
             .as_ref()
@@ -872,7 +1101,7 @@ impl<E: Model> CardGrid<E> {
                 )
             })
             .unwrap_or_default();
-        let sorts = if self.sorts.len() > 1 && !self.rail {
+        let sorts = if self.sorts.len() > 1 && !self.rail && self.reorder.is_none() {
             let options: String = self
                 .sorts
                 .iter()
@@ -917,9 +1146,9 @@ impl<E: Model> CardGrid<E> {
         out.push_str("</ul>");
         let empty = page.is_none_or(|p| p.count == 0);
         out.push_str(&format!(
-            r#"<p class="z-cards-empty" data-zeyn-cards-empty{}>{}</p>"#,
+            r#"<div class="z-cards-empty" data-zeyn-cards-empty{}>{}</div>"#,
             if empty { "" } else { " hidden" },
-            t("empty")
+            self.empty_html(r, t("empty"))
         ));
         let more = page.is_some_and(|p| p.next.is_some());
         if self.pages() {
@@ -1044,6 +1273,10 @@ impl<E: Model> Component for CardGrid<E> {
             "paging": self.paging,
             "sorts": self.sorts.iter().map(|(l, s)| json!({ "label": l, "field": s.field, "desc": s.desc })).collect::<Vec<_>>(),
             "search": self.search,
+            "reorder": self
+                .reorder
+                .as_ref()
+                .map(|s| json!({ "rank": s.rank, "action": s.source.action(), "group": s.source.link().map(|(g, _)| g) })),
         })
     }
 
@@ -1051,13 +1284,36 @@ impl<E: Model> Component for CardGrid<E> {
         Some(self)
     }
 
+    fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        match key {
+            "reorder" => self
+                .reorder
+                .as_ref()
+                .map(|s| s.source.as_ref()),
+            _ => None,
+        }
+    }
+
     fn page_check(&self, check: &mut super::PageCheck) {
         let scrolls = matches!(self.paging, Paging::Virtual { .. }) && self.list;
         if scrolls && self.builder.is_some() && self.row_height.is_none() {
-            check.problem("a virtual list with `builder` needs `.row_height(px)`: virtual rows have one fixed height");
+            check.problem(
+                crate::Problem::new(
+                    "Z0608",
+                    "a virtual list with `builder` needs `.row_height(px)`",
+                )
+                .why("virtual rows have one fixed height, which the list needs to know before it draws them")
+                .fix("add `.row_height(px)` with the height of one row")
+                .docs("components/catalog#card-grid"),
+            );
         }
         if scrolls && self.separator.is_some() {
-            check.problem("`separator` does not work with virtual scrolling, where every row has the same height; leave it out or page the list");
+            check.problem(
+                crate::Problem::new("Z0609", "`separator` does not work with virtual scrolling")
+                    .why("every virtual row has the same height, and separators would change the heights")
+                    .fix("leave it out or page the list")
+                    .docs("components/catalog#card-grid"),
+            );
         }
     }
 }
@@ -1297,7 +1553,12 @@ impl<E: Model> Component for SearchBox<E> {
 
     fn page_check(&self, check: &mut super::PageCheck) {
         if self.results.is_some() && !self.drives.is_empty() {
-            check.problem("a search box either opens a results screen (`results`) or refreshes listeners in place (`drives`), not both");
+            check.problem(
+                crate::Problem::new("Z0610", "a search box sets both `results` and `drives`")
+                    .why("a search box either opens a results screen or refreshes listeners in place, and cannot do both with one query")
+                    .fix("keep `results` for a search page, or `drives` to filter the current page")
+                    .docs("components/catalog#search-box"),
+            );
         }
         for t in &self.drives {
             check.drives(t);

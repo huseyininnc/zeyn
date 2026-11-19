@@ -1,7 +1,9 @@
 /**
  * Trees (W3C APG tree view) with lazy children. Loaded only by pages that hold one
  * (`data-zeyn-tree`). Leaves of a draggable tree (`data-zeyn-tree-drag`) get `draggable` and
- * are described by the tree's insert hint; `treedrag.js` handles the drag and the insert.
+ * are described by the tree's insert hint; `treedrag.js` handles the drag and the insert. Items
+ * of a movable tree (`data-zeyn-tree-move`) are described by its move hint, and `treedrag.js`
+ * moves them; `zeyn:tree-reload` on the tree then loads the changed levels again.
  * @module tree
  */
 const K = await import(new URL(`components.js${new URL(import.meta.url).search}`, import.meta.url).href);
@@ -31,6 +33,9 @@ function treeItems(wrap, items, level) {
     } else if (wrap.dataset.zeynTreeDrag !== undefined) {
       li.draggable = true;
       li.setAttribute('aria-describedby', `${wrap.zeynId}-keys`);
+    }
+    if (wrap.dataset.zeynTreeMove !== undefined) {
+      li.setAttribute('aria-describedby', `${li.getAttribute('aria-describedby') ?? ''} ${wrap.zeynId}-move`.trim());
     }
     const row = make('span', 'z-tree-row');
     row.append(make('span', 'z-tree-toggle', { 'aria-hidden': 'true' }), make('span', 'z-tree-label', { text: item.label }));
@@ -62,6 +67,8 @@ function initTrees(root) {
     wrap.zeynId = `z-tree-${K.uid()}`;
     const keys = wrap.querySelector(':scope > .z-tree-keys');
     if (keys) keys.id = `${wrap.zeynId}-keys`;
+    const moveKeys = wrap.querySelector(':scope > .z-tree-move-keys');
+    if (moveKeys) moveKeys.id = `${wrap.zeynId}-move`;
     const tree = wrap.querySelector('[role="tree"]');
     await loadTree(wrap, tree, null, 1);
     const first = tree.querySelector('[role="treeitem"]');
@@ -154,6 +161,31 @@ function treeKey(e, li) {
   return true;
 }
 
+/**
+ * Loads the levels under `parents` (ids, `null` for the top level) of a tree again, the higher
+ * ones first, opens them, and focuses the item `focus` when it is in view.
+ */
+async function reloadTree(wrap, { parents = [], focus = null } = {}) {
+  const tree = wrap.querySelector('[role="tree"]');
+  const find = (id) => [...tree.querySelectorAll('[role="treeitem"]')].find((x) => x.dataset.id === id);
+  const depth = (id) => (id == null ? 0 : Number(find(id)?.getAttribute('aria-level') ?? 1e9));
+  for (const parent of [...parents].sort((a, b) => depth(a) - depth(b))) {
+    if (parent == null) {
+      await loadTree(wrap, tree, null, 1);
+      continue;
+    }
+    const li = find(parent);
+    if (!li) continue;
+    li.querySelector(':scope > [role="group"]')?.remove();
+    li.setAttribute('aria-expanded', 'false');
+    li.dataset.lazy = '';
+    await toggleItem(li, true);
+  }
+  const moved = focus == null ? null : find(focus);
+  const target = moved && visibleItems(tree).includes(moved) ? moved : tree.querySelector('[role="treeitem"]');
+  if (target) focusItem(target);
+}
+
 /* Setup -------------------------------------------------------------------------------------- */
 
 initializers.push(initTrees);
@@ -171,6 +203,11 @@ clickHandlers.push((e, t) => {
     if (li.hasAttribute('aria-expanded')) toggleItem(li);
   }
   return true;
+});
+
+document.addEventListener('zeyn:tree-reload', (e) => {
+  const wrap = e.target instanceof Element ? e.target.closest('[data-zeyn-tree]') : null;
+  if (wrap) reloadTree(wrap, e.detail ?? {});
 });
 
 initTrees(document);

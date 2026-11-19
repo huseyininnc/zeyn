@@ -3,7 +3,7 @@
 تحفظ `zeyn::sql` الكيانات (entities) في قاعدة بيانات SQL. تسردها من `DataQuery` الذي ترسله الشبكة (المرشحات والفرز والصفحات والمجاميع والتجميعات) وتحفظها مع فحوص نسخة الصف. PostgreSQL خلف ميزة Cargo المسماة `postgres`، وOracle خلف `oracle`، فلا يصرّف تطبيق بلا قاعدة بيانات شيئاً منها.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.11", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## الإعداد
@@ -123,6 +123,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | كل مجموعة بين قوسين، ومرشحاتها ومجموعاتها مربوطة بـ `OR` (`any`) أو `AND` |
 
 يُتجاهل `contains` على أعمدة المال ونعم/لا في SQL. يُفرز النص بترتيب قاعدة البيانات (Oracle: `NLS_SORT`).
 
@@ -244,11 +245,11 @@ tx.commit().await?;
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test all postgres::
 
 docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 ```
 
 تستغرق حاويات Oracle بضع دقائق لتبدأ؛ انتظر ظهور `DATABASE IS READY TO USE!` في `docker logs`.

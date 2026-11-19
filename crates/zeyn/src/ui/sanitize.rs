@@ -20,6 +20,7 @@
 //! their ids apart.
 
 use crate::render::escape_into;
+use std::collections::HashSet;
 
 /// SVG elements a page may hold, by canonical name.
 const SVG: &[&str] = &[
@@ -466,9 +467,13 @@ pub(crate) fn clean(html: &str, prefix: &str) -> String {
         open: Vec::new(),
         svg: 0,
         uses: 0,
+        use_spans: Vec::new(),
+        open_uses: Vec::new(),
+        holds_use: HashSet::new(),
         prefix,
     };
     s.run();
+    s.drop_nested_uses();
     s.out
 }
 
@@ -483,9 +488,16 @@ struct Sanitizer<'a, 'p> {
     src: &'a str,
     at: usize,
     out: String,
-    open: Vec<&'static str>,
+    /// Open elements, with the id each one carries.
+    open: Vec<(&'static str, Option<String>)>,
     svg: usize,
     uses: usize,
+    /// Every `use` written: where it starts and ends in `out`, and the id it references.
+    use_spans: Vec<(usize, usize, Option<String>)>,
+    /// Indexes into `use_spans` of the `use` elements still open.
+    open_uses: Vec<usize>,
+    /// Ids of elements that are a `use` or hold one.
+    holds_use: HashSet<String>,
     prefix: &'p str,
 }
 
@@ -564,9 +576,39 @@ impl<'a> Sanitizer<'a, '_> {
             }
             self.markup();
         }
-        while let Some(name) = self.open.pop() {
+        while let Some((name, _)) = self.open.pop() {
             self.close(name);
         }
+    }
+
+    /// Removes every `use` whose target is a `use` or holds one.
+    ///
+    /// A `use` renders a copy of its target, so a target with `use` elements inside multiplies:
+    /// ten groups that each hold ten uses of the previous group render 10^10 copies from 100
+    /// elements, and `MAX_USE_ELEMENTS` alone does not stop that. Allowing only targets without
+    /// a `use` keeps every reference one level deep, so the copies a fragment renders grow with
+    /// its size, and a cycle (`a` uses `b`, `b` uses `a`) is removed with it. This is simpler
+    /// than counting the expansion of the reference graph and keeps icon sprites, whose symbols
+    /// hold shapes, working. Targets are known only once the whole fragment is read, so this
+    /// runs after it.
+    fn drop_nested_uses(&mut self) {
+        if self.holds_use.is_empty() {
+            return;
+        }
+        let mut out = String::with_capacity(self.out.len());
+        let mut at = 0;
+        for (start, end, target) in &self.use_spans {
+            let nested = target
+                .as_ref()
+                .is_some_and(|t| self.holds_use.contains(t));
+            if *start < at || !nested {
+                continue;
+            }
+            out.push_str(&self.out[at..*start]);
+            at = *end;
+        }
+        out.push_str(&self.out[at..]);
+        self.out = out;
     }
 
     /// Reads what starts at a `<`.
@@ -791,14 +833,24 @@ impl<'a> Sanitizer<'a, '_> {
         if self.open.len() >= MAX_DEPTH {
             return;
         }
+        let start = self.out.len();
         self.out.push('<');
         self.out.push_str(name);
         let mut seen: Vec<&str> = Vec::new();
+        let mut id = None;
+        let mut target = None;
         for (attr, value) in tag.attrs.iter().take(MAX_ATTRS) {
             if let Some((canonical, value)) = self.attr(name, attr, *value)
                 && !seen.contains(&canonical)
             {
                 seen.push(canonical);
+                if canonical == "id" {
+                    id = Some(value.clone());
+                } else if name == "use" && canonical == "href" {
+                    target = value
+                        .strip_prefix('#')
+                        .map(str::to_string);
+                }
                 self.out.push(' ');
                 self.out.push_str(canonical);
                 self.out.push_str("=\"");
@@ -819,7 +871,25 @@ impl<'a> Sanitizer<'a, '_> {
             if name == "svg" {
                 self.svg += 1;
             }
-            self.open.push(name);
+            self.open.push((name, id.clone()));
+        }
+        if name == "use" {
+            let open_ids = self
+                .open
+                .iter()
+                .filter_map(|(_, id)| id.clone());
+            self.holds_use.extend(open_ids);
+            self.holds_use.extend(id);
+            let end = match tag.closed {
+                true => self.out.len(),
+                false => {
+                    self.open_uses
+                        .push(self.use_spans.len());
+                    usize::MAX
+                }
+            };
+            self.use_spans
+                .push((start, end, target));
         }
     }
 
@@ -827,12 +897,12 @@ impl<'a> Sanitizer<'a, '_> {
         let Some(i) = self
             .open
             .iter()
-            .rposition(|n| n.eq_ignore_ascii_case(name))
+            .rposition(|(n, _)| n.eq_ignore_ascii_case(name))
         else {
             return;
         };
         while self.open.len() > i {
-            if let Some(n) = self.open.pop() {
+            if let Some((n, _)) = self.open.pop() {
                 self.close(n);
             }
         }
@@ -845,6 +915,11 @@ impl<'a> Sanitizer<'a, '_> {
         self.out.push_str("</");
         self.out.push_str(name);
         self.out.push('>');
+        if name == "use"
+            && let Some(i) = self.open_uses.pop()
+        {
+            self.use_spans[i].1 = self.out.len();
+        }
     }
 
     /// Text with character references, decoded and escaped again.

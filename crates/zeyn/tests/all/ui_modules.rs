@@ -1,0 +1,484 @@
+//! Browser modules: a page links the scripts and styles of the components it holds and nothing
+//! else; the runtime gets the same table for content that arrives later.
+
+use axum::body::Body;
+use axum::http::{HeaderMap, Request, StatusCode};
+use http_body_util::BodyExt;
+use std::sync::{Arc, RwLock};
+use tower::ServiceExt;
+use zeyn::prelude::*;
+use zeyn::{I18n, Identity};
+
+#[entity(table = "trips")]
+pub struct Trip {
+    #[key]
+    pub id: TripId,
+    pub name: String,
+    pub day: Option<Date>,
+}
+
+#[derive(Clone, Default)]
+pub struct Store(Arc<RwLock<Vec<Trip>>>);
+
+impl Service for Store {}
+
+#[action(permission = "trips.read")]
+pub async fn search_trips(q: DataQuery, store: Store) -> Result<Page<Trip>> {
+    Ok(q.apply(store.0.read().unwrap().clone()))
+}
+
+#[screen(route = "/plain", permission = "trips.read")]
+pub fn plain() -> Screen {
+    Screen::new("Plain").body(Paragraph::new("Only text"))
+}
+
+#[screen(route = "/trips", permission = "trips.read")]
+pub fn trips() -> Screen {
+    Screen::new("Trips").body(
+        DataGrid::of(search_trips)
+            .column(Trip::name)
+            .column(Trip::day),
+    )
+}
+
+#[screen(route = "/trip", permission = "trips.read")]
+pub fn trip() -> Screen {
+    Screen::new("Trip").body(
+        Form::of(Trip::default())
+            .field(Trip::name)
+            .field(Trip::day),
+    )
+}
+
+#[screen(route = "/photo", permission = "trips.read")]
+pub fn photo() -> Screen {
+    Screen::new("Photo").body(
+        Image::new("/p.webp")
+            .alt("Photo")
+            .size(40, 40),
+    )
+}
+
+#[screen(route = "/photos", permission = "trips.read")]
+pub fn photos() -> Screen {
+    Screen::new("Photos").body(
+        Image::new("/p.webp")
+            .alt("Photo")
+            .size(40, 40)
+            .placeholder(Placeholder::color("#d9dde3")),
+    )
+}
+
+#[action(permission = "trips.read")]
+pub async fn trip_tree(_q: TreeQuery) -> Result<Vec<TreeItem>> {
+    Ok(vec![TreeItem::leaf("name", "Name")])
+}
+
+#[screen(route = "/plain-tree", permission = "trips.read")]
+pub fn plain_tree() -> Screen {
+    Screen::new("Tree").body(Tree::of(trip_tree).label("Fields"))
+}
+
+#[screen(route = "/drag-tree", permission = "trips.read")]
+pub fn drag_tree() -> Screen {
+    Screen::new("Tree").body(
+        Tree::of(trip_tree)
+            .label("Fields")
+            .draggable(),
+    )
+}
+
+#[screen(route = "/faq", permission = "trips.read")]
+pub fn faq() -> Screen {
+    Screen::new("Faq").body(Accordion::new().section("Shipping", Paragraph::new("Two days")))
+}
+
+#[screen(route = "/inspector", permission = "trips.read")]
+pub fn inspector() -> Screen {
+    Screen::new("Inspector").body(PropertyInspector::island("designer"))
+}
+
+#[screen(route = "/kpi-later", permission = "trips.read")]
+pub fn kpi_later() -> Screen {
+    Screen::new("Later").body(
+        Row::new().col(
+            zeyn::ui::Deferred::new(zeyn::ui::Kpi::new("Trips", 12.0)).skeleton(Skeleton::kpi()),
+        ),
+    )
+}
+
+#[screen(route = "/text-later", permission = "trips.read")]
+pub fn text_later() -> Screen {
+    Screen::new("Later").body(zeyn::ui::Deferred::new(Paragraph::new("Soon")))
+}
+
+fn app() -> axum::Router {
+    App::new("Test")
+        .i18n(I18n::new("en"))
+        .service(Store::default())
+        .auth(|_: &HeaderMap| Some(Identity::user("u").with_permissions(["trips.read"])))
+        .feature(
+            Feature::new("trips")
+                .screen(plain)
+                .screen(trips)
+                .screen(trip)
+                .screen(photo)
+                .screen(photos)
+                .screen(plain_tree)
+                .screen(drag_tree)
+                .screen(inspector)
+                .screen(faq)
+                .screen(kpi_later)
+                .screen(text_later),
+        )
+        .router()
+        .unwrap()
+}
+
+async fn get(path: &str) -> (StatusCode, String) {
+    let res = app()
+        .oneshot(
+            Request::get(path)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = res.status();
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    (status, String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// The module table `zeyn.js` is served with: `(name, script selector, style selector)`.
+async fn table() -> Vec<(String, String, String)> {
+    let (status, js) = get("/_zeyn/zeyn.js").await;
+    assert_eq!(status, StatusCode::OK);
+    let start = js
+        .find("const MODULES = ")
+        .expect("the runtime carries the module table")
+        + "const MODULES = ".len();
+    let end = start + js[start..].find(";\n").unwrap();
+    serde_json::from_str(&js[start..end]).expect("the table is JSON")
+}
+
+/// Names of the framework scripts and styles a page links, such as `grid.js` or `charts.css`.
+fn links(page: &str) -> Vec<String> {
+    page.split("/_zeyn/")
+        .skip(1)
+        .filter_map(|s| {
+            let name = s.split('?').next()?;
+            (name.ends_with(".js") || name.ends_with(".css")).then(|| name.to_string())
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_screen_without_a_component_never_references_its_module() {
+    let (status, page) = get("/plain").await;
+    assert_eq!(status, StatusCode::OK);
+    let linked = links(&page);
+    let core = [
+        "zeyn.css",
+        "icons.css",
+        "zeyn.js",
+        "nav.js",
+        "enterprise.css",
+        "enterprise.js",
+        "components.css",
+        "content.css",
+        "pro.css",
+        "components.js",
+        "palette.js",
+    ];
+    for name in &linked {
+        assert!(
+            core.contains(&name.as_str()),
+            "a page with only text links {name}"
+        );
+    }
+    for (name, script, style) in table().await {
+        let on_shell = name == "components" || name == "palette";
+        if !script.is_empty() && !on_shell {
+            assert!(
+                !linked.contains(&format!("{name}.js")),
+                "{name}.js is linked by a page without {script}"
+            );
+        }
+        if !style.is_empty() {
+            assert!(
+                !linked.contains(&format!("{name}.css")),
+                "{name}.css is linked by a page without {style}"
+            );
+        }
+    }
+    assert!(!linked.contains(&"grid.js".to_string()));
+}
+
+#[tokio::test]
+async fn a_page_links_the_modules_of_its_components_with_what_they_import() {
+    let (_, grid) = get("/trips").await;
+    assert!(grid.contains(r#"<link rel="modulepreload" href="/_zeyn/grid.js?v="#));
+    assert!(!links(&grid).contains(&"dates.js".to_string()));
+    assert!(
+        !links(&grid).contains(&"menu.js".to_string()),
+        "the grid's data-zeyn-count is not a menu count"
+    );
+    let (_, form) = get("/trip").await;
+    let linked = links(&form);
+    for name in ["dates.js", "components.js"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
+    assert!(!linked.contains(&"grid.js".to_string()));
+    assert!(!linked.contains(&"lines.js".to_string()));
+    let at = |name: &str| {
+        form.find(&format!("/_zeyn/{name}?"))
+            .unwrap()
+    };
+    assert!(
+        at("components.js") < at("dates.js"),
+        "a module comes after what it imports"
+    );
+}
+
+#[tokio::test]
+async fn the_tree_drag_script_comes_only_with_a_draggable_tree() {
+    let (_, still) = get("/plain-tree").await;
+    let linked = links(&still);
+    assert!(linked.contains(&"tree.js".to_string()));
+    assert!(!linked.contains(&"treedrag.js".to_string()));
+    let (_, drag) = get("/drag-tree").await;
+    let linked = links(&drag);
+    for name in ["components.js", "tree.js", "treedrag.js"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
+}
+
+#[tokio::test]
+async fn the_drag_core_comes_only_with_a_module_that_drags() {
+    let (_, grid) = get("/trips").await;
+    assert!(links(&grid).contains(&"drag.js".to_string()));
+    for path in ["/plain", "/trip", "/plain-tree"] {
+        let (_, page) = get(path).await;
+        let linked = links(&page);
+        for name in ["drag.js", "net.js"] {
+            assert!(!linked.contains(&name.to_string()), "{path} links {name}");
+        }
+    }
+    let (_, runtime) = get("/_zeyn/zeyn.js").await;
+    assert!(
+        !runtime.contains("drag.js"),
+        "the core never loads the drag core itself"
+    );
+    let (_, grid_js) = get("/_zeyn/grid.js").await;
+    assert!(grid_js.contains("drag.js${new URL(import.meta.url).search}"));
+    for name in ["drag", "net"] {
+        let (status, body) = get(&format!("/_zeyn/{name}.js")).await;
+        assert_eq!(status, StatusCode::OK, "{name}.js");
+        assert!(body.contains("@module"), "{name}.js");
+        assert!(!body.contains("innerHTML"), "{name}.js writes no HTML");
+    }
+    let (_, net) = get("/_zeyn/net.js").await;
+    assert!(net.contains("'x-zeyn-csrf'") && net.contains("credentials: 'same-origin'"));
+}
+
+#[tokio::test]
+async fn every_module_in_the_table_is_served_and_imports_the_shared_part_by_its_own_build() {
+    for (name, script, style) in table().await {
+        if !script.is_empty() {
+            let (status, body) = get(&format!("/_zeyn/{name}.js")).await;
+            assert_eq!(status, StatusCode::OK, "{name}.js");
+            assert!(body.contains("@module"), "{name}.js");
+            assert!(
+                !body.contains("_zeyn/components.js'") && !body.contains("from './"),
+                "{name}.js imports other modules with the build query of its own URL"
+            );
+        }
+        if !style.is_empty() {
+            let (status, _) = get(&format!("/_zeyn/{name}.css")).await;
+            assert_eq!(status, StatusCode::OK, "{name}.css");
+        }
+    }
+}
+
+#[tokio::test]
+async fn every_rule_of_a_module_stylesheet_is_under_one_of_its_markers() {
+    for (name, _, style) in table().await {
+        if style.is_empty() {
+            continue;
+        }
+        let markers: Vec<&str> = style
+            .split(", ")
+            .map(|s| s.trim_start_matches('.'))
+            .collect();
+        let (_, raw) = get(&format!("/_zeyn/{name}.css")).await;
+        let mut css = String::with_capacity(raw.len());
+        let mut text = raw.as_str();
+        while let Some(start) = text.find("/*") {
+            css.push_str(&text[..start]);
+            text = text[start..]
+                .find("*/")
+                .map_or("", |end| &text[start + end + 2..]);
+        }
+        css.push_str(text);
+        let mut rest = css.as_str();
+        while let Some(open) = rest.find('{') {
+            let selectors = rest[..open]
+                .rsplit(['}', ';'])
+                .next()
+                .unwrap()
+                .trim();
+            rest = &rest[open + 1..];
+            if selectors.starts_with('@') || selectors.is_empty() || !selectors.contains('.') {
+                continue;
+            }
+            for selector in selectors.split(',') {
+                let covered = selector
+                    .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+                    .any(|token| {
+                        markers
+                            .iter()
+                            .any(|m| token.starts_with(m))
+                    });
+                assert!(
+                    covered,
+                    "{name}.css styles `{}` without one of the markers {style}; add the component's class to `style` of its module in server/modules.rs",
+                    selector.trim()
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn the_media_script_comes_only_with_images_that_need_it() {
+    let (_, simple) = get("/photo").await;
+    let linked = links(&simple);
+    assert!(linked.contains(&"media.css".to_string()));
+    assert!(
+        !linked.contains(&"media.js".to_string()),
+        "a plain image needs no script"
+    );
+    let (_, progressive) = get("/photos").await;
+    let linked = links(&progressive);
+    assert!(linked.contains(&"media.css".to_string()) && linked.contains(&"media.js".to_string()));
+    let table = table().await;
+    let media = table
+        .iter()
+        .find(|(name, _, _)| name == "media")
+        .unwrap();
+    assert!(media.1.contains("[data-zeyn-img]") && media.2.contains(".z-img-host"));
+}
+
+#[tokio::test]
+async fn an_island_inspector_links_the_controls_of_its_field_templates() {
+    let (status, page) = get("/inspector").await;
+    assert_eq!(status, StatusCode::OK);
+    let linked = links(&page);
+    for name in ["inspector.js", "colors.js", "length.js", "inputs.js"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
+    let (_, form) = get("/trip").await;
+    let linked = links(&form);
+    for name in ["inspector.js", "colors.js", "length.js"] {
+        assert!(
+            !linked.contains(&name.to_string()),
+            "{name} on a plain form"
+        );
+    }
+}
+
+#[tokio::test]
+async fn display_styles_come_only_with_a_display_component() {
+    let (_, text_page) = get("/plain").await;
+    assert!(!links(&text_page).contains(&"display.css".to_string()));
+    let (status, faq_page) = get("/faq").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(links(&faq_page).contains(&"display.css".to_string()));
+}
+
+#[tokio::test]
+async fn a_kpi_skeleton_brings_the_chart_styles_that_size_it() {
+    let (status, kpi_page) = get("/kpi-later").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(kpi_page.contains("z-skeleton-kpi"));
+    assert!(links(&kpi_page).contains(&"charts.css".to_string()));
+    let (_, text_page) = get("/text-later").await;
+    assert!(!links(&text_page).contains(&"charts.css".to_string()));
+}
+
+/// An extension module named `name` with one marker.
+fn extension(name: &'static str, marker: &'static str) -> zeyn::Module {
+    zeyn::Module::new(name)
+        .js("export {};")
+        .marker(marker)
+}
+
+#[test]
+fn an_extension_module_that_keeps_the_naming_rule_is_registered() {
+    let _ = App::new("Test")
+        .module(extension("rating", "data-zeyn-rating-stars"))
+        .module(extension("rating-x", "z-rating-x-box"));
+}
+
+#[test]
+#[should_panic(expected = "the framework has a module or file with this name")]
+fn an_extension_module_cannot_take_the_name_of_a_framework_module() {
+    let _ = App::new("Test").module(extension("grid", "data-zeyn-grid-x"));
+}
+
+#[test]
+#[should_panic(expected = "the framework has a module or file with this name")]
+fn an_extension_module_cannot_take_the_name_of_a_core_file() {
+    let _ = App::new("Test").module(extension("nav", "data-zeyn-nav-x"));
+}
+
+#[test]
+#[should_panic(expected = "lower case letters, digits and single hyphens")]
+fn an_extension_module_name_is_a_plain_lower_case_name() {
+    let _ = App::new("Test").module(extension("../x", "data-zeyn-x-y"));
+}
+
+#[test]
+#[should_panic(expected = "must be an attribute `data-zeyn-rating-...`")]
+fn an_extension_marker_carries_the_module_name() {
+    let _ = App::new("Test").module(extension("rating", "data-zeyn-stars"));
+}
+
+#[test]
+#[should_panic(expected = "belongs to a framework module")]
+fn an_extension_marker_cannot_be_a_marker_of_the_framework() {
+    let _ = App::new("Test").module(extension("filter", "data-zeyn-filter-date"));
+}
+
+#[test]
+#[should_panic(expected = "is registered twice")]
+fn an_extension_module_is_registered_once() {
+    let _ = App::new("Test")
+        .module(extension("rating", "data-zeyn-rating-a"))
+        .module(extension("rating", "data-zeyn-rating-b"));
+}
+
+#[test]
+#[should_panic(expected = "is already a marker of module `rating`")]
+fn two_extension_modules_never_share_a_marker() {
+    let _ = App::new("Test")
+        .module(extension("rating", "data-zeyn-rating-x-y"))
+        .module(extension("rating-x", "data-zeyn-rating-x-y"));
+}
+
+#[test]
+#[should_panic(expected = "has no marker")]
+fn an_extension_module_has_a_marker() {
+    let _ = App::new("Test").module(zeyn::Module::new("rating").css(".z-rating-a {}"));
+}
+
+#[test]
+#[should_panic(expected = "is not valid JSON")]
+fn the_texts_of_an_extension_module_are_checked_when_it_is_registered() {
+    let _ = App::new("Test").module(extension("rating", "z-rating-a").texts(&[("en", "{")]));
+}

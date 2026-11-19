@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+العدد الذي يغيّر الكلمات يوضع في عنصر نائب plural، والكلمة التي تُختار بحسب قيمة توضع في عنصر select. تأتي حالة الجمع من قواعد اللغة (`one` و`few` و`many` وغيرها، بأسماء CLDR)، والحالة الدقيقة مثل `=0` لها الأولوية، و`#` هو العدد، ويحتاج كل عنصر نائب إلى حالة `other`. يجب أن تكون وسيطة الجمع عددًا صحيحًا: `n = "two"` أو عدد عشري لا يُترجم.
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## تسميات الحقول والخيارات
 
 تستخدم تسميات الحقول المفتاح `<Model>.<field>`، مثل `Product.code`. وتستخدم تسميات الخيارات `<Choice>.<Variant>`. وعندما يكون المفتاح مفقوداً تعود التسمية إلى `#[label("...")]` أو إلى صيغة مقروءة من الاسم. يبلّغ `zeyn check` عن المفاتيح التي تملكها بعض اللغات وتفتقر إليها أخرى.

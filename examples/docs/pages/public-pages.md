@@ -38,7 +38,8 @@ A request with a matching `If-None-Match` gets `304 Not Modified` without a body
 in-app navigation are cached the same way, with their own tag.
 
 A request with a session never gets public cache headers: the page is sent with
-`Cache-Control: private, no-store`. `cache` on a screen that is not `public` does not compile.
+`Cache-Control: private, no-store`, as is every page and screen fragment of a screen that is not
+public, so records do not stay in the browser's disk cache after sign out. `cache` on a screen that is not `public` does not compile.
 
 The screen is still built and rendered for every request that reaches the server; the tag saves the
 transfer, and a cache in front of the app saves the request. Keep cached screens free of anything
@@ -120,3 +121,12 @@ App::new(t!("app.name"))
 ```
 
 Both are served as plain text to everyone.
+
+## The public folder
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+Files in the crate's `public/` folder are embedded in the binary by `zeyn::public_files!()` and served from the site's root: `public/favicon.svg` answers `/favicon.svg`, and a page links the first of `/favicon.svg`, `/favicon.png` and `/favicon.ico` it finds as its icon. Images, icons, fonts, text, XML, JSON, web manifests and PDF files are taken; HTML and scripts stop the build, because they would run under the app's origin. Files carry an entity tag and are cached for an hour. A file may be 256 KB and the folder 2 MB unless `max_public_file_kb` and `max_public_total_kb` under `[package.metadata.zeyn]` say otherwise. `App::check` reports a file whose path a screen, `/robots.txt`, `/llms.txt`, `/sitemap.xml` or `/_zeyn/` already uses. `zeyn new` adds a `public/favicon.svg`.

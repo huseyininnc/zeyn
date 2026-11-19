@@ -12,6 +12,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/grid/run", post(grid_run_call))
         .route("/_zeyn/grid/bulk", post(grid_bulk_call))
         .route("/_zeyn/grid/edit", post(grid_edit_call))
+        .route("/_zeyn/grid/add", post(grid_add_call))
         .route("/_zeyn/grid/export", get(grid_export))
 }
 
@@ -58,12 +59,16 @@ pub(super) struct GridCall {
     pub(super) shape: Option<String>,
 }
 
+/// Most selected rows one export takes by key; the keys travel in the export URL.
+pub const MAX_EXPORT_KEYS: usize = 1_000;
+
 #[derive(Deserialize)]
 struct ExportQuery {
     screen: String,
     params: Option<String>,
     node: crate::ui::NodePath,
-    /// JSON of `{ "sort": [...], "filters": [...], "columns": [...] }`, all optional.
+    /// JSON of `{ "sort": [...], "filters": [...], "filter_groups": [...], "q": "...", "columns": [...], "keys": [...] }`,
+    /// all optional. `keys` limits a CSV or XLSX export to the selected rows.
     q: Option<String>,
     /// `csv` (the default) or `xlsx`.
     format: Option<String>,
@@ -81,6 +86,16 @@ struct EditCall {
     /// Layout to render the saved row in.
     #[serde(default)]
     view: Option<DataGridView>,
+}
+
+#[derive(Deserialize)]
+struct AddCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    node: crate::ui::NodePath,
+    /// Typed values of the editable cells of the new row, as a form sends them.
+    values: Map<String, Json>,
 }
 
 #[derive(Deserialize)]
@@ -210,9 +225,18 @@ async fn grid_export(
     let mut query: DataQuery = serde_json::from_value(json!({
         "sort": spec.get("sort").cloned().unwrap_or(json!([])),
         "filters": spec.get("filters").cloned().unwrap_or(json!([])),
+        "filter_groups": spec.get("filter_groups").cloned().unwrap_or(json!([])),
+        "q": spec.get("q").cloned().unwrap_or(json!("")),
     }))
     .unwrap_or_default();
     query.with_total = false;
+    let keys: Option<Vec<String>> = match spec.get("keys") {
+        None | Some(Json::Null) => None,
+        Some(k) => match serde_json::from_value::<Vec<String>>(k.clone()) {
+            Ok(k) if k.len() <= MAX_EXPORT_KEYS && k.iter().all(|k| k.len() <= 200) => Some(k),
+            _ => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+        },
+    };
     #[cfg(feature = "pdf")]
     if q.format.as_deref() == Some("pdf") {
         return pdf::grid_report(
@@ -259,18 +283,26 @@ async fn grid_export(
         }
         let limit = grid.export_limit();
         let mut sent = 0usize;
+        let mut seek: Option<crate::action::Cursor> = None;
         let mut outcome: Result<(), Failure> = Ok(());
         while sent < limit {
             let size = (limit - sent).min(crate::action::MAX_PAGE_SIZE as usize) as u32;
             let mut q = query.clone();
-            q.page = crate::action::PageRequest::Offset {
-                offset: sent as u64,
-                limit: size,
+            q.page = match seek.take() {
+                Some(cursor) => crate::action::PageRequest::After {
+                    cursor: Some(cursor),
+                    limit: size,
+                },
+                None => crate::action::PageRequest::Offset {
+                    offset: sent as u64,
+                    limit: size,
+                },
             };
-            let mut page = match state
-                .timed(grid.fetch(ctx.clone(), q))
-                .await
-            {
+            let rows = match &keys {
+                Some(keys) => grid.fetch_keys(ctx.clone(), q, keys),
+                None => grid.fetch(ctx.clone(), q),
+            };
+            let mut page = match state.timed(rows).await {
                 Ok(p) => p,
                 Err(f) => {
                     outcome = Err(f);
@@ -281,6 +313,7 @@ async fn grid_export(
                 }
             };
             page.view = view.clone();
+            seek = keyset(page.next.take());
             let n = page.count;
             let open = match &sheet {
                 _ if n == 0 => true,
@@ -333,6 +366,13 @@ async fn grid_export(
 
 /// Records an export of a sensitive grid in the call's audit trail: once, with the row count and
 /// the query, so exports cost nothing per row.
+/// The cursor an export continues from when the data layer pages by keyset. A position cursor
+/// (a plain number, as [`crate::action::Page::window`] writes it) or none keeps offset paging,
+/// so actions that page only by offset still export every row once.
+fn keyset(next: Option<crate::action::Cursor>) -> Option<crate::action::Cursor> {
+    next.filter(|c| c.0.parse::<u64>().is_err())
+}
+
 pub(super) fn note_export(
     ctx: &Ctx,
     grid: &dyn GridSource,
@@ -341,7 +381,11 @@ pub(super) fn note_export(
     query: &DataQuery,
 ) {
     if let Some(model) = grid.sensitive_model() {
-        let query = json!({ "sort": query.sort, "filters": query.filters });
+        let query = json!({
+            "sort": query.sort,
+            "filters": query.filters,
+            "filter_groups": query.filter_groups,
+        });
         ctx.update_trail(|t| {
             t.export = Some(crate::audit::ExportRecord {
                 model,
@@ -363,6 +407,21 @@ async fn grid_edit_call(
         return st.error_response(&ctx, f);
     }
     match st.run_edit(&ctx, call).await {
+        Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+async fn grid_add_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<AddCall>,
+) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    match st.run_add(&ctx, call).await {
         Ok(body) => axum::Json(body).into_response(),
         Err(f) => st.error_response(&ctx, f),
     }
@@ -436,11 +495,12 @@ impl AppState {
             via_agent: ctx.via_agent(),
         };
         let query = call.query;
+        let view = call.view.map(|v| grid.clean_view(v));
         self.intercept(ctx, &info, move || async move {
             let mut page = self
-                .timed(grid.fetch_at(ctx.clone(), query, call.path))
+                .timed(grid.fetch_at(ctx.clone(), query, call.path, view.as_ref()))
                 .await?;
-            page.view = call.view.map(|v| grid.clean_view(v));
+            page.view = view;
             let r = user_render(entry.meta.name, ctx);
             let shape = call
                 .shape
@@ -569,6 +629,28 @@ impl AppState {
         page.view = call.view.map(|v| grid.clean_view(v));
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "row": grid.row_html(&page, &call.key, &r) }))
+    }
+
+    /// Creates a row from the editable cells of a new row through the grid's `add_with` action,
+    /// after the grid's read access and the action's own permission.
+    async fn run_add(&self, ctx: &Ctx, call: AddCall) -> Result<Json, Failure> {
+        if call.values.len() > 64 {
+            return Err(Failure::App(Error::NotFound));
+        }
+        let (_, entry, screen) = self
+            .open(ctx, &call.screen, call.params)
+            .await?;
+        let grid = grid_at(ctx, &screen, &call.node)?;
+        let add = grid.add_call(&call.values, ctx)?;
+        let info = Call {
+            kind: CallKind::Form,
+            screen: entry.meta.name,
+            action: Some(add.meta),
+            via_agent: ctx.via_agent(),
+        };
+        self.intercept(ctx, &info, || self.timed((add.run)(ctx.clone())))
+            .await?;
+        Ok(json!({ "added": true }))
     }
 
     /// Runs a bulk action with the selected keys, or with the keys of every row matching the

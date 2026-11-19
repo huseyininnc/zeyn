@@ -30,7 +30,7 @@ MessageThread::of(conversation_messages)
 
 `Delivery` की स्थितियाँ `Sending`, `Sent`, `Delivered`, `Read` (पढ़ने की रसीद) और `Failed` हैं, और हर एक एक आइकन और स्क्रीन रीडर के लिए एक टेक्स्ट के साथ दिखती है। `.attachments(field, rules)` किसी संदेश की फ़ाइलें दिखाता है (एक `Vec<File>` फ़ील्ड और `Feature::files` से रजिस्टर किए गए स्टोर के नियम): इमेज एक तय आकार के बॉक्स में, जो प्लेसहोल्डर के ऊपर lazy तरीके से लोड होता है, और बाकी फ़ाइलें डाउनलोड लिंक के रूप में, जो स्टोर की पढ़ने की अनुमति से होकर जाते हैं।
 
-नए संदेश तब लाए जाते हैं जब थ्रेड का कोई topic पुकारा जाता है, जो `"chat"` होता है जब तक `.topic(..)` कुछ और न कहे: किसी `Composer` के भेजने के बाद, किसी action के `ui.refresh("chat")` के साथ खत्म होने के बाद, या `.live()` और `realtime` फ़ीचर के साथ, जब कहीं भी `hub.notify(&ctx, "chat")` चलता है। दूसरों के संदेश एक polite लाइव क्षेत्र में घोषित किए जाते हैं।
+नए संदेश तब लाए जाते हैं जब थ्रेड का कोई topic पुकारा जाता है, जो `"chat"` होता है जब तक `.topic(..)` कुछ और न कहे: किसी `Composer` के भेजने के बाद, किसी action के `ui.refresh("chat")` के साथ खत्म होने के बाद, या `.live()` और `realtime` फ़ीचर के साथ, जब कहीं भी `socket.notify(&ctx, "chat")` चलता है। दूसरों के संदेश एक polite लाइव क्षेत्र में घोषित किए जाते हैं।
 
 ### AI जवाब
 
@@ -70,10 +70,10 @@ MessageThread::of(conversation_messages)
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ Composer::of(send_message)
 `TypingIndicator` एक polite लाइव क्षेत्र में दिखाता है कि बातचीत में और कौन टाइप कर रहा है: "Ada टाइप कर रही है", "Ada और Grace टाइप कर रही हैं", "3 लोग टाइप कर रहे हैं"।
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-यह रीयलटाइम चैनल (फ़ीचर `realtime`, देखें `realtime.md`) पर `Realtime::topic` से घोषित topic पर काम करता है। जब उपयोगकर्ता उसी बातचीत के `Composer` में टाइप करता है, ब्राउज़र पेज के लाइव सॉकेट पर हर 3 सेकंड में अधिकतम एक छोटा संकेत भेजता है; सर्वर हर उपयोगकर्ता के लिए इससे तेज़ संकेत छोड़ देता है और संकेत को टेनेंट में उस topic के दूसरे सब्सक्राइबरों तक पहुँचाता है, उसी उपयोगकर्ता को कभी वापस नहीं। एक संकेत में बातचीत की id और उपयोगकर्ता की एक key होती है जिसे केवल यही सर्वर बना सकता है, कभी user id या कोई टेक्स्ट नहीं। आखिरी संकेत के बाद एक नाम 6 सेकंड तक दिखता है; जिन लोगों को `.person(user, name)` से नहीं दिया गया, वे "कोई" के रूप में दिखते हैं।
+यह रीयलटाइम चैनल (फ़ीचर `realtime`, देखें `realtime.md`) पर `ZeynSocket::topic` से घोषित topic पर काम करता है। जब उपयोगकर्ता उसी बातचीत के `Composer` में टाइप करता है, ब्राउज़र पेज के लाइव सॉकेट पर हर 3 सेकंड में अधिकतम एक छोटा संकेत भेजता है; सर्वर हर उपयोगकर्ता के लिए इससे तेज़ संकेत छोड़ देता है और संकेत को टेनेंट में उस topic के दूसरे सब्सक्राइबरों तक पहुँचाता है, उसी उपयोगकर्ता को कभी वापस नहीं। एक संकेत में बातचीत की id और उपयोगकर्ता की एक key होती है जिसे केवल यही सर्वर बना सकता है, कभी user id या कोई टेक्स्ट नहीं। आखिरी संकेत के बाद एक नाम 6 सेकंड तक दिखता है; जिन लोगों को `.person(user, name)` से नहीं दिया गया, वे "कोई" के रूप में दिखते हैं।
 
 `realtime` फ़ीचर के बिना, या जब ऐप के पास रीयलटाइम चैनल नहीं है, इंडिकेटर कुछ भी रेंडर नहीं करता, उसकी स्क्रिप्ट कभी लोड नहीं होती और कुछ भी नहीं भेजा जाता। संकेत टेनेंट में उस topic के हर सब्सक्राइबर तक पहुँचते हैं, इसलिए बातचीत की id उन्हें दिखती है: अपारदर्शी id का उपयोग करें, या हर श्रोता समूह के लिए अलग topic रखें।

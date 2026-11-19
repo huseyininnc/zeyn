@@ -42,6 +42,27 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `.remember(KEY)` は、ユーザーが開いたタブを choice キーの下に保持するため（[クライアント設定](security.md#client-preferences) を参照）、以降のページでも同じタブが開きます。URL のハッシュで指定されたタブが優先されます。
 
+## Accordion
+
+`Accordion::new()` と `.section(title, node)` は、セクションを縦に並べます。それぞれタイトルで開閉します。ヘルプページの回答や、長いレコードの各部分に使います。セクションは閉じた状態で始まります。セクションの後の `.open()` はそれを開きます。`.single()` は同時に開くセクションをひとつにします。その場合、開くよう指定された最初のセクションだけが開いた状態で始まります。accordion が持てるセクションは最大 50 個です（`MAX_ACCORDION_SECTIONS`）。
+
+```rust
+Accordion::new()
+    .section(t!("help.password"), Paragraph::new(t!("help.password_answer")))
+    .open()
+    .section(t!("help.invoices"), Paragraph::new(t!("help.invoices_answer")))
+    .single()
+```
+
+@live accordion
+
+各セクションはネイティブの開閉要素（`<details>` と `<summary>`）で、見出しとボタンによる ARIA の accordion パターンではありません。ネイティブ要素はスクリプトを必要とせず、閉じたコンテンツを読み上げ順序の外に保ち、ブラウザーのページ内検索が一致を含むセクションを開けるからです。単一モードではセクションが `name` を共有し、別のセクションが開くとブラウザーが開いていたものを閉じます。`Tabs` と違い、閉じたセクションのコンテンツは最初からページ内にあります。
+
+| キー | 動作 |
+|---|---|
+| `Tab` | 次のセクションのタイトルに移動します |
+| `Enter` または `Space` | セクションを開閉します。フォーカスはタイトルに残ります |
+
 ## Split
 
 `Split::new(start, end)` は、2 つのノードをハンドルを挟んで表示します。`.ratio(percent)` で開始側のサイズを設定します。ハンドルはポインターまたは矢印キーで動かせます。
@@ -49,3 +70,28 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 ## Dock
 
 `Dock` は、中央の領域の周りにパネルを配置します。左、右、下、そして中央のタブがあり、ユーザーが移動、サイズ変更、閉じる、元に戻すことができます。各ユーザーのレイアウトは画面ごとに保存されます。[シェルとコマンド](shell.md) を参照してください。
+
+## Surface
+
+`Surface::new(label, width, height)` は固定サイズの領域で、フロアプラン上のテーブルのように項目を自由に配置できます。`.item(Draggable::new(id, node).at(x, y).size(w, h))` で項目を追加し、`.axis(Axis::X)` または `Axis::Y` で一方向だけに動かし、`.snap(step)` ですべての位置をグリッドに合わせます。`.on_move(action)` は移動を保存します。サーバーが id がこの領域のものかを確認し、位置を境界内、グリッド上、軸上に収めたあと、アクションは項目の id と新しい `x` と `y` を持つ `SurfaceMove` を受け取ります。
+
+`.resizable()` は項目の右下隅にハンドルを付けます。`.min_size(w, h)`、`.max_size(w, h)`、`.aspect(w, h)` はサイズを制限し、項目をリサイズ可能にもします。アクションは新しい `w` と `h` も受け取り、それらは制限、サーフェス、グリッドの内側に保たれます。縦横比を指定すると、高さは幅に従います。
+
+```rust
+Surface::new(t!("floor.plan"), 800, 480)
+    .snap(20)
+    .on_move(move_table)
+    .item(
+        Draggable::new("t1", Paragraph::new(t!("floor.table")))
+            .at(40, 60)
+            .size(120, 80),
+    )
+```
+
+マウスやペンで項目をドラッグできます。タッチでは短く長押ししてからドラッグします。ポインター一つで操作する場合は、クリックで項目を選び、領域をクリックするとそこへ置かれます。隅のハンドルをクリックするとサイズを選び、サーフェスをクリックするとそこに隅を置きます。
+
+| キー | 動作 |
+|---|---|
+| 矢印キー | フォーカスのある項目をグリッド一つ分動かします（グリッドがない場合は 10 ピクセル） |
+| `Shift` + 矢印キー | リサイズ可能な項目のサイズをグリッド 1 ステップ分変える |
+| `Escape` | 選んだ項目を解除するか、ドラッグ中の項目を元に戻します |

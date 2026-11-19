@@ -3,7 +3,7 @@
 `zeyn::sql`은 entity를 SQL 데이터베이스에 보관합니다. 그리드가 보내는 `DataQuery`(필터, 정렬, 페이지, 합계, 그룹)로 목록을 만들고 행 버전 검사와 함께 저장합니다. PostgreSQL은 `postgres` Cargo 기능, Oracle은 `oracle` 기능 뒤에 있으므로 데이터베이스가 없는 앱은 이 중 아무것도 컴파일하지 않습니다.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.11", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## 설정
@@ -122,6 +122,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | 각 그룹을 괄호로 묶고, 그 필터와 그룹을 `OR`(`any`) 또는 `AND`로 잇습니다 |
 
 금액과 예/아니요 열의 `contains`는 SQL에서 무시됩니다. 텍스트는 데이터베이스 콜레이션(Oracle은 `NLS_SORT`)으로 정렬됩니다.
 
@@ -242,11 +243,11 @@ SQL 빌더에는 데이터베이스가 필요 없는 두 방언의 단위 테스
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test all postgres::
 
 docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 ```
 
 Oracle 컨테이너는 시작하는 데 몇 분이 걸립니다. `docker logs`에서 `DATABASE IS READY TO USE!`를 기다리십시오.

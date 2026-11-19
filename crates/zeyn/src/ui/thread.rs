@@ -5,7 +5,9 @@
 use super::catalog::check_masks;
 use super::embed::{Fit, Image, Placeholder};
 use super::{dom_id, topic_list};
-use crate::action::{Action, ActionMeta, DataQuery, Error, Page, PageRequest, Result, Sort};
+#[cfg(feature = "server")]
+use crate::action::Error;
+use crate::action::{Action, ActionMeta, DataQuery, Page, PageRequest, Result, Sort};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::files::{File, FileRules, valid_file_id};
 use crate::i18n::Text;
@@ -221,7 +223,7 @@ fn clip(text: &str, max: usize) -> &str {
 ///
 /// New messages are fetched when one of the thread's topics is named (after a [`Composer`]
 /// sends, after `ui.refresh("chat")`, or with [`MessageThread::live`] and the `realtime`
-/// feature, `hub.notify(&ctx, "chat")`) and announced in a polite live region.
+/// feature, `socket.notify(&ctx, "chat")`) and announced in a polite live region.
 ///
 /// [`Composer`]: crate::ui::Composer
 ///
@@ -669,7 +671,8 @@ impl<E: Model> MessageThread<E> {
             .and_then(|p| p.total)
             .unwrap_or(count as u64);
         out.push_str(&format!(
-            r#"<section class="z-thread" data-zeyn-thread data-room="{room}" data-topics="{topics}" data-page="{THREAD_PAGE}" data-count="{count}" data-total="{total}" data-texts="{texts}"{reply}{live} data-testid="{scope}.thread">{title}<div class="z-thread-view" role="feed" tabindex="0"{labelled} aria-busy="false">"#,
+            r#"<section class="z-thread" data-zeyn-thread data-room="{room}" data-topics="{topics}" data-page="{THREAD_PAGE}" data-count="{count}" data-total="{total}" data-texts="{texts}"{reply}{live} data-testid="{scope}.thread">{title}<div class="z-thread-view" role="{role}" tabindex="0"{labelled} aria-busy="false">"#,
+            role = if count == 0 { "region" } else { "feed" },
             room = escape(&self.conversation),
             topics = escape(&topics),
             texts = attr(&self.texts(r)),
@@ -810,10 +813,23 @@ impl<E: Model> Component for MessageThread<E> {
             check.listens(t);
         }
         if self.author.is_none() || self.text.is_none() || self.when.is_none() {
-            check.problem("a MessageThread needs `.author(field)`, `.text(field)` and `.when(field)`: who sent a message, its text and when");
+            check.problem(
+                crate::Problem::new(
+                    "Z0621",
+                    "a MessageThread needs `.author(field)`, `.text(field)` and `.when(field)`",
+                )
+                .why("these fields say who sent a message, its text and when, and the thread cannot draw a message without them")
+                .fix("add the missing calls with the model's fields")
+                .docs("components/chat#messagethread"),
+            );
         }
         if !E::fields().iter().any(|f| f.key) {
-            check.problem("a MessageThread needs a model with a `#[key]` field, so messages that load twice show once");
+            check.problem(
+                crate::Problem::new("Z0622", "a MessageThread needs a model with a `#[key]` field")
+                    .why("messages that arrive live and with the next page are matched by key, so without one they show twice")
+                    .fix("mark the message id field `#[key]`")
+                    .docs("components/chat#messagethread"),
+            );
         }
     }
 }

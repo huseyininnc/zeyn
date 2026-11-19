@@ -11,12 +11,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. Endpoint'ler
@@ -24,13 +24,13 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | Endpoint | Amaç |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: ortak çalışılan bir doküman |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: topic'ler için değişiklik bildirimleri |
+| `GET /_zeyn/socket` | WebSocket: topic'ler için değişiklik bildirimleri |
 | `GET /_zeyn/live.js` | Topic betiği, yalnızca abone olan sayfalar bağlar |
 
 Her el sıkışma (handshake) yükseltmeden önce şu sırayla denetlenir:
 
 1. Kanal açıktır (değilse `404`).
-2. **Origin:** `Origin` başlığı isteğin geldiği sunucuyu ya da `Realtime::allow_origin` ile eklenmiş bir origin'i belirtmelidir. Tarayıcılar bunu WebSocket el sıkışmalarında her zaman gönderir; eksik olan reddedilir. Başka bir sitenin kullanıcının çerezleriyle soket açmasını engelleyen budur.
+2. **Origin:** `Origin` başlığı isteğin geldiği sunucuyu ya da `ZeynSocket::allow_origin` ile eklenmiş bir origin'i belirtmelidir. Tarayıcılar bunu WebSocket el sıkışmalarında her zaman gönderir; eksik olan reddedilir. Başka bir sitenin kullanıcının çerezleriyle soket açmasını engelleyen budur.
 3. **CSRF token'ı:** tarayıcılar WebSocket'e başlık ekleyemez, bu yüzden `meta[name=zeyn-csrf]` içindeki token `csrf` sorgu parametresinde gider ve `POST`'larda `x-zeyn-csrf` için yapıldığı gibi `zeyn_csrf` çerezi ile sabit zamanlı karşılaştırılır. Başarısızlık `403` döner.
 4. **Kimlik:** her istekteki ile aynı authenticator; kullanıcı oturum açmış olmalıdır (`403`).
 5. **Kullanıcı başına sınır** (`429`).
@@ -77,9 +77,9 @@ channel.close();                // in unmount
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -88,7 +88,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 Bildirimler yalnızca topic adını taşır, hiçbir zaman veri taşımaz: yenileme, tüm izin denetimleriyle birlikte normal grid endpoint'i üzerinden gider. `notify` yalnızca çağıranın tenant'ına ulaşır; `notify_tenant(Some(id), topic)` birini adlandırır, `None` tenant kullanmayan uygulamadır.
 
-Aynı topic adları kanal olmadan da çalışır. `.listens("orders")` ile işaretlenen node'lar, bir bildirim topic'i adlandırdığında (`live.js` onu `zeyn:topics` olarak iletir) yerinde yenilenir; bir action `ui.refresh("orders")` ile bittiğinde ya da `.drives("orders")` diyen bir filtre değiştiğinde de yenilenir: grid'ler geçerli sayfalarını yeniden yükler, diğer dinleyiciler screen başına tek bir `POST /_zeyn/nodes` ile yeniden render edilir (`examples/docs/pages/effects.md` içindeki Topics bölümüne bakın). Socket yalnızca `Realtime::topic` ile bildirilmesi gereken `Live` node'larının topic'lerine abone olur; grid olmayan parçalar için onların içinde ya da yanında `.listens` kullanın.
+Aynı topic adları kanal olmadan da çalışır. `.listens("orders")` ile işaretlenen node'lar, bir bildirim topic'i adlandırdığında (`live.js` onu `zeyn:topics` olarak iletir) yerinde yenilenir; bir action `ui.refresh("orders")` ile bittiğinde ya da `.drives("orders")` diyen bir filtre değiştiğinde de yenilenir: grid'ler geçerli sayfalarını yeniden yükler, diğer dinleyiciler screen başına tek bir `POST /_zeyn/nodes` ile yeniden render edilir (`examples/docs/pages/effects.md` içindeki Topics bölümüne bakın). Socket yalnızca `ZeynSocket::topic` ile bildirilmesi gereken `Live` node'larının topic'lerine abone olur; grid olmayan parçalar için onların içinde ya da yanında `.listens` kullanın.
 
 ## 5. Bellek ve geri basınç (backpressure)
 
@@ -108,7 +108,7 @@ Her durum parçasının bir sınırı vardır (`Limits`, varsayılanlar köşeli
 
 Yayınlar (broadcast) hiçbir zaman beklemez: bir güncelleme `try_send` ile her istemcinin sınırlı kuyruğuna sunulur. Kuyruğu dolan istemci hemen odadan çıkarılır, böylece tek bir yavaş okuyucu belleği tutamaz ve diğerlerini yavaşlatamaz; yeniden bağlanır ve dokümanın tamamını alır. Kuyruğu dolu bir topic abonesi yalnızca o bildirimi kaçırır (bir sonraki zaten onu yeniler).
 
-Bu yüzden en kötü durum belleği, dokümanlar için yaklaşık `rooms * doc_bytes` artı kuyruklar için `clients * queue * message_bytes` kadardır (bir güncelleme kuyruklar arasında paylaşılır, kopyalanmaz). Diyagramda iki canlı sekmesi olan showcase sunucusu toplamda yaklaşık 19 MB kullanır (debug derlemesi). `Hub::stats()` izleme için odaları, istemcileri, aboneleri ve doküman baytlarını bildirir.
+Bu yüzden en kötü durum belleği, dokümanlar için yaklaşık `rooms * doc_bytes` artı kuyruklar için `clients * queue * message_bytes` kadardır (bir güncelleme kuyruklar arasında paylaşılır, kopyalanmaz). Diyagramda iki canlı sekmesi olan showcase sunucusu toplamda yaklaşık 19 MB kullanır (debug derlemesi). `Socket::stats()` izleme için odaları, istemcileri, aboneleri ve doküman baytlarını bildirir.
 
 ## 6. Güvenlik notları
 

@@ -417,10 +417,10 @@ impl Assistant {
         self
     }
 
-    /// `false` leaves out the floating launcher; the chat is then only where a screen places
+    /// Leaves out the floating launcher; the chat is then only where a screen places
     /// [`AssistantChat`].
-    pub fn launcher(mut self, on: bool) -> Self {
-        self.launcher = on;
+    pub fn no_launcher(mut self) -> Self {
+        self.launcher = false;
         self
     }
 

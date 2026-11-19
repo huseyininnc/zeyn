@@ -8,11 +8,14 @@
 |---|---|
 | `zeyn new <name>` | 標準の Feature 構成でアプリを作成します |
 | `zeyn new <name> --lib` | 複数のアプリで共有するモデル、Feature、テキストのライブラリを作成します |
+| `zeyn new <name> --component` | ブラウザスクリプト、スタイルシート、テキスト、サンプルアプリ、テストを備えたコンポーネントクレート `zeyn-<name>` を作成する |
 | `zeyn g feature <name>` | `models`、`services`、`actions`、`screens` フォルダーと動作する一覧画面を備えた `src/features/<name>` を追加します |
 | `zeyn g screen <feature> <name>` | feature に `screens/<name>.rs` を追加して登録し、タイトルをすべてのロケールファイルに追加します |
 | `zeyn routes` | Feature、画面、ルート、API、アクセス権を一覧表示します |
 | `zeyn check` | コンパイルし、構造上の問題と翻訳の欠落を報告します |
 | `zeyn check --fix` | `src`、`tests`、`examples` 内で名前が変わった Zeyn API を書き換えてから検査します |
+| `zeyn check --json` | 安定したコード、理由、修正方法つきでレポートを JSON で出力します |
+| `zeyn doctor` | プロジェクトのビルド方法を読み取り、遅さや大きさの原因を、各項目に1行の修正方法を添えて報告します |
 | `zeyn mcp` | AI エージェント向けに標準入出力で MCP サーバーを起動します |
 
 crates.io からインストールします。
@@ -53,6 +56,7 @@ cargo run
 
   次のような書き方ではありません: `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`。
 - `build.rs` と、`Cargo.toml` の `[package.metadata.zeyn]` にある `max_file_lines = 300`: `src/` のファイルの空でない行がそれより多いと `cargo build` が止まります。clippy の `too_many_lines`（60、`clippy.toml`）は関数について同じことをします。[Project structure](structure.md) を参照してください。
+- `Cargo.toml` の `[profile.dev]`、`.cargo/config.toml`、`.vscode/settings.json`: 速いビルドの繰り返しのための設定です。依存関係は `opt-level = 1` でデバッグ情報なしにビルドされ、自分のコードは行テーブルだけを持ち（バックトレースにはファイルと行が表示されます。ローカル変数でデバッグするには `CARGO_PROFILE_DEV_DEBUG=full` を設定します）、Windows では `rust-lld` でリンクし、rust-analyzer は専用の target フォルダを使うので `cargo build` を待ちません。
 - `Dockerfile` と `.dockerignore`: 小さなコンテナイメージ。
 - 代表的な CI サーバー向けのパイプライン。いずれも同じ検査（`cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`、`cargo deny check`）を実行し、`Cargo.toml` と一致しない `vX.Y.Z` タグを拒否します。
   - `.github/workflows/ci.yml`: GitHub Actions 用。`.github/dependabot.yml`（Cargo とアクションの週次更新）とプルリクエストのチェックリストが付きます。
@@ -63,6 +67,23 @@ cargo run
 - git がインストールされていて（Windows、macOS、Linux）、フォルダがすでにリポジトリ内にない場合は、ブランチ `main` のローカル git リポジトリ。何もコミットされないため、最初のコミットにはご自身の名前とメールアドレスが入ります。`--no-git` を付けると作成しません。
 
 各フォルダについては [プロジェクト構造](structure.md) を参照してください。
+
+## 新しいコンポーネントクレート
+
+`zeyn new <name> --component` はクレート `zeyn-<name>` を書き出します(名前の先頭の `zeyn-` は受け付けます。名前は小文字、数字、単独のハイフンで、最大32文字)。[共有ライブラリ](polyrepo.md)の拡張モデルをそのまま変更できる形にしたものです。
+
+- `src/lib.rs`: サンプルのコンポーネント(トグルボタン)、`App::module` でブラウザモジュールを登録するその `Plugin`、定数 `CATALOGS`。
+- `assets/<name>.js` と `assets/<name>.css`: モジュール。クラスは `z-<name>-` で、マーカー属性は `data-zeyn-<name>-` で始まります。スタイルシートはテーマトークンだけを使うので、ライトとダークの両方のテーマで動きます。
+- `assets/en.json` と `assets/tr.json`: テキスト。キーは `<name>` の下にあります。
+- `examples/demo`: コンポーネントのないスタートページと、コンポーネントのあるページを持つアプリ。`cargo run --example demo` で実行します。
+- `tests/<name>.rs`: コンポーネントのあるページはモジュールをリンクし、ないページは決して参照しません。ランタイムは後から届くコンテンツ用にモジュールを一覧し、ファイルはURLにビルドを含めて配信され、アプリはテキストの文言を変更できます。
+- ライブラリと同じプロジェクトファイル: GitHub、GitLab、Jenkins 用の CI、lint とフォーマットの規則、`AGENTS.md` と `CLAUDE.md`。
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## ジェネレーター
 
@@ -87,6 +108,53 @@ Zeyn のリリースで API の名前が変わったときは、`zeyn check --fi
 zeyn check --fix
 ```
 
+どの問題にも安定したコードがあります。アプリ、フィーチャー、ルート、サービスは `Z01xx`、セキュリティは `Z02xx`、公開ページは `Z03xx`、メニュー、コマンド、ショートカットは `Z04xx`、データは `Z05xx`、ページ検査は `Z06xx`、警告は `W01xx` です。テキスト出力は各問題を理由 (`why`)、修正方法 (`help`)、このドキュメントへのリンク、コードとともに表示します。`zeyn check --json` は同じレポートをエージェントと CI 向けに 1 つの JSON ドキュメントとして出力し、`ok` が false のときはエラーで終了します。
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
+```
+
+`zeyn check` はアプリのソースも読み、ファイルと行を添えて次を警告します。`W0106` は `src` のない `<script>` や `onclick=` のようなインラインのイベントハンドラーを含む文字列 (CSP はどちらもブロックします)、`W0107` は `escape(..)`、`r.text(..)`、`r.value(..)` を使わずに HTML を書く手書きのコンポーネント、`W0108` は範囲を限るクエリなしで `Vec` 全体を返す action、`W0109` は `.trusted()` を付けた `DocumentViewer` です。`permission` や `public` がない場合は警告するまでもなく、コンパイルできません。
+
+## 新しい Zeyn バージョンへの移行
+
+`zeyn migrate` はアプリを新しい Zeyn バージョンへ移行します（`ng update` のように）。アプリが使う Zeyn のバージョンを `Cargo.lock`（または `Cargo.toml`）から読み取り、そのバージョンと移行先の間にあるすべての移行ステップを順に実行し、`Cargo.toml` の Zeyn 依存関係を移行先に更新して、行ったことを出力します。各変更はファイルと行とともに、人が確認すべき箇所はその理由とともに示されます。
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+ステップは名前やメソッドを変更し（`Hub` を `Socket` に、`.realtime(live)` を `.socket(live)` に）、呼び出しの形を変え（`.sort_by(Order::date, true)` を `.sort_by_desc(Order::date)` に）、`use` のパスを移し、安全に書き換えられないものを指摘します。たとえばリテラルではない `bool` フラグや、削除されたアドレスへのサインアウトリンクです。置き換えるトークンだけを編集するので、書式とコメントはそのまま残り、2 回目の実行では何も変わりません。`--dry-run` は何も書き込まずに unified diff を出力し、`--json` はレポートを `changes`、`todos`、`errors` を持つ 1 つの JSON ドキュメントとして出力します。ファイルの読み込み、解析、書き込みができない場合を除き、終了コードは 0 です。`zeyn check --fix` はすべてのステップの名前変更を適用します。MCP ツール `zeyn_migrate` はエージェントのために同じことを行います。
+
+## ビルド速度とディスク使用量
+
+`zeyn doctor` はプロジェクトのビルド方法を読み取り、遅さや大きさの原因を報告します。target フォルダのサイズと最大のフォルダ、リンカー、dev プロファイル（デバッグ情報と依存関係の最適化）、`rust-version` と比べた rustc と cargo、古いツールチェーンが残した成果物、rust-analyzer 用の target フォルダ、そして Windows では target フォルダと `~/.cargo` が Defender のスキャン対象外かどうか（除外設定または Dev Drive。Windows が読み取りを許可しない場合はその旨を伝えます）を調べます。各項目には安定したコードと1行の修正方法があります。`--json` はそれらを1つのドキュメントとして出力し、`--target-limit-gb` は大きいとみなすサイズを決め（既定は 20）、終了コードは常に 0 です。`zeyn doctor --fix` は高速な dev プロファイルを `Cargo.toml` に、`rust-lld` リンカーを `.cargo/config.toml` に追加し、ほかは何も変更しません。2回目の実行では何も変わりません。MCP ツール `zeyn_doctor` はエージェント向けに同じことを行います。
+
+## DevTools
+
+`cargo run`（または `zeyn dev`）で動かすデバッグビルドは、各リクエストが何をしたかを記録します。実行した画面とアクション、ステータスと時間、画面の構築と描画にかかった時間、各 SQL 文とその時間および影響を受けた行数、アクションが返したエフェクトとトピックです。Alt+Shift+D で直近 50 件のリクエストを表示するパネルが開き、各リクエストを開くとその SQL 文が表示されます。`GET /_zeyn/devtools` は同じ一覧を JSON で返し、MCP ツール `zeyn_devtools` がそれをエージェントのために読みます。
+
+SQL 文は引数なしで保存されるため、値がパネルに届くことはありません。リリースビルドには DevTools がなく、そのためのコードもルートもメモリもありません。`App::router` を自分で提供するアプリやテストは、`zeyn::server::devtools(true)` で有効にします。
+
 ## Docker
 
 生成される `Dockerfile` は 2 段階でビルドし、distroless イメージ上で root 権限のないユーザーとして動作します。バイナリは `<app> health` で自身の稼働状態を確認でき、`HEALTHCHECK` がこれを使います。
@@ -100,4 +168,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP サーバー
 
-`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。
+`zeyn mcp` は標準入出力で MCP を話します。ツールは `zeyn_docs`（トピック別のフレームワークリファレンス）、`zeyn_describe`（カレントディレクトリにあるアプリの Feature、画面、ルート、問題点）、`zeyn_inspect`（画面のノードツリーと、各ノードを置いた Rust の行）、`zeyn_devtools`（実行中のデバッグビルドの DevTools リクエストログ: 画面、アクション、時間、SQL 文）、`zeyn_check`（`fix: true` を付けると `check --fix` を実行）、`zeyn_doctor`, `zeyn_test`、`zeyn_new_feature`、`zeyn_new_screen` です。[MCP と AI エージェント](mcp.md) を参照してください。

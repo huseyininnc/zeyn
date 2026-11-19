@@ -16,9 +16,10 @@ document.addEventListener('click', (e) => {
 const DRAFT_PREFIX = 'zeyn-draft:';
 const DRAFT_DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Storage key of a form's draft: base path, screen, params and node. */
+/** Storage key of a form's draft: user (`meta[name=zeyn-storage]`), base path, screen, params and node. */
 function draftKey(a) {
-  return `${DRAFT_PREFIX}${BASE}|${a.screen}|${JSON.stringify(a.params ?? null)}|${a.node}`;
+  const user = document.querySelector('meta[name="zeyn-storage"]')?.content ?? 'anon';
+  return `${DRAFT_PREFIX}${user}|${BASE}|${a.screen}|${JSON.stringify(a.params ?? null)}|${a.node}`;
 }
 
 /** Inputs a draft keeps: what the user typed, never masked, secret or hidden values. */

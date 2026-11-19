@@ -8,11 +8,14 @@
 |---|---|
 | `zeyn new <name>` | Standart Feature yapısıyla bir uygulama oluşturur |
 | `zeyn new <name> --lib` | Birkaç uygulamanın paylaştığı model, Feature ve metin kütüphanesi oluşturur |
+| `zeyn new <name> --component` | Tarayıcı betiği, stil dosyası, metinler, örnek uygulama ve testleri olan `zeyn-<name>` bileşen crate’ini oluşturur |
 | `zeyn g feature <name>` | `models`, `services`, `actions` ve `screens` klasörleri ve çalışan bir liste screen'iyle `src/features/<name>` ekler |
 | `zeyn g screen <feature> <name>` | Bir feature'a `screens/<name>.rs` ekler, kaydeder ve başlığını her dil dosyasına ekler |
 | `zeyn routes` | Feature'ları, screen'leri, rotaları, API'leri ve erişimi listeler |
 | `zeyn check` | Derler ve yapısal sorunları ile eksik çevirileri bildirir |
 | `zeyn check --fix` | `src`, `tests` ve `examples` içinde adı değişen Zeyn API'lerini yeniden yazar, sonra denetler |
+| `zeyn check --json` | Raporu kararlı kodlar, nedenler ve çözümlerle JSON olarak yazar |
+| `zeyn doctor` | Projenin nasıl derlendiğini okur ve onu yavaş ya da büyük yapanı, her bulgu için tek satırlık bir çözümle bildirir |
 | `zeyn mcp` | AI ajanları için stdio üzerinde bir MCP sunucusu çalıştırır |
 
 crates.io üzerinden kurun:
@@ -53,6 +56,7 @@ cargo run
 
   şöyle değil: `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
 - `build.rs` ve `Cargo.toml` içinde `[package.metadata.zeyn]` altındaki `max_file_lines = 300`: `src/` içindeki bir dosya daha fazla boş olmayan satıra sahipse `cargo build` durur; clippy `too_many_lines` (60, `clippy.toml` içinde) aynısını fonksiyonlar için yapar. Bkz. [Project structure](structure.md).
+- `Cargo.toml` içindeki `[profile.dev]`, `.cargo/config.toml` ve `.vscode/settings.json`: hızlı bir derleme döngüsü. Bağımlılıklar `opt-level = 1` ile ve hata ayıklama bilgisi olmadan derlenir, kendi kodunuz yalnızca satır tablolarını tutar (hata izleri dosya ve satırı gösterir; yerel değişkenlerle hata ayıklamak için `CARGO_PROFILE_DEV_DEBUG=full` verin), Windows `rust-lld` ile bağlar ve rust-analyzer kendi hedef klasörünü kullanır, böylece `cargo build` işini beklemez.
 - `Dockerfile` ve `.dockerignore`: küçük bir konteyner imajı.
 - Yaygın CI sunucuları için, hepsi aynı denetimleri çalıştıran (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) ve `Cargo.toml` ile eşleşmeyen bir `vX.Y.Z` etiketini reddeden pipeline'lar:
   - GitHub Actions için `.github/workflows/ci.yml`; yanında `.github/dependabot.yml` (haftalık Cargo ve action güncellemeleri) ve bir pull request kontrol listesi;
@@ -63,6 +67,23 @@ cargo run
 - Git kuruluysa (Windows, macOS ya da Linux) ve klasör zaten bir deponun içinde değilse `main` dalında yerel bir git deposu. Hiçbir şey commit edilmez, bu yüzden ilk commit kendi adınızı ve e-postanızı taşır. `--no-git` bunu atlar.
 
 Her klasör için [Project structure](structure.md) sayfasına bakın.
+
+## Yeni bir bileşen crate’i
+
+`zeyn new <name> --component`, `zeyn-<name>` crate’ini yazar (addaki baştaki `zeyn-` kabul edilir; ad küçük harf, rakam ve tek tire içerir, en çok 32 karakterdir). [Paylaşılan kütüphaneler](polyrepo.md) sayfasındaki genişletme modelidir, değiştirmeye hazır:
+
+- `src/lib.rs`: örnek bir bileşen (açma kapama düğmesi), tarayıcı modülünü `App::module` ile kaydeden `Plugin` ve `CATALOGS` sabiti.
+- `assets/<name>.js` ve `assets/<name>.css`: modül. Sınıflar `z-<name>-`, işaret özniteliği `data-zeyn-<name>-` ile başlar; stil dosyası yalnızca tema değişkenlerini kullanır, bu yüzden açık ve koyu tema çalışır.
+- `assets/en.json` ve `assets/tr.json`: metinler, `<name>` anahtarı altında.
+- `examples/demo`: bileşeni olmayan bir başlangıç sayfası ve bir bileşeni olan bir sayfası bulunan uygulama. `cargo run --example demo` ile çalıştırın.
+- `tests/<name>.rs`: bileşenli sayfa modülü bağlar, bileşensiz sayfa ona hiç başvurmaz, çalışma zamanı sonradan gelen içerik için modülü listeler, dosyalar adreste derleme ile sunulur ve uygulama metinleri yeniden yazabilir.
+- Kütüphaneyle aynı proje dosyaları: GitHub, GitLab ve Jenkins için CI, lint ve biçim kuralları, `AGENTS.md` ve `CLAUDE.md`.
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## Üreticiler
 
@@ -87,6 +108,53 @@ Bir Zeyn sürümü bir API'nin adını değiştirdiğinde `zeyn check --fix` esk
 zeyn check --fix
 ```
 
+Her sorunun kararlı bir kodu vardır: uygulama, feature'lar, rotalar ve servisler için `Z01xx`, güvenlik için `Z02xx`, herkese açık sayfalar için `Z03xx`, menüler, komutlar ve kısayollar için `Z04xx`, veri için `Z05xx`, sayfa denetimleri için `Z06xx` ve uyarılar için `W01xx`. Metin çıktısı her sorunu nedeni (`why`), çözümü (`help`), bu belgelere bir bağlantı ve koduyla gösterir. `zeyn check --json` aynı raporu ajanlar ve CI için tek bir JSON belgesi olarak yazar ve `ok` false olduğunda hata ile çıkar.
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
+```
+
+`zeyn check` uygulamanın kaynağını da okur ve dosya ile satırıyla şu durumlarda uyarır: `W0106` `src` olmadan `<script>` ya da `onclick=` gibi satır içi bir olay işleyicisi tutan bir metin (CSP ikisini de engeller), `W0107` `escape(..)`, `r.text(..)` veya `r.value(..)` kullanmadan HTML yazan elle yazılmış bir bileşen, `W0108` onu sınırlayan bir sorgu olmadan bütün bir `Vec` döndüren bir action, `W0109` `.trusted()` işaretli bir `DocumentViewer`. Eksik `permission` veya `public` için uyarıya gerek yoktur: derlenmez.
+
+## Yeni bir Zeyn sürümüne geçiş
+
+`zeyn migrate`, bir uygulamayı daha yeni bir Zeyn sürümüne taşır (`ng update` gibi). Uygulamanın kullandığı Zeyn sürümünü `Cargo.lock` dosyasından (ya da `Cargo.toml`) okur, bu sürüm ile hedef arasındaki her geçiş adımını sırayla çalıştırır, `Cargo.toml` içindeki Zeyn bağımlılıklarını hedef sürüme taşır ve ne yaptığını yazar: her değişikliği dosyası ve satırıyla, bir kişinin bakması gereken yerleri de nedenleriyle.
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+Bir adım adları ve metotları yeniden adlandırır (`Hub` yerine `Socket`, `.realtime(live)` yerine `.socket(live)`), bir çağrının biçimini değiştirir (`.sort_by(Order::date, true)` yerine `.sort_by_desc(Order::date)`), `use` yollarını taşır ve güvenle yeniden yazamadığını gösterir: değeri sabit olmayan bir `bool` bayrağı ya da kaldırılmış bir adrese giden çıkış bağlantısı gibi. Yalnızca değiştirdiği token'ları düzenler, bu yüzden biçim ve yorumlar kalır; ikinci bir çalıştırma hiçbir şeyi değiştirmez. `--dry-run` hiçbir şey yazmaz ve birleşik bir diff basar; `--json` raporu `changes`, `todos` ve `errors` alanlarıyla tek bir JSON belgesi olarak basar. Bir dosya okunamaz, ayrıştırılamaz ya da yazılamazsa çıkış kodu 0 olmaz. `zeyn check --fix` her adımın yeniden adlandırmalarını uygular. MCP aracı `zeyn_migrate` aynısını bir ajan için yapar.
+
+## Derleme hızı ve disk kullanımı
+
+`zeyn doctor` projenin nasıl derlendiğini okur ve onu yavaş ya da büyük yapanı bildirir: hedef klasörün boyutu ve en büyük klasörleri, bağlayıcı, dev profili (hata ayıklama bilgisi ve bağımlılık eniyilemesi), rustc ve cargo sürümü ile `rust-version`, eski bir araç zincirinden kalan çıktılar, rust-analyzer hedef klasörü ve Windows'ta hedef klasörün ve `~/.cargo` klasörünün Defender taramalarının dışında olup olmadığı (bir dışlama ya da Dev Drive; Windows okumasına izin vermiyorsa bunu söyler). Her bulgunun kararlı bir kodu ve tek satırlık bir çözümü vardır. `--json` hepsini tek belge olarak yazar, `--target-limit-gb` neyin büyük sayılacağını belirler (varsayılan 20) ve çıkış kodu her zaman 0'dır. `zeyn doctor --fix` hızlı dev profilini `Cargo.toml` dosyasına, `rust-lld` bağlayıcısını `.cargo/config.toml` dosyasına ekler ve başka hiçbir şeyi değiştirmez; ikinci çalıştırma hiçbir şeyi değiştirmez. `zeyn_doctor` MCP aracı aynısını bir ajan için yapar.
+
+## DevTools
+
+`cargo run` (ya da `zeyn dev`) ile sunulan bir debug derlemesi her isteğin ne yaptığını kaydeder: çalıştırdığı screen ve action, durumu ve süresi, screen'in oluşturulması ve çizilmesinin ne kadar sürdüğü, her SQL ifadesi ile süresi ve etkilenen satır sayısı, action'ın döndürdüğü etkiler ve konular. Alt+Shift+D son 50 isteği gösteren bir panel açar; her istek açılınca SQL ifadelerini gösterir. `GET /_zeyn/devtools` aynı listeyi JSON olarak döndürür; MCP aracı `zeyn_devtools` bunu bir ajan için okur.
+
+İfadeler argümanları olmadan tutulur, bu yüzden hiçbir değer panele ulaşmaz. Release derlemelerinde DevTools yoktur: ne kodu, ne rotası, ne de onlar için bellek. `App::router`'ı kendisi sunan bir uygulama ya da bir test, onları `zeyn::server::devtools(true)` ile açar.
+
 ## Docker
 
 Oluşturulan `Dockerfile` iki aşamada derler ve root yetkisi olmayan bir kullanıcıyla distroless bir imajda çalışır. İkili dosya kendi sağlığını `<app> health` ile denetler; `HEALTHCHECK` bunu kullanır.
@@ -100,4 +168,4 @@ Oluşturulan bir uygulamanın imajı yaklaşık 43 MB'tır ve boşta çalışan 
 
 ## MCP sunucusu
 
-`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.
+`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_inspect` (bir screen'in node ağacı ve her node'u yerleştiren Rust satırı), `zeyn_devtools` (çalışan debug derlemesinin DevTools istek günlüğü: screen, action, süreler, SQL cümleleri), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_doctor`, `zeyn_test`, `zeyn_new_feature` ve `zeyn_new_screen`'dir. [MCP and AI agents](mcp.md) sayfasına bakın.

@@ -23,6 +23,7 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.field(M::f)` | 单独一行的一个字段 |
 | `.row(\|r\| r.field(a).field(b))` | 并排的字段；在窄屏幕上会堆叠 |
 | `.section(title)` | 其后各字段的带标题分组 |
+| `.settings()` | 设置布局:每个控件旁边是标签和帮助,一旦有改动,保存栏就固定在底部 |
 | `.step(title)` | 向导的一个步骤；表单一次显示一个步骤 |
 | `.range(M::from, M::to)` | 两个日期合为一个范围选择器 |
 | `Form::auto(value)` | 所有字段，按声明顺序 |
@@ -112,10 +113,13 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 该控件是放在拖放区域内的原生文件输入。每个文件独立上传并带进度条，上传过程中可以取消，失败后可以重试，完成后可以移除。图片会显示由所选文件的对象 URL 生成的预览。进度和结果通过一个 polite 实时区域播报。showcase 在 `/uploads` 有一个可运行的示例；本文档站点没有已登录的用户，因此不显示实时上传。
 
+拖放的文件夹会加入其中及子文件夹里的文件，每次最多读取 100 个条目，直到读完整个文件夹；字段不接受的类型的文件会被跳过，并在实时区域中报告数量。字段获得焦点时粘贴的文件也会上传。扩展名或类型不在 `accept` 中的文件会在发送任何字节之前被浏览器拒绝，服务器还会再次检查内容。一个字段最多同时上传三个文件，其余文件带着忙碌进度条排队等待。
+
 | 按键 | 作用 |
 |---|---|
 | Tab | 移到文件输入，然后依次移到每个文件的下载链接及其取消、重试或移除按钮 |
 | 在文件输入上按 Enter 或 Space | 打开系统文件选择器（拖放的键盘替代方式） |
+| 在文件输入上按 Ctrl+V 或 Cmd+V | 上传剪贴板中的文件，例如截图 |
 | 在取消、重试、移除上按 Enter 或 Space | 执行该操作；取消后焦点移到重试，移除后移到下一个文件或回到输入框 |
 
 服务器对 `POST /_zeyn/files/{store}` 所做的处理：
@@ -126,8 +130,60 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 4. 运行 Feature 的 `FileScanner`；被拒绝的文件，或扫描器失败时，文件会被删除，并返回 `422`；
 5. 返回 `201` 和 `{id, name, size, type}`。id 是服务器生成的 128 位随机数；文件名会被清除路径和控制字符。
 
+启用 `image` 功能后，`FileRules::clean_images()` 会在存储保存文件后增加一步：PNG、JPEG 和 WebP 上传会被解码并以相同格式重新编码，因此 EXIF（含 GPS）、XMP、ICC 配置文件、文本块以及藏在图像数据之后的字节都不会留在服务器上。EXIF 方向会先应用到像素上；JPEG 以质量 90 写出，PNG 和 WebP 为无损。解码在单边 `MAX_IMAGE_SIDE`（12,000）像素和 `MAX_IMAGE_MEMORY`（256 MiB）处停止；无法解码的图像会被删除，响应为 `422`。两个上限都会在解码任何像素之前按图像头中的尺寸检查，因此声称是巨大图像的小文件会在不占用那部分内存的情况下被拒绝；动画图像只保留第一帧。清理后的文件以新的 id 替换原文件，随后扫描器检查清理后的文件。没有该功能时这个方法不存在，因此存储不会在没有清理时误以为已经清理。
+
 下载（`GET /_zeyn/files/{store}/{id}`）会检查 id 的形态、权限、guard 和租户，并通过媒体服务（参见 `docs/media.md`）处理：范围请求、实体标签和 `nosniff`。只有位图图片、音频和视频以内联方式提供；其余一律以 `application/octet-stream` 和 `Content-Disposition: attachment` 发送，附带带引号的 ASCII 名称和 UTF-8 名称，并带有 `Content-Security-Policy: sandbox`。
 
 `DiskStore` 在一个文件夹中保存 `{id}.bin` 和 `{id}.json`，并先把上传内容写到 `{id}.part`。`MemoryStore` 把文件保存在内存中并设有字节上限，用于测试和演示。表单值只是引用文件的名称：必须确认文件存在的保存 action 应调用 `store.meta(id)`，showcase 就是这样做的。
 
-预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 12 KB 原始大小和 4 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。
+`FileRules::quota(bytes, window)` 限制单个用户在每个时间窗口内向某个存储上传的量，并通过应用的 rate store 计数；超过限额的那次上传仍会保存，下一次上传返回 `429`。`DiskStore` 最多每小时一次删除超过一小时的 `.part` 文件（因崩溃而中断的上传）。`ZipGuard` 是针对基于 ZIP 的上传（ZIP、Word、Excel、PowerPoint）的扫描器：它会拒绝中央目录声明超过 10,000 个条目、总计超过 1 GiB 或超过文件大小 200 倍的归档，以及 ZIP64 归档；解压已接受归档的代码仍须在这些限制处停止。
+
+预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 21 KB 原始大小和 7 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。
+
+### 可续传上传
+
+启用 Cargo 特性 `resumable` 后，上传字段和 `FileDrop` 通过 tus 1.0 协议的一个子集发送文件，因此断网的上传会从中断处继续，而不是从头开始。控件本身无需改动：
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+不调用 `resumable_uploads` 时，未完成的上传存放在系统临时文件夹中，在最后一次收到字节后保留 24 小时，每个用户最多 5 个、总共最多 1000 个处于打开状态。
+
+| 请求 | 响应 |
+|---|---|
+| 带 `Upload-Length` 和 `Upload-Metadata: filename <base64>` 的 `POST /_zeyn/uploads/{store}` | `201`，带 `Location`、`Upload-Offset: 0` 和 `Upload-Expires`；超过存储上限为 `413`，空文件为 `422`，超过配额或打开上传上限为 `429` |
+| 对该位置 `HEAD` | `200`，带 `Upload-Offset` 和 `Upload-Length` |
+| 带 `Content-Type: application/offset+octet-stream` 和 `Upload-Offset` 的 `PATCH` | `204`，带新的 `Upload-Offset`；偏移量与服务器不一致时为 `409`，同一上传的另一个 `PATCH` 仍在进行时为 `423`，字节超过声明长度时为 `413` |
+| 带来最后一个字节的 `PATCH` | `200`，带 `{id, name, size, type}`，与普通上传相同 |
+| 对该位置 `DELETE` | `204`；上传及其字节被删除 |
+
+每个请求都需要 `Tus-Resumable: 1.0.0`（否则为 `412`）、存储的写入权限和特性的守卫；`POST`、`PATCH` 和 `DELETE` 还需要 CSRF 头。只有创建上传的用户和租户能找到它；其他人得到 `404`。创建上传与普通上传一样计入写入限制；它的 `PATCH` 不计入，因为它们不能携带超过声明长度的数据。浏览器以每个 1 MiB 的 `PATCH` 发送文件，这是常见反向代理的默认请求体上限，因此连接断开最多只需重发这么多。
+
+字节一到达就写入上传文件夹中的 `{id}.part`，因此连接断开前已到达服务器的字节会被保留，`HEAD` 会报告它们。最后一个字节到达后，文件经过与 `POST /_zeyn/files/{store}` 相同的步骤：根据内容识别的类型、大小上限、配额、存储、扫描器和拦截器（`CallKind::Upload`）。之后删除分块文件，检查拒绝文件时也会删除。在过期时间内没有新字节的上传，会在下次被查询或下一个上传创建时删除；重启遗留的分块文件每个过期周期清理一次。
+
+在浏览器中，失败的请求（断网、`409`、`423`、`429` 或服务器错误）会在浏览器恢复在线后，按 1、2、4、8 秒然后每 15 秒重试，连续最多 12 次；每次尝试都先询问偏移量，只发送剩余部分。取消会停止请求并删除服务器上的上传。最终失败后点击重试，只要服务器仍保留该上传，就会继续同一上传。
+
+与 tus 1.0 的差异：只有 creation、expiration 和 termination 扩展；没有 `OPTIONS` 发现、校验和、延迟长度和拼接；最后一个 `PATCH` 返回带已存储文件的 `200` 而不是 `204`，这样字段无需再发请求即可得到文件 id。打开的上传只有创建它的进程知道，因此在有多个实例的负载均衡器后面，`/_zeyn/uploads/` 路径需要粘性会话（sticky sessions）。
+
+## File drop
+
+`FileDrop::new(label, rules)` 是同一个上传控件脱离表单单独使用，适用于文件就是全部任务的界面，例如文档收件箱。它像表单字段一样接受文件夹、粘贴的文件和 accept 列表，并上传到 `rules` 的存储，该存储由 `Feature::files` 连同权限一起注册。`.single()` 每次只接受一个文件。`.on_upload(action)` 对每个已保存的 `File` 运行一个动作；服务器先检查 id 是否是它生成的格式，再次清理名称，并只保留规则中的内容类型，因此动作不会收到浏览器编造的任何内容。动作拒绝时，条目会显示原因。区域内的文件选择器是键盘和单指针的操作路径。
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

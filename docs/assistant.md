@@ -8,7 +8,7 @@ for their own customers, connect the model those customers want, and keep chat h
 they need it.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["assistant"] }
+zeyn = { version = "0.0.11", features = ["assistant"] }
 ```
 
 Without the feature nothing of it is compiled: no HTTP client, no extra routes, no extra memory.
@@ -124,8 +124,10 @@ everything marked `ai = false`, with descriptions from the `///` doc comments an
 guidance. Two built in tools are added:
 
 - `navigate`: opens a routed screen the user may open, without a page load (`zeyn:navigate`), and
-  can filter its grid (`zeyn:filter`). The grid then loads through `POST /_zeyn/grid`, where the
-  server applies its usual checks.
+  can filter its grid (`zeyn:filter`) with flat filters and OR groups (`filter_groups`, as in
+  `DataQuery::filter_groups`). The server drops empty filters and keeps the caps of
+  `DataQuery::retain_filters`; the grid then loads through `POST /_zeyn/grid`, where the server
+  applies its usual checks.
 - `suggest`: follow up prompts shown as chips.
 
 Every call runs through the normal action path with the context marked as an agent: the screen's
@@ -180,7 +182,7 @@ An app that sells the assistant to its own customers usually wants:
 | `POST /_zeyn/assistant/stt` (audio body) | `{ text }`; `404` without server speech to text |
 | `POST /_zeyn/assistant/tts` `{ text }` | Streamed audio; `404` without server text to speech |
 
-Events, one JSON object per line: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters}`,
+Events, one JSON object per line: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters,filter_groups}`,
 `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`,
 `{t:"error",message}`, `{t:"done"}`.
 

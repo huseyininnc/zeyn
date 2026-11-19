@@ -3,7 +3,7 @@
 `zeyn::sql` хранит сущности (entities) в SQL-базе данных. Модуль выбирает их по `DataQuery`, который отправляет таблица (фильтры, сортировка, страницы, итоги, группы), и сохраняет их с проверкой версии строки. PostgreSQL подключается через Cargo-feature `postgres`, Oracle через `oracle`, поэтому приложение без базы данных не компилирует ничего из этого.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.11", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Настройка
@@ -123,6 +123,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | каждая группа в скобках, её фильтры и группы соединены `OR` (`any`) или `AND` |
 
 `contains` для столбцов с деньгами и да/нет в SQL игнорируется. Текст сортируется по правилам сопоставления базы данных (Oracle: `NLS_SORT`).
 
@@ -262,11 +263,11 @@ tx.commit().await?;
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test all postgres::
 
 docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 ```
 
 Контейнерам Oracle нужно несколько минут на запуск; дождитесь `DATABASE IS READY TO USE!` в `docker logs`.

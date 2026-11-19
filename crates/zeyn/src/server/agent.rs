@@ -614,6 +614,20 @@ impl AppState {
 
     /// Runs a published API action: permission, guards, interceptors and the time limit.
     async fn run_api(&self, ctx: &Ctx, fi: usize, ai: usize, input: Json) -> Result<Json, Failure> {
+        self.run_api_as(ctx, fi, ai, input, CallKind::Api)
+            .await
+    }
+
+    /// Runs a published action with its checks: permission, feature guards, interceptors (with
+    /// `kind`), validation and the time limit.
+    pub(super) async fn run_api_as(
+        &self,
+        ctx: &Ctx,
+        fi: usize,
+        ai: usize,
+        input: Json,
+        kind: CallKind,
+    ) -> Result<Json, Failure> {
         let feature = &self.features[fi];
         let entry = feature.apis()[ai];
         if !ctx.identity().can(&entry.meta.access) {
@@ -621,13 +635,28 @@ impl AppState {
         }
         feature.check_guards(ctx)?;
         let info = Call {
-            kind: CallKind::Api,
+            kind,
             screen: "",
             action: Some(entry.meta),
             via_agent: ctx.via_agent(),
         };
         self.intercept(ctx, &info, || self.timed((entry.call)(ctx.clone(), input)))
             .await
+    }
+
+    /// The feature and position of the published action named `name`, the first one when two
+    /// features publish the same name.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    pub(super) fn api_by_name(&self, name: &str) -> Option<(usize, usize)> {
+        self.features
+            .iter()
+            .enumerate()
+            .find_map(|(fi, f)| {
+                f.apis()
+                    .iter()
+                    .position(|a| a.meta.name == name)
+                    .map(|ai| (fi, ai))
+            })
     }
 
     /// `None` when the caller may read the API documentation, otherwise the response to send.

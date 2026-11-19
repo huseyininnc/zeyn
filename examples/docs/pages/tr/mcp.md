@@ -11,9 +11,13 @@ Bir ajanın çalıştığı proje kendi kurallarını ve araçlarını taşır:
 
 | Araç | Ne yapar |
 |---|---|
-| `zeyn_docs` | Konuya göre framework başvurusu: `rules`, `language`, `protocol` |
+| `zeyn_docs` | Konuya göre framework başvurusu: `rules`, `language`, `protocol`; `search: "kelimeler"` bu sürümün docs sayfalarını sıralar, `page: "/language/forms"` birini Markdown olarak döndürür |
 | `zeyn_describe` | Uygulamanın Feature'ları, ekranları, rotaları, erişimi, API'leri, sorunları ve eksik çevirileri |
+| `zeyn_inspect` | Bir screen'in node ağacı: yol, bileşen türü ve her node'u yerleştiren Rust `file:line:column` bilgisi |
+| `zeyn_devtools` | Debug modunda çalışan uygulamanın DevTools istek günlüğü: en yeni istekler önce, her biri screen, action, durum, süreler ve SQL cümleleriyle (metin ve süre, değer yok); `addr` ve `limit` isteğe bağlı |
 | `zeyn_check` | Derler ve sorunları bildirir; `fix: true` önce yeniden adlandırılmış API'leri yeniden yazar |
+| `zeyn_doctor` | Projenin nasıl derlendiğini okur: hedef klasör boyutu, bağlayıcı, dev profili, araç zinciri, Windows tarama dışlamaları; `fix: true` hızlı dev profilini ve bağlayıcıyı ekler (yalnızca `Cargo.toml` ve `.cargo/config.toml`) |
+| `zeyn_migrate` | Uygulamayı adım adım daha yeni bir Zeyn sürümüne taşır (yeniden adlandırmalar, değişen çağrılar, taşınan yollar) ve biçimi korur; her değişikliği dosya ve satırıyla, bir kişinin bakması gerekenleri de döndürür; `dry_run: true` bir diff döndürür ve hiçbir şey yazmaz |
 | `zeyn_test` | `cargo test` çalıştırır ve çıktının sonunu döndürür |
 | `zeyn_new_feature` | Bir Feature klasörü oluşturur ve kaydeder |
 | `zeyn_new_screen` | Bir Feature'a ekran dosyası ekler ve kaydeder |
@@ -26,6 +30,12 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ```
 
 `ZEYN_DESCRIBE=1 cargo run`, `zeyn_describe` aracının döndürdüğü aynı açıklamayı yazdırır ve çıkar.
+
+### Source inspector
+
+Debug derlemeleri, her node'u ekrana yerleştiren Rust satırını hatırlar (`Screen::body`, `Stack::add`, `Tabs::tab` ve diğer container metotları). `ZEYN_INSPECT=<screen> cargo run`, `zeyn_inspect` aracının döndürdüğü node ağacını yazdırır ve çıkar.
+
+`cargo run` ile sunulan bir debug derlemesi bu satırı sayfada her node'un ilk öğesine `data-zeyn-src` olarak yazar. Alt+Shift+I, işaretçinin altındaki node'u ya da odaktaki öğeyi çerçeveleyen ve satırını, ardından onu içeren node'ların satırlarını gösteren bir katman açar; Alt+Shift+I ya da Escape kapatır. Release derlemeleri satır tutmaz: node tek bir kutulu işaretçi olarak kalır, sayfada öznitelik olmaz ve denetçi betiği ikili dosyada yer almaz.
 
 ## Bir uygulamayı kullanan ajanlar
 

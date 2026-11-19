@@ -66,8 +66,8 @@ fn check_permission(lit: &LitStr) -> syn::Result<()> {
 /// Returns the type of the first argument (input or params) and the return type.
 fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
     if !f.sig.generics.params.is_empty() {
-        return Err(syn::Error::new(
-            f.sig.generics.span(),
+        return Err(syn::Error::new_spanned(
+            &f.sig.generics,
             format!("{kind}s cannot be generic"),
         ));
     }
@@ -78,8 +78,8 @@ fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
             quote!(#ty)
         }
         Some(FnArg::Receiver(r)) => {
-            return Err(syn::Error::new(
-                r.span(),
+            return Err(syn::Error::new_spanned(
+                r,
                 format!("{kind}s cannot take `self`"),
             ));
         }
@@ -229,8 +229,8 @@ fn injected_call(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts, Ts)> {
         }
         let ty = &pt.ty;
         if matches!(**ty, Type::Reference(_)) {
-            return Err(syn::Error::new(
-                ty.span(),
+            return Err(syn::Error::new_spanned(
+                ty,
                 format!(
                     "injected {kind} arguments must be owned types\n  = help: take `Ctx` or the service by value; they are cheap to clone"
                 ),
@@ -247,7 +247,15 @@ fn injected_call(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts, Ts)> {
     } else {
         quote!()
     };
-    let call = quote!({ #ignore Self::run(#(#args),*) #await_ });
+    let at = match &f.sig.output {
+        ReturnType::Type(_, ty) => ty.span(),
+        ReturnType::Default => proc_macro2::Span::call_site(),
+    };
+    let call = if f.sig.inputs.is_empty() {
+        quote_spanned!(at=> { #ignore Self::run() #await_ })
+    } else {
+        quote_spanned!(at=> Self::run(#(#args),*) #await_)
+    };
     let deps = quote!(::std::vec::Vec::<::core::option::Option<::zeyn::Dep>>::from([#(#deps),*]).into_iter().flatten().collect());
     Ok((quote!(#(#binds)*), call, deps))
 }
@@ -261,6 +269,24 @@ fn or_error(result: syn::Result<Ts>, original: Ts) -> TokenStream {
             quote!(#err #original).into()
         }
     }
+}
+
+/// Takes the helper attributes of models off an item that is emitted unchanged after an error,
+/// so a mistake in one attribute does not add a `cannot find attribute` error for every other.
+fn strip_model_helpers(s: &ItemStruct) -> Ts {
+    let mut s = s.clone();
+    s.attrs
+        .retain(|a| !a.path().is_ident("sensitive"));
+    if let Fields::Named(named) = &mut s.fields {
+        for field in &mut named.named {
+            field.attrs.retain(|a| {
+                !["key", "readonly", "version", "label", "mask", "rule"]
+                    .iter()
+                    .any(|name| a.path().is_ident(name))
+            });
+        }
+    }
+    quote!(#s)
 }
 
 /// Defines a server side action. Access must be declared.
@@ -574,6 +600,65 @@ fn path_value_fn(route: &LitStr, params: &Ts, no_params: bool) -> syn::Result<Ts
     })
 }
 
+/// Makes a `Serialize` type an event the live socket sends to browsers (feature `realtime`).
+/// The name, given with `#[event(name = "area.name")]`, is what the browser listens for: 1 to 64
+/// lowercase letters, digits, `.`, `_` or `-`.
+///
+/// ```ignore
+/// #[derive(Serialize, Event)]
+/// #[event(name = "chat.message")]
+/// pub struct MessageSent { pub room: String, pub text: String }
+/// ```
+#[proc_macro_derive(Event, attributes(event))]
+pub fn derive_event(item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as syn::DeriveInput);
+    match event_tokens(&input) {
+        Ok(ts) => ts.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+fn event_tokens(input: &syn::DeriveInput) -> syn::Result<Ts> {
+    let mut name: Option<LitStr> = None;
+    for attr in &input.attrs {
+        if !attr.path().is_ident("event") {
+            continue;
+        }
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("name") {
+                name = Some(meta.value()?.parse()?);
+                Ok(())
+            } else {
+                Err(meta.error("`#[event]` takes only `name = \"area.name\"`"))
+            }
+        })?;
+    }
+    let Some(name) = name else {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "an event needs a name the browser listens for: add `#[event(name = \"area.name\")]`",
+        ));
+    };
+    let value = name.value();
+    let plain = (1..=64).contains(&value.len())
+        && value.bytes().all(|b| {
+            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'_' | b'-')
+        });
+    if !plain {
+        return Err(syn::Error::new(
+            name.span(),
+            "event names are 1 to 64 lowercase letters, digits, `.`, `_` or `-`, such as `chat.message`",
+        ));
+    }
+    let ident = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    Ok(quote! {
+        impl #impl_generics ::zeyn::realtime::Event for #ident #ty_generics #where_clause {
+            const NAME: &'static str = #name;
+        }
+    })
+}
+
 /// Marks a struct or enum as screen params.
 #[proc_macro_attribute]
 pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -586,9 +671,17 @@ pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
     let ident = match &item {
         Item::Struct(s) => &s.ident,
         Item::Enum(e) => &e.ident,
-        other => {
+        Item::Fn(f) => {
             return syn::Error::new(
-                other.span(),
+                f.sig.ident.span(),
+                "`#[params]` can only be used on a struct or an enum",
+            )
+            .to_compile_error()
+            .into();
+        }
+        other => {
+            return syn::Error::new_spanned(
+                other,
                 "`#[params]` can only be used on a struct or an enum",
             )
             .to_compile_error()
@@ -624,7 +717,12 @@ pub fn choice(attr: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
     let e = syn::parse_macro_input!(item as ItemEnum);
-    let original = quote!(#e);
+    let mut stripped = e.clone();
+    for v in &mut stripped.variants {
+        v.attrs
+            .retain(|a| !a.path().is_ident("label") && !a.path().is_ident("default"));
+    }
+    let original = quote!(#stripped);
     or_error(expand_choice(e), original)
 }
 
@@ -645,8 +743,8 @@ fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
     let mut arms = Vec::new();
     for (i, v) in e.variants.iter_mut().enumerate() {
         if !matches!(v.fields, Fields::Unit) {
-            return Err(syn::Error::new(
-                v.span(),
+            return Err(syn::Error::new_spanned(
+                &v.fields,
                 "choice variants cannot have fields",
             ));
         }
@@ -778,7 +876,7 @@ fn without_digit_groups(expr: syn::Expr) -> syn::Expr {
 #[proc_macro_attribute]
 pub fn model(attr: TokenStream, item: TokenStream) -> TokenStream {
     let s = syn::parse_macro_input!(item as ItemStruct);
-    let original = quote!(#s);
+    let original = strip_model_helpers(&s);
     let result = parse_model_args(attr, false).and_then(|args| expand_model(s, args, false));
     or_error(result, original)
 }
@@ -799,7 +897,7 @@ pub fn model(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn entity(attr: TokenStream, item: TokenStream) -> TokenStream {
     let s = syn::parse_macro_input!(item as ItemStruct);
-    let original = quote!(#s);
+    let original = strip_model_helpers(&s);
     let result = parse_model_args(attr, true).and_then(|args| expand_model(s, args, true));
     or_error(result, original)
 }
@@ -838,8 +936,8 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         .retain(|a| !a.path().is_ident("sensitive"));
     let sensitive = args.sensitive || s.attrs.len() != before;
     if !s.generics.params.is_empty() {
-        return Err(syn::Error::new(
-            s.generics.span(),
+        return Err(syn::Error::new_spanned(
+            &s.generics,
             format!("{kind}s cannot be generic"),
         ));
     }
@@ -858,6 +956,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
     let mut value_arms = Vec::new();
     let mut checks = Vec::new();
     let mut keys = 0usize;
+    let mut second_key: Option<Ident> = None;
     let mut generate_id = false;
 
     for (idx, field) in named.named.iter_mut().enumerate() {
@@ -1017,6 +1116,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
 
         if is_key {
             keys += 1;
+            if keys == 2 {
+                second_key = Some(fname.clone());
+            }
             if let Type::Path(p) = &ty
                 && p.qself.is_none()
                 && p.path.is_ident(&id_name)
@@ -1074,7 +1176,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         })?;
         if keys != 1 {
             return Err(syn::Error::new(
-                name.span(),
+                second_key
+                    .as_ref()
+                    .map_or_else(|| name.span(), Ident::span),
                 format!("entity `{name}` needs exactly one `#[key]` field, found {keys}"),
             ));
         }
@@ -1167,15 +1271,177 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
     })
 }
 
+/// The files of the crate's `public/` folder, embedded in the binary and served from the site's
+/// root by `App::public`: `public/favicon.svg` is `/favicon.svg`. Only static types are taken
+/// (images, icons, fonts, text, XML, JSON and web manifests); HTML and scripts are a compile
+/// error, since they would run under the app's origin. A file over `max_public_file_kb` (256
+/// unless set) or a folder over `max_public_total_kb` (2048) stops the build; set them under
+/// `[package.metadata.zeyn]` in Cargo.toml.
+#[proc_macro]
+pub fn public_files(input: TokenStream) -> TokenStream {
+    if !input.is_empty() {
+        return syn::Error::new(
+            Ts::from(input).span(),
+            "`public_files!()` takes no arguments",
+        )
+        .to_compile_error()
+        .into();
+    }
+    match public_tokens() {
+        Ok(ts) => ts.into(),
+        Err(e) => syn::Error::new(proc_macro2::Span::call_site(), e)
+            .to_compile_error()
+            .into(),
+    }
+}
+
+/// The content type of a public file by its extension, `None` for types that are not served.
+fn public_type(name: &str) -> Option<&'static str> {
+    let ext = name
+        .rsplit_once('.')?
+        .1
+        .to_ascii_lowercase();
+    Some(match ext.as_str() {
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "avif" => "image/avif",
+        "gif" => "image/gif",
+        "ico" => "image/x-icon",
+        "woff2" => "font/woff2",
+        "woff" => "font/woff",
+        "txt" => "text/plain; charset=utf-8",
+        "xml" => "application/xml",
+        "json" => "application/json",
+        "webmanifest" => "application/manifest+json",
+        "pdf" => "application/pdf",
+        _ => return None,
+    })
+}
+
+/// A `[package.metadata.zeyn]` number of the crate's Cargo.toml, or `default`.
+fn zeyn_metadata(manifest: &str, key: &str, default: u64) -> u64 {
+    let mut inside = false;
+    for line in manifest.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            inside = line == "[package.metadata.zeyn]";
+            continue;
+        }
+        if inside
+            && let Some((k, v)) = line.split_once('=')
+            && k.trim() == key
+        {
+            return v.trim().parse().unwrap_or(default);
+        }
+    }
+    default
+}
+
+fn public_tokens() -> Result<Ts, String> {
+    let root = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default());
+    let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default();
+    let max_file = zeyn_metadata(&manifest, "max_public_file_kb", 256) * 1024;
+    let max_total = zeyn_metadata(&manifest, "max_public_total_kb", 2048) * 1024;
+    let dir = root.join("public");
+    let mut files = Vec::new();
+    let mut stack = vec![dir.clone()];
+    while let Some(d) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&d) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry
+                .file_name()
+                .to_string_lossy()
+                .into_owned();
+            if name.starts_with('.') {
+                continue;
+            }
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    let mut total = 0u64;
+    let mut items = Vec::new();
+    let mut tracked = Vec::new();
+    for path in files {
+        let rel = path
+            .strip_prefix(&dir)
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        let safe = rel
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'-' | b'_' | b'.'));
+        if !safe || rel.contains("..") {
+            return Err(format!(
+                "public/{rel}: use only letters, digits, `-`, `_` and `.` in public file names"
+            ));
+        }
+        let Some(content_type) = public_type(&rel) else {
+            return Err(format!(
+                "public/{rel}: this type is not served from public/
+  = help: public/ takes images, icons, fonts, text, XML, JSON, web manifests and PDF; HTML and scripts would run under the app's origin, so build them as screens"
+            ));
+        };
+        let size = std::fs::metadata(&path)
+            .map_err(|e| e.to_string())?
+            .len();
+        if size > max_file {
+            return Err(format!(
+                "public/{rel} has {} KB, more than max_public_file_kb ({} KB)
+  = help: make the file smaller, or raise `max_public_file_kb` under [package.metadata.zeyn] in Cargo.toml",
+                size / 1024,
+                max_file / 1024
+            ));
+        }
+        total += size;
+        let abs = path.to_string_lossy().into_owned();
+        let url = format!("/{rel}");
+        items.push(quote!(::zeyn::PublicFile {
+            path: #url,
+            bytes: ::core::include_bytes!(#abs),
+            content_type: #content_type,
+        }));
+        tracked.push(abs);
+    }
+    if total > max_total {
+        return Err(format!(
+            "public/ holds {} KB, more than max_public_total_kb ({} KB)
+  = help: remove or shrink files, or raise `max_public_total_kb` under [package.metadata.zeyn] in Cargo.toml",
+            total / 1024,
+            max_total / 1024
+        ));
+    }
+    let _ = tracked;
+    Ok(quote!({
+        const FILES: &[::zeyn::PublicFile] = &[#(#items),*];
+        FILES
+    }))
+}
+
 /// Catalog text checked at compile time: `t!("products.title")` or `t!("orders.count", n = count)`.
 ///
 /// Every JSON file in the crate's `locales/` folder must have the key, and the message's `{name}`
-/// placeholders must match the arguments exactly.
+/// placeholders must match the arguments exactly. Messages may hold plural and select
+/// placeholders, `{n, plural, one {# order} other {# orders}}` and
+/// `{role, select, admin {..} other {..}}`; each needs an `other` case, and a plural argument
+/// must be an integer.
 #[proc_macro]
 pub fn t(input: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(input as TArgs);
     expand_t(args)
-        .unwrap_or_else(|e| e.to_compile_error())
+        .unwrap_or_else(|e| {
+            let err = e.to_compile_error();
+            quote!({ #err ::core::unreachable!() })
+        })
         .into()
 }
 
@@ -1207,24 +1473,75 @@ fn lookup_key<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
         .as_str()
 }
 
-fn placeholders(message: &str) -> std::collections::BTreeSet<String> {
-    let mut found = std::collections::BTreeSet::new();
+/// The length up to the brace that closes the one at the start of `s`, nested braces counted.
+fn closing(s: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (i, c) in s.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The arguments a message uses, each with whether it is counted by a plural placeholder; `Err`
+/// with the problem when a plural or select placeholder has no `other` case.
+fn placeholders(message: &str) -> Result<std::collections::BTreeMap<String, bool>, String> {
+    let mut found = std::collections::BTreeMap::new();
     let mut rest = message;
     while let Some(start) = rest.find('{') {
-        let Some(len) = rest[start..].find('}') else {
+        let Some(len) = closing(&rest[start..]) else {
             break;
         };
-        let name = &rest[start + 1..start + len];
-        if !name.is_empty()
+        let inner = &rest[start + 1..start + len];
+        let mut parts = inner.splitn(3, ',');
+        let name = parts.next().unwrap_or("").trim();
+        let plain = !name.is_empty()
             && name
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_')
-        {
-            found.insert(name.to_string());
+                .all(|c| c.is_ascii_alphanumeric() || c == '_');
+        match (plain, parts.next().map(str::trim)) {
+            (true, None) => {
+                found
+                    .entry(name.to_string())
+                    .or_insert(false);
+            }
+            (true, Some(kind @ ("plural" | "select"))) => {
+                let plural = kind == "plural";
+                let entry = found
+                    .entry(name.to_string())
+                    .or_insert(false);
+                *entry |= plural;
+                let mut cases = parts.next().unwrap_or("").trim_start();
+                let mut other = false;
+                while let Some(open) = cases.find('{') {
+                    other |= cases[..open].trim() == "other";
+                    let Some(n) = closing(&cases[open..]) else {
+                        break;
+                    };
+                    for (inner_name, p) in placeholders(&cases[open + 1..open + n])? {
+                        *found.entry(inner_name).or_insert(false) |= p;
+                    }
+                    cases = cases[open + n + 1..].trim_start();
+                }
+                if !other {
+                    return Err(format!(
+                        "the {kind} placeholder of `{name}` has no `other` case"
+                    ));
+                }
+            }
+            _ => {}
         }
-        rest = &rest[start + len..];
+        rest = &rest[start + len + 1..];
     }
-    found
+    Ok(found)
 }
 
 fn expand_t(t: TArgs) -> syn::Result<Ts> {
@@ -1261,6 +1578,7 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
         .map(|(n, _)| n.to_string())
         .collect();
     let mut tracked = Vec::new();
+    let mut counted = std::collections::BTreeSet::new();
     for path in &files {
         let text = std::fs::read_to_string(path)
             .map_err(|e| syn::Error::new(span, format!("t!: {}: {e}", path.display())))?;
@@ -1282,7 +1600,15 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
                 ),
             ));
         };
-        let wanted = placeholders(message);
+        let found = placeholders(message).map_err(|why| {
+            syn::Error::new(span, format!("t!: `{key}` in locales/{file}: {why}"))
+        })?;
+        for (name, plural) in &found {
+            if *plural {
+                counted.insert(name.clone());
+            }
+        }
+        let wanted: std::collections::BTreeSet<String> = found.into_keys().collect();
         if let Some(missing) = wanted.difference(&given).next() {
             return Err(syn::Error::new(
                 span,
@@ -1292,8 +1618,13 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
             ));
         }
         if let Some(extra) = given.difference(&wanted).next() {
+            let at = t
+                .args
+                .iter()
+                .find(|(n, _)| n == extra)
+                .map_or(span, |(n, _)| n.span());
             return Err(syn::Error::new(
-                span,
+                at,
                 format!("t!: argument `{extra}` is not used by `{key}` in locales/{file}"),
             ));
         }
@@ -1303,11 +1634,39 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
         ));
     }
     let args = t.args.iter().map(|(n, v)| {
-        let n = n.to_string();
-        quote!(.arg(#n, ::zeyn::Text::from(::std::string::ToString::to_string(&#v))))
+        let name = n.to_string();
+        if counted.contains(&name) {
+            quote!(.arg(#name, ::zeyn::Text::from(::zeyn::__plural(&#v))))
+        } else {
+            quote!(.arg(#name, ::zeyn::Text::from(::std::string::ToString::to_string(&#v))))
+        }
     });
     Ok(quote!({
         #(#tracked)*
         ::zeyn::Text::key(#key) #(#args)*
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{public_type, zeyn_metadata};
+
+    #[test]
+    fn public_files_take_static_types_only() {
+        assert_eq!(public_type("logo.SVG"), Some("image/svg+xml"));
+        assert_eq!(
+            public_type("site.webmanifest"),
+            Some("application/manifest+json")
+        );
+        assert_eq!(public_type("index.html"), None);
+        assert_eq!(public_type("app.js"), None);
+        assert_eq!(public_type("noext"), None);
+    }
+
+    #[test]
+    fn public_limits_come_from_the_zeyn_metadata_table() {
+        let manifest = "[package]\nmax_public_file_kb = 1\n[package.metadata.zeyn]\nmax_public_file_kb = 512\n";
+        assert_eq!(zeyn_metadata(manifest, "max_public_file_kb", 256), 512);
+        assert_eq!(zeyn_metadata(manifest, "max_public_total_kb", 2048), 2048);
+    }
 }

@@ -12,7 +12,8 @@
     },
     "draft": {
       "restored": "Daha önce kaydetmediğiniz girişler geri yüklendi.",
-      "discard": "Girişleri at"
+      "discard": "Girişleri at",
+      "unsaved": "Kaydedilmemiş değişiklikleriniz var."
     },
     "session": {
       "idle_title": "Hâlâ orada mısınız?",
@@ -95,6 +96,23 @@
       "reason_cancel": "Vazgeç",
       "reason_invalid": "3 ile 300 karakter arasında bir gerekçe yazın."
     },
+    "devtools": {
+      "title": "Geliştirici araçları",
+      "refresh": "Yenile",
+      "close": "Kapat",
+      "empty": "Henüz kaydedilmiş istek yok.",
+      "queries": "Sorgular",
+      "effects": "Etkiler",
+      "topics": "Konular",
+      "build": "Oluşturma",
+      "render": "Çizim",
+      "hint": "Alt+Shift+D veya Escape paneli kapatır."
+    },
+    "inspect": {
+      "title": "Öğenin kaynağı",
+      "none": "Bu öğenin kaynak satırı yok.",
+      "hint": "Alt+Shift+I veya Escape denetçiyi kapatır."
+    },
     "validation": {
       "required": "{label} alanı zorunludur.",
       "min_len": "{label} en az {n} karakter olmalıdır.",
@@ -130,13 +148,48 @@
       "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin.",
       "confirmation_required": "Bu işlem çalışmadan önce uygulamada onayınızı bekliyor.",
       "cursor": "Liste yüklendikten sonra değişti. Yenileyip tekrar deneyin.",
-      "duplicate": "Bu kayıt zaten var."
+      "duplicate": "Bu kayıt zaten var.",
+      "too_large": "İstek çok büyük.",
+      "bad_request": "İstek okunamadı.",
+      "socket_only": "Bu işlem yalnızca canlı bağlantı üzerinden çalışır."
     },
     "grid": {
       "pagination": "Sayfalama",
       "previous": "Önceki sayfa",
       "next": "Sonraki sayfa",
       "load_more": "Daha fazla yükle",
+      "search": "Satırlarda ara",
+      "page_size": "Sayfa başına satır",
+      "filter_builder": "Süz",
+      "builder_title": "Satırları süz",
+      "active_filters": "Etkin süzgeçler",
+      "remove_filter": "{label} süzgecini kaldır",
+      "filter_group": "{n} koşul",
+      "add_condition": "Koşul ekle",
+      "remove_condition": "Koşulu kaldır",
+      "add_group": "Grup ekle",
+      "remove_group": "Grubu kaldır",
+      "condition_group": "Koşul grubu",
+      "rows_match": "Eşleşme",
+      "match_all": "Tüm koşullar",
+      "match_any": "Herhangi bir koşul",
+      "column": "Sütun",
+      "apply": "Uygula",
+      "clear_all": "Tümünü temizle",
+      "group_by": "Bu sütuna göre grupla",
+      "ungroup": "Gruplamayı kaldır",
+      "groups": "Gruplama",
+      "group_hint": "Gruplamak için bir sütun başlığını buraya sürükleyin ya da menüsünü kullanın",
+      "ungroup_by": "{label} gruplamasını kaldır",
+      "add_row": "Satır ekle",
+      "added": "Satır eklendi.",
+      "delete": "Sil",
+      "delete_confirm": "Seçili satırlar silinsin mi?",
+      "batch_count": "Değişen satır: {n}",
+      "save_changes": "Değişiklikleri kaydet",
+      "discard_changes": "Değişiklikleri at",
+      "batch_saved": "{n} satır kaydedildi.",
+      "discard_confirm": "{n} satırdaki değişiklikler atılsın mı?",
       "range": "{from}-{to}",
       "range_total": "{from}-{to} / {total}",
       "loaded": "{count} satır yüklendi",
@@ -194,7 +247,9 @@
         "hide": "Kolonu gizle",
         "columns": "Kolonlar",
         "filter": "Filtrele",
-        "reset": "Görünümü sıfırla"
+        "reset": "Görünümü sıfırla",
+        "autofit": "Genişliği içeriğe uydur",
+        "autofit_all": "Tüm sütunları uydur"
       },
       "agg": {
         "sum": "Toplam",
@@ -219,6 +274,14 @@
     "shell": {
       "skip": "İçeriğe geç",
       "menu": "Ana menü",
+      "menu_filter": "Menüde ara",
+      "menu_results": "{n} öğe",
+      "menu_none": "Eşleşen menü öğesi yok",
+      "menu_favorites": "Favoriler",
+      "menu_pin": "{label} sabitle",
+      "menu_unpin": "{label} sabitlemesini kaldır",
+      "rail_collapse": "Menüyü daralt",
+      "rail_expand": "Menüyü genişlet",
       "language": "Dil",
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)",
@@ -341,6 +404,16 @@
         "empty": "Açık panel yok. Panel seçeneklerinden birini açın.",
         "resize": "{area} alanı yeniden boyutlandır"
       },
+      "surface": {
+        "item": "taşınabilir öğe",
+        "hint": "Ok tuşları öğeyi taşır. Ya da bir öğeye tıklayın, sonra alanda koymak istediğiniz yere tıklayın.",
+        "moved": "{item} {x}, {y} konumuna taşındı.",
+        "picked": "{item} seçildi. Koymak için alanda bir yere tıklayın ya da Escape tuşuna basın.",
+        "refused": "Taşıma kaydedilmedi.",
+        "resized": "{item} boyutu {w} x {h} oldu.",
+        "picked_size": "{item} boyutu seçildi. Sağ alt köşenin gideceği yere tıklayın ya da Escape tuşuna basın.",
+        "hint_resize": "Shift ve ok tuşları köşe tutamacı olan bir öğenin boyutunu değiştirir. Ya da tutamaca tıklayın, sonra köşenin gideceği yere tıklayın."
+      },
       "loading": "Yükleniyor…",
       "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
       "date": {
@@ -459,7 +532,17 @@
         "insert": "Ekle",
         "insert_hint": "Control+Enter ekler.",
         "insert_label": "{label} ekle",
-        "inserted": "{label} eklendi."
+        "inserted": "{label} eklendi.",
+        "move": "Taşı",
+        "move_down": "Aşağı",
+        "move_hint": "Alt ile ok tuşları öğeyi taşır: Yukarı, Aşağı, Sol dalın dışına, Sağ üstteki dalın içine.",
+        "move_into": "Üstteki dalın içine",
+        "move_label": "{label} öğesini taşı",
+        "move_none": "Taşınacak yer yok",
+        "move_out": "Bu dalın dışına",
+        "move_refused": "{label} taşınamadı.",
+        "move_up": "Yukarı",
+        "moved": "{label} taşındı."
       },
       "select": {
         "none": "Seçilmedi",
@@ -505,7 +588,7 @@
         "brand": "Not"
       },
       "upload": {
-        "drop": "Dosyaları buraya bırakın ya da seçin.",
+        "drop": "Dosyaları ya da klasörleri buraya bırakın, yapıştırın ya da seçin.",
         "hint": "{types}, en fazla {max}.",
         "hint_many": "{types}, her biri en fazla {max}, en çok {n} dosya.",
         "list": "Dosyalar",
@@ -517,7 +600,10 @@
         "cancel": "İptal",
         "retry": "Yeniden dene",
         "remove": "Kaldır",
-        "remove_name": "{name} dosyasını kaldır"
+        "remove_name": "{name} dosyasını kaldır",
+        "waiting": "{name} yüklenmeyi bekliyor",
+        "skipped": "Bu alanın almadığı türde {n} dosya atlandı.",
+        "not_added": "Dosya yüklendi ama eklenemedi."
       },
       "kpi": {
         "up": "Önceki döneme göre yüzde {pct} artış",
@@ -560,6 +646,45 @@
       "alpha": {
         "label": "Harfe göre gözat",
         "other": "Diğer karakterler"
+      },
+      "avatar": {
+        "more": "{n} kişi daha"
+      },
+      "stepper": {
+        "done": "tamamlandı"
+      },
+      "heat": {
+        "day": "{date}: {n}",
+        "less": "Az",
+        "more": "Çok"
+      },
+      "tour": {
+        "close": "Kapat",
+        "finish": "Bitir"
+      },
+      "compare": {
+        "yes": "Var",
+        "no": "Yok"
+      },
+      "flow": {
+        "next": "Sonraki: {steps}"
+      },
+      "gantt": {
+        "task": "Görev",
+        "from": "Başlangıç",
+        "to": "Bitiş",
+        "done": "%{n} tamamlandı"
+      },
+      "meter": {
+        "low": "düşük",
+        "high": "yüksek",
+        "fair": "orta"
+      },
+      "pagination": {
+        "label": "Sayfalama",
+        "previous": "Önceki",
+        "next": "Sonraki",
+        "page": "Sayfa {n}"
       },
       "week": {
         "label": "Hafta",
@@ -670,6 +795,29 @@
         "no_moves": "Bu kart buradan taşınamaz",
         "count": "{n}",
         "count_wip": "{n} / {wip}"
+      },
+      "sortable": {
+        "help": "Boşluk satırı kaldırır, ok tuşları taşır, Boşluk bırakır, Escape geri koyar. Alt ile Yukarı veya Aşağı satırı hemen taşır. Enter taşıma menüsünü açar.",
+        "handle_plain": "Satırı taşı",
+        "handle": "{item} öğesini taşı",
+        "lifted": "{item} kaldırıldı, sıra {pos} / {count}",
+        "moved": "{item}, sıra {pos} / {count}",
+        "dropped": "{item} {pos}. sıraya bırakıldı, toplam {count}",
+        "cancelled": "Taşıma iptal edildi, {item} yine {pos}. sırada",
+        "refused": "{item} taşınamadı, yine {pos}. sırada",
+        "up": "Yukarı taşı",
+        "down": "Aşağı taşı",
+        "top": "En başa taşı",
+        "bottom": "En sona taşı",
+        "menu": "{item} öğesini taşı",
+        "to_list": "{list} listesine taşı",
+        "select": "Taşımak için seç",
+        "deselect": "Seçimden çıkar",
+        "selected": "{item} seçildi, {count} seçili",
+        "deselected": "{item} seçilmedi, {count} seçili",
+        "too_many": "Bir kerede en fazla {count} satır taşınır",
+        "is_selected": "seçili",
+        "moved_to": "{item} {list} listesine taşındı, sıra {pos} / {count}"
       },
       "calendar": {
         "navigation": "Dönem",
@@ -1109,12 +1257,17 @@
     },
     "files": {
       "too_large": "Dosya çok büyük. İzin verilen en büyük dosya {max}.",
+      "quota": "Şimdilik yükleme sınırına ulaştınız. Daha sonra tekrar deneyin.",
       "too_many": "{label} en fazla {n} dosya alır.",
       "type": "Bu dosya türü kabul edilmiyor ya da içeriği adıyla uyuşmuyor.",
       "refused": "Dosya güvenlik denetiminden geçmedi.",
       "aborted": "Yükleme dosyanın tamamı gelmeden durdu. Yeniden deneyin.",
       "empty": "Dosya boş.",
-      "store_full": "Bu dosya için yer kalmadı."
+      "store_full": "Bu dosya için yer kalmadı.",
+      "open": "Bitmemiş yüklemeniz çok fazla. Birini bitirin ya da iptal edin, sonra yeniden deneyin.",
+      "offset": "Yükleme sunucuyla aynı noktada değil. Sunucunun kaldığı yerden sürer.",
+      "busy": "Bu yükleme hâlâ veri alıyor. Biraz sonra yeniden deneyin.",
+      "length": "Yükleme dosyanın boyutunu bildirmedi."
     }
   },
   "AccountLogin": {

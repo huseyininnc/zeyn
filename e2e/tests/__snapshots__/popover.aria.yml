@@ -1,0 +1,17 @@
+- main:
+  - region "Popover":
+    - heading "Popover" [level=1]
+    - paragraph: A button that opens a small panel.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#tooltip-popover-and-busy-overlay
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Popover
+    - tablist "Popover sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - button "Details"
+      - group: Show code
+      - button "Copy"
+      - status

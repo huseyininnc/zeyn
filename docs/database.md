@@ -6,7 +6,7 @@ behind the `postgres` Cargo feature and Oracle behind `oracle`, so an app withou
 compiles none of it.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.11", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Setup
@@ -82,7 +82,8 @@ The SQL builder is shared. A `Dialect` supplies only what differs, and `Postgres
 |---|---|---|---|
 | Parameters | `$1` | `:1` | `:1` |
 | Identifiers | `"code"`, up to 63 characters | `"CODE"`, up to 30 characters | `"CODE"`, up to 30 characters |
-| Pages | `LIMIT $n OFFSET $m` | `OFFSET :m ROWS FETCH NEXT :n ROWS ONLY` | `ROWNUM` window over the ordered query |
+| Pages | `LIMIT $n OFFSET $m` | `OFFSET :m ROWS FETCH NEXT :n ROWS ONLY` | `ROWNUM` window over the ordered query; `ROWNUM <= :n` alone without an offset |
+| Keyset seek | `(a, b) > ($1, $2)` when the keys share a direction and hold no NULLs, else `OR` terms | `OR` terms | `OR` terms |
 | New keys | identity, `RETURNING` | identity, `RETURNING id INTO :n` | `<table>_seq.NEXTVAL` |
 | Read back after a write | `RETURNING` the row | read by key | read by key |
 | Yes/no | `BOOLEAN` | `NUMBER(1)` | `NUMBER(1)` |
@@ -158,6 +159,7 @@ the same on memory data and in SQL:
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
+| `filter_groups` | each group in parentheses, its filters and groups joined by `OR` (`any`) or `AND` |
 
 `contains` on money and yes/no columns is ignored in SQL. Text sorts by the database collation
 (Oracle: `NLS_SORT`).
@@ -258,6 +260,19 @@ trusts it. It is decoded with a size limit, refused when its order differs from 
 every value is checked against its column type before it is bound. A bad cursor is a validation
 error, not a query. It only says where to continue; filters and permissions apply again.
 
+On PostgreSQL, when every sort key goes the same way and none can be NULL, the seek is one row
+comparison, `WHERE ("code", "id") > ($1, $2)`, which an index on `(code, id)` answers as one
+range scan. The `OR` form above is kept for mixed directions, nullable keys and Oracle, which
+has no ordered row comparison. Measured on one million rows with an index on `(status, id)` and
+three status values: the `OR` form read and dropped 300,000 rows in 29.4 ms, the row comparison
+took 0.11 ms. An `OFFSET 500000` page on the same index took 82 ms.
+
+On Oracle 11g a page without an offset (the first page, every keyset page and capped counts) is
+`SELECT * FROM (...) WHERE ROWNUM <= :n`, which Oracle runs as a top N sort that stops early.
+
+Grid exports continue with the cursor of the previous batch when the data layer returns a keyset
+cursor, and with offsets otherwise, so a large export does not reread the rows before each batch.
+
 Grouped pages use offsets for their cursors.
 
 ## Totals and counts
@@ -340,11 +355,11 @@ holds one or more URLs (separated by spaces) and say they were skipped otherwise
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test all postgres::
 
 docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 ```
 
 The Oracle containers take a few minutes to start; wait for `DATABASE IS READY TO USE!` in

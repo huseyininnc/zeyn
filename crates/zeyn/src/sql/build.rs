@@ -5,8 +5,8 @@
 //! between databases: placeholders, quoting, date conversion, paging and column types.
 
 use super::decode::{Arg, Col, args_of};
-use crate::action::{Aggregate, Cursor, DataQuery, Error, MAX_FILTERS, PageRequest, Result};
-use crate::grid::{Cond, Key, MAX_SORT, TextOp};
+use crate::action::{Aggregate, Cursor, DataQuery, Error, PageRequest, Result};
+use crate::grid::{Cond, CondGroup, Key, MAX_SORT, TextOp};
 use crate::i18n::Text;
 use crate::model::{Entity, FieldError, FieldMeta, Model, Rule, ValidationErrors};
 use crate::time::{Date, DateTime, LocalDateTime, Time};
@@ -110,6 +110,12 @@ pub trait Dialect: Send + Sync + 'static {
     fn binary_sort(&self) -> Option<(&'static str, &'static str)> {
         None
     }
+
+    /// Whether keyset seeks may compare rows as `(a, b) > (x, y)`. One index on the sort columns
+    /// then serves the seek as a single range scan instead of a chain of `OR` terms.
+    fn row_compare(&self) -> bool {
+        false
+    }
 }
 
 /// PostgreSQL 12 and later.
@@ -179,6 +185,10 @@ impl Dialect for Postgres {
         out.push_str("CAST(");
         out.push_str(expr);
         out.push_str(" AS TEXT)");
+    }
+
+    fn row_compare(&self) -> bool {
+        true
     }
 
     fn page(&self, sql: &mut Sql, limit: i64, offset: i64) {
@@ -300,7 +310,9 @@ impl Dialect for Oracle {
     }
 
     /// 12c: `OFFSET :o ROWS FETCH NEXT :n ROWS ONLY`. 11g: the `ROWNUM` wrapper, which numbers
-    /// the ordered rows and keeps the window; the outer `ORDER BY` keeps their order.
+    /// the ordered rows and keeps the window; the outer `ORDER BY` keeps their order. Without an
+    /// offset (first pages, keyset seeks, capped counts) 11g needs only `ROWNUM <= :n`, which
+    /// Oracle runs as a top N sort that stops early.
     fn page(&self, sql: &mut Sql, limit: i64, offset: i64) {
         match self.compat {
             OracleCompat::V12 => {
@@ -309,6 +321,10 @@ impl Dialect for Oracle {
                 sql.push(" ROWS FETCH NEXT ");
                 sql.bind(self, Arg::Int(limit), Cast::Plain);
                 sql.push(" ROWS ONLY");
+            }
+            OracleCompat::V11 if offset == 0 => {
+                sql.wrap("SELECT * FROM (", ") WHERE ROWNUM <= ");
+                sql.bind(self, Arg::Int(limit), Cast::Plain);
             }
             OracleCompat::V11 => {
                 sql.wrap(
@@ -540,11 +556,7 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
     let fields = E::fields();
     sql.push(" FROM ");
     sql.push(&ident(d, E::TABLE)?);
-    let mut conds = Vec::new();
-    for f in q.filters.iter().take(MAX_FILTERS) {
-        Cond::read(f, fields, q.time_zone, &mut conds);
-    }
-    conds.extend(Cond::search(&q.q, fields));
+    let (conds, mut groups) = q.conditions(fields);
     let mut first = true;
     for c in &conds {
         if let Cond::Search(cols, needle) = c {
@@ -569,24 +581,87 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
             sql.push(")");
             continue;
         }
-        let i = match c {
-            Cond::Text(i, ..)
-            | Cond::Range(i, ..)
-            | Cond::AnyOf(i, ..)
-            | Cond::Is(i, ..)
-            | Cond::Blank(i, ..)
-            | Cond::AnyKey(i, ..) => *i,
-            Cond::Search(..) => continue,
+        let Some(i) = field_of(c) else {
+            continue;
         };
-        let f = &fields[i];
-        if matches!(c, Cond::Text(..)) && matches!(f.kind, FieldKind::Money | FieldKind::Bool) {
+        if unwritten(fields, c) {
             continue;
         }
         sql.push(if first { " WHERE " } else { " AND " });
         first = false;
-        condition(d, sql, f, c)?;
+        condition(d, sql, &fields[i], c)?;
+    }
+    groups.retain_mut(|g| written(fields, g));
+    for g in &groups {
+        sql.push(if first { " WHERE " } else { " AND " });
+        first = false;
+        group(d, sql, fields, g)?;
     }
     Ok(!first)
+}
+
+/// The column a condition reads; `None` for [`Cond::Search`], which reads several.
+fn field_of(c: &Cond) -> Option<usize> {
+    match c {
+        Cond::Text(i, ..)
+        | Cond::Range(i, ..)
+        | Cond::AnyOf(i, ..)
+        | Cond::Is(i, ..)
+        | Cond::Blank(i, ..)
+        | Cond::AnyKey(i, ..) => Some(*i),
+        Cond::Search(..) => None,
+    }
+}
+
+/// Whether SQL leaves the condition out: text conditions on money and yes/no columns.
+fn unwritten(fields: &[FieldMeta], c: &Cond) -> bool {
+    matches!(c, Cond::Text(..))
+        && field_of(c).is_some_and(|i| matches!(fields[i].kind, FieldKind::Money | FieldKind::Bool))
+}
+
+/// Drops the conditions SQL leaves out from a group; `false` when nothing is left in it.
+fn written(fields: &[FieldMeta], g: &mut CondGroup) -> bool {
+    for conds in &mut g.filters {
+        conds.retain(|c| field_of(c).is_some() && !unwritten(fields, c));
+    }
+    g.filters
+        .retain(|conds| !conds.is_empty());
+    g.groups
+        .retain_mut(|s| written(fields, s));
+    !g.filters.is_empty() || !g.groups.is_empty()
+}
+
+/// Writes a filter group in parentheses: its filters (each in parentheses, conditions joined
+/// by `AND`) and nested groups, joined by `OR` for `any` and `AND` for `all`.
+fn group(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], g: &CondGroup) -> Result<()> {
+    let join = if g.any { " OR " } else { " AND " };
+    sql.push("(");
+    let mut first = true;
+    for conds in &g.filters {
+        if !first {
+            sql.push(join);
+        }
+        first = false;
+        sql.push("(");
+        for (n, c) in conds.iter().enumerate() {
+            if n > 0 {
+                sql.push(" AND ");
+            }
+            if let Some(i) = field_of(c) {
+                condition(d, sql, &fields[i], c)?;
+            }
+        }
+        sql.push(")");
+    }
+    for s in &g.groups {
+        if !first {
+            sql.push(join);
+        }
+        first = false;
+        group(d, sql, fields, s)?;
+    }
+    sql.push(")");
+    Ok(())
 }
 
 fn condition(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, c: &Cond) -> Result<()> {
@@ -812,6 +887,18 @@ fn push_seek(
         FieldKind::Money => Cast::Plain,
         ref kind => Cast::of(kind),
     };
+    if d.row_compare()
+        && keys.len() > 1
+        && keys.len() == values.len()
+        && keys
+            .iter()
+            .all(|k| !k.nullable && k.desc == keys[0].desc)
+        && !values
+            .iter()
+            .any(|v| matches!(v, Arg::Null(_)))
+    {
+        return push_row_seek(d, sql, fields, keys, values, cast);
+    }
     if let (Some(k), Some(v)) = (keys.first(), values.first())
         && !k.nullable
         && keys.len() > 1
@@ -861,6 +948,34 @@ fn push_seek(
     }
     if terms == 0 {
         sql.push("1 = 0");
+    }
+    sql.push(")");
+    Ok(())
+}
+
+/// Keyset seek as one row comparison, `(a, b) > (x, y)`, for keys that share a direction and hold
+/// no NULLs ([`Dialect::row_compare`]).
+fn push_row_seek(
+    d: &dyn Dialect,
+    sql: &mut Sql,
+    fields: &[FieldMeta],
+    keys: &[OrderKey],
+    values: &[Arg],
+    cast: impl Fn(&OrderKey) -> Cast,
+) -> Result<()> {
+    sql.push("(");
+    for (i, k) in keys.iter().enumerate() {
+        if i > 0 {
+            sql.push(", ");
+        }
+        sql.push(&sort_column(d, &fields[k.index])?);
+    }
+    sql.push(if keys[0].desc { ") < (" } else { ") > (" });
+    for (i, (k, v)) in keys.iter().zip(values).enumerate() {
+        if i > 0 {
+            sql.push(", ");
+        }
+        bind_key(d, sql, &fields[k.index], v.clone(), cast(k));
     }
     sql.push(")");
     Ok(())

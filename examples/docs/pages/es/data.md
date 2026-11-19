@@ -26,9 +26,21 @@ El árbol sigue el patrón ARIA tree: las teclas de flecha se mueven entre eleme
 Tree::of(report_fields).label("Fields").draggable()
 ```
 
+`.movable(move_item)` permite mover elementos. Un ratón o un lápiz arrastran un elemento a la parte superior o inferior de otra fila (antes o después de ella) o al centro de una rama (dentro de ella), y una marca muestra dónde queda. El botón Mover del elemento enfocado abre un menú (arriba, abajo, fuera de su rama, dentro de la rama de arriba), la forma de mover con un solo puntero y la que usan las pantallas táctiles; Alt con una tecla de flecha mueve al instante. La acción recibe un `TreeMove` (`id`, `target`, `place`) por `POST /_zeyn/data` con CSRF, el límite de escritura y su permiso. Ambos ids vienen del navegador, así que la acción los busca, y `TreeMove::parent` da el nuevo padre y rechaza mover el elemento dentro de sí mismo o debajo de sí (`Error::Conflict`, también para una cadena de padres más larga que `MAX_TREE_DEPTH`). Tras un movimiento el árbol vuelve a cargar los niveles que cambiaron y mantiene el foco en el elemento movido. El código de mover forma parte de `treedrag.js` y se carga solo con un árbol arrastrable o movible.
+
+```rust
+#[action(permission = "folders.write")]
+pub async fn move_folder(m: TreeMove, store: Folders) -> Result<()> {
+    let parent = m.parent(|id| store.parent_of(id))?;
+    store.place(&m.id, parent, &m.target, m.place)
+}
+
+Tree::of(folders).label("Folders").movable(move_folder)
+```
+
 ## Gráficos
 
-`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` y `funnel` dibujan SVG en el servidor. No hay biblioteca de gráficos en el navegador; un gráfico es parte del HTML de la página.
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` y `funnel` dibujan SVG en el servidor. No hay biblioteca de gráficos en el navegador; un gráfico es parte del HTML de la página. Un donut necesita de 2 a 5 partes mayores que cero y la mayor por debajo del 75% del total; cualquier otro donut se dibuja como una lista de barras (nombre, una barra tan ancha como su parte, valor y porcentaje) y una compilación de depuración registra un aviso.
 
 ```rust
 Row::new()
@@ -60,6 +72,110 @@ Cada barra, punto, porción, etapa y valor de gauge es una marca con su etiqueta
 | Escape | Oculta el tooltip |
 
 El cursor, el foco y un toque muestran el mismo texto en un tooltip, que se oculta a los lectores de pantalla para que nada se lea dos veces. Sin el script las marcas siguen teniendo nombre y la tabla permanece. Las marcas pequeñas (puntos de 8 px) están por debajo del tamaño de objetivo de 24 px; la tabla bajo *Show data* es el camino equivalente (WCAG 2.5.8).
+
+## Gantt
+
+Tareas como barras sobre un intervalo de días, como el plan de un proyecto. `Gantt::new(label, start, end)` fija el intervalo, de dos años como máximo; `.task(title, from, to)` añade una tarea, `.done(percent)` y `.tone(...)` se aplican a la última tarea añadida, y `.today(day)` dibuja una línea en ese día. Es una tabla que da el primer y el último día de cada tarea como texto, de modo que las barras solo lo repiten; las barras se cortan en los extremos del intervalo.
+
+```rust
+Gantt::new(t!("project.plan"), project.starts, project.ends)
+    .task(t!("project.design"), design.from, design.to)
+    .done(design.percent)
+    .today(ctx.today())
+```
+
+@live gantt
+
+## OrgChart
+
+Una jerarquía en cajas unidas por líneas, desde una caja en lo alto: las personas de una empresa, las partes de un producto. `OrgNode::new(name)` es una caja, `.role(text)` una línea más discreta bajo el nombre y `.child(node)` una caja debajo. Son listas anidadas, así que los lectores de pantalla reciben los niveles; un organigrama dibuja 200 cajas en 8 niveles como máximo y se desplaza dentro de su propia caja cuando es ancho.
+
+```rust
+OrgChart::new(
+    t!("company.chart"),
+    OrgNode::new(director.name.clone())
+        .role(t!("company.director"))
+        .child(OrgNode::new(lead.name.clone())),
+)
+```
+
+## FlowDiagram
+
+Los pasos de un proceso como cajas unidas por flechas, del lado inicial al lado final: un pedido desde el carrito hasta la entrega, una aprobación con sus ramas. `.node(id, title)` añade un paso, `.tone(...)` colorea el último paso añadido, `.edge(from, to)` dibuja una flecha entre dos pasos por sus ids y `.edge_with(from, to, label)` una con una palabra encima. El servidor coloca los pasos en columnas según lo lejos que están de los primeros pasos, y una flecha hacia un paso anterior pasa por debajo de las cajas. Los pasos son una lista ordenada y cada uno nombra los pasos a los que lleva para los lectores de pantalla; un diagrama dibuja 40 pasos y 80 flechas como máximo y se desplaza dentro de su propia caja cuando es ancho.
+
+```rust
+FlowDiagram::new(t!("order.process"))
+    .node("cart", t!("order.cart"))
+    .node("pay", t!("order.payment"))
+    .node("ship", t!("order.shipping"))
+    .edge("cart", "pay")
+    .edge_with("pay", "ship", t!("order.paid"))
+```
+
+@live flow
+
+## Funnel
+
+Las etapas de un proceso que pierde algo en cada paso, como visitas, carritos y pedidos. `Funnel::new(label)` con `.stage(title, value)` dibuja cada etapa como una barra centrada tan ancha como su parte de la primera etapa, con su número y esa parte como texto. Un embudo contiene 10 etapas como máximo.
+
+```rust
+Funnel::new(t!("sales.funnel"))
+    .stage(t!("sales.visits"), visits)
+    .stage(t!("sales.orders"), orders)
+```
+
+## ActivityRings
+
+Hasta cuatro partes de un todo como anillos uno dentro de otro, como los objetivos de un día. `.ring(title, value, max, tone)` añade un anillo de fuera hacia dentro, y `.size(px)` fija el diámetro. Cada nombre y porcentaje se escribe junto a los anillos, por lo que el dibujo está oculto para los lectores de pantalla.
+
+```rust
+ActivityRings::new(t!("day.goals"))
+    .ring(t!("day.packed"), packed, 60, Tone::Brand)
+    .ring(t!("day.calls"), calls, 20, Tone::Success)
+```
+
+@live visuals
+
+## ComparisonTable
+
+Planes o productos uno al lado del otro, una columna cada uno y una fila por característica. `.plan(name)` añade una columna y `.featured()` destaca el último plan añadido; `.row(feature, cells)` toma una celda por cada plan: `true` y `false` se convierten en una marca y una cruz, leídas como "Incluido" y "No incluido", y un texto se escribe tal cual. Contiene 6 planes y 100 filas como máximo.
+
+```rust
+ComparisonTable::new(t!("pricing.plans"))
+    .plan(t!("pricing.free"))
+    .plan(t!("pricing.team"))
+    .featured()
+    .row(t!("pricing.audit_log"), [false, true])
+```
+
+## Table
+
+Una tabla pequeña de texto que la pantalla ya tiene: los planes de una lista de precios, el horario de una tienda, los totales de un informe. `Table::new(caption)` toma un título que da nombre a la tabla, `.head([...])` los encabezados de columna y `.row([...])` cada fila; `.row_headers()` convierte la primera celda de cada fila en su encabezado, de modo que los lectores de pantalla dicen la columna y la fila de cada celda, `.numeric(index)` alinea una columna de números al final y `.striped()` sombrea una de cada dos filas. Una fila más corta que el encabezado se rellena con celdas vacías y una más larga se corta; una tabla contiene 200 filas y 12 columnas como máximo. No tiene paginación, orden ni filtros y no hace ninguna petición: las filas que vienen de una acción, o con las que el usuario trabaja, van en `DataGrid`. En pantallas estrechas se desplaza hacia los lados dentro de su propia caja, que recibe el foco para que las teclas de flecha la desplacen.
+
+```rust
+Table::new(t!("shop.opening_hours"))
+    .head([t!("shop.day"), t!("shop.opens"), t!("shop.closes")])
+    .row([t!("shop.weekdays"), "09:00".into(), "18:00".into()])
+    .row([t!("shop.saturday"), "10:00".into(), "14:00".into()])
+    .row_headers()
+```
+
+@live table
+
+## Heatmap
+
+Un número por cada día de las últimas semanas, como los pedidos recibidos o las horas registradas, en un calendario de cuadros: una columna por semana, una fila por día de la semana, más oscuro cuanto mayor es el número. `Heatmap::ending(label, end)` termina con la semana de `end`, normalmente hoy, y los días posteriores quedan vacíos. `.weeks(n)` fija cuántas semanas se muestran, 17 salvo que se indique y 53 como máximo; `.value(day, n)` o `.values(days)` dan los números, y `.tone(...)` el color. El número más alto que se muestra recibe el más oscuro de cuatro tonos. La semana empieza el día en que la empieza el idioma del usuario.
+
+```rust
+Heatmap::ending(t!("sales.orders_a_day"), ctx.today())
+    .weeks(12)
+    .values(orders.iter().map(|o| (o.day, o.count)))
+    .tone(Tone::Success)
+```
+
+@live heatmap
+
+Es una tabla dibujada por el servidor sin script. Los lectores de pantalla leen el día de la semana de una fila y, para cada día, su fecha y su número en el idioma del usuario, de modo que el tono solo repite lo que dice el texto; al señalar un cuadro se muestra el mismo texto. En pantallas estrechas la tabla se desplaza hacia los lados dentro de su propia caja, y la caja recibe el foco para que las teclas de flecha la desplacen. Cada día son dos elementos: las 17 semanas por defecto caben en el presupuesto de 300 elementos de un componente, y un año completo no.
 
 ## Cifras clave, sparklines y bullets
 

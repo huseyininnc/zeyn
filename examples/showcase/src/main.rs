@@ -11,7 +11,10 @@ mod charts;
 mod gallery;
 mod inputs;
 mod islands;
+mod live;
 mod media;
+#[cfg(feature = "metronome")]
+mod ops;
 mod overview;
 mod people;
 mod pro;
@@ -129,7 +132,8 @@ async fn main() -> std::io::Result<()> {
         .service(stock::ProductStore::seeded())
         .service(islands::CounterStore::default())
         .service(diagrams.clone())
-        .realtime(islands::realtime(diagrams))
+        .service(live::Jobs::default())
+        .socket(live::events(islands::socket(diagrams)))
         .mailer(mailer.clone())
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
@@ -155,10 +159,15 @@ async fn main() -> std::io::Result<()> {
         .feature(charts::feature())
         .feature(inputs::feature())
         .feature(shop::feature())
+        .menu_source(shortcuts)
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     #[cfg(feature = "pdf")]
     {
         app = app.service(pdf);
+    }
+    #[cfg(feature = "metronome")]
+    {
+        app = ops::schedules(app);
     }
     if let Some(a) = assistant {
         app = app.assistant(a);
@@ -173,6 +182,24 @@ async fn main() -> std::io::Result<()> {
             .allow_dev_auth()
     };
     app.serve(&addr).await
+}
+
+/// Side menu shortcuts built for each request, the way an app builds them from a menu table.
+/// Only users with the `showcase.shortcuts` permission see the group; the server still checks
+/// the access of every linked screen.
+async fn shortcuts(_ctx: Ctx) -> Result<Vec<MenuNode>> {
+    Ok(vec![
+        MenuNode::group(
+            t!("menu.shortcuts"),
+            vec![
+                MenuNode::screen(t!("menu.shortcut_product"), "product_page")
+                    .params(serde_json::json!({ "code": "NW-0001" })),
+                MenuNode::path(t!("menu.shortcut_cities"), "/sales/by-city"),
+            ],
+        )
+        .icon(Icon::Link)
+        .permission("showcase.shortcuts"),
+    ])
 }
 
 /// Turns on user accounts instead of the development sign in (`NORTHWIND_ACCOUNTS__ENABLED=1`):
@@ -236,5 +263,5 @@ async fn accounts(app: App, config: &Config, mailer: zeyn::Mailer) -> std::io::R
     }
     Ok(app
         .accounts(accounts)
-        .feature(accounts::ui().admin(true).build()))
+        .feature(accounts::ui().admin().build()))
 }

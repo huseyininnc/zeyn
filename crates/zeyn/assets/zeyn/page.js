@@ -130,12 +130,19 @@ async function submitForm(form, submitter) {
 
 /**
  * Downloads the whole filtered result from `GET /_zeyn/grid/export` as CSV or XLSX, which the
- * server builds page by page. Sends the sort, filters and column layout the user sees.
+ * server builds page by page. Sends the sort, filters and column layout the user sees, and the
+ * keys of the selected rows (at most 1,000) so only they are exported; a PDF report prints every
+ * matching row.
  */
 function exportServer(grid, format) {
   const s = grids.get(grid);
   const a = address(grid);
-  const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], columns: s?.columns ?? [] });
+  const spec = { sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], filter_groups: s?.filterGroups ?? [], q: s?.q ?? '', columns: s?.columns ?? [] };
+  if (s?.selected.size && !s.allMatching && format !== 'pdf') {
+    if (s.selected.size > 1000) return toast(fill(s.texts.too_many || 'Select at most {n} rows for this action.', { n: fmt(1000) }), 'error');
+    spec.keys = [...s.selected];
+  }
+  const q = JSON.stringify(spec);
   const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
   const link = document.createElement('a');
   link.href = `${BASE}/_zeyn/grid/export?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}&format=${format}&q=${encodeURIComponent(q)}`;
@@ -277,6 +284,30 @@ function syncTimeZone() {
     return;
   }
   location.reload();
+}
+
+/** Prefixes of the stored values that belong to one user: form drafts, grid views, palette recents. */
+const USER_STORAGE = /^zeyn(-draft:|\.view:|\.palette\.recent)/;
+
+/**
+ * Removes the form drafts, grid views and palette recents another user left in this browser when
+ * the page belongs to a new user (`meta[name=zeyn-storage]`, the per user key the values are
+ * filed under). Signed out pages (`anon`) keep them, so a sign out and the next sign in of the
+ * same user lose nothing; the sign out response clears storage itself on HTTPS
+ * (`Clear-Site-Data`). The last user is kept under `zeyn.storage`.
+ */
+function dropOtherUsers() {
+  const user = document.querySelector('meta[name="zeyn-storage"]')?.content;
+  if (!user || user === 'anon') return;
+  try {
+    if (localStorage.getItem('zeyn.storage') === user) return;
+    for (const area of [localStorage, sessionStorage]) {
+      for (const key of Object.keys(area)) if (USER_STORAGE.test(key)) area.removeItem(key);
+    }
+    localStorage.setItem('zeyn.storage', user);
+  } catch {
+    return;
+  }
 }
 
 /** Abort controller of the currently registered WebMCP tools. */

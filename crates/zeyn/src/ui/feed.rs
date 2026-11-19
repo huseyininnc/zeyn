@@ -359,7 +359,7 @@ impl<E: Model> Feed<E> {
     }
 
     /// Also subscribes to the topics on the realtime hub (feature `realtime`), so a
-    /// `hub.notify` from another user's action brings the "new posts" button. The topics must be
+    /// `socket.notify` from another user's action brings the "new posts" button. The topics must be
     /// declared with `Realtime::topic`.
     pub fn live(mut self) -> Self {
         self.live = true;
@@ -659,14 +659,30 @@ impl<E: Model> Component for Feed<E> {
             check.listens(t);
         }
         if self.post.is_none() {
-            check.problem("a `Feed` needs `.post(|row| Post::new(..))` to show its rows");
+            check.problem(
+                crate::Problem::new(
+                    "Z0614",
+                    "a `Feed` needs `.post(|row| Post::new(..))` to show its rows",
+                )
+                .why("the feed does not know how to draw a row, so it would stay empty")
+                .fix("add `.post(|row| Post::new(..))`")
+                .docs("components/social#feed"),
+            );
         }
         if self
             .reactions
             .as_ref()
             .is_some_and(|r| r.set.keys().is_empty())
         {
-            check.problem("`Feed::reactions` without `.reaction(key, name, symbol)` offers nothing to press; add the reactions or leave it out");
+            check.problem(
+                crate::Problem::new(
+                    "Z0615",
+                    "`Feed::reactions` without `.reaction(key, name, symbol)` offers nothing to press",
+                )
+                .why("an empty reaction bar takes space and a tab stop without doing anything")
+                .fix("add the reactions or leave it out")
+                .docs("components/social#feed"),
+            );
         }
     }
 }

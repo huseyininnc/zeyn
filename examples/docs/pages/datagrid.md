@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 The server caps the page size whatever the client asks for.
 
+`.page_sizes(&[10, 25, 50, 100])` adds a "Rows per page" list to the pager of numbered pages. The grid's own size is always offered, the pick is saved with the user's view, and the server keeps only sizes the grid offers.
+
 ## Columns
 
 | Call | Result |
@@ -80,6 +82,11 @@ Numbers and money are right aligned with tabular digits. Whole numbers are group
 - `.confirm(message)` and `.tone(Tone::Danger)` right after `.row_action` or `.bulk_action`: asks before that action runs, in the same dialog as `ActionButton::confirm` (Cancel has the focus first), and draws its button in red.
 - `.row_menu(|row| ContextMenu)`: the right click menu of a row.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning or success rows.
+- `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: an "Add row" button, a
+  Delete button and key, and edits saved together. See the [DataGrid reference](grid.md).
+- `.groupable()`, `.summary(label, |t| ...)` on a column: users group by it from its menu or the group panel, and a value computed from the totals shows under it.
+- `.filter_builder()`: a "Filter" button that opens a dialog to build the filter conditions; the same list the filter row, saved views and AI agents use.
+- `.filter_chips()`: the active filters as chips above the grid, each with a remove button, in step with the filter row, the filter builder and saved views.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.
 
 ## Columns known at run time
@@ -101,6 +108,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 Paging, virtual scrolling, keyboard use and number and date formatting in the user's language work
 as in a typed grid. Names, labels and cells are escaped, and the server caps columns, rows and text
 length. The grid does not sort or filter, and its rows are read only. See the
+[DataGrid reference](grid.md).
+
+## Search and bands
+
+`.search()` puts a search box above the grid. The action gets the text as `DataQuery::q`, which
+`DataQuery::apply` matches against the text fields, never the masked ones.
+`.band(label, |b| b.column(..).column(..))` groups columns under one header cell. See the
 [DataGrid reference](grid.md).
 
 ## Refreshing in place

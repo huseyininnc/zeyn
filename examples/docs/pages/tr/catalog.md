@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -49,7 +49,7 @@ CardGrid::of(catalog_products)
     .placeholder(Placeholder::color("--z-surface-2"))
     .priority(4)
 ```
-- **Uzun ızgaralar.** Ekran dışındaki kartlar ve liste satırları yerleşim ve boyama adımlarını atlar (`content-visibility: auto`) ve boyutları görsel boyutundan ayrılır; böylece uzun bir ızgara görülene kadar çok az maliyet getirir. 200 veya daha fazla kartı olan bir kart ızgarası, sanal bir [DataGrid](datagrid.md) gibi sayfada yalnızca görüntü alanına yakın satırları tutar: diğer satırlar aynı yükseklikte boşluktur, her satır ilk kartların en uzununun yüksekliğini alır ve her kart ekran okuyuculara konumunu bildirir (`aria-posinset`, `aria-setsize`). Tab ve Shift+Tab her karta ulaşır, odaktaki kart kaydırılıp görünümden çıkarken de yerinde kalır ve "Show more" aynı pencereye ekler. Hızlı bir kaydırma sırasında yalnızca geçip giden kartlar görsel getirmez; görseller kaydırma durunca yüklenir. Sayfada bul yalnızca görüntü alanına yakın kartları görür; diğerleri için ızgaranın aramasını kullanın.
+- **Uzun ızgaralar.** Ekran dışındaki kartlar ve liste satırları yerleşim ve boyama adımlarını atlar (`content-visibility: auto`) ve boyutları görsel boyutundan ayrılır; böylece uzun bir ızgara görülene kadar çok az maliyet getirir. 200 veya daha fazla kartı olan bir kart ızgarası, sanal bir [DataGrid](datagrid.md) gibi sayfada yalnızca görüntü alanına yakın satırları tutar: diğer satırlar aynı yükseklikte boşluktur, her satır ilk kartların en uzununun yüksekliğini alır ve her kart ekran okuyuculara konumunu bildirir (`aria-posinset`, `aria-setsize`). Tab ve Shift+Tab her karta ulaşır, odaktaki kart kaydırılıp görünümden çıkarken de yerinde kalır ve "Show more" aynı pencereye ekler. Hızlı bir kaydırma sırasında yalnızca geçip giden kartlar görsel getirmez; görseller kaydırma durunca yüklenir. Sayfada bul yalnızca görüntü alanına yakın kartları görür; diğerleri için ızgaranın aramasını kullanın. Kaydırmanın vardığı kartların görselleri, kaydırma durmadan, yavaşlarken yüklenmeye başlar.
 - **İlk sayfa sunucuda.** İlk sayfa (kart ızgarasında 24, şeritte 12 kart ya da `paging` ile verilen boyut) sayfanın HTML'inin parçasıdır; arama motorları ve JavaScript'i olmayan ziyaretçiler kartları ve bağlantılarını görür, görseller boyutlarını taşıdığı için yüklenirken hiçbir şey kaymaz. Sonraki sayfalar tarayıcıdan gelir. Public bir sayfa her ziyaretçi için aynı HTML'dir, bu yüzden önbelleğe alınabilir. Route'u olan bir ekrana bağlanan kart, yönlendirmeye değil o ekranın kanonik adresine (`/items/{slug}`) bağlanır.
 - **Sayfalama.** `Paging::infinite(n)` (varsayılan, 24) ekranda göründüğünde de tetiklenen bir "Show more" düğmesi gösterir; düğmeye basıldığında odak ilk yeni karta geçer. `Paging::pages(n)` önceki ve sonraki düğmelerini ve sayfa numarasını gösterir: action bir toplam döndürürse "Page 2 of 5", döndürmezse "Page 2"; o zaman Next, action bir imleç döndürdüğü sürece çalışır. Sayfa boyutunu sunucu belirler; istemci yalnızca nereden devam edileceğini söyler.
 - **Sıralama.** Her `sort_option`, kullanıcıların bir seçim listesinden seçebileceği bir sıradır; ilki kartların başladığı sıradır. Sunucu yalnızca bu sıraları kabul eder ve istemcinin gönderdiği süzgeçleri ve arama metnini atar.
@@ -92,13 +92,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 Rail, yana kayan tek satıra dizilmiş bir kart ızgarasıdır; kaydırma yakalama (snap) ve bir görünüm genişliği kadar kaydıran önceki ve sonraki düğmeleri vardır (kullanıcı azaltılmış hareket istemediyse yumuşakça). Kullanıcı sonuna yaklaştıkça sonraki grubu, 12'şer 12'şer yükler. Kartlar sekme sırasında yer alan bağlantılardır ve odak aldıklarında görünüme kayarlar.
 
-Kaydırma çubuğu gizlidir; dokunmatik ekran, dokunmatik yüzey ve Shift+tekerlek yine kaydırır, `.scrollbar(true)` ince bir çubuk bırakır. Fareyle basılı tutup şeridi yana sürükleyebilirsiniz. 5 pikselden fazla hareketten sonra bırakıştaki tıklama iptal edilir, böylece işaretçinin altındaki kart açılmaz ve şerit en yakın karta oturur; daha küçük bir hareket normal bir tıklamadır. Sürüklerken metin seçilmez, görseller dışarı sürüklenmez ve kart önizlemesi açılmaz. Dokunmatikte tarayıcının kendi kaydırması kalır. Önceki ve sonraki düğmeleri her zaman vardır ve uçlarda devre dışı kalır, çünkü gizli bir kaydırma çubuğu klavye için bir kaydırma yolu değildir. JavaScript olmadan düğmeler gizlenir ve şerit tarayıcının kendi kaydırmasıyla kayar.
+Kaydırma çubuğu gizlidir; dokunmatik ekran, dokunmatik yüzey ve Shift+tekerlek yine kaydırır, `.scrollbar()` ince bir çubuk bırakır. Fareyle basılı tutup şeridi yana sürükleyebilirsiniz. 5 pikselden fazla hareketten sonra bırakıştaki tıklama iptal edilir, böylece işaretçinin altındaki kart açılmaz ve şerit en yakın karta oturur; daha küçük bir hareket normal bir tıklamadır. Sürüklerken metin seçilmez, görseller dışarı sürüklenmez ve kart önizlemesi açılmaz. Dokunmatikte tarayıcının kendi kaydırması kalır. Önceki ve sonraki düğmeleri her zaman vardır ve uçlarda devre dışı kalır, çünkü gizli bir kaydırma çubuğu klavye için bir kaydırma yolu değildir. JavaScript olmadan düğmeler gizlenir ve şerit tarayıcının kendi kaydırmasıyla kayar.
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## Arama kutusu

@@ -56,10 +56,11 @@ function savedView(grid) {
   }
 }
 
-/** `localStorage` key of a grid's view: screen and node. */
+/** `localStorage` key of a grid's view: user (`meta[name=zeyn-storage]`), screen and node. */
 function viewKey(grid) {
   const a = address(grid);
-  return `zeyn.view:${a.screen}#${a.node}`;
+  const user = document.querySelector('meta[name="zeyn-storage"]')?.content ?? 'anon';
+  return `zeyn.view:${user}:${a.screen}#${a.node}`;
 }
 
 /** Every column of the grid, shown or not: `[{field, label, hidden, pin, width}]`. */
@@ -73,7 +74,7 @@ function columnsOf(grid) {
 
 /** The shown columns as the header has them now: `[{field, width, pin}]`. */
 function shownColumns(grid) {
-  return [...(grid.querySelector('thead tr')?.cells ?? [])]
+  return [...(grid.querySelector('thead tr:not(.z-band-row)')?.cells ?? [])]
     .filter((th) => th.dataset.field)
     .map((th) => {
       const c = { field: th.dataset.field };
@@ -94,7 +95,7 @@ function saveView(grid, reset = false) {
   s.viewTimer = setTimeout(() => {
     const view = reset
       ? null
-      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), shape: grid.dataset.zeynShape };
+      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), filter_groups: s.filterGroups, shape: grid.dataset.zeynShape, group_by: s.groups, page_size: own(grid, '[data-zeyn-page-size-pick]') ? s.size : undefined };
     if (grid.dataset.zeynViews === 'server') {
       post(BASE + '/_zeyn/grid/view', { ...address(grid), view }, { quiet: true });
       return;
@@ -117,6 +118,70 @@ function setColumns(grid, columns) {
   loadGrid(grid, 'layout');
 }
 
+/**
+ * Groups the rows by `fields` (at most three, outermost first), saves the view and reloads the
+ * grid so the server renders the groups. An empty list puts back the grid's own grouping.
+ */
+function setGroups(grid, fields) {
+  const s = grids.get(grid);
+  if (!s) return;
+  s.groups = [...new Set(fields)].slice(0, 3);
+  s.allMatching = false;
+  groupChips(grid);
+  saveView(grid);
+  loadGrid(grid, 'layout');
+}
+
+/**
+ * Shows the user's groups in the group panel above the grid as buttons that remove them, and
+ * marks the table a treegrid while it groups.
+ */
+function groupChips(grid) {
+  const s = grids.get(grid);
+  const panel = toolsOf(grid)?.querySelector('[data-zeyn-group-panel]');
+  if (!s || !panel) return;
+  const labels = new Map(columnsOf(grid).map((c) => [c.field, c.label]));
+  const chips = s.groups.map((field) => {
+    const label = labels.get(field) ?? field;
+    const chip = make('button', 'z-button z-group-chip', { type: 'button', 'aria-label': fill(panel.dataset.textRemove || 'Stop grouping by {label}', { label }) });
+    chip.dataset.zeynUngroup = field;
+    chip.textContent = label;
+    return chip;
+  });
+  panel.querySelector('.z-group-hint').hidden = chips.length > 0;
+  panel.querySelectorAll('.z-group-chip').forEach((c) => c.remove());
+  panel.append(...chips);
+  grid.querySelector(':scope > table')?.setAttribute('role', s.groups.length ? 'treegrid' : s.role || 'grid');
+}
+
+/** Stops grouping by the column of a chip in the group panel and moves focus to a neighbour. */
+function ungroup(chip) {
+  const grid = gridOfTools(chip);
+  const s = grid && grids.get(grid);
+  if (!s) return;
+  const panel = chip.parentElement;
+  const near = (chip.nextElementSibling ?? chip.previousElementSibling)?.dataset.zeynUngroup;
+  setGroups(grid, s.groups.filter((f) => f !== chip.dataset.zeynUngroup));
+  ((near && panel.querySelector(`[data-zeyn-ungroup="${CSS.escape(near)}"]`)) || grid).focus();
+}
+
+/** Shows the page size the user picked from the first page and saves it with the view. */
+function pickPageSize(select) {
+  const grid = select.closest('[data-zeyn-grid]');
+  const s = grid && grids.get(grid);
+  const size = Number(select.value);
+  if (!s || !(size > 0)) return;
+  s.size = size;
+  saveView(grid);
+  loadGrid(grid, 'reset');
+}
+
+/** Fits a column from a double click on its resize handle and saves the width. */
+function fitColumn(th) {
+  autofit(th);
+  widthChanged(th.closest('[data-zeyn-grid]'));
+}
+
 /** Puts back the grid's own layout, sort and filters and forgets the saved view. */
 function resetView(grid) {
   const s = grids.get(grid);
@@ -124,6 +189,9 @@ function resetView(grid) {
   s.columns = null;
   s.sort = defaultSort(grid);
   s.filters = {};
+  s.filterGroups = [];
+  s.groups = [];
+  groupChips(grid);
   saveView(grid, true);
   loadGrid(grid, 'layout');
 }
@@ -160,7 +228,7 @@ function applyHead(grid, s, html) {
   table.style.width = '';
   setupHead(grid, s);
   if (s.paging === 'virtual' && s.filler) {
-    const n = thead.rows[0]?.cells.length ?? 1;
+    const n = thead.querySelector('tr:not(.z-band-row)')?.cells.length ?? 1;
     s.filler.colSpan = n;
     s.placeholder.innerHTML = '<td></td>'.repeat(n);
     s.holders.clear();
@@ -176,7 +244,7 @@ function applyHead(grid, s, html) {
  * filled from the current filters, sort badges and pinned column offsets.
  */
 function setupHead(grid, s) {
-  const head = grid.querySelector('thead tr');
+  const head = grid.querySelector('thead tr:not(.z-band-row)');
   if (!head) return;
   const t = s.texts;
   const widths = new Map([...head.cells].map((th) => [th, Math.round(th.getBoundingClientRect().width)]));
@@ -257,7 +325,7 @@ function fillFilter(cell, f, t) {
  * applies to every row, including virtual rows, without touching them.
  */
 function pinOffsets(grid) {
-  const cells = [...(grid.querySelector('thead tr')?.cells ?? [])];
+  const cells = [...(grid.querySelector('thead tr:not(.z-band-row)')?.cells ?? [])];
   let start = 0;
   while (start < cells.length && cells[start].dataset.pin === 'start') start++;
   let end = 0;
@@ -287,7 +355,9 @@ function pinOffsets(grid) {
 
 /**
  * Sets a column width. The first time, every column is frozen at its current width and the
- * table switches to a fixed layout so one column can change without moving the others.
+ * table switches to a fixed layout so one column can change without moving the others. A fixed
+ * table takes its widths from its first row, which is the band row when the grid has bands, so
+ * those grids keep the widths in a `colgroup` as well.
  */
 function setWidth(th, px) {
   const table = th.closest('table');
@@ -308,9 +378,15 @@ function setWidth(th, px) {
   }
   if (!table.classList.contains('z-fixed')) {
     for (const c of head.cells) c.style.width = `${c.offsetWidth}px`;
+    if (head.previousElementSibling?.matches('.z-band-row')) {
+      const group = make('colgroup');
+      for (const c of head.cells) group.append(make('col', '', { style: `width:${c.style.width}` }));
+      table.prepend(group);
+    }
     table.classList.add('z-fixed');
   }
   const w = Math.round(Math.max(MIN_COLUMN, Math.min(MAX_COLUMN, px)));
+  table.querySelector(':scope > colgroup')?.children[[...head.cells].indexOf(th)]?.style.setProperty('width', `${w}px`);
   th.style.width = `${w}px`;
   th.dataset.userWidth = String(w);
   th.querySelector('.z-resize')?.setAttribute('aria-valuenow', String(w));
@@ -324,6 +400,66 @@ function widthChanged(grid) {
   if (!s) return;
   s.columns = shownColumns(grid);
   saveView(grid);
+}
+
+/**
+ * Moves a column by dragging its header onto another header of the same pinned group, through
+ * the drag core (`drag.js`): a press that moves less than its threshold is still a click and
+ * sorts, Escape cancels. The drop goes before or after the header under the pointer by its
+ * midpoint, mirrored in right to left grids. The column menu (Move left, Move right) does the
+ * same from the keyboard.
+ */
+function startColumnDrag(e, th) {
+  const grid = th.closest('[data-zeyn-grid]');
+  if (!grids.get(grid)) return;
+  D.press(e, {
+    onStart: (ev) => {
+      const rtl = getComputedStyle(grid).direction === 'rtl';
+      const group = [...th.parentElement.cells].filter((h) => h.dataset.field && (h.dataset.pin || '') === (th.dataset.pin || ''));
+      const panel = th.dataset.group ? toolsOf(grid)?.querySelector('[data-zeyn-group-panel]') : null;
+      let target = null;
+      let after = false;
+      let onPanel = false;
+      const mark = (on) => target?.classList.toggle(after ? 'z-col-drop-end' : 'z-col-drop-start', on);
+      th.classList.add('z-col-dragging');
+      document.documentElement.classList.add('z-col-moving');
+      const move = (m) => {
+        mark(false);
+        const p = panel?.getBoundingClientRect();
+        onPanel = !!p && m.clientX >= p.left && m.clientX <= p.right && m.clientY >= p.top && m.clientY <= p.bottom;
+        panel?.classList.toggle('z-drop', onPanel);
+        if (onPanel) {
+          target = null;
+          return;
+        }
+        target = group.find((h) => {
+          const r = h.getBoundingClientRect();
+          return m.clientX >= r.left && m.clientX <= r.right;
+        }) ?? null;
+        if (target === th) target = null;
+        if (target) {
+          const r = target.getBoundingClientRect();
+          after = m.clientX > r.left + r.width / 2 !== rtl;
+          mark(true);
+        }
+      };
+      move(ev);
+      D.capture(th, ev, move, (_, cancelled) => {
+        mark(false);
+        th.classList.remove('z-col-dragging');
+        document.documentElement.classList.remove('z-col-moving');
+        if (!cancelled) D.swallowClick();
+        panel?.classList.remove('z-drop');
+        if (onPanel && !cancelled) return setGroups(grid, [...grids.get(grid).groups.filter((f) => f !== th.dataset.field), th.dataset.field]);
+        if (!target || cancelled) return;
+        const shown = shownColumns(grid);
+        const [col] = shown.splice(shown.findIndex((c) => c.field === th.dataset.field), 1);
+        const at = shown.findIndex((c) => c.field === target.dataset.field) + (after ? 1 : 0);
+        shown.splice(at, 0, col);
+        setColumns(grid, shown);
+      });
+    },
+  });
 }
 
 /** Drags a resize handle; in right to left pages, dragging left makes the column wider. */
@@ -352,6 +488,12 @@ function startResize(e, handle) {
 /** Arrow keys resize a focused handle by 16 px (64 px with Shift). Returns true when handled. */
 function resizeKey(e, handle) {
   const th = handle.closest('th');
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    autofit(th);
+    widthChanged(th.closest('[data-zeyn-grid]'));
+    return true;
+  }
   const rtl = getComputedStyle(th).direction === 'rtl';
   const step = e.shiftKey ? 64 : 16;
   const delta = { ArrowRight: step, ArrowLeft: -step }[e.key];
@@ -360,6 +502,41 @@ function resizeKey(e, handle) {
   setWidth(th, th.offsetWidth + (rtl ? -delta : delta));
   widthChanged(th.closest('[data-zeyn-grid]'));
   return true;
+}
+
+/** Width the contents of an element take on one line, without its own box. */
+function contentWidth(el) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  return range.getBoundingClientRect().width;
+}
+
+/**
+ * Fits a column to its widest content: the header label with its sort mark and menu button, and
+ * the cells of the rows in the page (the rows a virtual grid has drawn), within the resize
+ * limits. Contents are measured with a range, so a column can shrink as well as grow.
+ */
+function autofit(th) {
+  const grid = th.closest('[data-zeyn-grid]');
+  const i = cellsOf(th.parentElement).indexOf(th);
+  if (!grid || i < 0) return;
+  const pad = (el) => {
+    const cs = getComputedStyle(el);
+    return parseFloat(cs.paddingInlineStart) + parseFloat(cs.paddingInlineEnd);
+  };
+  const label = th.querySelector('.z-sort, .z-th-label');
+  let want = (label ? contentWidth(label) + 24 : contentWidth(th)) + (th.querySelector('.z-col-menu')?.offsetWidth ?? 0) + pad(th) + 8;
+  for (const tr of rows(grid)) {
+    const td = dataRow(tr) ? cellsOf(tr)[i] : null;
+    if (td?.isConnected) want = Math.max(want, contentWidth(td) + pad(td) + 4);
+  }
+  setWidth(th, Math.ceil(want));
+}
+
+/** Fits every shown column of a grid to its content and saves the widths with the view. */
+function autofitAll(grid) {
+  for (const th of grid.querySelectorAll(':scope > table > thead tr:not(.z-band-row) > th[data-field]')) autofit(th);
+  widthChanged(grid);
 }
 
 /** Items of the menu of one column: sort, pin, move, hide, choose columns, reset. */
@@ -394,8 +571,14 @@ function columnMenu(grid, th) {
     { label: t.menu_sort_clear || 'Clear sort', disabled: !key, run: sortBy(null) },
     { separator: true },
   ];
+  const grouped = s.groups.includes(field);
+  const grouping = th.dataset.group ? [
+    { label: grouped ? t.ungroup || 'Ungroup' : t.group_by || 'Group by this column', run: () => setGroups(grid, grouped ? s.groups.filter((f) => f !== field) : [...s.groups, field]) },
+    { separator: true },
+  ] : [];
   return [
     ...sorting,
+    ...grouping,
     { label: t.menu_pin_start || 'Pin to start', checked: th.dataset.pin === 'start', radio: true, run: pin('start') },
     { label: t.menu_pin_end || 'Pin to end', checked: th.dataset.pin === 'end', radio: true, run: pin('end') },
     { label: t.menu_unpin || 'Unpin', disabled: !th.dataset.pin, run: pin(null) },
@@ -403,6 +586,15 @@ function columnMenu(grid, th) {
     { label: t.menu_move_prev || 'Move left', disabled: i <= 0, run: move(-1) },
     { label: t.menu_move_next || 'Move right', disabled: i < 0 || i >= shown.length - 1, run: move(1) },
     { label: t.menu_hide || 'Hide column', disabled: shown.length <= 1, run: () => setColumns(grid, shown.filter((c) => c.field !== field)) },
+    { separator: true },
+    {
+      label: t.menu_autofit || 'Fit width to content',
+      run: () => {
+        autofit(th);
+        widthChanged(grid);
+      },
+    },
+    { label: t.menu_autofit_all || 'Fit all columns', run: () => autofitAll(grid) },
     {
       label: t.menu_filter || 'Filter',
       disabled: !th.dataset.filter,

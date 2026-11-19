@@ -62,7 +62,11 @@ async fn dev_events() -> Response {
 
 /// Static assets that skip IP rules and rate limits like the other runtime files.
 pub(super) fn is_asset(path: &str) -> bool {
-    path == "/_zeyn/enterprise.js" || path == "/_zeyn/enterprise.css" || path == "/_zeyn/dev.js"
+    path == "/_zeyn/enterprise.js"
+        || path == "/_zeyn/enterprise.css"
+        || path == "/_zeyn/dev.js"
+        || (cfg!(debug_assertions) && path.starts_with("/_zeyn/devtools."))
+        || (cfg!(debug_assertions) && path.starts_with("/_zeyn/inspect."))
 }
 
 type Check = Arc<dyn Fn() -> BoxFuture<bool> + Send + Sync>;
@@ -86,10 +90,14 @@ pub(super) struct Extras {
 /// The startup problem of a development authenticator in a release build, unless allowed.
 pub(super) fn dev_auth_problem(release: bool, development: bool, allowed: bool) -> Option<String> {
     (release && development && !allowed).then(|| {
-        "DevAuth signs every request in with full access, so it does not run in release builds
-  = help: use a real authenticator in release builds (OidcAuth, JwtAuth, ForwardAuth or App::accounts), for example only under `#[cfg(debug_assertions)]`
-  = help: a demo that must run in a release build can call `App::allow_dev_auth()`"
-            .into()
+crate::Problem::new(
+    "Z0201",
+    "DevAuth signs every request in with full access, so it does not run in release builds",
+)
+.why("a release build is what goes to users, and with DevAuth anyone who reaches it can read and change everything")
+.fix("use a real authenticator in release builds (OidcAuth, JwtAuth, ForwardAuth or App::accounts), for example DevAuth only under `#[cfg(debug_assertions)]`; a demo that must run in a release build can call `App::allow_dev_auth()`")
+.docs("guides/security#signing-in")
+.to_string()
     })
 }
 
@@ -230,8 +238,13 @@ impl App {
             .get_or_insert_with(crate::jobs::Jobs::default)
             .clone();
         if let Err(e) = jobs.set_store(store) {
-            self.setup_problems
-                .push(format!("job_store: {e:?}"));
+            self.setup_problems.push(
+                crate::Problem::new("Z0504", format!("job_store: {e:?}"))
+                    .why("the job store could not be set, so jobs would run without the store the app asked for")
+                    .fix("call `App::job_store` once, before the first `App::job`")
+                    .docs("guides/enterprise#background-jobs")
+                    .to_string(),
+            );
         }
         self.services.insert(jobs);
         self
@@ -241,8 +254,16 @@ impl App {
     pub fn job_concurrency(mut self, limit: usize) -> Self {
         match &self.extras.jobs {
             Some(jobs) if !jobs.is_empty() => {
-                self.setup_problems
-                    .push("job_concurrency must be set before the first job is added".into());
+                self.setup_problems.push(
+                    crate::Problem::new(
+                        "Z0505",
+                        "job_concurrency must be set before the first job is added",
+                    )
+                    .why("the job runner is created with the first job, and its limit cannot change afterwards")
+                    .fix("move `.job_concurrency(n)` above the first `.job(...)`")
+                    .docs("guides/enterprise#background-jobs")
+                    .to_string(),
+                );
             }
             _ => {
                 let jobs = crate::jobs::Jobs::with_limit(limit);
@@ -253,8 +274,69 @@ impl App {
         self
     }
 
+    #[cfg(feature = "metronome")]
+    fn jobs_mut(&mut self) -> crate::jobs::Jobs {
+        let jobs = self
+            .extras
+            .jobs
+            .get_or_insert_with(crate::jobs::Jobs::default)
+            .clone();
+        self.services.insert(jobs.clone());
+        jobs
+    }
+
+    /// Queues runs of `job` when `trigger` fires: a cron expression with seconds, a time zone, a
+    /// calendar, a payload, a priority, a timeout and a misfire policy (feature `metronome`).
+    /// A job may have several triggers. Mistakes (a bad expression, an unknown job, time zone or
+    /// calendar, a duplicate id) stop the app at startup with the trigger named.
+    ///
+    /// ```ignore
+    /// App::new("Billing")
+    ///     .queued_job("close_day", Schedule::manual(), close_day)
+    ///     .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul"))
+    /// ```
+    #[cfg(feature = "metronome")]
+    pub fn trigger(mut self, job: &str, trigger: crate::metronome::Trigger) -> Self {
+        self.jobs_mut()
+            .add_trigger(job, trigger);
+        self
+    }
+
+    /// A calendar of excluded days and times that triggers name (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub fn calendar(mut self, name: &str, calendar: crate::metronome::Calendar) -> Self {
+        self.jobs_mut()
+            .add_calendar(name, calendar);
+        self
+    }
+
+    /// After a run of `first` succeeds, queues a run of `then` with the same payload (feature
+    /// `metronome`). Cycles and chains longer than `MAX_CHAIN` jobs are refused at startup.
+    #[cfg(feature = "metronome")]
+    pub fn chain(mut self, first: &str, then: &str) -> Self {
+        self.jobs_mut().add_chain(first, then);
+        self
+    }
+
+    /// How long run history is kept: 30 days and 100,000 rows unless set (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub fn job_history(mut self, retention: crate::metronome::Retention) -> Self {
+        self.jobs_mut().set_retention(retention);
+        self
+    }
+
+    /// Problems of the app's triggers, calendars and chains.
+    pub(super) fn jobs_problems(&self) -> Vec<String> {
+        #[cfg(feature = "metronome")]
+        if let Some(jobs) = &self.extras.jobs {
+            return jobs.problems();
+        }
+        Vec::new()
+    }
+
     /// Publishes job status as JSON at `GET /_zeyn/jobs` to users with this permission. Off
-    /// unless set.
+    /// unless set. With the feature `metronome`, `GET /_zeyn/jobs/runs` gives the run history
+    /// (`?job=` one job, `?offset=` and `?limit=` to page) to the same users.
     pub fn jobs_permission(mut self, permission: &'static str) -> Self {
         self.extras.jobs_permission = Some(permission);
         self
@@ -362,6 +444,45 @@ async fn jobs_status(State(st): State<Arc<AppState>>, headers: axum::http::Heade
     no_store(axum::Json(json!({ "jobs": jobs.status() })).into_response())
 }
 
+/// Query of the run history endpoint.
+#[cfg(feature = "metronome")]
+#[derive(serde::Deserialize)]
+struct RunsQuery {
+    job: Option<String>,
+    #[serde(default)]
+    offset: u64,
+    limit: Option<usize>,
+}
+
+/// Run history for users with the jobs permission: newest first, error codes only.
+#[cfg(feature = "metronome")]
+async fn jobs_runs(
+    State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    axum::extract::Query(q): axum::extract::Query<RunsQuery>,
+) -> Response {
+    let ctx = st.ctx(&headers);
+    let (Some(jobs), Some(permission)) = (&st.extras.jobs, st.extras.jobs_permission) else {
+        return st.error_response(&ctx, super::Failure::App(crate::Error::NotFound));
+    };
+    if !ctx
+        .identity()
+        .can(&crate::Access::Permission(permission))
+    {
+        return st.error_response(&ctx, super::Failure::App(crate::Error::Forbidden));
+    }
+    let limit = q
+        .limit
+        .unwrap_or(crate::DEFAULT_PAGE_SIZE as usize);
+    match jobs
+        .history(q.job.as_deref(), q.offset, limit)
+        .await
+    {
+        Ok(runs) => no_store(axum::Json(json!({ "runs": runs })).into_response()),
+        Err(e) => st.error_response(&ctx, super::Failure::App(e)),
+    }
+}
+
 fn no_store(mut r: Response) -> Response {
     r.headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -421,7 +542,10 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     let router = router
         .route("/_zeyn/health", get(health))
         .route("/_zeyn/ready", get(ready))
-        .route("/_zeyn/jobs", get(jobs_status))
+        .route("/_zeyn/jobs", get(jobs_status));
+    #[cfg(feature = "metronome")]
+    let router = router.route("/_zeyn/jobs/runs", get(jobs_runs));
+    let router = router
         .route(
             "/_zeyn/enterprise.js",
             get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
@@ -516,8 +640,8 @@ pub fn build_id() -> &'static str {
             });
         from_env.unwrap_or_else(|| {
             let seed = 0xcbf2_9ce4_8422_2325;
-            let hash = match std::env::current_exe().and_then(std::fs::read) {
-                Ok(bytes) => fnv(&bytes, seed),
+            let hash = match std::env::current_exe().and_then(|p| hash_file(&p, seed)) {
+                Ok(hash) => hash,
                 Err(_) => [
                     super::JS,
                     super::GRID_JS,
@@ -532,6 +656,30 @@ pub fn build_id() -> &'static str {
             format!("{hash:016x}")
         })
     })
+}
+
+/// FNV-1a of a file, read in 64 KiB pieces so hashing a large executable does not hold it in
+/// memory.
+fn hash_file(path: &std::path::Path, seed: u64) -> std::io::Result<u64> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut hash = seed;
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            return Ok(hash);
+        }
+        hash = fnv(&buf[..n], hash);
+    }
+}
+
+/// Computes the [`build_id`] on a background thread at startup, so no request waits for the
+/// executable to be hashed.
+pub(super) fn warm_build_id() {
+    let _ = std::thread::Builder::new()
+        .name("zeyn-build-id".into())
+        .spawn(|| build_id().len());
 }
 
 /// Adds the build id header to a response, so the runtime notices a new deploy.
@@ -574,6 +722,32 @@ const TEXTS: &[&str] = &[
     "privacy.reason_continue",
     "privacy.reason_cancel",
     "privacy.reason_invalid",
+    #[cfg(debug_assertions)]
+    "devtools.title",
+    #[cfg(debug_assertions)]
+    "devtools.refresh",
+    #[cfg(debug_assertions)]
+    "devtools.close",
+    #[cfg(debug_assertions)]
+    "devtools.empty",
+    #[cfg(debug_assertions)]
+    "devtools.queries",
+    #[cfg(debug_assertions)]
+    "devtools.effects",
+    #[cfg(debug_assertions)]
+    "devtools.topics",
+    #[cfg(debug_assertions)]
+    "devtools.build",
+    #[cfg(debug_assertions)]
+    "devtools.render",
+    #[cfg(debug_assertions)]
+    "devtools.hint",
+    #[cfg(debug_assertions)]
+    "inspect.title",
+    #[cfg(debug_assertions)]
+    "inspect.none",
+    #[cfg(debug_assertions)]
+    "inspect.hint",
 ];
 
 /// Extra `<head>` markup: the enterprise runtime and its texts.
@@ -605,6 +779,18 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
         base = escape(&st.prefix),
         v = asset_version(),
     ) + &accounts_head(st)
+        + &devtools_head(st)
+}
+
+/// The DevTools script of debug builds, while they are on.
+fn devtools_head(st: &AppState) -> String {
+    #[cfg(debug_assertions)]
+    return super::devtools::head(&st.prefix);
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = st;
+        String::new()
+    }
 }
 
 /// The passkey script of the accounts system, when it is on.

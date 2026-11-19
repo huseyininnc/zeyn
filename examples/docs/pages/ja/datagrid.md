@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 クライアントが何を要求しても、サーバーはページサイズに上限を設けます。
 
+`.page_sizes(&[10, 25, 50, 100])` は番号付きページのページャーに「1 ページの行数」リストを加えます。グリッド自身のサイズは常に選べ、選んだ値はユーザーのビューと一緒に保存され、サーバーはグリッドが用意したサイズだけを受け入れます。
+
 ## 列
 
 | 呼び出し | 結果 |
@@ -79,6 +81,11 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_action` または `.bulk_action` の直後の `.confirm(message)` と `.tone(Tone::Danger)`: その操作の実行前に `ActionButton::confirm` と同じダイアログで確認し（フォーカスは最初にキャンセル）、ボタンを赤で描きます。
 - `.row_menu(|row| ContextMenu)`: 行の右クリックメニュー。
 - `.row_style(|row| Option<RowStyle>)`: danger、warning、success の行。
+- `.add_with(create)`、`.delete_with(action, M::id)`、`.batch_edit()`: 「行を追加」ボタン、削除の
+  ボタンとキー、まとめて保存する編集。[DataGrid リファレンス](grid.md)を参照してください。
+- 列の `.groupable()`、`.summary(label, |t| ...)`: ユーザーは列メニューかグループパネルからその列でグループ化でき、集計から計算した値が列の下に表示されます。
+- `.filter_builder()`: フィルター条件を組み立てるダイアログを開く「フィルター」ボタン。フィルター行、保存済みビュー、AI エージェントと同じ一覧を使います。
+- `.filter_chips()`: 有効なフィルターをグリッドの上にチップとして表示し、それぞれに削除ボタンを付けます。フィルター行、フィルタービルダー、保存済みビューと連動します。
 - `.exportable()`: フィルター後の行の CSV エクスポート。サーバーがストリーミングします。
 
 ## 実行時に決まる列
@@ -96,6 +103,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 ```
 
 ページング、仮想スクロール、キーボード操作、ユーザーの言語での数値と日付の書式は、型付きの grid と同じように動きます。名前、ラベル、セルはエスケープされ、サーバーが列数、行数、テキストの長さを制限します。この grid は並べ替えも絞り込みもせず、行は読み取り専用です。詳しくは [DataGrid リファレンス](grid.md) を参照してください。
+
+## 検索とバンド
+
+`.search()` はグリッドの上に検索ボックスを置きます。アクションはテキストを `DataQuery::q` として
+受け取り、`DataQuery::apply` はマスクされた項目を除くテキスト項目と照合します。
+`.band(label, |b| b.column(..).column(..))` は列を一つのヘッダーセルの下にまとめます。
+[DataGrid リファレンス](grid.md)を参照してください。
 
 ## その場での更新
 

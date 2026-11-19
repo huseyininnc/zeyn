@@ -3,7 +3,7 @@
 التطبيقات التي تحتفظ بمستخدميها بنفسها تفعّل ميزة Cargo المسماة `accounts`. وهي توفر التسجيل وكلمات المرور وتأكيد البريد الإلكتروني وإعادة تعيين كلمة المرور والقفل والأدوار وتسجيل الدخول بخطوتين ومفاتيح المرور (passkeys) وتسجيل الدخول الخارجي وشاشات جاهزة ونقاط نهاية JSON لتطبيقات الجوال. أما التطبيقات التي تسجل الدخول عبر وكيل تسجيل دخول موحد أو مزود هوية فلا تحتاج إليها. المرجع الكامل، مع جدول لمن يعرفون ASP.NET Core Identity، هو `docs/accounts.md`.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["accounts"] }
+zeyn = { version = "0.0.11", features = ["accounts"] }
 ```
 
 ## التفعيل
@@ -20,7 +20,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - يأتي المفتاح من الإعدادات، وطوله 32 بايت على الأقل، ولا يتغير أبدًا.

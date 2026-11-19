@@ -88,12 +88,16 @@ mod jobs;
 mod mail;
 mod media;
 mod menu;
+/// Wall clock job schedules: cron triggers, calendars, misfires, history (feature `metronome`).
+#[cfg(feature = "metronome")]
+pub mod metronome;
 mod model;
 #[cfg(feature = "pdf")]
 mod pdf;
 mod platform;
 mod prefs;
 mod privacy;
+mod problem;
 /// Fractional index keys for user ordered rows.
 pub mod rank;
 #[cfg(feature = "redis")]
@@ -111,6 +115,8 @@ mod slug;
 /// Data layer for SQL databases (`postgres` and `oracle` features).
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub mod sql;
+#[cfg(feature = "server")]
+pub mod testing;
 pub mod text;
 mod time;
 pub mod ui;
@@ -121,8 +127,8 @@ mod xlsx;
 
 pub use action::{
     Access, Action, ActionMeta, Aggregate, AggregateRequest, Ai, Cursor, DEFAULT_PAGE_SIZE,
-    DataQuery, Error, Filter, MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE,
-    Page, PageRequest, Result, Sort, Span, Total,
+    DataQuery, Error, Filter, FilterGroup, MAX_FILTER_CHOICES, MAX_FILTER_DEPTH, MAX_FILTER_TEXT,
+    MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Sort, Span, Total,
 };
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 #[cfg(feature = "assistant")]
@@ -143,30 +149,42 @@ pub use csp::{Csp, MAX_EMBED_URL, TRACKING_PARAMS, embed_url};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
 pub use feature::{
-    Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn,
+    Feature, Guard, GuardResult, MENU_DEPTH, Menu, MenuGroup, MenuItem, Route, ScreenEntry,
+    SignedIn,
 };
+#[cfg(feature = "resumable")]
+pub use files::ResumableUploads;
 #[cfg(feature = "server")]
 pub use files::{
     DiskStore, FileAccess, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore,
-    ScanVerdict, StoredFile,
+    STALE_PART, ScanVerdict, StoredFile, ZipGuard,
 };
 pub use files::{
     File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,
     UPLOAD_CHUNK, UploadValue, clean_file_name, valid_file_id,
 };
+#[cfg(feature = "image")]
+pub use files::{MAX_IMAGE_MEMORY, MAX_IMAGE_SIDE, clean_image};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid,
     DataGridColumn, DataGridView, DataGridViewStore, DataMode, DynamicColumn, DynamicGrid,
     DynamicKind, DynamicPage, DynamicRow, ExportColumn, MAX_BULK, MAX_CELL_TEXT, MAX_COLUMN_NAME,
-    MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT, MAX_PINNED, MAX_SORT, MemoryViewStore,
-    Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS, position_cursor, total,
+    MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT, MAX_PINNED, MAX_SORT, MAX_USER_GROUPS,
+    MemoryViewStore, Paging, Pin, RowStyle, Tone, Totals, VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS,
+    position_cursor, total,
 };
-pub use i18n::{I18n, NumberFormat, Text};
+#[doc(hidden)]
+pub use i18n::__plural;
+pub use i18n::{
+    I18n, NumberFormat, PluralCount, Text, format_message, parse_cases, plural_category,
+};
 pub use import::{
     Checked, CsvError, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource,
     MAX_CSV_BYTES, RowError, check_csv, check_file, error_report, parse_csv,
 };
+#[cfg(all(feature = "metronome", any(feature = "postgres", feature = "oracle")))]
+pub use jobs::migrate_job_tables;
 #[cfg(feature = "server")]
 pub use jobs::{
     ClaimedJob, JOB_LEASE, JOB_POLL, JobState, JobStatus, JobStore, Jobs, MAX_BACKOFF_MS,
@@ -188,10 +206,12 @@ pub use model::{
 pub use pdf::{MAX_PDF_DATA, MAX_PDF_ROWS, Pdf, PdfLink, PdfSource, PdfTemplate};
 pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource,
-    Licensed, PerTenant, Secret, StaticSource, Tenant, TenantRequired,
+    Licensed, Secret, StaticSource, Tenant, TenantRequired,
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
+#[cfg(feature = "server")]
+pub use platform::{MAX_TENANTS, PerTenant};
 pub use prefs::{
     Choice, ClientPref, ClientPrefs, Consent, Draft, MAX_DRAFT_CHARS, MAX_DRAFTS,
     MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
@@ -199,7 +219,8 @@ pub use prefs::{
 #[doc(hidden)]
 pub use privacy::output as __privacy;
 pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
-pub use rank::Rank;
+pub use problem::{DOCS_URL, Problem, problem_json};
+pub use rank::{Rank, ReorderRequest};
 #[cfg(feature = "redis")]
 pub use redis_store::RedisStore;
 pub use render::Render;
@@ -218,9 +239,10 @@ pub use server::realtime;
 #[cfg(feature = "server")]
 pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
-    CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin,
-    Prefetch, READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
-    TimePolicy, probe,
+    CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MAX_EXTENSION_MODULES,
+    MAX_MENU_CACHE, MAX_MENU_LABEL, MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL, Mcp,
+    MemoryAudit, MenuNode, MenuSource, Menus, Module, Plugin, Prefetch, PublicFile, READY_CACHE,
+    StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
 pub use site::{
     BottomNavItem, CenterOnPhone, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell,
@@ -241,7 +263,7 @@ pub use workflow::{
 };
 #[cfg(feature = "xlsx")]
 pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
-pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
+pub use zeyn_macros::{action, choice, entity, model, params, public_files, screen, t};
 
 #[doc(hidden)]
 pub use feature::read_params as __read_params;
@@ -253,16 +275,23 @@ pub use serde_json as __serde_json;
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
     pub use crate::seo::{Robots, SitemapPart, SitemapUrl};
+    pub use crate::ui::FileDrop;
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
-        ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card,
-        CardGrid, Chart, Chips, Control, DateOptions, DescriptionList, Dock, Embed,
-        EmbedPermission, EmptyState, ExternalLink, Fit, Heading, Hero, Image, Kpi, LinkButton,
-        List, Listens, LookupItem, LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph,
-        Placeholder, Popover, PrevNext, Progress, PropertyInspector, Rail, Reactions, RelativeTime,
-        Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar,
-        Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
+        Accordion, ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, AvatarGroup, Badge,
+        Breadcrumb, Busy, Card, CardGrid, Chart, Chips, Control, CopyButton, DateOptions,
+        DescriptionList, Divider, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Fit,
+        Heading, Heatmap, Hero, Image, Kbd, Kpi, LinkButton, List, Listens, LookupItem,
+        LookupQuery, MenuBar, MenuButton, MetaLine, Pagination, Panel, Paragraph, Placeholder,
+        Popover, PrevNext, Progress, ProgressRing, PropertyInspector, Quote, Rail, Reactions,
+        RelativeTime, Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack,
+        StatusBar, Stepper, Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeMove,
+        TreePlace, TreeQuery, Video, WeekSchedule,
+    };
+    pub use crate::ui::{
+        ActivityRings, ComparisonTable, FlowDiagram, Funnel, Gantt, Highlight, ImageCompare,
+        Indicator, Meter, OrgChart, OrgNode, Table, Toc, Tour, TourStop,
     };
     pub use crate::ui::{
         Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeEditor, CodeError,
@@ -277,6 +306,7 @@ pub mod prelude {
         Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
+    pub use crate::ui::{Draggable, Surface, SurfaceMove};
     pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
     pub use crate::ui::{FieldSpec, FormSchema, LengthUnit, SchemaForm};
     #[cfg(feature = "server")]
@@ -285,14 +315,14 @@ pub mod prelude {
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
         Decimal, DynamicColumn, DynamicKind, DynamicPage, Effect, Entity, Error, Export, Feature,
         Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import, Licensed,
-        LocalDateTime, Model, Money, Node, Page, Paging, Rank, Result, RowStyle, Screen, ScreenDef,
-        Secret, Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone,
-        Toast, Tone, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window,
-        Workflow, action, choice, entity, model, params, screen, t,
+        LocalDateTime, Model, Money, Node, Page, Paging, Rank, ReorderRequest, Result, RowStyle,
+        Screen, ScreenDef, Secret, Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text,
+        Time, TimeZone, Toast, Tone, TransitionRequest, Transitions, UiCtx, Valid,
+        ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{
-        ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, Plugin,
-        RateLimit, StaticCredentials, StderrAudit, Theme, TimePolicy,
+        ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, MenuNode, Menus,
+        Plugin, RateLimit, StaticCredentials, StderrAudit, Theme, TimePolicy,
     };
 }

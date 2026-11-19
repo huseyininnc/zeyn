@@ -3,7 +3,7 @@
 `zeyn::sql` 把 entity 保存在 SQL 数据库中。它根据表格发送的 `DataQuery`（筛选、排序、分页、合计、分组）列出 entity，并通过行版本检查来保存它们。PostgreSQL 位于 `postgres` Cargo feature 之后，Oracle 位于 `oracle` 之后，因此不使用数据库的应用不会编译其中任何内容。
 
 ```toml
-zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.11", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## 设置
@@ -124,6 +124,7 @@ db.migrate_dir("./migrations").await?;
 | `any_of` | `col IN ($1, $2, ...)` |
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`、`col IS NOT NULL` |
+| `filter_groups` | 每个组放在括号中,其筛选和子组用 `OR`(`any`)或 `AND` 连接 |
 
 对金额和是/否列使用 `contains` 时，在 SQL 中会被忽略。文本按数据库的排序规则排序（Oracle：`NLS_SORT`）。
 
@@ -244,11 +245,11 @@ SQL 构建器有针对两种方言的单元测试，不需要数据库。集成�
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
-ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test all postgres::
 
 docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
 docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
-ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test all oracle::
 ```
 
 Oracle 容器需要几分钟才能启动；请等待 `docker logs` 中出现 `DATABASE IS READY TO USE!`。

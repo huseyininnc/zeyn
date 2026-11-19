@@ -2,6 +2,9 @@
 
 mod desktop;
 mod dev;
+mod doctor;
+#[rustfmt::skip]
+mod doc_pages;
 mod generate;
 mod islands;
 
@@ -11,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 mod license;
+mod migrate;
 
 const TEMPLATES: &[(&str, &str)] = &[
     ("Cargo.toml", include_str!("../templates/Cargo.toml.tmpl")),
@@ -80,6 +84,10 @@ const TEMPLATES: &[(&str, &str)] = &[
         "locales/tr.json",
         include_str!("../templates/locales/tr.json"),
     ),
+    (
+        "public/favicon.svg",
+        include_str!("../templates/public/favicon.svg"),
+    ),
     ("src/main.rs", include_str!("../templates/src/main.rs")),
     ("src/app.rs", include_str!("../templates/src/app.rs")),
     (
@@ -115,15 +123,19 @@ const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/src/features/notes/screens.rs"),
     ),
     ("tests/app.rs", include_str!("../templates/tests/app.rs")),
+    (
+        ".cargo/config.toml",
+        include_str!("../templates/cargo-config.toml"),
+    ),
+    (
+        ".vscode/settings.json",
+        include_str!("../templates/vscode-settings.json"),
+    ),
     ("build.rs", include_str!("../templates/common/build.rs")),
 ];
 
-const LIB_TEMPLATES: &[(&str, &str)] = &[
-    (
-        "Cargo.toml",
-        include_str!("../templates/lib/Cargo.toml.tmpl"),
-    ),
-    ("AGENTS.md", include_str!("../templates/lib/AGENTS.md.tmpl")),
+/// Files every library and component crate gets, next to its own.
+const CRATE_COMMON: &[(&str, &str)] = &[
     ("CLAUDE.md", include_str!("../templates/CLAUDE.md.tmpl")),
     (
         ".gitignore",
@@ -175,6 +187,24 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
     ("clippy.toml", include_str!("../templates/clippy.toml")),
     ("deny.toml", include_str!("../templates/deny.toml")),
     (
+        ".cargo/config.toml",
+        include_str!("../templates/cargo-config.toml"),
+    ),
+    (
+        ".vscode/settings.json",
+        include_str!("../templates/vscode-settings.json"),
+    ),
+    ("build.rs", include_str!("../templates/common/build.rs")),
+];
+
+/// The files of a shared library.
+const LIB_TEMPLATES: &[(&str, &str)] = &[
+    (
+        "Cargo.toml",
+        include_str!("../templates/lib/Cargo.toml.tmpl"),
+    ),
+    ("AGENTS.md", include_str!("../templates/lib/AGENTS.md.tmpl")),
+    (
         "locales/en.json",
         include_str!("../templates/lib/locales/en.json"),
     ),
@@ -211,7 +241,55 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
         "tests/lib.rs",
         include_str!("../templates/lib/tests/lib.rs"),
     ),
-    ("build.rs", include_str!("../templates/common/build.rs")),
+];
+
+/// The files of a component crate (`zeyn new <name> --component`). `{{component}}` in a path is the
+/// component name.
+const COMPONENT_TEMPLATES: &[(&str, &str)] = &[
+    (
+        "Cargo.toml",
+        include_str!("../templates/component/Cargo.toml.tmpl"),
+    ),
+    (
+        "AGENTS.md",
+        include_str!("../templates/component/AGENTS.md.tmpl"),
+    ),
+    (
+        "src/lib.rs",
+        include_str!("../templates/component/src/lib.rs"),
+    ),
+    (
+        "assets/{{component}}.js",
+        include_str!("../templates/component/assets/{{component}}.js"),
+    ),
+    (
+        "assets/{{component}}.css",
+        include_str!("../templates/component/assets/{{component}}.css"),
+    ),
+    (
+        "assets/en.json",
+        include_str!("../templates/component/assets/en.json"),
+    ),
+    (
+        "assets/tr.json",
+        include_str!("../templates/component/assets/tr.json"),
+    ),
+    (
+        "examples/demo/main.rs",
+        include_str!("../templates/component/examples/demo/main.rs"),
+    ),
+    (
+        "locales/en.json",
+        include_str!("../templates/component/locales/en.json"),
+    ),
+    (
+        "locales/tr.json",
+        include_str!("../templates/component/locales/tr.json"),
+    ),
+    (
+        "tests/{{component}}.rs",
+        include_str!("../templates/component/tests/{{component}}.rs"),
+    ),
 ];
 
 const DOCS: &[(&str, &str)] = &[
@@ -229,6 +307,10 @@ Usage:
                                           local git repository on branch main when git is installed
   zeyn new <name> --lib [--zeyn-path <path>] [--no-git]
                                           the same for a shared library (models, features, texts)
+  zeyn new <name> --component [--zeyn-path <path>] [--no-git]
+                                          a component crate zeyn-<name>: a component with a browser
+                                          script, a stylesheet using theme tokens, en and tr texts,
+                                          a Plugin, an example app and tests (see docs/polyrepo.md)
   zeyn g feature <name>                   add src/features/<name> with models/, services/, actions/ and
                                           screens/ and a working list screen; delete a folder the
                                           feature does not need, with its mod line
@@ -237,10 +319,25 @@ Usage:
                                           a flat screens.rs is first moved to screens/mod.rs
                                           Short forms: g f, g s
   zeyn routes                             list features, screens, routes, APIs and access
-  zeyn check [--fix]                      compile and report structural problems and missing translations;
+  zeyn check [--fix] [--json]             compile and report structural problems and missing translations;
                                           warns about unregistered screens and actions and crowded flat
-                                          screens.rs or actions.rs files;
-                                          --fix first rewrites renamed Zeyn APIs in src, tests and examples
+                                          screens.rs or actions.rs files; every problem has a stable code;
+                                          --fix first rewrites renamed Zeyn APIs in src, tests and examples;
+                                          --json prints one JSON document with codes, reasons and fixes
+  zeyn migrate [--from <ver>] [--to <ver>] [--dry-run] [--json]
+                                          move the app to a newer Zeyn version: runs every step
+                                          between the version in Cargo.lock (or --from) and --to in
+                                          order (renames, changed calls, moved paths), keeps the
+                                          formatting, moves the Zeyn dependency and reports each
+                                          change with file:line and what needs a person;
+                                          --dry-run writes nothing and prints a unified diff
+  zeyn doctor [--fix] [--json] [--target-limit-gb <n>]
+                                          read only report on build speed and disk use: target size
+                                          and largest folders, linker, dev profile, toolchain, stale
+                                          artifacts, rust-analyzer folder and on Windows Defender
+                                          exclusions or a Dev Drive; every finding has a one line fix
+                                          and a stable code, --json prints them, the exit code is 0;
+                                          --fix edits only Cargo.toml and .cargo/config.toml
   zeyn dev                                run the app, rebuild and restart on every change; the browser
                                           follows without a page reload
   zeyn build-desktop [--package <name>] [--features <list>]
@@ -265,6 +362,12 @@ fn main() -> ExitCode {
         .map(String::as_str)
         .collect();
     let result = match words.as_slice() {
+        ["new", "--component", name, rest @ ..] => {
+            new_component(name, flag(rest, "--zeyn-path"), !rest.contains(&"--no-git"))
+        }
+        ["new", name, rest @ ..] if rest.contains(&"--component") => {
+            new_component(name, flag(rest, "--zeyn-path"), !rest.contains(&"--no-git"))
+        }
         ["new", name, rest @ ..] => new_project(
             name,
             flag(rest, "--zeyn-path"),
@@ -281,19 +384,29 @@ fn main() -> ExitCode {
             "unknown generator `{kind}` or wrong arguments; use `zeyn g feature <name>` (g f) or `zeyn g screen <feature> <name>` (g s)"
         )),
         ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
-        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
-            .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
-            .and_then(|report| {
-                print!("{report}");
-                if report
-                    .lines()
-                    .any(|l| l.starts_with("error") || l.contains(": error"))
-                {
-                    Err("the app has problems".into())
-                } else {
-                    Ok(())
-                }
-            }),
+        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix")).and_then(|fixed| {
+            let report = check(Path::new("."))?;
+            if rest.contains(&"--json") {
+                eprint!("{fixed}");
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report).unwrap_or_default()
+                );
+            } else {
+                print!("{fixed}{}", check_text(&report));
+            }
+            if report["ok"] == true {
+                Ok(())
+            } else {
+                Err("the app has problems".into())
+            }
+        }),
+        ["migrate", rest @ ..] => run_migrate(rest),
+        ["doctor", rest @ ..] => run_doctor(
+            rest.contains(&"--fix"),
+            rest.contains(&"--json"),
+            flag(rest, "--target-limit-gb").and_then(|g| g.parse::<f64>().ok()),
+        ),
         ["dev"] => dev::run(Path::new(".")),
         ["build-desktop", rest @ ..] => desktop::build(
             Path::new("."),
@@ -332,6 +445,60 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// `zeyn migrate [--from <ver>] [--to <ver>] [--dry-run] [--json]`. Fails only when a file
+/// could not be read, written or parsed; TODOs for a person are part of a successful run.
+fn run_migrate(rest: &[&str]) -> Result<(), String> {
+    let dry_run = rest.contains(&"--dry-run");
+    let report = migrate::run(
+        Path::new("."),
+        flag(rest, "--from"),
+        flag(rest, "--to"),
+        dry_run,
+    )?;
+    if rest.contains(&"--json") {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report.to_json(dry_run)).unwrap_or_default()
+        );
+    } else {
+        print!("{}", report.to_text(dry_run));
+    }
+    match report.errors.len() {
+        0 => Ok(()),
+        n => Err(format!("{n} files could not be migrated")),
+    }
+}
+
+/// `zeyn doctor [--fix] [--json] [--target-limit-gb <n>]`.
+fn run_doctor(fix: bool, json: bool, limit_gb: Option<f64>) -> Result<(), String> {
+    let options = doctor_options(limit_gb);
+    let fixed = if fix {
+        doctor::fix(Path::new("."))?
+    } else {
+        String::new()
+    };
+    let findings = doctor::diagnose(Path::new("."), &options);
+    if json {
+        eprint!("{fixed}");
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&doctor::to_json(&findings)).unwrap_or_default()
+        );
+    } else {
+        print!("{fixed}{}", doctor::to_text(&findings));
+    }
+    Ok(())
+}
+
+/// Doctor options with the size limit in gigabytes when given.
+fn doctor_options(limit_gb: Option<f64>) -> doctor::Options {
+    let mut options = doctor::Options::default();
+    if let Some(gb) = limit_gb {
+        options.target_limit = (gb.max(0.0) * 1024.0 * 1024.0 * 1024.0) as u64;
+    }
+    options
 }
 
 /// `zeyn build-islands [--out <dir>] [<crate dir>...]`.
@@ -402,6 +569,114 @@ fn title_of(name: &str) -> String {
         .join(" ")
 }
 
+/// The `zeyn = ..` line of a new project's `Cargo.toml`: a path dependency for `--zeyn-path`,
+/// else the version of this CLI.
+fn zeyn_dependency(zeyn_path: Option<&str>) -> Result<String, String> {
+    match zeyn_path {
+        Some(p) => {
+            let abs = std::fs::canonicalize(p).map_err(|e| format!("--zeyn-path {p}: {e}"))?;
+            let shown = abs
+                .to_string_lossy()
+                .trim_start_matches(r"\\?\")
+                .replace('\\', "/");
+            Ok(format!("zeyn = {{ path = \"{shown}\" }}"))
+        }
+        None => Ok(format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION"))),
+    }
+}
+
+/// Writes every template of `sets` under `root`, replacing each placeholder of `replacements`
+/// in both the path and the text.
+fn write_templates(
+    root: &Path,
+    sets: &[&[(&str, &str)]],
+    replacements: &[(&str, &str)],
+) -> Result<(), String> {
+    let fill = |text: &str| {
+        replacements
+            .iter()
+            .fold(text.to_string(), |t, (from, to)| t.replace(from, to))
+    };
+    for (path, body) in sets.iter().flat_map(|s| s.iter()) {
+        let target = root.join(fill(path));
+        if let Some(dir) = target.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&target, fill(body)).map_err(|e| format!("{}: {e}", target.display()))?;
+    }
+    Ok(())
+}
+
+/// The Rust type name of a component name: `star-rating` gives `StarRating`.
+fn type_of(component: &str) -> String {
+    title_of(component).replace(' ', "")
+}
+
+/// Checks a component name and returns it without a leading `zeyn-`. The module rule of
+/// `App::module` applies: lower case letters, digits and single hyphens, at most 32 characters.
+fn component_name(given: &str) -> Result<String, String> {
+    let name = given
+        .strip_prefix("zeyn-")
+        .unwrap_or(given);
+    let ok = name.len() <= 32
+        && name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase())
+        && !name.ends_with('-')
+        && !name.contains("--")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if ok {
+        Ok(name.to_string())
+    } else {
+        Err(format!(
+            "`{given}` is not a valid component name; use lower case letters, digits and single `-`, starting with a letter, at most 32 characters (the crate becomes `zeyn-<name>`)"
+        ))
+    }
+}
+
+/// Writes the component crate `zeyn-<component>` into `root`.
+fn new_component_at(
+    root: &Path,
+    given: &str,
+    zeyn_path: Option<&str>,
+    git: bool,
+) -> Result<(), String> {
+    let component = component_name(given)?;
+    let package = format!("zeyn-{component}");
+    if root.exists() {
+        return Err(format!("`{package}` already exists"));
+    }
+    let dep = zeyn_dependency(zeyn_path)?;
+    let crate_name = package.replace('-', "_");
+    let title = title_of(&component);
+    let kind = type_of(&component);
+    let replacements = [
+        ("{{component}}", component.as_str()),
+        ("{{type}}", kind.as_str()),
+        ("{{name}}", package.as_str()),
+        ("{{crate}}", crate_name.as_str()),
+        ("{{title}}", title.as_str()),
+        ("{{zeyn_dep}}", dep.as_str()),
+        ("{{component_index}}", component_index()),
+    ];
+    write_templates(root, &[CRATE_COMMON, COMPONENT_TEMPLATES], &replacements)?;
+    if git {
+        println!("{}", git_init(root));
+    }
+    println!(
+        "Created component crate {package}/\n\n  cd {package}\n  cargo test\n  cargo run --example demo\n\nAdd it to an app with `.plugin({kind}Plugin)`; the module `{component}` loads only on pages that hold a `{kind}`."
+    );
+    Ok(())
+}
+
+fn new_component(name: &str, zeyn_path: Option<&str>, git: bool) -> Result<(), String> {
+    let dir = format!("zeyn-{}", component_name(name)?);
+    new_component_at(&PathBuf::from(dir), name, zeyn_path, git)
+}
+
 fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool, git: bool) -> Result<(), String> {
     new_project_at(&PathBuf::from(name), name, zeyn_path, lib, git)
 }
@@ -429,33 +704,22 @@ fn new_project_at(
     if root.exists() {
         return Err(format!("`{name}` already exists"));
     }
-    let dep = match zeyn_path {
-        Some(p) => {
-            let abs = std::fs::canonicalize(p).map_err(|e| format!("--zeyn-path {p}: {e}"))?;
-            let shown = abs
-                .to_string_lossy()
-                .trim_start_matches(r"\\?\")
-                .replace('\\', "/");
-            format!("zeyn = {{ path = \"{shown}\" }}")
-        }
-        None => format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION")),
-    };
+    let dep = zeyn_dependency(zeyn_path)?;
     let title = title_of(name);
     let crate_name = name.replace('-', "_");
-    let templates = if lib { LIB_TEMPLATES } else { TEMPLATES };
-    for (path, body) in templates {
-        let target = root.join(path);
-        if let Some(dir) = target.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        }
-        let text = body
-            .replace("{{name}}", name)
-            .replace("{{crate}}", &crate_name)
-            .replace("{{title}}", &title)
-            .replace("{{zeyn_dep}}", &dep)
-            .replace("{{component_index}}", component_index());
-        std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
-    }
+    let sets: &[&[(&str, &str)]] = if lib {
+        &[CRATE_COMMON, LIB_TEMPLATES]
+    } else {
+        &[TEMPLATES]
+    };
+    let replacements = [
+        ("{{name}}", name),
+        ("{{crate}}", crate_name.as_str()),
+        ("{{title}}", title.as_str()),
+        ("{{zeyn_dep}}", dep.as_str()),
+        ("{{component_index}}", component_index()),
+    ];
+    write_templates(root, sets, &replacements)?;
     if git {
         println!("{}", git_init(root));
     }
@@ -519,6 +783,103 @@ fn describe(root: &Path) -> Result<Value, String> {
         .map_err(|e| format!("the app did not print a description: {e}"))
 }
 
+/// The node tree of one screen with the source line of each node: runs the app with
+/// `ZEYN_INSPECT=<screen>`, which builds the screen, prints the tree and exits.
+fn inspect(root: &Path, screen: &str) -> Result<Value, String> {
+    if screen.is_empty() {
+        return Err("give `screen` a screen name; zeyn_describe lists them".into());
+    }
+    let out = Command::new("cargo")
+        .args(["run", "--quiet"])
+        .current_dir(root)
+        .env("ZEYN_INSPECT", screen)
+        .output()
+        .map_err(|e| format!("cargo could not be started: {e}"))?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr)
+            .trim()
+            .to_string());
+    }
+    serde_json::from_slice(&out.stdout)
+        .map_err(|e| format!("the app did not print a node tree: {e}"))
+}
+
+/// The address of the app in `root`: `addr` when given, else `APP_SERVER__ADDR`, else
+/// `server.addr` in `config/app.json`, else the template's `127.0.0.1:3000`.
+fn app_addr(root: &Path, addr: Option<&str>) -> String {
+    addr.map(str::to_string)
+        .or_else(|| std::env::var("APP_SERVER__ADDR").ok())
+        .or_else(|| {
+            let text = std::fs::read_to_string(root.join("config/app.json")).ok()?;
+            let config: Value = serde_json::from_str(&text).ok()?;
+            config["server"]["addr"]
+                .as_str()
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "127.0.0.1:3000".into())
+}
+
+/// The DevTools request log of the running app: `GET /_zeyn/devtools` over plain HTTP, the
+/// newest `limit` requests (at most 50, as many as the app keeps). Only debug builds served with
+/// `App::serve` answer; others answer 404.
+fn devtools(root: &Path, addr: Option<&str>, limit: u64) -> Result<String, String> {
+    use std::io::Read;
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::Duration;
+    let addr = app_addr(root, addr);
+    let mut target = addr
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut a| a.next())
+        .ok_or_else(|| format!("`{addr}` is not a host:port address"))?;
+    if target.ip().is_unspecified() {
+        target.set_ip(if target.is_ipv4() {
+            [127, 0, 0, 1].into()
+        } else {
+            std::net::Ipv6Addr::LOCALHOST.into()
+        });
+    }
+    let limit_time = Duration::from_secs(5);
+    let mut stream = TcpStream::connect_timeout(&target, limit_time).map_err(|e| {
+        format!("no app answers at {addr} ({e}); start it with `cargo run`, or pass `addr`")
+    })?;
+    stream
+        .set_read_timeout(Some(limit_time))
+        .map_err(|e| e.to_string())?;
+    stream
+        .write_all(b"GET /_zeyn/devtools HTTP/1.0\r\nHost: localhost\r\n\r\n")
+        .map_err(|e| e.to_string())?;
+    let mut bytes = Vec::new();
+    stream
+        .take(16 * 1024 * 1024)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    let text = String::from_utf8_lossy(&bytes);
+    let (head, body) = text
+        .split_once("\r\n\r\n")
+        .ok_or("the app sent no HTTP response")?;
+    match head.get(9..12) {
+        Some("200") => {}
+        Some("404") => {
+            return Err(format!(
+                "the app at {addr} shows no DevTools: they exist only in debug builds served with `App::serve` (`cargo run`), and only a signed in user with the `zeyn.devtools` permission reads them (`DevAuth` has it)"
+            ));
+        }
+        _ => {
+            return Err(format!(
+                "the app at {addr} answered `{}`",
+                head.lines().next().unwrap_or("")
+            ));
+        }
+    }
+    let mut log: Value =
+        serde_json::from_str(body).map_err(|e| format!("the DevTools sent no JSON: {e}"))?;
+    if let Some(requests) = log["requests"].as_array_mut() {
+        requests.truncate(limit.clamp(1, 50) as usize);
+    }
+    Ok(serde_json::to_string_pretty(&log).unwrap_or_default())
+}
+
 fn routes_table(d: &Value) -> String {
     let mut out = String::new();
     for f in d["features"]
@@ -563,18 +924,6 @@ fn routes_table(d: &Value) -> String {
     out
 }
 
-/// Zeyn names that changed, old to new. `zeyn check --fix` rewrites them. A name with `::`
-/// (`Icon::Delete`) is renamed only where it is written with that path.
-const RENAMES: &[(&str, &str)] = &[
-    ("GridQuery", "DataQuery"),
-    ("GridMode", "DataMode"),
-    ("GridColumn", "DataGridColumn"),
-    ("Grid", "DataGrid"),
-    ("MAX_EMBED_CONSENT", "MAX_PREF_LIFETIME"),
-    ("Icon::Delete", "Icon::Trash"),
-    ("Icon::Chart", "Icon::ChartBar"),
-];
-
 /// Runs [`fix_renames`] when asked and describes what changed.
 fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
     if !fix {
@@ -587,7 +936,8 @@ fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
         .collect())
 }
 
-/// Rewrites renamed Zeyn names in the `.rs` files under `src`, `tests` and `examples`.
+/// Rewrites renamed Zeyn names in the `.rs` files under `src`, `tests` and `examples`, with the
+/// renames of every `zeyn migrate` step.
 fn fix_renames(root: &Path) -> Result<Vec<(PathBuf, usize)>, String> {
     let mut files = Vec::new();
     for dir in ["src", "tests", "examples"] {
@@ -597,8 +947,10 @@ fn fix_renames(root: &Path) -> Result<Vec<(PathBuf, usize)>, String> {
     for path in files {
         let text =
             std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let (fixed, n) = rename_idents(&text, RENAMES);
+        let edits = migrate::rename_edits(&text, &migrate::renames());
+        let n = edits.len();
         if n > 0 {
+            let fixed = migrate::apply(&text, edits);
             std::fs::write(&path, fixed).map_err(|e| format!("{}: {e}", path.display()))?;
             changed.push((path, n));
         }
@@ -628,123 +980,120 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Replaces whole identifiers outside string and char literals. Comments are rewritten too, so
-/// doc examples follow. Returns the text and how many identifiers changed.
-fn rename_idents(text: &str, renames: &[(&str, &str)]) -> (String, usize) {
-    let chars: Vec<char> = text.chars().collect();
-    let mut out = String::with_capacity(text.len());
-    let mut count = 0;
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        if c == '"'
-            || (c == 'r' && matches!(chars.get(i + 1), Some('"' | '#')) && !ident_before(&chars, i))
-        {
-            let end = string_end(&chars, i);
-            out.extend(&chars[i..end]);
-            i = end;
-        } else if c == '\'' && chars.get(i + 2) == Some(&'\'') {
-            out.extend(&chars[i..i + 3]);
-            i += 3;
-        } else if c.is_alphabetic() || c == '_' {
-            let start = i;
-            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
-                i += 1;
-            }
-            let word: String = chars[start..i].iter().collect();
-            if chars.get(i) == Some(&':') && chars.get(i + 1) == Some(&':') {
-                let mut j = i + 2;
-                while j < chars.len() && (chars[j].is_alphanumeric() || chars[j] == '_') {
-                    j += 1;
-                }
-                let path: String = chars[start..j].iter().collect();
-                if let Some((_, new)) = renames
-                    .iter()
-                    .find(|(old, _)| *old == path)
-                {
-                    out.push_str(new);
-                    count += 1;
-                    i = j;
-                    continue;
-                }
-            }
-            match renames
-                .iter()
-                .find(|(old, _)| *old == word)
-            {
-                Some((_, new)) => {
-                    out.push_str(new);
-                    count += 1;
-                }
-                None => out.push_str(&word),
-            }
-        } else {
-            out.push(c);
-            i += 1;
-        }
-    }
-    (out, count)
-}
+/// Code of the problem reported when the app does not compile. App problems use `Z01xx` to
+/// `Z06xx` (see `zeyn::Problem`); warnings of `zeyn check` use `W01xx`.
+const NOT_COMPILED: &str = "Z0001";
 
-fn ident_before(chars: &[char], i: usize) -> bool {
-    i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_')
-}
+/// Warning code: a translation key is missing in a language.
+const MISSING_TRANSLATION: &str = "W0105";
 
-/// End (exclusive) of the string literal starting at `i`: `"..."` with escapes, or `r#"..."#`.
-fn string_end(chars: &[char], i: usize) -> usize {
-    let mut j = i;
-    let mut hashes = 0;
-    let raw = chars[j] == 'r';
-    if raw {
-        j += 1;
-        while chars.get(j) == Some(&'#') {
-            hashes += 1;
-            j += 1;
-        }
-        if chars.get(j) != Some(&'"') {
-            return i + 1;
-        }
-    }
-    j += 1;
-    while j < chars.len() {
-        match chars[j] {
-            '\\' if !raw => j += 2,
-            '"' if (1..=hashes).all(|h| chars.get(j + h) == Some(&'#')) => return j + 1 + hashes,
-            _ => j += 1,
-        }
-    }
-    chars.len()
-}
-
-/// Compiles, then reports structural problems and missing translations.
-fn check(root: &Path) -> Result<String, String> {
+/// Compiles, then reports structural problems and missing translations as one JSON document:
+/// `{ "ok": bool, "errors": [{code, summary, why, fix, docs}], "warnings": [{code, message}] }`,
+/// plus `compiler` with the compiler's output when the app does not compile.
+fn check(root: &Path) -> Result<Value, String> {
     let out = Command::new("cargo")
         .args(["check", "--quiet", "--message-format=short"])
         .current_dir(root)
         .output()
         .map_err(|e| format!("cargo could not be started: {e}"))?;
-    let mut report = String::new();
     if !out.status.success() {
-        report.push_str(&String::from_utf8_lossy(&out.stderr));
-        return Ok(report);
+        return Ok(json!({
+            "ok": false,
+            "errors": [{
+                "code": NOT_COMPILED,
+                "summary": "the app does not compile",
+                "why": "zeyn check runs the app to read its own checks, which needs a build",
+                "fix": "fix the compiler errors in `compiler`, then run zeyn check again",
+                "docs": "https://docs.zeynsoft.com/start/cli#checking-an-app",
+            }],
+            "warnings": [],
+            "compiler": String::from_utf8_lossy(&out.stderr),
+        }));
     }
     let d = describe(root)?;
-    for p in d["problems"]
+    Ok(check_report(&d, &check_warnings(root, &d)))
+}
+
+/// The JSON report of `zeyn check` from the app's description and the warnings. Problems of
+/// apps built with a Zeyn release without `problem_details` keep their text as the summary.
+fn check_report(d: &Value, warnings: &[(&str, String)]) -> Value {
+    let errors: Vec<Value> = match d["problem_details"].as_array() {
+        Some(details) => details.clone(),
+        None => d["problems"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|p| json!({ "code": "", "summary": p, "why": "", "fix": "", "docs": "" }))
+            .collect(),
+    };
+    json!({
+        "ok": errors.is_empty(),
+        "errors": errors,
+        "warnings": warnings
+            .iter()
+            .map(|(code, message)| json!({ "code": code, "message": message }))
+            .collect::<Vec<_>>(),
+    })
+}
+
+/// The text form of a `zeyn check` report: `error:` blocks with their reason, fix, docs link
+/// and code, then `warning[code]:` lines, or `ok: no problems found`.
+fn check_text(report: &Value) -> String {
+    let mut text = String::new();
+    if let Some(compiler) = report["compiler"].as_str() {
+        return compiler.to_string();
+    }
+    for e in report["errors"]
         .as_array()
         .into_iter()
         .flatten()
     {
-        report.push_str(&format!("error: {}\n", p.as_str().unwrap_or("")));
+        let field = |k: &str| e[k].as_str().unwrap_or("").to_string();
+        text.push_str(&format!("error: {}\n", field("summary")));
+        for (label, key) in [
+            ("why", "why"),
+            ("help", "fix"),
+            ("docs", "docs"),
+            ("code", "code"),
+        ] {
+            let value = field(key);
+            if !value.is_empty() {
+                text.push_str(&format!("  = {label}: {value}\n"));
+            }
+        }
     }
+    for w in report["warnings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        text.push_str(&format!(
+            "warning[{}]: {}\n",
+            w["code"].as_str().unwrap_or(""),
+            w["message"].as_str().unwrap_or("")
+        ));
+    }
+    if text.is_empty() {
+        text.push_str("ok: no problems found\n");
+    }
+    text
+}
+
+/// The warnings of `zeyn check` with their codes: missing translations, layout and topics.
+fn check_warnings(root: &Path, d: &Value) -> Vec<(&'static str, String)> {
+    let mut warnings = Vec::new();
     for m in d["missing_translations"]
         .as_array()
         .into_iter()
         .flatten()
     {
-        report.push_str(&format!(
-            "warning: translation `{}` is missing in `{}`\n",
-            m[1].as_str().unwrap_or(""),
-            m[0].as_str().unwrap_or("")
+        warnings.push((
+            MISSING_TRANSLATION,
+            format!(
+                "translation `{}` is missing in `{}`",
+                m[1].as_str().unwrap_or(""),
+                m[0].as_str().unwrap_or("")
+            ),
         ));
     }
     let registered: Vec<String> = d["features"]
@@ -780,16 +1129,10 @@ fn check(root: &Path) -> Result<String, String> {
             ))
         })
         .collect();
-    for w in generate::layout_warnings(&files, &registered)
-        .into_iter()
-        .chain(generate::topic_warnings(&files))
-    {
-        report.push_str(&format!("warning: {w}\n"));
-    }
-    if report.is_empty() {
-        report.push_str("ok: no problems found\n");
-    }
-    Ok(report)
+    warnings.extend(generate::layout_warnings(&files, &registered));
+    warnings.extend(generate::topic_warnings(&files));
+    warnings.extend(generate::rule_warnings(&files));
+    warnings
 }
 
 fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> Value {
@@ -800,9 +1143,13 @@ fn tools() -> Value {
     json!([
         tool(
             "zeyn_docs",
-            "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol).",
-            json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol"] } }),
-            &["topic"]
+            "Zeyn framework reference for this version. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol). Or `search` the docs pages (ranked list of pages with their path), or read one with `page` (a path such as /language/forms).",
+            json!({
+                "topic": { "type": "string", "enum": ["rules", "language", "protocol"] },
+                "search": { "type": "string", "description": "words to look for in the docs pages" },
+                "page": { "type": "string", "description": "a docs page path from search, such as /language/forms" }
+            }),
+            &[]
         ),
         tool(
             "zeyn_describe",
@@ -811,9 +1158,43 @@ fn tools() -> Value {
             &[]
         ),
         tool(
+            "zeyn_inspect",
+            "Build one screen of the app in the current directory and return its node tree: each node's path (as in `1.0.2`), component type, the Rust file:line:column that placed it (debug builds) and its children.",
+            json!({ "screen": { "type": "string", "description": "a screen name from zeyn_describe" } }),
+            &["screen"]
+        ),
+        tool(
+            "zeyn_devtools",
+            "The DevTools request log of the app running from the current directory (a debug build served with `cargo run`): the newest requests first, each with its screen, action, status, times, SQL statements (text and time, no arguments), effects and topics. The address comes from `addr`, else APP_SERVER__ADDR, else server.addr in config/app.json.",
+            json!({
+                "addr": { "type": "string", "description": "host:port of the running app, such as 127.0.0.1:3000" },
+                "limit": { "type": "integer", "description": "most requests to return, newest first (default 20, at most 50)" }
+            }),
+            &[]
+        ),
+        tool(
             "zeyn_check",
             "Compile the app and report compiler errors, structural problems and missing translations. With fix: true, first rewrite renamed Zeyn APIs (Grid to DataGrid and others).",
             json!({ "fix": { "type": "boolean" } }),
+            &[]
+        ),
+        tool(
+            "zeyn_migrate",
+            "Move the app in the current directory to a newer Zeyn version: run every migration step between its Zeyn version (Cargo.lock, or `from`) and `to` in order (renamed names, changed method calls, moved paths), keeping formatting, and move the Zeyn dependency. Returns each change with file:line and the places a person has to look at, with the reason. With dry_run: true nothing is written and a unified diff is returned.",
+            json!({
+                "from": { "type": "string", "description": "the Zeyn version the app is on, such as 0.0.9" },
+                "to": { "type": "string", "description": "the version to move to (default: the newest step)" },
+                "dry_run": { "type": "boolean" }
+            }),
+            &[]
+        ),
+        tool(
+            "zeyn_doctor",
+            "Read only report on build speed and disk use of the project in the current directory: target folder size and largest folders, linker, dev profile debug info and dependency optimization, rustc and cargo against rust-version, stale artifacts, the rust-analyzer target folder, and on Windows Defender exclusions or a Dev Drive. Each finding has a code, a status and a one line fix. With fix: true, first add the fast dev profile to Cargo.toml and the rust-lld linker to .cargo/config.toml (only those two files).",
+            json!({
+                "fix": { "type": "boolean" },
+                "target_limit_gb": { "type": "number", "description": "report the target folder above this size (default 20)" }
+            }),
             &[]
         ),
         tool(
@@ -844,9 +1225,121 @@ fn generator_args() -> Value {
     })
 }
 
+/// A docs page by its path (`/language/forms`, also with `.md`, a trailing `/` or the docs
+/// address in front), without the `@live` lines of the HTML page.
+fn doc_page(path: &str) -> Option<String> {
+    let path = path
+        .trim()
+        .trim_start_matches("https://docs.zeynsoft.com")
+        .trim_end_matches(".md")
+        .trim_end_matches('/');
+    let path = match path {
+        "" | "/index" => "/",
+        p => p,
+    };
+    doc_pages::DOC_PAGES
+        .iter()
+        .find(|(route, _, _)| *route == path)
+        .map(|(_, _, text)| {
+            text.lines()
+                .filter(|l| !l.trim_start().starts_with("@live "))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+}
+
+/// The docs pages that best match `query`, ranked: a word in the title counts 8, in a heading 3,
+/// and each place in the text 1 (at most 10 per word). Each hit gives its path, title, the
+/// heading of the first match and a short snippet.
+fn search_docs(query: &str) -> String {
+    let words: Vec<String> = query
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|w| w.len() > 1)
+        .map(str::to_lowercase)
+        .collect();
+    if words.is_empty() {
+        return "give `search` some words, such as `search: \"grid export\"`".into();
+    }
+    let mut hits: Vec<(usize, &str, &str, String)> = doc_pages::DOC_PAGES
+        .iter()
+        .filter_map(|(route, title, text)| {
+            let lower = text.to_lowercase();
+            let title_l = title.to_lowercase();
+            let mut score = 0;
+            for w in &words {
+                if title_l.contains(w.as_str()) {
+                    score += 8;
+                }
+                score += 3 * lower
+                    .lines()
+                    .filter(|l| l.starts_with('#') && l.contains(w.as_str()))
+                    .count();
+                score += lower
+                    .matches(w.as_str())
+                    .take(10)
+                    .count();
+            }
+            (score > 0).then(|| (score, *route, *title, snippet(text, &lower, &words)))
+        })
+        .collect();
+    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(b.1)));
+    if hits.is_empty() {
+        return format!("no docs page mentions {query:?}");
+    }
+    hits.iter()
+        .take(8)
+        .map(|(score, route, title, snip)| format!("{route}  {title}  (score {score})\n  {snip}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The heading above the first match of any word and up to 160 characters around it.
+fn snippet(text: &str, lower: &str, words: &[String]) -> String {
+    let Some(at) = words
+        .iter()
+        .filter_map(|w| lower.find(w.as_str()))
+        .min()
+    else {
+        return String::new();
+    };
+    let heading = text[..at]
+        .lines()
+        .rev()
+        .find(|l| l.starts_with('#'))
+        .unwrap_or("")
+        .trim_start_matches('#')
+        .trim();
+    let start = text[..at]
+        .char_indices()
+        .rev()
+        .nth(60)
+        .map_or(0, |(i, _)| i);
+    let end = text[at..]
+        .char_indices()
+        .nth(100)
+        .map_or(text.len(), |(i, _)| at + i);
+    let body = text[start..end]
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if heading.is_empty() {
+        format!("...{body}...")
+    } else {
+        format!("[{heading}] ...{body}...")
+    }
+}
+
 fn call_tool(name: &str, args: &Value) -> Result<String, String> {
     let root = Path::new(".");
     match name {
+        "zeyn_docs" if args["page"].is_string() => {
+            let path = args["page"].as_str().unwrap_or("");
+            doc_page(path)
+                .ok_or_else(|| format!("no docs page `{path}`; use `search` to find the path"))
+        }
+        "zeyn_docs" if args["search"].is_string() => {
+            Ok(search_docs(args["search"].as_str().unwrap_or("")))
+        }
         "zeyn_docs" => {
             let topic = args["topic"]
                 .as_str()
@@ -859,8 +1352,35 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
         "zeyn_describe" => {
             describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default())
         }
+        "zeyn_inspect" => inspect(root, args["screen"].as_str().unwrap_or(""))
+            .map(|d| serde_json::to_string_pretty(&d).unwrap_or_default()),
+        "zeyn_devtools" => devtools(
+            root,
+            args["addr"].as_str(),
+            args["limit"].as_u64().unwrap_or(20),
+        ),
         "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false))
-            .and_then(|fixed| check(root).map(|r| fixed + &r)),
+            .and_then(|fixed| check(root).map(|r| fixed + &check_text(&r))),
+        "zeyn_migrate" => {
+            let dry_run = args["dry_run"]
+                .as_bool()
+                .unwrap_or(false);
+            migrate::run(root, args["from"].as_str(), args["to"].as_str(), dry_run)
+                .map(|r| r.to_text(dry_run))
+        }
+        "zeyn_doctor" => {
+            let fixed = if args["fix"].as_bool().unwrap_or(false) {
+                doctor::fix(root)?
+            } else {
+                String::new()
+            };
+            let options = doctor_options(args["target_limit_gb"].as_f64());
+            let findings = doctor::diagnose(root, &options);
+            Ok(format!(
+                "{fixed}{}",
+                serde_json::to_string_pretty(&doctor::to_json(&findings)).unwrap_or_default()
+            ))
+        }
         "zeyn_test" => {
             let out = Command::new("cargo")
                 .args(["test", "--quiet"])
@@ -966,38 +1486,134 @@ mod drift;
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn renames_identifiers_but_not_strings_or_longer_names() {
-        let src = r##"use zeyn::{Grid, GridQuery};
-/// `Grid::of(find)` shows rows.
-fn list(q: GridQuery) -> Grid<P> { Grid::of(find).mode(GridMode::Server).title("Grid") }
-struct MyGrid; impl GridSource for MyGrid {}
-const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
-        let (out, n) = super::rename_idents(src, super::RENAMES);
-        assert_eq!(n, 7, "{out}");
-        assert!(out.contains("use zeyn::{DataGrid, DataQuery};"));
-        assert!(out.contains("/// `DataGrid::of(find)` shows rows."));
-        assert!(out.contains(
-            "fn list(q: DataQuery) -> DataGrid<P> { DataGrid::of(find).mode(DataMode::Server).title(\"Grid\") }"
-        ));
-        assert!(out.contains("struct MyGrid; impl GridSource for MyGrid {}"));
-        assert!(out.contains(r##"r#"Grid "quoted" Grid"#"##));
-        assert_eq!(
-            super::rename_idents(&out, super::RENAMES).1,
-            0,
-            "a second run changes nothing"
-        );
+
+    /// Serves `answer` once to the next connection and returns the address.
+    fn answer_once(answer: &'static str) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener
+            .local_addr()
+            .unwrap()
+            .to_string();
+        std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 1024];
+            let n = s.read(&mut buf).unwrap();
+            assert!(String::from_utf8_lossy(&buf[..n]).starts_with("GET /_zeyn/devtools HTTP/1.0"));
+            s.write_all(answer.as_bytes()).unwrap();
+        });
+        addr
     }
 
     #[test]
-    fn renames_qualified_names_only_with_their_path() {
-        let src = "m.group(\"Reports\", Icon::Chart).icon(Icon::Delete); Method::Delete; Icon::ChartBar; let Chart = 1;";
-        let (out, n) = super::rename_idents(src, super::RENAMES);
-        assert_eq!(n, 2, "{out}");
-        assert_eq!(
-            out,
-            "m.group(\"Reports\", Icon::ChartBar).icon(Icon::Trash); Method::Delete; Icon::ChartBar; let Chart = 1;"
+    fn zeyn_devtools_returns_the_newest_requests_of_the_running_app() {
+        let addr = answer_once(
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{\"requests\":[{\"path\":\"/b\"},{\"path\":\"/a\"}]}",
         );
+        let out = super::devtools(std::path::Path::new("."), Some(&addr), 1).unwrap();
+        let log: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            log["requests"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(log["requests"][0]["path"], "/b");
+
+        let addr = answer_once("HTTP/1.1 404 Not Found\r\n\r\n");
+        let err = super::devtools(std::path::Path::new("."), Some(&addr), 20).unwrap_err();
+        assert!(err.contains("debug builds"), "{err}");
+
+        let closed = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .to_string();
+        let err = super::devtools(std::path::Path::new("."), Some(&closed), 20).unwrap_err();
+        assert!(err.contains("no app answers"), "{err}");
+    }
+
+    #[test]
+    fn zeyn_check_flags_scripts_unescaped_components_unbounded_lists_and_trusted_documents() {
+        use std::path::PathBuf;
+        let bad = vec![
+            (
+                PathBuf::from("src/a.rs"),
+                "let html = \"<script>alert(1)</script>\";\nlet b = r#\"<button onclick=\"go()\">\"#;\n// let c = \"<script>\";\n".to_string(),
+            ),
+            (
+                PathBuf::from("src/b.rs"),
+                "impl Component for Card {\n    fn render(&self, out: &mut String, _r: &Render) {\n        out.push_str(&format!(\"<p>{}</p>\", self.name));\n    }\n}\n".to_string(),
+            ),
+            (
+                PathBuf::from("src/c.rs"),
+                "#[action(permission = \"x.read\")]\npub async fn all(_: (), db: Db) -> Result<Vec<Order>> {\n    db.all().await\n}\n#[action(permission = \"x.read\")]\npub async fn page(q: DataQuery, db: Db) -> Result<Page<Order>> {\n    db.page(q).await\n}\n".to_string(),
+            ),
+            (
+                PathBuf::from("src/d.rs"),
+                "DocumentViewer::of(load).trusted()\n".to_string(),
+            ),
+        ];
+        let w = crate::generate::rule_warnings(&bad);
+        let codes: Vec<&str> = w.iter().map(|w| w.0).collect();
+        assert_eq!(
+            codes,
+            ["W0106", "W0106", "W0107", "W0108", "W0109"],
+            "{w:#?}"
+        );
+        assert!(w[0].1.starts_with("src/a.rs:1:"));
+        assert!(w[3].1.starts_with("src/c.rs:1:"));
+
+        let good = vec![(
+            PathBuf::from("src/e.rs"),
+            "impl Component for Card {\n    fn render(&self, out: &mut String, r: &Render) {\n        out.push_str(&format!(\"<p>{}</p>\", r.text(&self.name)));\n    }\n}\nlet t = \"Turn on = off\";\n".to_string(),
+        )];
+        assert!(crate::generate::rule_warnings(&good).is_empty());
+    }
+
+    #[test]
+    fn a_new_project_has_no_rule_warnings() {
+        use std::path::PathBuf;
+        let files: Vec<(PathBuf, String)> = crate::TEMPLATES
+            .iter()
+            .filter(|(path, _)| path.ends_with(".rs"))
+            .map(|(path, text)| (PathBuf::from(path), text.to_string()))
+            .collect();
+        assert!(!files.is_empty());
+        let w = crate::generate::rule_warnings(&files);
+        assert!(w.is_empty(), "{w:#?}");
+    }
+    #[test]
+    fn zeyn_docs_reads_and_searches_the_docs_pages() {
+        let page = super::call_tool(
+            "zeyn_docs",
+            &serde_json::json!({ "page": "/language/forms" }),
+        )
+        .unwrap();
+        assert!(page.starts_with('#'), "{}", &page[..80]);
+        assert!(!page.contains("\n@live "));
+        let same = super::call_tool(
+            "zeyn_docs",
+            &serde_json::json!({ "page": "https://docs.zeynsoft.com/language/forms.md" }),
+        )
+        .unwrap();
+        assert_eq!(page, same);
+        assert!(super::call_tool("zeyn_docs", &serde_json::json!({ "page": "/nope" })).is_err());
+        let found =
+            super::call_tool("zeyn_docs", &serde_json::json!({ "search": "grid export" })).unwrap();
+        let first = found.lines().next().unwrap();
+        assert!(first.starts_with("/language/datagrid"), "{found}");
+        assert!(
+            found
+                .lines()
+                .filter(|l| l.starts_with('/'))
+                .count()
+                <= 8
+        );
+        let rules =
+            super::call_tool("zeyn_docs", &serde_json::json!({ "topic": "rules" })).unwrap();
+        assert!(!rules.is_empty());
     }
 
     use super::*;
@@ -1043,6 +1659,156 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         new_project_at(&lib, "ci-lib", None, true, false).unwrap();
         assert!(lib.join("Jenkinsfile").is_file() && !lib.join(".git").exists());
         std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// Every new project builds dependencies lean, links with `rust-lld` on Windows and keeps
+    /// rust-analyzer in its own target folder.
+    #[test]
+    fn new_projects_ship_the_fast_dev_profile_linker_and_analyzer_target() {
+        let base = std::env::temp_dir().join(format!("zeyn-fast-{}", std::process::id()));
+        std::fs::remove_dir_all(&base).ok();
+        std::fs::create_dir_all(&base).unwrap();
+        for (name, lib) in [("fast-app", false), ("fast-lib", true)] {
+            let root = base.join(name);
+            new_project_at(&root, name, None, lib, false).unwrap();
+            let manifest = read(&root, "Cargo.toml");
+            assert!(
+                manifest.contains(
+                    "[profile.dev]
+debug = \"line-tables-only\""
+                ) && manifest.contains(
+                    "[profile.dev.package.\"*\"]
+debug = false
+opt-level = 1"
+                ),
+                "{name}: {manifest}"
+            );
+            let cargo = read(&root, ".cargo/config.toml");
+            assert!(
+                cargo.contains("x86_64-pc-windows-msvc") && cargo.contains("rust-lld.exe"),
+                "{name}: {cargo}"
+            );
+            let editor = read(&root, ".vscode/settings.json");
+            let editor: serde_json::Value = serde_json::from_str(&editor).unwrap();
+            assert_eq!(editor["rust-analyzer.cargo.targetDir"], true, "{name}");
+        }
+        if std::env::var("ZEYN_TEST_NEW_BUILD").is_ok() {
+            let zeyn = format!("{}/../zeyn", env!("CARGO_MANIFEST_DIR"));
+            let root = base.join("built");
+            new_project_at(&root, "built", Some(&zeyn), false, false).unwrap();
+            let out = Command::new("cargo")
+                .args(["check", "--quiet"])
+                .current_dir(&root)
+                .env("CARGO_TARGET_DIR", base.join("target"))
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// `zeyn new <name> --component` writes a crate that follows the extension model: a module
+    /// with a script and stylesheet on theme tokens, en and tr texts, a plugin, an example app and
+    /// tests. With `ZEYN_TEST_NEW_BUILD` set it also runs the crate's own tests.
+    #[test]
+    fn new_components_follow_the_extension_model() {
+        let base = std::env::temp_dir().join(format!("zeyn-comp-{}", std::process::id()));
+        std::fs::remove_dir_all(&base).ok();
+        std::fs::create_dir_all(&base).unwrap();
+        let zeyn = format!("{}/../zeyn", env!("CARGO_MANIFEST_DIR"));
+        let root = base.join("zeyn-star-rating");
+        new_component_at(&root, "star-rating", Some(&zeyn), false).unwrap();
+        for file in [
+            "Cargo.toml",
+            "AGENTS.md",
+            "src/lib.rs",
+            "assets/star-rating.js",
+            "assets/star-rating.css",
+            "assets/en.json",
+            "assets/tr.json",
+            "examples/demo/main.rs",
+            "tests/star-rating.rs",
+            "Jenkinsfile",
+            ".github/workflows/ci.yml",
+        ] {
+            assert!(root.join(file).is_file(), "{file}");
+        }
+        assert!(read(&root, "Cargo.toml").contains("name = \"zeyn-star-rating\""));
+        let lib = read(&root, "src/lib.rs");
+        assert!(lib.contains("pub struct StarRatingPlugin;"), "{lib}");
+        assert!(
+            lib.contains(".marker(\"data-zeyn-star-rating-toggle\")"),
+            "{lib}"
+        );
+        let css = read(&root, "assets/star-rating.css");
+        assert!(css.contains(".z-star-rating-toggle") && css.contains("var(--z-text)"));
+        assert!(
+            !css.contains('#') && !css.contains("rgb"),
+            "colors come from theme tokens only: {css}"
+        );
+        for file in ["assets/en.json", "assets/tr.json"] {
+            let json: Value = serde_json::from_str(&read(&root, file)).unwrap();
+            assert!(json["star-rating"]["on"].is_string(), "{file}");
+        }
+        for entry in walk(&root) {
+            let text = std::fs::read_to_string(&entry).unwrap_or_default();
+            for name in [
+                "component",
+                "type",
+                "name",
+                "crate",
+                "title",
+                "zeyn_dep",
+                "component_index",
+            ] {
+                assert!(
+                    !text.contains(&format!("{{{{{name}}}}}")),
+                    "{}: unfilled placeholder {name}",
+                    entry.display()
+                );
+            }
+        }
+        for bad in ["Rating", "reserved--x", "-x", "x-", "9x", &"a".repeat(33)] {
+            assert!(component_name(bad).is_err(), "{bad}");
+        }
+        assert_eq!(component_name("zeyn-rating").unwrap(), "rating");
+        assert!(new_component_at(&root, "star-rating", None, false).is_err());
+        if std::env::var("ZEYN_TEST_NEW_BUILD").is_ok() {
+            let out = Command::new("cargo")
+                .args(["test", "--quiet", "--all-targets"])
+                .current_dir(&root)
+                .env("CARGO_TARGET_DIR", base.join("target"))
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// Every file under `dir`.
+    fn walk(dir: &Path) -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        for entry in std::fs::read_dir(dir)
+            .unwrap()
+            .flatten()
+        {
+            let path = entry.path();
+            if path.is_dir() {
+                out.extend(walk(&path));
+            } else {
+                out.push(path);
+            }
+        }
+        out
     }
 
     /// A project from the app template in a fresh temp folder.
@@ -1294,13 +2060,21 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         let w = generate::layout_warnings(&files, &["one".into()]);
         assert_eq!(w.len(), 3, "{w:#?}");
         assert!(
-            w[0].contains("#[screen] `two` in src/features/sales/screens.rs is not registered")
+            w[0].1
+                .contains("#[screen] `two` in src/features/sales/screens.rs is not registered")
         );
-        assert!(w[1].contains("src/features/sales/screens.rs has 2 #[screen] functions in 155 lines; run `zeyn g screen sales <name>`"));
+        assert!(w[1].1.contains("src/features/sales/screens.rs has 2 #[screen] functions in 155 lines; run `zeyn g screen sales <name>`"));
         assert!(
-            w[2].contains("#[action] `lost` in src/features/sales/actions.rs is not registered")
+            w[2].1
+                .contains("#[action] `lost` in src/features/sales/actions.rs is not registered")
         );
-        assert!(w.iter().all(|w| !w.contains("error")));
+        assert_eq!(
+            w.iter()
+                .map(|w| w.0)
+                .collect::<Vec<_>>(),
+            ["W0101", "W0102", "W0101"]
+        );
+        assert!(w.iter().all(|w| !w.1.contains("error")));
         let small = generate::layout_warnings(&files[1..], &["lost".into()]);
         assert!(small.is_empty(), "{small:#?}");
     }
@@ -1319,12 +2093,50 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         ];
         let w = generate::topic_warnings(&files);
         assert_eq!(w.len(), 3, "{w:#?}");
-        assert!(w[0].contains("topic `orphan` is driven at src/a.rs:3, but no node listens"));
-        assert!(w[1].contains("topic `gone` is refreshed at src/b.rs:3"));
         assert!(
-            w[2].contains("nodes listen to topic `quiet` at src/b.rs:4, but nothing refreshes")
+            w[0].1
+                .contains("topic `orphan` is driven at src/a.rs:3, but no node listens")
         );
-        assert!(w.iter().all(|w| !w.contains("Saved")));
+        assert!(
+            w[1].1
+                .contains("topic `gone` is refreshed at src/b.rs:3")
+        );
+        assert!(
+            w[2].1
+                .contains("nodes listen to topic `quiet` at src/b.rs:4, but nothing refreshes")
+        );
+        assert_eq!((w[0].0, w[2].0), ("W0103", "W0104"));
+        assert!(w.iter().all(|w| !w.1.contains("Saved")));
+
+        let report = check_report(
+            &json!({
+                "problems": ["route `/a` is used by screens `x` and `y`\n  = code: Z0101"],
+                "problem_details": [{
+                    "code": "Z0101",
+                    "summary": "route `/a` is used by screens `x` and `y`",
+                    "why": "one route opens one screen",
+                    "fix": "give one of them another route",
+                    "docs": "https://docs.zeynsoft.com/language/screens",
+                }],
+            }),
+            &w,
+        );
+        assert_eq!(report["ok"], false);
+        assert_eq!(report["errors"][0]["code"], "Z0101");
+        assert_eq!(report["errors"][0]["fix"], "give one of them another route");
+        assert_eq!(report["warnings"][0]["code"], "W0103");
+        assert!(
+            report["warnings"][0]["message"]
+                .as_str()
+                .unwrap()
+                .contains("orphan")
+        );
+        let text = check_text(&report);
+        assert!(text.starts_with("error: route `/a` is used by screens `x` and `y`\n  = why: one route opens one screen\n  = help: give one of them another route\n  = docs: https://docs.zeynsoft.com/language/screens\n  = code: Z0101\n"));
+        assert!(text.contains("warning[W0103]: topic `orphan`"));
+        let clean = check_report(&json!({ "problems": [], "problem_details": [] }), &[]);
+        assert_eq!(clean["ok"], true);
+        assert_eq!(check_text(&clean), "ok: no problems found\n");
     }
 
     #[test]

@@ -23,6 +23,7 @@ Adı boş bırakın ya da yanlış bir e-posta yazıp *Send* düğmesine basın:
 | `.field(M::f)` | Kendi satırında tek bir alan |
 | `.row(\|r\| r.field(a).field(b))` | Yan yana alanlar; dar ekranlarda üst üste dizilirler |
 | `.section(title)` | Kendisinden sonraki alanların başlıklı bir grubu |
+| `.settings()` | Ayarlar yerleşimi: her denetimin yanında etiket ve yardım, bir şey değişince altta sabit duran kaydetme çubuğu |
 | `.step(title)` | Bir sihirbaz adımı; form bir seferde tek adım gösterir |
 | `.range(M::from, M::to)` | Tek bir aralık seçici olarak iki tarih |
 | `Form::auto(value)` | Her alan, tanım sırasıyla |
@@ -112,10 +113,13 @@ Tek bir izin adı aynı kullanıcılara hem yükleme hem indirme verir. Okuyucul
 
 Kontrol, bir bırakma alanının içindeki yerel bir dosya girdisidir. Her dosya kendi ilerleme çubuğuyla ayrı ayrı yüklenir; çalışırken iptal edilebilir, başarısız olduysa yeniden denenebilir ve bittiğinde kaldırılabilir. Görseller, seçilen dosyanın bir nesne URL'sinden üretilen bir önizleme gösterir. İlerleme ve sonuçlar, nazik (polite) bir canlı bölgede duyurulur. Showcase'in `/uploads` adresinde çalışan bir örnek vardır; bu dokümantasyon sitesinde oturum açmış kullanıcı olmadığı için canlı yükleme göstermez.
 
+Bırakılan bir klasör, içindeki ve alt klasörlerindeki dosyaları ekler; klasör, bitene kadar en fazla 100 girdilik sayfalarla okunur. Alanın almadığı türdeki dosyalar atlanır ve sayıları canlı bölgede duyurulur. Alan odaktayken yapıştırılan dosyalar da yüklenir. Uzantısı veya türü `accept` içinde olmayan bir dosya, tek bir bayt gönderilmeden tarayıcıda reddedilir; sunucu içeriği yine denetler. Bir alanın en fazla üç dosyası aynı anda yüklenir; diğerleri meşgul bir ilerleme çubuğuyla sırada bekler.
+
 | Tuş | Ne yapar |
 |---|---|
 | Tab | Dosya girdisine, sonra her dosyanın indirme bağlantısına ve İptal, Yeniden dene ya da Kaldır düğmesine geçer |
 | Dosya girdisinde Enter veya Space | Sistemin dosya seçicisini açar (sürükle bırak için klavye yolu) |
+| Dosya girişinde Ctrl+V veya Cmd+V | Panodaki dosyaları, örneğin bir ekran görüntüsünü yükler |
 | İptal, Yeniden dene, Kaldır üzerinde Enter veya Space | Çalıştırır; İptal'den sonra odak Yeniden dene'ye, Kaldır'dan sonra sonraki dosyaya ya da girdiye döner |
 
 Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:
@@ -126,8 +130,60 @@ Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:
 4. Feature'ın `FileScanner`'ını çalıştırır; reddedilen bir dosya ya da başarısız olan bir tarayıcı dosyanın silinmesine yol açar ve yanıt `422` olur;
 5. `{id, name, size, type}` ile `201` yanıtı verir. Kimlik, sunucudan gelen 128 rastgele bittir; adlar yollardan ve denetim karakterlerinden temizlenir.
 
+`image` özelliğiyle `FileRules::clean_images()`, dosya depoya yazıldıktan sonra bir adım ekler: PNG, JPEG ve WebP yüklemeleri çözülür ve aynı biçimde yeniden kodlanır; böylece EXIF (GPS ile), XMP, ICC profilleri, metin parçaları ve görüntü verisinin ardına gizlenmiş baytlar sunucuda kalmaz. EXIF yönü önce piksellere uygulanır; JPEG 90 kaliteyle, PNG ve WebP kayıpsız yazılır. Çözme, bir kenarda `MAX_IMAGE_SIDE` (12.000) pikselde ve `MAX_IMAGE_MEMORY` (256 MiB) bellekte durur; çözülemeyen bir görüntü silinir ve yanıt `422` olur. İki sınır da herhangi bir piksel çözülmeden önce görüntü başlığındaki boyuta göre denetlenir; böylece dev bir görüntü olduğunu söyleyen küçük bir dosya o belleği almadan reddedilir. Hareketli bir görüntüden yalnızca ilk kare kalır. Temizlenen dosya özgün dosyanın yerine yeni bir kimlikle geçer ve tarayıcı (scanner) ardından temizlenen dosyayı denetler. Özellik olmadan bu yöntem yoktur; böylece bir depo temizlenmediği hâlde temizlendiğini sanamaz.
+
 İndirmeler (`GET /_zeyn/files/{store}/{id}`) kimliğin biçimini, izni, guard'ları ve tenant'ı denetler ve medya sunumundan geçer (`docs/media.md` dosyasına bakın): aralıklar (range), entity tag'ler ve `nosniff`. Yalnızca raster görseller, ses ve video satır içi sunulur; geri kalan her şey `Content-Disposition: attachment` ile, tırnaklı bir ASCII ad ve UTF-8 adla birlikte, `Content-Security-Policy: sandbox` altında `application/octet-stream` olarak gönderilir.
 
 `DiskStore`, `{id}.bin` ve `{id}.json` dosyalarını tek bir klasörde tutar ve yüklemeleri önce `{id}.part` olarak yazar. `MemoryStore` dosyaları bayt üst sınırıyla bellekte tutar; testler ve demolar içindir. Form değeri yalnızca dosyaları adlandırır: bir dosyanın var olduğundan emin olması gereken bir kaydetme action'ı, showcase'in yaptığı gibi `store.meta(id)` çağırır.
 
-Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 12 KB ve gzip 4 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+`FileRules::quota(bytes, window)` bir kullanıcının bir depoya belirli bir sürede yükleyebileceği miktarı sınırlar ve uygulamanın rate store'u ile sayılır; sınırı aşan yükleme yine kaydedilir, sonraki `429` alır. `DiskStore`, bir saatten eski `.part` dosyalarını (çökme nedeniyle yarım kalan yüklemeler) saatte en fazla bir kez siler. `ZipGuard`, ZIP tabanlı yüklemeler (ZIP, Word, Excel, PowerPoint) için bir tarayıcıdır: merkezi dizini 10.000'den fazla girdi, toplam 1 GiB'tan fazla veya dosya boyutunun 200 katından fazla açılacağını söyleyen arşivleri ve ZIP64 arşivlerini reddeder; kabul edilen bir arşivi açan kod da bu sınırlarda durmalıdır.
+
+Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 21 KB ve gzip 7 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+
+### Sürdürülebilir yüklemeler
+
+`resumable` Cargo özelliği açıkken yükleme alanı ve `FileDrop`, dosyaları tus 1.0 protokolünün bir alt kümesiyle gönderir; ağı kaybeden bir yükleme baştan başlamak yerine kaldığı yerden sürer. Kontrolde değişiklik gerekmez:
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+`resumable_uploads` çağrılmazsa bitmemiş yüklemeler sistemin geçici klasörüne gider, son baytlarından sonra 24 saat tutulur ve kullanıcı başına en çok 5, toplamda en çok 1000 yükleme açık olabilir.
+
+| İstek | Yanıt |
+|---|---|
+| `Upload-Length` ve `Upload-Metadata: filename <base64>` ile `POST /_zeyn/uploads/{store}` | `Location`, `Upload-Offset: 0` ve `Upload-Expires` ile `201`; deponun sınırını aşarsa `413`, boş dosyada `422`, kotayı ya da açık yükleme sınırlarını aşarsa `429` |
+| konuma `HEAD` | `Upload-Offset` ve `Upload-Length` ile `200` |
+| `Content-Type: application/offset+octet-stream` ve `Upload-Offset` ile `PATCH` | yeni `Upload-Offset` ile `204`; ofset sunucununki değilse `409`, aynı yüklemenin başka bir `PATCH`'i sürerken `423`, bildirilenden fazla baytta `413` |
+| son baytı getiren `PATCH` | düz bir yükleme gibi `{id, name, size, type}` ile `200` |
+| konuma `DELETE` | `204`; yükleme ve baytları silinir |
+
+Her istek `Tus-Resumable: 1.0.0` (yoksa `412`), deponun yazma iznini ve feature'ın guard'larını ister; `POST`, `PATCH` ve `DELETE` ayrıca CSRF başlığını ister. Bir yüklemeyi yalnızca onu açan kullanıcı ve tenant bulur; başka herkes `404` alır. Yükleme açmak düz bir yükleme gibi yazma sınırına sayılır; `PATCH`'leri sayılmaz, çünkü bildirilen uzunluktan fazlasını taşıyamazlar. Tarayıcı dosyayı, yaygın ters vekil sunucuların varsayılan gövde sınırı olan 1 MiB'lık `PATCH`'lerle gönderir; kopan bir bağlantı en çok bu kadarını yeniden göndermeye mal olur.
+
+Baytlar geldikçe yükleme klasöründeki `{id}.part` dosyasına yazılır; bağlantı kopmadan önce sunucuya ulaşan baytlar korunur ve `HEAD` onları bildirir. Son bayt geldiğinde dosya `POST /_zeyn/files/{store}` ile aynı adımlardan geçer: içerikten bulunan tür, boyut sınırı, kota, depo, tarayıcı ve interceptor'lar (`CallKind::Upload`). Ardından part dosyası silinir; bir denetim dosyayı reddettiğinde de. Süresi boyunca yeni bayt almayan bir yükleme, bir sonraki sorulduğunda ya da bir sonraki yükleme açıldığında silinir; yeniden başlatmadan kalan part dosyaları süre başına bir kez süpürülür.
+
+Tarayıcıda başarısız bir istek (kopan ağ, `409`, `423`, `429` ya da sunucu hatası) tarayıcı yeniden çevrim içi olduktan sonra 1, 2, 4, 8 ve sonra her 15 saniyede, art arda en çok 12 kez yeniden denenir; her deneme önce ofseti sorar ve yalnızca kalanı gönderir. İptal isteği durdurur ve sunucudaki yüklemeyi siler. Son bir başarısızlıktan sonra Yeniden dene, sunucu hâlâ tutuyorsa aynı yüklemeyi sürdürür.
+
+tus 1.0'dan farklar: yalnızca creation, expiration ve termination eklentileri; `OPTIONS` keşfi, sağlama toplamı, ertelenmiş uzunluk ve birleştirme yok; son `PATCH`, alan dosyanın kimliğini başka bir istek olmadan alsın diye `204` yerine saklanan dosyayla `200` yanıtı verir. Açık yüklemeleri yalnızca onları açan süreç bilir; bu yüzden birden çok örnekli bir yük dengeleyicinin arkasında `/_zeyn/uploads/` yolları yapışkan oturum (sticky session) ister.
+
+## File drop
+
+`FileDrop::new(label, rules)`, aynı yükleme kontrolünün form dışında, tek başına kullanılan hâlidir; bir belge gelen kutusu gibi işin tamamının dosyalar olduğu ekranlar içindir. Form alanı gibi klasörleri, yapıştırılan dosyaları ve kabul listesini alır ve `rules` deposuna yükler; bu depoyu izniyle birlikte `Feature::files` kaydeder. `.single()` bir seferde tek dosya alır. `.on_upload(action)` saklanan her `File` için bir eylem çalıştırır; sunucu önce kimliğin kendi ürettiği biçimde olduğunu denetler, adı yeniden temizler ve yalnızca kurallardaki bir içerik türünü bırakır, böylece eylem tarayıcının uydurduğu hiçbir şeyi almaz. Eylem reddederse öğe nedeni gösterir. Alanın içindeki dosya seçici, klavye ve tek işaretçi yoludur.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

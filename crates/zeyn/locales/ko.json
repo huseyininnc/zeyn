@@ -95,6 +95,23 @@
       "reason_cancel": "취소",
       "reason_invalid": "3자에서 300자 사이로 사유를 작성하십시오."
     },
+    "devtools": {
+      "title": "개발자 도구",
+      "refresh": "새로 고침",
+      "close": "닫기",
+      "empty": "아직 기록된 요청이 없습니다.",
+      "queries": "쿼리",
+      "effects": "효과",
+      "topics": "토픽",
+      "build": "빌드",
+      "render": "렌더링",
+      "hint": "Alt+Shift+D 또는 Escape로 패널을 닫습니다."
+    },
+    "inspect": {
+      "title": "요소의 소스",
+      "none": "이 요소에는 소스 줄이 없습니다.",
+      "hint": "Alt+Shift+I 또는 Escape로 검사기를 닫습니다."
+    },
     "validation": {
       "required": "{label}을(를) 입력하십시오.",
       "min_len": "{label}은(는) 최소 {n}자여야 합니다.",
@@ -129,7 +146,10 @@
       "rate_limited": "요청이 너무 많습니다. 잠시 후 다시 시도하십시오.",
       "confirmation_required": "실행하기 전에 앱에서 확인이 필요합니다.",
       "cursor": "불러온 이후 목록이 변경되었습니다. 다시 불러온 후 시도하십시오.",
-      "duplicate": "이 레코드는 이미 존재합니다."
+      "duplicate": "이 레코드는 이미 존재합니다.",
+      "too_large": "요청이 너무 큽니다.",
+      "bad_request": "요청을 읽을 수 없습니다.",
+      "socket_only": "이 작업은 실시간 연결에서만 실행됩니다."
     },
     "grid": {
       "pagination": "페이지 이동",
@@ -212,6 +232,14 @@
     "shell": {
       "skip": "본문으로 건너뛰기",
       "menu": "메인",
+      "menu_filter": "메뉴 필터",
+      "menu_results": "{n}개 항목",
+      "menu_none": "일치하는 메뉴 항목이 없습니다",
+      "menu_favorites": "즐겨찾기",
+      "menu_pin": "{label} 고정",
+      "menu_unpin": "{label} 고정 해제",
+      "rail_collapse": "메뉴 접기",
+      "rail_expand": "메뉴 펼치기",
       "language": "언어",
       "time_zone": "시간대",
       "time_zone_auto": "자동 (이 기기)",
@@ -482,7 +510,7 @@
         "brand": "참고"
       },
       "upload": {
-        "drop": "파일을 여기에 놓거나 선택하십시오.",
+        "drop": "파일이나 폴더를 여기에 놓거나, 붙여넣거나, 선택하십시오.",
         "hint": "{types}, 최대 {max}.",
         "hint_many": "{types}, 각각 최대 {max}, 최대 {n}개 파일.",
         "list": "파일",
@@ -494,7 +522,10 @@
         "cancel": "취소",
         "retry": "다시 시도",
         "remove": "제거",
-        "remove_name": "{name} 제거"
+        "remove_name": "{name} 제거",
+        "waiting": "{name} 업로드 대기 중",
+        "skipped": "이 필드가 받지 않는 형식의 파일 {n}개를 건너뛰었습니다.",
+        "not_added": "파일은 업로드되었지만 추가할 수 없습니다."
       },
       "kpi": {
         "up": "이전 기간 대비 {pct}% 증가",
@@ -934,12 +965,17 @@
     },
     "files": {
       "too_large": "파일이 너무 큽니다. 허용되는 최대 파일 크기는 {max}입니다.",
+      "quota": "지금은 업로드 한도에 도달했습니다. 나중에 다시 시도하세요.",
       "too_many": "{label}에는 최대 {n}개 파일을 넣을 수 있습니다.",
       "type": "이 파일 형식은 허용되지 않거나, 내용이 이름과 일치하지 않습니다.",
       "refused": "보안 검사에서 파일이 거부되었습니다.",
       "aborted": "전체 파일이 도착하기 전에 업로드가 중단되었습니다. 다시 시도하십시오.",
       "empty": "파일이 비어 있습니다.",
-      "store_full": "이 파일을 위한 공간이 남아 있지 않습니다."
+      "store_full": "이 파일을 위한 공간이 남아 있지 않습니다.",
+      "open": "완료되지 않은 업로드가 너무 많습니다. 하나를 완료하거나 취소한 뒤 다시 시도하세요.",
+      "offset": "업로드가 서버와 맞지 않습니다. 서버가 있는 위치에서 계속합니다.",
+      "busy": "이 업로드는 아직 데이터를 받고 있습니다. 잠시 후 다시 시도하세요.",
+      "length": "업로드에 파일 크기가 없습니다."
     }
   },
   "AccountLogin": {

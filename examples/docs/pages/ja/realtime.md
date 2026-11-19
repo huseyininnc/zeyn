@@ -11,12 +11,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. エンドポイント
@@ -24,13 +24,13 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | エンドポイント | 目的 |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: 共同編集ドキュメント |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: トピックの変更通知 |
+| `GET /_zeyn/socket` | WebSocket: トピックの変更通知 |
 | `GET /_zeyn/live.js` | トピック用スクリプト。購読するページだけがリンクします |
 
 すべてのハンドシェイクは、アップグレードの前に次の順で検査されます。
 
 1. チャネルが有効であること（そうでなければ `404`）。
-2. **Origin:** `Origin` ヘッダーは、リクエストが届いたホスト、または `Realtime::allow_origin` で追加した origin を指していなければなりません。ブラウザは WebSocket のハンドシェイクで常にこれを送ります。ないものは拒否されます。これが、他のサイトがユーザーの cookie を使ってソケットを開くのを防ぎます。
+2. **Origin:** `Origin` ヘッダーは、リクエストが届いたホスト、または `ZeynSocket::allow_origin` で追加した origin を指していなければなりません。ブラウザは WebSocket のハンドシェイクで常にこれを送ります。ないものは拒否されます。これが、他のサイトがユーザーの cookie を使ってソケットを開くのを防ぎます。
 3. **CSRF トークン:** ブラウザは WebSocket にヘッダーを設定できないため、`meta[name=zeyn-csrf]` のトークンを `csrf` クエリパラメーターに入れ、`POST` に対する `x-zeyn-csrf` とまったく同じように、`zeyn_csrf` cookie と定数時間で比較します。失敗すると `403` を返します。
 4. **Identity:** すべてのリクエストと同じ authenticator です。ユーザーはサインインしている必要があります（`403`）。
 5. **ユーザーごとの上限**（`429`）。
@@ -77,9 +77,9 @@ channel.close();                // in unmount
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -88,7 +88,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 通知にはトピック名だけが含まれ、データは決して含まれません。更新は、すべての permission 検査を伴う通常のグリッドエンドポイントを通じて行われます。`notify` は呼び出し元のテナントにだけ届きます。`notify_tenant(Some(id), topic)` は特定のテナントを指定し、`None` はテナントを使わないアプリを指します。
 
-同じトピック名はチャネルなしでも使えます。`.listens("orders")` を付けたノードは、通知がそのトピックを指定したとき（`live.js` がそれを `zeyn:topics` として渡します）にその場で更新され、action が `ui.refresh("orders")` で終わったときや、`.drives("orders")` を持つフィルターが変わったときにも更新されます。グリッドは現在のページを再読み込みし、ほかのリスナーは画面ごとに 1 回の `POST /_zeyn/nodes` で再レンダリングされます（`examples/docs/pages/effects.md` の Topics を参照）。ソケットが購読するのは、`Realtime::topic` で宣言が必要な `Live` ノードのトピックだけです。グリッドではない部分には、その中か隣で `.listens` を使ってください。
+同じトピック名はチャネルなしでも使えます。`.listens("orders")` を付けたノードは、通知がそのトピックを指定したとき（`live.js` がそれを `zeyn:topics` として渡します）にその場で更新され、action が `ui.refresh("orders")` で終わったときや、`.drives("orders")` を持つフィルターが変わったときにも更新されます。グリッドは現在のページを再読み込みし、ほかのリスナーは画面ごとに 1 回の `POST /_zeyn/nodes` で再レンダリングされます（`examples/docs/pages/effects.md` の Topics を参照）。ソケットが購読するのは、`ZeynSocket::topic` で宣言が必要な `Live` ノードのトピックだけです。グリッドではない部分には、その中か隣で `.listens` を使ってください。
 
 ## 5. メモリとバックプレッシャー
 
@@ -108,7 +108,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 ブロードキャストは決して待機しません。更新は `try_send` で各クライアントの上限付きキューに渡されます。キューがいっぱいのクライアントは直ちにルームから外されるため、遅い読み取り側が 1 つあってもメモリを占有したり他のクライアントを遅らせたりしません。そのクライアントは再接続してドキュメント全体を受け取ります。キューがいっぱいのトピック購読者は、その通知を逃すだけです（次の通知でどのみち更新されます）。
 
-したがって、最悪の場合のメモリは、ドキュメントでおよそ `rooms * doc_bytes`、キューで `clients * queue * message_bytes` です（更新はキュー間で共有され、コピーされません）。ダイアグラムで 2 つのライブタブを開いた showcase サーバーは、合計で約 19 MB を使用します（デバッグビルド）。`Hub::stats()` は、監視用にルーム、クライアント、購読者、ドキュメントのバイト数を報告します。
+したがって、最悪の場合のメモリは、ドキュメントでおよそ `rooms * doc_bytes`、キューで `clients * queue * message_bytes` です（更新はキュー間で共有され、コピーされません）。ダイアグラムで 2 つのライブタブを開いた showcase サーバーは、合計で約 19 MB を使用します（デバッグビルド）。`Socket::stats()` は、監視用にルーム、クライアント、購読者、ドキュメントのバイト数を報告します。
 
 ## 6. セキュリティ上の注意
 

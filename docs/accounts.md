@@ -10,8 +10,8 @@ names. Apps that sign in through a single sign on proxy or an identity provider 
 Everything sits behind the Cargo feature `accounts`. Without it nothing of this is compiled.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["accounts"] }            # memory store
-zeyn = { version = "0.0.10", features = ["accounts", "postgres"] } # or "oracle"
+zeyn = { version = "0.0.11", features = ["accounts"] }            # memory store
+zeyn = { version = "0.0.11", features = ["accounts", "postgres"] } # or "oracle"
 ```
 
 The module is `zeyn::accounts` because `Identity` already names the request's user.
@@ -30,7 +30,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - `App::accounts` registers `Accounts`, `UserManager`, `RoleManager` and `SignInManager` as
@@ -38,6 +38,8 @@ App::new("Shop")
   authenticator, checks security stamps, and serves the JSON endpoints under `/_zeyn/account`.
 - `accounts::feature()` (or `accounts::ui()...build()`) adds the screens under `/account`. The
   app's `login_url`, the step up and re authentication pages and the idle sign out point there.
+  The idle timeout ends the session with `POST /_zeyn/account/logout` and the CSRF token; there
+  is no `GET` sign out, so a link or image on another site cannot sign a user out.
 - The key must be at least 32 bytes and must not change: it seals cookies and stored
   authenticator keys and signs links. A shorter key stops the app at startup.
 - `public_url` is used for links in messages and as the passkey relying party. It is never taken
@@ -316,12 +318,13 @@ The equivalent of `MapIdentityApi`, under `/_zeyn/account`:
 | `GET /manage/personalData` | | the user's data as a JSON download |
 | `POST /passkeys/requestOptions`, `POST /passkeys/login` | `credentialJson` | options; cookie or tokens |
 | `POST /manage/passkeys/creationOptions`, `GET`, `POST /manage/passkeys`, `POST /manage/passkeys/remove` | `credentialJson`, `name`, `credentialId` | options, list, the new passkey |
-| `POST /logout`, `GET /signout` | | ends the cookie session |
+| `POST /logout` | | ends the cookie session |
 
 Validation problems list errors by code in Pascal case (`PasswordTooShort`), as .NET does. Every
 `POST` must be `application/json` (a cross site form cannot send that, and a cross site script
-cannot without a CORS preflight the app does not grant). A `POST` that carries the session cookie
-also needs the `x-zeyn-csrf` token. The paths count as writes for the write rate limit.
+cannot without a CORS preflight the app does not grant). A `POST` that carries any cookie also
+needs the `x-zeyn-csrf` token, unless it signs in with a bearer token; clients that sign in for
+tokens send no cookies. The paths count as writes for the write rate limit.
 
 ## Security
 
@@ -404,15 +407,15 @@ authenticator verified the user.
 
 ## Testing
 
-- `crates/zeyn/tests/accounts.rs`: managers, the policy, .NET v2 and v3 hashes and their
+- `crates/zeyn/tests/all/accounts.rs`: managers, the policy, .NET v2 and v3 hashes and their
   migration, purpose tokens and their expiry, lockout and events, constant time for missing users,
   recovery and authenticator codes, roles to permissions, the JSON endpoints, the security stamp
   sign out, bearer tokens, two factor, CSRF and content type, rate limits, secrets in output, the
   screens and external logins.
-- `crates/zeyn/tests/accounts_passkeys.rs`: registration and sign in against a software ES256
+- `crates/zeyn/tests/all/accounts_passkeys.rs`: registration and sign in against a software ES256
   authenticator, and the refusals for a reused challenge, a counter that does not grow, a changed
   signature and another origin.
-- `crates/zeyn/tests/accounts_sql.rs`: the schema for both dialects, and a round trip against a
+- `crates/zeyn/tests/all/accounts_sql.rs`: the schema for both dialects, and a round trip against a
   database when `ZEYN_TEST_PG` (and with the `oracle` feature `ZEYN_TEST_ORACLE`) is set, as in
   `docs/database.md`.
 

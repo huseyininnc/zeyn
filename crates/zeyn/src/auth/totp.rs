@@ -162,10 +162,16 @@ impl Totp {
 
     pub(crate) fn problems(&self) -> Vec<String> {
         if self.sealer.is_none() {
-            vec![format!(
-                "Totp: the key must be at least {} bytes",
-                super::seal::MIN_SECRET
-            )]
+            vec![
+                crate::Problem::new(
+                    "Z0206",
+                    format!("Totp: the key must be at least {} bytes", super::seal::MIN_SECRET),
+                )
+                .why("the key seals the second factor proof and the stored secrets, and a short key could be guessed, which would skip the second factor")
+                .fix("read a random key of at least 32 bytes from configuration (never from code), such as `openssl rand -base64 48`")
+                .docs("guides/sign-in#built-in-totp")
+                .to_string(),
+            ]
         } else {
             Vec::new()
         }

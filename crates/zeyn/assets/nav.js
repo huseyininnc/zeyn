@@ -31,7 +31,36 @@ function isScreenUrl(url) {
   return !local.startsWith('/_zeyn/') && !local.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(local);
 }
 
-/** Marks the menu link of the current page and writes the top bar's breadcrumb from it. */
+/**
+ * Whether `res` came from this app's origin, also after redirects. A response from another
+ * origin is never swapped in or written to the history.
+ */
+function sameOrigin(res) {
+  return !res.url || new URL(res.url).origin === location.origin;
+}
+
+/**
+ * Opens the side menu groups around `link` (their heading buttons, see `menu.js`); in an
+ * accordion menu it closes their open siblings. In the icon rail the groups are flyouts, so it
+ * closes them instead.
+ */
+function openBranch(link) {
+  if (link.closest('[data-zeyn-rail]')) {
+    for (const b of document.querySelectorAll('[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading')) b.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  const accordion = link.closest('[data-zeyn-accordion]');
+  const heading = (el) => el.querySelector(':scope > :is(h2, h3, h4, h5) > .z-nav-heading');
+  for (let g = link.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {
+    if (accordion) for (const s of g.parentElement.children) if (s !== g) heading(s)?.setAttribute('aria-expanded', 'false');
+    heading(g)?.setAttribute('aria-expanded', 'true');
+  }
+}
+
+/**
+ * Marks the menu link of the current page, opens its menu groups and writes the top bar's
+ * breadcrumb from them.
+ */
 function markCurrent(url) {
   let current = null;
   document.querySelectorAll('.z-nav a[href], .z-site-nav a[href], .z-site-bottom a[href]').forEach((a) => {
@@ -41,10 +70,15 @@ function markCurrent(url) {
       if (a.closest('.z-nav')) current = a;
     } else a.removeAttribute('aria-current');
   });
+  if (current) openBranch(current);
   const crumbs = document.querySelector('[data-zeyn-crumbs] ol');
   if (!crumbs) return;
-  const group = current?.closest('.z-nav-group')?.querySelector('h2')?.textContent ?? '';
-  const page = current?.textContent ?? document.querySelector('#z-main h1')?.textContent ?? '';
+  const label = (el) => el?.querySelector('span:not([aria-hidden="true"])')?.textContent ?? el?.textContent;
+  const groups = [];
+  for (let g = current?.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {
+    groups.unshift(label(g.querySelector(':scope > :is(h2, h3, h4, h5)')) ?? '');
+  }
+  const page = label(current) ?? document.querySelector('#z-main h1')?.textContent ?? '';
   const li = (text, here) => {
     const item = document.createElement('li');
     const span = document.createElement('span');
@@ -53,7 +87,7 @@ function markCurrent(url) {
     item.append(here ? span : text);
     return item;
   };
-  crumbs.replaceChildren(...(group && group !== page ? [li(group, false)] : []), ...(page ? [li(page, true)] : []));
+  crumbs.replaceChildren(...groups.filter((g) => g && g !== page).map((g) => li(g, false)), ...(page ? [li(page, true)] : []));
 }
 
 /** Moves focus to the new screen's heading and tells screen readers that the page changed. */
@@ -115,6 +149,10 @@ async function swapScreen(url, push) {
     });
   } catch (err) {
     if (err?.name === 'AbortError') return;
+    location.assign(url.href);
+    return;
+  }
+  if (!sameOrigin(res)) {
     location.assign(url.href);
     return;
   }
@@ -220,6 +258,10 @@ async function swapFrame(url, push, hash) {
     location.assign(url.href);
     return;
   }
+  if (!sameOrigin(res)) {
+    location.assign(url.href);
+    return;
+  }
   const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
   const next = doc.querySelector('.z-app');
   const current = document.querySelector('.z-app');
@@ -264,12 +306,20 @@ function refreshPage() {
  * Other scripts ask for navigation with events instead of loading pages themselves:
  * `zeyn:navigate` (`detail.url`, `detail.replace`) loads a screen, `zeyn:refresh` reloads the
  * current one in place and `zeyn:refresh-page` the whole app frame. Each event is canceled when
- * handled, so a sender without this script can fall back to a page load.
+ * handled, so a sender without this script can fall back to a page load. A `zeyn:navigate` to
+ * another origin (also `javascript:` and `data:` addresses) is canceled too and goes nowhere,
+ * with one console warning.
  */
+let warnedOrigin = false;
+
 document.addEventListener('zeyn:navigate', (e) => {
-  const url = new URL(e.detail?.url ?? location.href, location.href);
-  if (url.origin !== location.origin) return;
   e.preventDefault();
+  const url = new URL(e.detail?.url ?? location.href, location.href);
+  if (url.origin !== location.origin) {
+    if (!warnedOrigin) console.warn('zeyn:navigate ignored an address outside this app');
+    warnedOrigin = true;
+    return;
+  }
   visit(url, !e.detail?.replace);
 });
 
@@ -308,10 +358,11 @@ window.addEventListener('popstate', () => {
 history.replaceState({ zeyn: true }, '', location.href);
 
 /**
- * Below 1024 px the side menu of the app shell folds behind the menu button under the app's name
- * (W3C APG disclosure). This shows the button; without the script the menu stays open. Pressing
- * the button opens or closes the menu, following a link or pressing Escape closes it, and Escape
- * moves focus back to the button.
+ * Below 1024 px the side menu of the app shell folds behind the menu button under the app's name.
+ * This shows the button; without the script the menu stays open. The button opens the menu as a
+ * drawer over the screen: focus moves into it and stays between the button and the drawer, the
+ * screen behind it is inert and does not scroll. The button, Escape, the backdrop, a link and a
+ * swipe toward the menu's edge close it; focus returns to the button.
  */
 function initAppMenu() {
   const toggle = document.querySelector('[data-zeyn-nav-toggle]');
@@ -325,8 +376,24 @@ function setAppMenu(open) {
   const toggle = document.querySelector('[data-zeyn-nav-toggle]');
   const body = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
   if (!toggle || !body) return;
+  const bar = toggle.closest('.z-nav-bar');
+  if (open && bar) toggle.closest('.z-nav')?.style.setProperty('--z-drawer-top', `${Math.round(bar.getBoundingClientRect().bottom)}px`);
   toggle.setAttribute('aria-expanded', String(open));
   body.toggleAttribute('data-open', open);
+  for (const el of document.querySelectorAll('.z-app > .z-main, .z-app > .z-app-header')) el.inert = open;
+  if (open) (body.querySelector('[aria-current="page"]') ?? drawerStops(body)[0])?.focus();
+}
+
+/** The focusable elements of the open drawer, in order. */
+function drawerStops(body) {
+  return [...body.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, [tabindex]:not([tabindex="-1"])')].filter((el) => el.checkVisibility());
+}
+
+/** The open drawer's toggle and body, or `null`. */
+function openDrawer() {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle][aria-expanded="true"]');
+  const body = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
+  return body ? { toggle, body } : null;
 }
 
 document.addEventListener('click', (e) => {
@@ -335,15 +402,47 @@ document.addEventListener('click', (e) => {
     setAppMenu(t.closest('[data-zeyn-nav-toggle]').getAttribute('aria-expanded') !== 'true');
   } else if (t?.closest('#z-nav-body[data-open] a[href]')) {
     setAppMenu(false);
+  } else if (t?.matches('.z-nav') && openDrawer()) {
+    setAppMenu(false);
+    document.querySelector('[data-zeyn-nav-toggle]')?.focus();
   }
 });
 
 document.addEventListener('keydown', (e) => {
-  const toggle = document.querySelector('[data-zeyn-nav-toggle][aria-expanded="true"]');
-  if (e.key !== 'Escape' || !toggle) return;
-  setAppMenu(false);
-  toggle.focus();
+  const open = openDrawer();
+  if (!open) return;
+  if (e.key === 'Escape') {
+    setAppMenu(false);
+    open.toggle.focus();
+  } else if (e.key === 'Tab') {
+    const stops = [open.toggle, ...drawerStops(open.body)];
+    const at = stops.indexOf(document.activeElement);
+    const next = e.shiftKey ? (at <= 0 ? stops.length - 1 : at - 1) : (at === stops.length - 1 || at < 0 ? 0 : at + 1);
+    stops[next].focus();
+    e.preventDefault();
+  }
 });
+
+/** Where a touch on the open drawer started, for swipe to close. */
+let swipe = null;
+
+document.addEventListener('pointerdown', (e) => {
+  swipe = e.pointerType === 'touch' && e.target instanceof Element && e.target.closest('#z-nav-body[data-open]') ? { x: e.clientX, y: e.clientY } : null;
+});
+
+document.addEventListener('pointerup', (e) => {
+  if (!swipe) return;
+  const rtl = document.documentElement.dir === 'rtl';
+  const dx = (e.clientX - swipe.x) * (rtl ? -1 : 1);
+  const dy = e.clientY - swipe.y;
+  swipe = null;
+  if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    setAppMenu(false);
+    document.querySelector('[data-zeyn-nav-toggle]')?.focus();
+  }
+});
+
+matchMedia('(min-width: 1024px)').addEventListener('change', (e) => e.matches && openDrawer() && setAppMenu(false));
 
 document.addEventListener('zeyn:content', initAppMenu);
 initAppMenu();

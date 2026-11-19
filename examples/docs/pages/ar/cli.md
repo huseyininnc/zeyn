@@ -8,11 +8,14 @@
 |---|---|
 | `zeyn new <name>` | ينشئ تطبيقًا ببنية الميزات القياسية |
 | `zeyn new <name> --lib` | ينشئ مكتبة من النماذج والميزات والنصوص تشترك فيها عدة تطبيقات |
+| `zeyn new <name> --component` | ينشئ crate مكوّن `zeyn-<name>` مع سكربت متصفح وملف أنماط ونصوص وتطبيق مثال واختبارات |
 | `zeyn g feature <name>` | يضيف `src/features/<name>` مع `models` و`services` و`actions` و`screens` وشاشة قائمة تعمل |
 | `zeyn g screen <feature> <name>` | يضيف `screens/<name>.rs` إلى ميزة ويسجله ويضيف عنوانه إلى كل ملف لغة |
 | `zeyn routes` | يسرد الميزات والشاشات والمسارات وواجهات API والوصول |
 | `zeyn check` | يصرّف المشروع ويبلّغ عن المشكلات البنيوية والترجمات الناقصة |
 | `zeyn check --fix` | يعيد كتابة واجهات Zeyn المعاد تسميتها في `src` و`tests` و`examples`، ثم يفحص |
+| `zeyn check --json` | يطبع التقرير بصيغة JSON مع رموز ثابتة وأسباب وحلول |
+| `zeyn doctor` | يقرأ كيف يُبنى المشروع ويبلغ عمّا يجعله بطيئا أو كبيرا، مع إصلاح من سطر واحد لكل ملاحظة |
 | `zeyn mcp` | يشغّل خادم MCP على stdio لوكلاء الذكاء الاصطناعي |
 
 ثبّته من crates.io:
@@ -55,6 +58,7 @@ cargo run
 
   وليس `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
 - `build.rs` و`max_file_lines = 300` تحت `[package.metadata.zeyn]` في `Cargo.toml`: يتوقف `cargo build` عندما يزيد عدد الأسطر غير الفارغة في ملف داخل `src/`؛ ويفعل clippy `too_many_lines` (60، في `clippy.toml`) الشيء نفسه للدوال. انظر [Project structure](structure.md).
+- `[profile.dev]` في `Cargo.toml` و`.cargo/config.toml` و`.vscode/settings.json`: حلقة بناء سريعة. تُبنى الاعتماديات بـ `opt-level = 1` ودون معلومات تصحيح، ويحتفظ كودك بجداول الأسطر فقط (تعرض آثار الاستدعاء الملف والسطر؛ اضبط `CARGO_PROFILE_DEV_DEBUG=full` للتصحيح مع المتغيرات المحلية)، ويربط Windows عبر `rust-lld`، ويستخدم rust-analyzer مجلد target خاصا به فلا ينتظر `cargo build`.
 - `Dockerfile` و`.dockerignore`: صورة حاوية صغيرة.
 - خطوط إنتاج (pipelines) لخوادم CI الشائعة، وكلها تجري الفحوص نفسها (`cargo fmt --check` و`cargo clippy -D warnings` و`cargo test` و`cargo deny check`) وترفض وسمًا `vX.Y.Z` لا يطابق `Cargo.toml`:
   - `.github/workflows/ci.yml` لـ GitHub Actions، مع `.github/dependabot.yml` (تحديثات أسبوعية لـ Cargo والإجراءات) وقائمة مراجعة لطلبات السحب (pull requests)؛
@@ -65,6 +69,23 @@ cargo run
 - مستودع git محلي على الفرع `main`، عندما يكون git مثبتًا (Windows أو macOS أو Linux) ولا يكون المجلد داخل مستودع أصلًا. لا يُنفَّذ أي commit، فيحمل أول commit اسمك وبريدك. يتخطاه الخيار `--no-git`.
 
 راجع [بنية المشروع](structure.md) لمعرفة كل مجلد.
+
+## crate مكوّن جديد
+
+يكتب `zeyn new <name> --component` الـ crate ‏`zeyn-<name>` (يُقبل `zeyn-` في بداية الاسم؛ الاسم أحرف صغيرة وأرقام وشرطات مفردة، بحد أقصى 32 حرفًا). إنه نموذج الامتداد في [المكتبات المشتركة](polyrepo.md)، جاهزًا للتعديل:
+
+- `src/lib.rs`: مكوّن نموذجي (زر تبديل)، وPlugin الخاص به الذي يسجّل وحدة المتصفح عبر `App::module`، والثابت `CATALOGS`.
+- `assets/<name>.js` و`assets/<name>.css`: الوحدة. تبدأ الأصناف بـ `z-<name>-` وسمة العلامة بـ `data-zeyn-<name>-`؛ وملف الأنماط يستخدم رموز السمة فقط، لذلك يعمل السمتان الفاتحة والداكنة.
+- `assets/en.json` و`assets/tr.json`: النصوص، تحت المفتاح `<name>`.
+- `examples/demo`: تطبيق فيه صفحة بداية بلا مكوّن وصفحة تحتوي واحدًا. شغّله بـ `cargo run --example demo`.
+- `tests/<name>.rs`: الصفحة التي فيها المكوّن تربط الوحدة، والصفحة التي بلا مكوّن لا تشير إليها أبدًا، ويسرد وقت التشغيل الوحدة للمحتوى الذي يصل لاحقًا، وتُخدَّم الملفات مع رقم البناء في العنوان، ويستطيع التطبيق تغيير صياغة النصوص.
+- ملفات المشروع نفسها كما في المكتبة: CI لـ GitHub وGitLab وJenkins، وقواعد التنسيق والفحص، و`AGENTS.md` و`CLAUDE.md`.
+
+```sh
+zeyn new rating --component
+cd zeyn-rating
+cargo test
+```
 
 ## المولدات
 
@@ -89,6 +110,53 @@ zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 zeyn check --fix
 ```
 
+لكل مشكلة رمز ثابت: `Z01xx` للتطبيق والميزات والمسارات والخدمات، و`Z02xx` للأمان، و`Z03xx` للصفحات العامة، و`Z04xx` للقوائم والأوامر والاختصارات، و`Z05xx` للبيانات، و`Z06xx` لفحوص الصفحات، و`W01xx` للتحذيرات. يعرض الناتج النصي كل مشكلة مع سببها (`why`) وحلها (`help`) ورابط إلى هذا التوثيق ورمزها. يطبع `zeyn check --json` التقرير نفسه كمستند JSON واحد للوكلاء وCI، ويخرج بخطأ عندما تكون قيمة `ok` هي false.
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
+```
+
+يقرأ `zeyn check` أيضًا مصدر التطبيق وينبّه، مع الملف والسطر، إلى `W0106` نص يحمل `<script>` دون `src` أو معالج أحداث مضمّنًا مثل `onclick=` (تحظر سياسة CSP كليهما)، و`W0107` مكوّن مكتوب يدويًا يكتب HTML دون `escape(..)` أو `r.text(..)` أو `r.value(..)`، و`W0108` action يعيد `Vec` كاملًا دون استعلام يحدّه، و`W0109` `DocumentViewer` مُعلَّم بـ `.trusted()`. ولا يحتاج غياب `permission` أو `public` إلى تنبيه: فهو لا يُترجم.
+
+## الانتقال إلى إصدار جديد من Zeyn
+
+ينقل `zeyn migrate` التطبيق إلى إصدار أحدث من Zeyn، مثل `ng update`. يقرأ إصدار Zeyn الذي يستخدمه التطبيق من `Cargo.lock` (أو `Cargo.toml`)، ويشغّل بالترتيب كل خطوة ترحيل بين ذلك الإصدار والإصدار المستهدف، وينقل اعتماديات Zeyn في `Cargo.toml` إلى الإصدار المستهدف، ويطبع ما فعله: كل تغيير مع ملفه وسطره، والمواضع التي يجب أن ينظر فيها شخص، كل منها مع السبب.
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+تعيد الخطوة تسمية الأسماء والدوال (`Hub` إلى `Socket`، و`.realtime(live)` إلى `.socket(live)`)، وتغيّر شكل الاستدعاء (`.sort_by(Order::date, true)` إلى `.sort_by_desc(Order::date)`)، وتنقل مسارات `use`، وتشير إلى ما لا تستطيع إعادة كتابته بأمان، مثل علم `bool` ليس قيمة حرفية أو رابط تسجيل خروج إلى عنوان أزيل. لا تعدّل إلا الرموز التي تستبدلها، فيبقى التنسيق والتعليقات كما هي، ولا يغيّر التشغيل الثاني شيئا. لا يكتب `--dry-run` شيئا ويطبع فرقا موحدا (unified diff)؛ ويطبع `--json` التقرير كمستند JSON واحد فيه `changes` و`todos` و`errors`. رمز الخروج 0 ما لم يتعذر قراءة ملف أو تحليله أو كتابته. يطبّق `zeyn check --fix` إعادات التسمية في كل الخطوات. وتفعل أداة MCP `zeyn_migrate` الشيء نفسه للوكيل.
+
+## سرعة البناء واستخدام القرص
+
+يقرأ `zeyn doctor` كيف يُبنى المشروع ويبلغ عمّا يجعله بطيئا أو كبيرا: حجم مجلد target وأكبر مجلداته، والرابط، وملف dev (معلومات التصحيح وتحسين الاعتماديات)، وإصدارَي rustc وcargo مقارنة بـ `rust-version`، والنواتج التي تركتها سلسلة أدوات أقدم، ومجلد target الخاص بـ rust-analyzer، وفي Windows ما إذا كان مجلد target و`~/.cargo` خارج فحص Defender (استثناء أو Dev Drive؛ ويقول ذلك إذا لم يسمح Windows بقراءته). لكل ملاحظة رمز ثابت وإصلاح من سطر واحد. يطبعها `--json` في مستند واحد، ويحدد `--target-limit-gb` الحجم الذي يُعدّ كبيرا (الافتراضي 20)، ورمز الخروج دائما 0. يضيف `zeyn doctor --fix` ملف dev السريع إلى `Cargo.toml` والرابط `rust-lld` إلى `.cargo/config.toml` ولا يعدّل شيئا آخر؛ ولا يغيّر التشغيل الثاني شيئا. وأداة MCP ‏`zeyn_doctor` تفعل الشيء نفسه للوكيل.
+
+## DevTools
+
+تسجّل بنية التصحيح التي تُخدَّم بـ `cargo run` (أو `zeyn dev`) ما فعله كل طلب: الشاشة والإجراء اللذين شغّلهما، وحالته ومدته، والوقت الذي استغرقه بناء الشاشة وعرضها، وكل جملة SQL مع وقتها وعدد الصفوف المتأثرة، والتأثيرات والمواضيع التي أعادها الإجراء. يفتح Alt+Shift+D لوحة بآخر 50 طلبًا؛ ويُفتح كل طلب ليعرض جمله. ويعيد `GET /_zeyn/devtools` القائمة نفسها بصيغة JSON، وتقرؤها أداة MCP `zeyn_devtools` للوكيل.
+
+تُحفظ الجمل دون وسائطها، فلا تصل أي قيمة إلى اللوحة. لا تحتوي بنيات الإصدار على DevTools: لا شيفرة ولا مسار ولا ذاكرة لها. والتطبيق الذي يخدم `App::router` بنفسه، أو الاختبار، يشغّلها بـ `zeyn::server::devtools(true)`.
+
 ## Docker
 
 يبني `Dockerfile` المولَّد على مرحلتين ويعمل على صورة distroless بمستخدم بلا صلاحيات الجذر. يفحص الملف التنفيذي صحته بنفسه عبر `<app> health`، وهو ما يستخدمه `HEALTHCHECK`.
@@ -102,4 +170,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## خادم MCP
 
-يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_test` و`zeyn_new_feature` و`zeyn_new_screen`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).
+يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_inspect` (شجرة عُقد الشاشة مع سطر Rust الذي وضع كل عقدة) و`zeyn_devtools` (سجل طلبات DevTools لبناء التصحيح الجاري: الشاشة والإجراء والأزمنة وعبارات SQL) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_doctor`, `zeyn_test` و`zeyn_new_feature` و`zeyn_new_screen`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).

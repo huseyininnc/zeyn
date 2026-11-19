@@ -50,6 +50,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 
 클라이언트가 무엇을 요청하든 서버가 페이지 크기에 상한을 둡니다.
 
+`.page_sizes(&[10, 25, 50, 100])`는 번호 페이지의 페이저에 "페이지당 행 수" 목록을 더합니다. 그리드 자체의 크기는 항상 제공되고, 선택은 사용자의 뷰와 함께 저장되며, 서버는 그리드가 제공하는 크기만 받습니다.
+
 ## 열
 
 | 호출 | 결과 |
@@ -79,6 +81,11 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_action`이나 `.bulk_action` 바로 뒤의 `.confirm(message)`와 `.tone(Tone::Danger)`: 그 작업이 실행되기 전에 `ActionButton::confirm`과 같은 대화 상자로 묻고(포커스는 먼저 취소에 있음), 버튼을 빨간색으로 그립니다.
 - `.row_menu(|row| ContextMenu)`: 행의 오른쪽 클릭 메뉴.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning, success 행.
+- `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: "행 추가" 버튼, 삭제 버튼과
+  키, 함께 저장되는 편집. [DataGrid 참조](grid.md)를 보세요.
+- 열의 `.groupable()`, `.summary(label, |t| ...)`: 사용자가 열 메뉴나 그룹 패널에서 그 열로 그룹화하고, 합계로 계산한 값이 열 아래에 표시됩니다.
+- `.filter_builder()`: 필터 조건을 만드는 대화 상자를 여는 "필터" 버튼. 필터 행, 저장된 뷰, AI 에이전트가 쓰는 것과 같은 목록입니다.
+- `.filter_chips()`: 활성 필터를 그리드 위에 칩으로 표시하고 각 칩에 제거 버튼을 둡니다. 필터 행, 필터 빌더, 저장된 뷰와 함께 맞춰집니다.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.
 
 ## 실행 시점에 정해지는 열
@@ -96,6 +103,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 ```
 
 페이지 나누기, 가상 스크롤, 키보드 사용, 사용자 언어에 맞춘 숫자와 날짜 서식은 타입이 있는 grid와 똑같이 동작합니다. 이름, 레이블, 셀은 이스케이프되며 서버가 열 수, 행 수, 텍스트 길이를 제한합니다. 이 grid는 정렬하거나 필터링하지 않으며 행은 읽기 전용입니다. [DataGrid 레퍼런스](grid.md)를 참고하세요.
+
+## 검색과 밴드
+
+`.search()`는 그리드 위에 검색 상자를 둡니다. 액션은 텍스트를 `DataQuery::q`로 받고,
+`DataQuery::apply`는 마스킹된 필드를 뺀 텍스트 필드와 비교합니다.
+`.band(label, |b| b.column(..).column(..))`는 열을 하나의 헤더 셀 아래로 묶습니다.
+[DataGrid 참조](grid.md)를 보세요.
 
 ## 제자리 새로 고침
 

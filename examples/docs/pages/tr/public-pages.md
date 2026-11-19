@@ -98,3 +98,12 @@ App::new(t!("app.name"))
 ```
 
 İkisi de herkese düz metin olarak sunulur.
+
+## public klasörü
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+Crate'in `public/` klasöründeki dosyalar `zeyn::public_files!()` ile ikili dosyaya gömülür ve sitenin kökünden sunulur: `public/favicon.svg` `/favicon.svg` adresine cevap verir; sayfa `/favicon.svg`, `/favicon.png` ve `/favicon.ico` içinden bulduğu ilkini simgesi olarak bağlar. Görseller, simgeler, yazı tipleri, metin, XML, JSON, web manifestleri ve PDF dosyaları alınır; HTML ve betikler derlemeyi durdurur, çünkü uygulamanın kaynağı altında çalışırlar. Dosyalar bir entity tag taşır ve bir saat önbelleğe alınır. `[package.metadata.zeyn]` altındaki `max_public_file_kb` ve `max_public_total_kb` başka bir değer vermedikçe bir dosya en fazla 256 KB, klasör 2 MB olabilir. `App::check`, yolunu bir ekranın, `/robots.txt`, `/llms.txt`, `/sitemap.xml` veya `/_zeyn/` adresinin zaten kullandığı dosyayı bildirir. `zeyn new` bir `public/favicon.svg` ekler.

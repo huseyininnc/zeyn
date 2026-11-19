@@ -7,7 +7,7 @@ proxy de inicio de sesión único o de un proveedor de identidad no la necesitan
 quienes conocen ASP.NET Core Identity, está en `docs/accounts.md`.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["accounts"] }
+zeyn = { version = "0.0.11", features = ["accounts"] }
 ```
 
 ## Actívala
@@ -24,7 +24,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - La clave sale de la configuración, tiene al menos 32 bytes y nunca cambia.

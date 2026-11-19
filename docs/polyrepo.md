@@ -122,3 +122,48 @@ Remove it, tag the library and bump the tag in the app when the change is done.
    A breaking change needs a new minor version while the library is below 1.0.
 3. Commit, tag `v<version>`, push the tag. The CI job `tag-matches-version` fails when the tag and
    `Cargo.toml` disagree.
+
+## Component crates
+
+A crate can ship components with a script, a stylesheet and texts of their own. A crate
+`zeyn-<name>` registers the browser module `<name>`; its classes start with `z-<name>-`, its
+attributes with `data-zeyn-<name>-` and its text keys with `<name>.`. `examples/widget` is a
+complete one, with tests.
+
+`zeyn new <name> --component` writes a new one: the crate `zeyn-<name>` with a sample component, its
+plugin, the script and stylesheet, texts in English and Turkish, an example app and tests.
+
+```rust
+use zeyn::{App, Module, Plugin};
+
+pub struct RatingPlugin;
+
+impl Plugin for RatingPlugin {
+    fn install(self, app: App) -> App {
+        app.module(
+            Module::new("rating")
+                .js(include_str!("../assets/rating.js"))
+                .css(include_str!("../assets/rating.css"))
+                .marker("data-zeyn-rating-stars")
+                .texts(&[("en", include_str!("../assets/en.json"))]),
+        )
+    }
+}
+```
+
+The app adds `.plugin(RatingPlugin)`. A page links `/_zeyn/ext/rating.js` and
+`/_zeyn/ext/rating.css` only when its HTML holds a marker, and `zeyn.js` loads them when such
+content arrives later. The files carry the build in their URL, so browsers keep them until the
+next build, and they are never inline, so the Content Security Policy stays strict. The script is
+an ES module that listens to `zeyn:content` for later content; the stylesheet takes its colors and
+sizes from the theme tokens (`var(--z-text)`, `var(--z-space)`). The app's own catalogs win over
+the module's texts.
+
+`App::module` stops the app at startup, with the fix in the message, when a module breaks the
+naming rule, clashes with a framework module or marker or with another module, or carries a
+catalog that is not valid JSON. In tests, `TestResponse::links` lists what a page head links.
+
+| Zeyn | Component crates |
+|---|---|
+| Releases after 0.0.10 | `App::module`, `Module`, `TestResponse::links`, `zeyn new --component` |
+| 0.0.10 and earlier | HTML only; no browser code or styles of their own |

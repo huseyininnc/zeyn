@@ -78,6 +78,7 @@
       "operations": "Operasyon",
       "assistant": "AI asistanı",
       "islands": "WASM islands",
+      "socket": "ZeynSocket",
       "realtime": "Realtime ve CRDT",
       "desktop": "Masaüstü uygulamaları",
       "protocol": "Runtime protokolü",

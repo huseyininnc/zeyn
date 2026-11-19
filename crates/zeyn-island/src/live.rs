@@ -21,6 +21,8 @@ type Handler = Closure<dyn FnMut(JsValue)>;
 
 struct Shared {
     url: String,
+    /// Subprotocols of the handshake: `zeyn` and `csrf.TOKEN`, so the token stays out of the URL.
+    protocols: js_sys::Array,
     ws: RefCell<Option<WebSocket>>,
     on_open: RefCell<Box<dyn FnMut()>>,
     on_update: RefCell<OnUpdate>,
@@ -64,15 +66,18 @@ impl Channel {
             "ws"
         };
         let url = format!(
-            "{scheme}://{}{}/_zeyn/live/doc/{}/{}?csrf={}",
+            "{scheme}://{}{}/_zeyn/live/doc/{}/{}",
             location.host()?,
             meta("zeyn-base").trim_end_matches('/'),
             js_sys::encode_uri_component(kind),
             js_sys::encode_uri_component(doc),
-            js_sys::encode_uri_component(&meta("zeyn-csrf")),
         );
         let shared = Rc::new(Shared {
             url,
+            protocols: js_sys::Array::of2(
+                &"zeyn".into(),
+                &format!("csrf.{}", meta("zeyn-csrf")).into(),
+            ),
             ws: RefCell::new(None),
             on_open: RefCell::new(Box::new(on_open)),
             on_update: RefCell::new(Box::new(on_update)),
@@ -132,7 +137,7 @@ fn detach(ws: &WebSocket) {
 }
 
 fn connect(shared: &Rc<Shared>) -> Result<(), JsValue> {
-    let ws = WebSocket::new(&shared.url)?;
+    let ws = WebSocket::new_with_str_sequence(&shared.url, &shared.protocols)?;
     ws.set_binary_type(BinaryType::Arraybuffer);
     let weak = Rc::downgrade(shared);
     let opened = handler(&weak, |s, _| {

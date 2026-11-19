@@ -7,7 +7,7 @@ single sign on proxy or an identity provider do not need it. The full reference,
 people who know ASP.NET Core Identity, is `docs/accounts.md`.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["accounts"] }
+zeyn = { version = "0.0.11", features = ["accounts"] }
 ```
 
 ## Turn it on
@@ -24,7 +24,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - The key comes from configuration, is at least 32 bytes and never changes.

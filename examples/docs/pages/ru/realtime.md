@@ -11,12 +11,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. Конечные точки
@@ -24,13 +24,13 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | Конечная точка | Назначение |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: совместный документ |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: уведомления об изменениях для тем (topics) |
+| `GET /_zeyn/socket` | WebSocket: уведомления об изменениях для тем (topics) |
 | `GET /_zeyn/live.js` | Скрипт тем, подключается только страницами, которые подписываются |
 
 Каждое рукопожатие проверяется до обновления протокола, в таком порядке:
 
 1. Канал включён (иначе `404`).
-2. **Origin:** заголовок `Origin` должен называть хост, на который пришёл запрос, или origin, добавленный через `Realtime::allow_origin`. Браузеры всегда отправляют его при рукопожатиях WebSocket; отсутствующий отклоняется. Именно это не даёт другому сайту открыть сокет с cookie пользователя.
+2. **Origin:** заголовок `Origin` должен называть хост, на который пришёл запрос, или origin, добавленный через `ZeynSocket::allow_origin`. Браузеры всегда отправляют его при рукопожатиях WebSocket; отсутствующий отклоняется. Именно это не даёт другому сайту открыть сокет с cookie пользователя.
 3. **CSRF-токен:** браузеры не могут задавать заголовки для WebSocket, поэтому токен из `meta[name=zeyn-csrf]` передаётся в параметре запроса `csrf` и сравнивается за постоянное время с cookie `zeyn_csrf`, точно так же, как `x-zeyn-csrf` для `POST`. Сбои дают `403`.
 4. **Идентичность:** тот же аутентификатор, что и для каждого запроса; пользователь должен быть вошедшим в систему (`403`).
 5. **Лимит на пользователя** (`429`).
@@ -77,9 +77,9 @@ channel.close();                // in unmount
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -88,7 +88,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 Уведомления несут только имя темы, никогда не данные: обновление идёт через обычную конечную точку сетки со всеми проверками разрешений. `notify` достигает только арендатора вызывающего; `notify_tenant(Some(id), topic)` называет конкретного, `None` означает приложение без мультиарендности.
 
-Те же имена тем работают и без канала. Узлы, отмеченные `.listens("orders")`, обновляются на месте, когда уведомление называет тему (`live.js` передаёт её дальше как `zeyn:topics`), а также когда action заканчивается `ui.refresh("orders")` или меняется фильтр с `.drives("orders")`: сетки перезагружают текущую страницу, другие слушатели заново рендерятся одним `POST /_zeyn/nodes` на экран (см. раздел Topics в `examples/docs/pages/effects.md`). Сокет подписывается только на темы узлов `Live`, которые нужно объявить через `Realtime::topic`; для частей, которые не являются сетками, используйте `.listens` внутри них или рядом.
+Те же имена тем работают и без канала. Узлы, отмеченные `.listens("orders")`, обновляются на месте, когда уведомление называет тему (`live.js` передаёт её дальше как `zeyn:topics`), а также когда action заканчивается `ui.refresh("orders")` или меняется фильтр с `.drives("orders")`: сетки перезагружают текущую страницу, другие слушатели заново рендерятся одним `POST /_zeyn/nodes` на экран (см. раздел Topics в `examples/docs/pages/effects.md`). Сокет подписывается только на темы узлов `Live`, которые нужно объявить через `ZeynSocket::topic`; для частей, которые не являются сетками, используйте `.listens` внутри них или рядом.
 
 ## 5. Память и обратное давление
 
@@ -108,7 +108,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 Рассылки никогда не ждут: обновление предлагается ограниченной очереди каждого клиента через `try_send`. Клиент, у которого очередь заполнена, сразу удаляется из комнаты, поэтому один медленный читатель не может удерживать память или замедлять остальных; он переподключается и получает весь документ. Подписчик темы с заполненной очередью лишь пропускает это уведомление (следующее всё равно его обновит).
 
-Поэтому худший случай по памяти это примерно `rooms * doc_bytes` для документов плюс `clients * queue * message_bytes` для очередей (обновление разделяется между очередями, а не копируется). Сервер showcase с двумя живыми вкладками на диаграмме использует в сумме около 19 МБ (отладочная сборка). `Hub::stats()` сообщает комнаты, клиентов, подписчиков и байты документов для мониторинга.
+Поэтому худший случай по памяти это примерно `rooms * doc_bytes` для документов плюс `clients * queue * message_bytes` для очередей (обновление разделяется между очередями, а не копируется). Сервер showcase с двумя живыми вкладками на диаграмме использует в сумме около 19 МБ (отладочная сборка). `Socket::stats()` сообщает комнаты, клиентов, подписчиков и байты документов для мониторинга.
 
 ## 6. Замечания по безопасности
 

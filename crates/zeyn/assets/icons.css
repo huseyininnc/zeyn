@@ -1,4 +1,4 @@
-/* Generated from assets/icons/*.svg by tests/icons.rs. Do not edit. */
+/* Generated from assets/icons/*.svg by tests/all/icons.rs. Do not edit. */
 .z-icon-home{--z-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 9.5 10 3.5l7 6V17h-4.5v-5h-5v5H3z'/%3E%3C/svg%3E")}
 .z-icon-dashboard{--z-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3h6v6H3zM11 3h6v4h-6zM11 9h6v8h-6zM3 11h6v6H3z'/%3E%3C/svg%3E")}
 .z-icon-chart-bar{--z-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17h14M6 14V9M10 14V5M14 14v-3'/%3E%3C/svg%3E")}

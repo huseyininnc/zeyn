@@ -308,7 +308,10 @@ impl Component for Chips {
     fn page_check(&self, check: &mut super::PageCheck) {
         if matches!(self.kind, Kind::Links(_)) && !self.drives.is_empty() {
             check.problem(
-                "`Chips::drives` works on filter chips only; make them with `Chips::filter`",
+                crate::Problem::new("Z0611", "`Chips::drives` works on filter chips only")
+                    .why("link chips open another screen, so there is no change to refresh listeners with")
+                    .fix("make them with `Chips::filter`")
+                    .docs("components/content#chips"),
             );
         }
         for t in &self.drives {

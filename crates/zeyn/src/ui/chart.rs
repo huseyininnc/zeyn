@@ -675,6 +675,52 @@ impl Chart {
         );
     }
 
+    /// Whether a donut reads well: 2 to 5 parts above zero and the largest under 75% of the whole.
+    /// Other donuts render as a bar list ([`Chart::bar_list`]).
+    fn donut_fits(&self) -> bool {
+        let values = self
+            .series
+            .first()
+            .map(|s| s.values.as_slice())
+            .unwrap_or_default();
+        let parts = values
+            .iter()
+            .filter(|v| **v > 0.0)
+            .count();
+        let total: f64 = values.iter().map(|v| v.max(0.0)).sum();
+        let largest = values
+            .iter()
+            .fold(0.0_f64, |a, v| a.max(*v));
+        (2..=5).contains(&parts) && largest < total * 0.75
+    }
+
+    /// The parts of a donut that does not fit as a list of rows: name, a bar as wide as its share
+    /// and the value with its percentage.
+    fn bar_list(&self, out: &mut String, r: &Render, id: &str) {
+        let values = self
+            .series
+            .first()
+            .map(|s| s.values.as_slice())
+            .unwrap_or_default();
+        let total: f64 = values.iter().map(|v| v.max(0.0)).sum();
+        let _ = write!(
+            out,
+            r#"<ol class="z-chart-barlist" aria-labelledby="{id}-title">"#
+        );
+        for (i, v) in values.iter().enumerate() {
+            let v = v.max(0.0);
+            let share = if total > 0.0 { v * 100.0 / total } else { 0.0 };
+            let _ = write!(
+                out,
+                r#"<li class="z-series-{}"><span class="z-chart-barlist-name">{}</span><span class="z-chart-barlist-bar" style="--z-share:{share:.1}%" aria-hidden="true"></span><span class="z-chart-barlist-value">{} ({share:.0}%)</span></li>"#,
+                i % 8,
+                escape(&self.label(r, i)),
+                escape(&self.num(v, r.locale))
+            );
+        }
+        out.push_str("</ol>");
+    }
+
     fn gauge_value(&self) -> f64 {
         self.value_at(0, 0)
     }
@@ -991,7 +1037,13 @@ impl Component for Chart {
             out,
             r#"<figure class="z-chart" data-zeyn-chart><figcaption class="z-chart-title" id="{id}-title">{title}</figcaption>"#
         );
-        if self.series.len() > 1
+        let listed = self.kind == ChartKind::Donut && !self.donut_fits();
+        if listed {
+            #[cfg(debug_assertions)]
+            tracing::warn!(
+                "the donut chart `{title}` has fewer than 2 or more than 5 parts, or one part of 75% or more; it is shown as a bar list"
+            );
+        } else if self.series.len() > 1
             || !matches!(
                 self.kind,
                 ChartKind::Bar
@@ -1037,6 +1089,8 @@ impl Component for Chart {
             );
             self.x_labels(out, r);
             out.push_str("</div>");
+        } else if listed {
+            self.bar_list(out, r, &id);
         } else {
             let round = if matches!(self.kind, ChartKind::Donut | ChartKind::Gauge) {
                 " z-chart-round"

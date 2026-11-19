@@ -8,7 +8,7 @@ para sus propios clientes, conectar el modelo que esos clientes quieran y guarda
 lo necesiten.
 
 ```toml
-zeyn = { version = "0.0.10", features = ["assistant"] }
+zeyn = { version = "0.0.11", features = ["assistant"] }
 ```
 
 Sin la feature no se compila nada de esto: ni cliente HTTP, ni rutas adicionales, ni memoria adicional.
@@ -124,7 +124,9 @@ todo lo marcado con `ai = false`, con descripciones de los comentarios de docume
 Se añaden dos herramientas incorporadas:
 
 - `navigate`: abre una pantalla con ruta que el usuario puede abrir, sin carga de página (`zeyn:navigate`), y
-  puede filtrar su grid (`zeyn:filter`). El grid se carga entonces mediante `POST /_zeyn/grid`, donde el
+  puede filtrar su grid (`zeyn:filter`) con filtros simples y grupos OR (`filter_groups`, como en
+  `DataQuery::filter_groups`). El servidor descarta los filtros vacíos y respeta los límites de
+  `DataQuery::retain_filters`. El grid se carga entonces mediante `POST /_zeyn/grid`, donde el
   servidor aplica sus comprobaciones habituales.
 - `suggest`: indicaciones de seguimiento mostradas como chips.
 
@@ -180,7 +182,7 @@ Una app que vende el asistente a sus propios clientes suele querer:
 | `POST /_zeyn/assistant/stt` (cuerpo de audio) | `{ text }`; `404` sin voz a texto en el servidor |
 | `POST /_zeyn/assistant/tts` `{ text }` | Audio en streaming; `404` sin texto a voz en el servidor |
 
-Eventos, un objeto JSON por línea: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters}`,
+Eventos, un objeto JSON por línea: `{t:"text",v}`, `{t:"tool",name,id}`, `{t:"navigate",url,screen,filters,filter_groups}`,
 `{t:"suggest",v}`, `{t:"confirm",id,tool,title,question,details}`, `{t:"resolved",id,approved}`,
 `{t:"error",message}`, `{t:"done"}`.
 

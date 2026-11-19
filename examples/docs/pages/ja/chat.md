@@ -30,7 +30,7 @@ MessageThread::of(conversation_messages)
 
 `Delivery` には `Sending`、`Sent`、`Delivered`、`Read`（既読通知）、`Failed` の状態があり、それぞれアイコンとスクリーンリーダー向けのテキストで示されます。`.attachments(field, rules)` はメッセージのファイルを表示します（`Vec<File>` フィールドと、`Feature::files` で登録したストアのルール）。画像はプレースホルダーの上に遅延読み込みされる固定サイズのボックスに表示され、それ以外のファイルはストアの読み取り権限を通るダウンロードリンクとして表示されます。
 
-新しいメッセージは、スレッドの topic のどれかが指定されたときに取得されます。`.topic(..)` で別の指定をしない限り `"chat"` です。`Composer` が送信した後、action が `ui.refresh("chat")` で終わった後、または `.live()` と `realtime` feature がある場合はどこかで `hub.notify(&ctx, "chat")` が実行されたときです。ほかの人のメッセージは polite なライブリージョンで読み上げられます。
+新しいメッセージは、スレッドの topic のどれかが指定されたときに取得されます。`.topic(..)` で別の指定をしない限り `"chat"` です。`Composer` が送信した後、action が `ui.refresh("chat")` で終わった後、または `.live()` と `realtime` feature がある場合はどこかで `socket.notify(&ctx, "chat")` が実行されたときです。ほかの人のメッセージは polite なライブリージョンで読み上げられます。
 
 ### AI の返信
 
@@ -70,10 +70,10 @@ MessageThread::of(conversation_messages)
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ Composer::of(send_message)
 `TypingIndicator` は、会話でほかに誰が入力中かを polite なライブリージョンで示します。「Ada が入力中」「Ada と Grace が入力中」「3 人が入力中」のように表示されます。
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-これはリアルタイムチャネル（`realtime` feature、`realtime.md` を参照）の上で、`Realtime::topic` で宣言した topic を使って動きます。ユーザーが同じ会話の `Composer` で入力している間、ブラウザーはページのライブソケットで小さな信号を最大 3 秒に 1 回送ります。サーバーはユーザーごとにそれより速い信号を捨て、信号をテナント内の topic のほかの購読者に渡し、同じユーザーに送り返すことはありません。信号に含まれるのは会話 ID と、このサーバーだけが作れるユーザーのキーで、ユーザー ID やテキストは決して含まれません。名前は最後の信号から 6 秒間表示されます。`.person(user, name)` で指定していない人は「誰か」と表示されます。
+これはリアルタイムチャネル（`realtime` feature、`realtime.md` を参照）の上で、`ZeynSocket::topic` で宣言した topic を使って動きます。ユーザーが同じ会話の `Composer` で入力している間、ブラウザーはページのライブソケットで小さな信号を最大 3 秒に 1 回送ります。サーバーはユーザーごとにそれより速い信号を捨て、信号をテナント内の topic のほかの購読者に渡し、同じユーザーに送り返すことはありません。信号に含まれるのは会話 ID と、このサーバーだけが作れるユーザーのキーで、ユーザー ID やテキストは決して含まれません。名前は最後の信号から 6 秒間表示されます。`.person(user, name)` で指定していない人は「誰か」と表示されます。
 
 `realtime` feature がない場合、またはアプリにリアルタイムチャネルがない場合、インジケーターは何も描画せず、スクリプトも読み込まれず、何も送られません。信号はテナント内の topic のすべての購読者に届くので、会話 ID は彼らに見えます。不透明な ID を使うか、対象者ごとに topic を分けてください。
