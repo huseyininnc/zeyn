@@ -100,3 +100,34 @@ acme-domain = { path = "../acme-domain" }
 1. ارفع `version` في `Cargo.toml`.
 2. شغّل `cargo semver-checks` إن كان مثبّتاً. يبلّغ عن تغييرات الواجهة العامة (public API) التي تكسر المستدعين. التغيير الكاسر يحتاج إصداراً ثانوياً (minor) جديداً ما دامت المكتبة دون 1.0.
 3. نفّذ commit، ثم ضع الوسم `v<version>` وادفعه. تفشل مهمة CI المسماة `tag-matches-version` عندما يختلف الوسم عن `Cargo.toml`.
+
+## حزم المكوّنات
+
+يمكن لحزمة (crate) أن تقدّم مكوّنات لها سكربت وملف أنماط ونصوص خاصة بها. تسجّل الحزمة `zeyn-<name>` وحدة المتصفح `<name>`؛ تبدأ أصنافها بـ `z-<name>-` وسماتها بـ `data-zeyn-<name>-` ومفاتيح نصوصها بـ `<name>.`. المثال `examples/widget` حزمة كاملة مع اختباراتها.
+
+```rust
+use zeyn::{App, Module, Plugin};
+
+pub struct RatingPlugin;
+
+impl Plugin for RatingPlugin {
+    fn install(self, app: App) -> App {
+        app.module(
+            Module::new("rating")
+                .js(include_str!("../assets/rating.js"))
+                .css(include_str!("../assets/rating.css"))
+                .marker("data-zeyn-rating-stars")
+                .texts(&[("en", include_str!("../assets/en.json"))]),
+        )
+    }
+}
+```
+
+يضيف التطبيق `.plugin(RatingPlugin)`. تربط الصفحة `/_zeyn/ext/rating.js` و`/_zeyn/ext/rating.css` فقط عندما يحمل HTML الخاص بها علامة، ويحمّلها `zeyn.js` عندما يصل مثل هذا المحتوى لاحقًا. يحمل عنوان الملفات رقم البناء، فيحتفظ بها المتصفح حتى البناء التالي، ولا تكون مضمّنة أبدًا، فتبقى Content Security Policy صارمة. السكربت وحدة ES تستمع إلى `zeyn:content` للمحتوى اللاحق، وملف الأنماط يأخذ ألوانه ومقاساته من متغيرات السمة (`var(--z-text)` و`var(--z-space)`). كتالوجات التطبيق نفسه تتقدّم على نصوص الوحدة.
+
+يوقف `App::module` التطبيق عند بدء التشغيل، مع الحل في الرسالة، عندما تخالف وحدة قاعدة التسمية، أو تتعارض مع وحدة أو علامة من إطار العمل أو مع وحدة أخرى، أو تحمل كتالوجًا ليس JSON صالحًا. في الاختبارات يسرد `TestResponse::links` ما يربطه رأس الصفحة.
+
+| Zeyn | حزم المكوّنات |
+|---|---|
+| الإصدارات بعد 0.0.10 | `App::module`, `Module`, `TestResponse::links` |
+| 0.0.10 وما قبله | HTML فقط؛ بلا سكربتات أو أنماط خاصة |
