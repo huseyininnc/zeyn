@@ -1759,9 +1759,9 @@ fn names(text: &str) -> Vec<&str> {
 
 #[test]
 fn the_two_halves_of_the_browser_runtime_agree_on_what_they_share() {
-    let api = include_str!("../assets/zeyn/grid-api.js");
-    let core = include_str!("../assets/zeyn/core.js");
-    let exports = include_str!("../assets/zeyn/grid-exports.js");
+    let api = include_str!("../../assets/zeyn/grid-api.js");
+    let core = include_str!("../../assets/zeyn/core.js");
+    let exports = include_str!("../../assets/zeyn/grid-exports.js");
     let declared = api
         .lines()
         .find_map(|l| {
@@ -1788,9 +1788,9 @@ fn the_two_halves_of_the_browser_runtime_agree_on_what_they_share() {
     for part in ["core.js", "menus.js", "page.js", "events.js"] {
         let src = match part {
             "core.js" => core,
-            "menus.js" => include_str!("../assets/zeyn/menus.js"),
-            "page.js" => include_str!("../assets/zeyn/page.js"),
-            _ => include_str!("../assets/zeyn/events.js"),
+            "menus.js" => include_str!("../../assets/zeyn/menus.js"),
+            "page.js" => include_str!("../../assets/zeyn/page.js"),
+            _ => include_str!("../../assets/zeyn/events.js"),
         };
         for used in src.split("G?.").skip(1) {
             let name: String = used

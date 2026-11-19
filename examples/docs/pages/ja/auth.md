@@ -188,13 +188,13 @@ App::new("Back office")
 
 ## テスト
 
-`crates/zeyn/tests/oidc.rs` は、テスト内の小さな issuer に対してすべてのフローを実行します。この issuer は実行用に作られた鍵で署名します。そして、期限切れのトークン、誤った audience と issuer、`alg=none`、公開鍵を鍵とした HMAC トークン、改ざんされたクレーム、改ざんされた cookie、再利用された、または一致しない `state`、誤った `nonce` が拒否されることを確認します。`crates/zeyn/tests/totp.rs` は、登録、検証、リプレイ、リカバリーコード、レート制限をカバーします。
+`crates/zeyn/tests/all/oidc.rs` は、テスト内の小さな issuer に対してすべてのフローを実行します。この issuer は実行用に作られた鍵で署名します。そして、期限切れのトークン、誤った audience と issuer、`alg=none`、公開鍵を鍵とした HMAC トークン、改ざんされたクレーム、改ざんされた cookie、再利用された、または一致しない `state`、誤った `nonce` が拒否されることを確認します。`crates/zeyn/tests/all/totp.rs` は、登録、検証、リプレイ、リカバリーコード、レート制限をカバーします。
 
 開発モードの Keycloak があれば、同じフローを Keycloak に対しても実行できます。
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 テストは独自のクライアントとユーザーを持つ `zeyn-test` realm を作成し、終了時に削除します。

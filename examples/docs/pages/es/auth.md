@@ -258,17 +258,17 @@ pruebas. Mantén estable la clave TOTP: los registros sellados con otra clave de
 
 ## Pruebas
 
-`crates/zeyn/tests/oidc.rs` ejecuta cada flujo contra un pequeño emisor dentro de la prueba que firma con una
+`crates/zeyn/tests/all/oidc.rs` ejecuta cada flujo contra un pequeño emisor dentro de la prueba que firma con una
 clave creada para la ejecución, y comprueba que se rechazan los tokens caducados, las audiencias y emisores incorrectos, `alg=none`, un
 token HMAC con la clave pública como clave, los claims modificados, las cookies manipuladas, un `state` reutilizado o que no coincide
-y un `nonce` incorrecto. `crates/zeyn/tests/totp.rs` cubre el registro,
+y un `nonce` incorrecto. `crates/zeyn/tests/all/totp.rs` cubre el registro,
 la verificación, la repetición, los códigos de recuperación y el límite de frecuencia.
 
 Con un Keycloak en modo de desarrollo, los mismos flujos también se ejecutan contra él:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 La prueba crea un realm `zeyn-test` con su propio cliente y usuario y lo elimina al final.

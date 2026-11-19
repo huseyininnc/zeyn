@@ -257,7 +257,7 @@ fn post(path: &str, perms: &str, body: serde_json::Value) -> Request<Body> {
 /// list is empty, and folds case and accents the same way for the query and the label.
 #[test]
 fn the_palette_finds_menu_items_from_the_first_keystroke() {
-    let js = include_str!("../assets/palette.js");
+    let js = include_str!("../../assets/palette.js");
     assert!(
         js.contains("document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]')"),
         "menu links of both shells are indexed"

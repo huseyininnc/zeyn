@@ -213,13 +213,13 @@ App::new("Back office")
 
 ## الاختبار
 
-يشغّل `crates/zeyn/tests/oidc.rs` كل تدفق مقابل مُصدِر صغير داخل الاختبار يوقّع بمفتاح صُنع لهذا التشغيل، ويتحقق من رفض الرموز المنتهية والجماهير والمُصدِرين الخاطئين و`alg=none` ورمز HMAC موقّع بالمفتاح العام والمطالبات المتغيّرة والكعكات العبث بها و`state` المعاد استخدامه أو غير المطابق و`nonce` الخاطئ. ويغطي `crates/zeyn/tests/totp.rs` التسجيل والتحقق وإعادة التشغيل (replay) ورموز الاسترداد وحد المعدل.
+يشغّل `crates/zeyn/tests/all/oidc.rs` كل تدفق مقابل مُصدِر صغير داخل الاختبار يوقّع بمفتاح صُنع لهذا التشغيل، ويتحقق من رفض الرموز المنتهية والجماهير والمُصدِرين الخاطئين و`alg=none` ورمز HMAC موقّع بالمفتاح العام والمطالبات المتغيّرة والكعكات العبث بها و`state` المعاد استخدامه أو غير المطابق و`nonce` الخاطئ. ويغطي `crates/zeyn/tests/all/totp.rs` التسجيل والتحقق وإعادة التشغيل (replay) ورموز الاسترداد وحد المعدل.
 
 مع Keycloak في وضع التطوير، تعمل التدفقات نفسها مقابله أيضًا:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 ينشئ الاختبار realm باسم `zeyn-test` مع عميله ومستخدمه الخاصين ويحذفه في النهاية.

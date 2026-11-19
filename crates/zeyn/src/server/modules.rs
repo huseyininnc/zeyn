@@ -64,7 +64,7 @@ const fn script(name: &'static str, script: &'static [&'static str]) -> Builtin 
 }
 
 /// Every browser module of a component. A new component with browser code adds its module here
-/// (and its file to [`FILES`]); `tests/ui_modules.rs` fails when a page links a module it does not
+/// (and its file to [`FILES`]); `tests/all/ui_modules.rs` fails when a page links a module it does not
 /// use. The grid runtime is linked as a `modulepreload`, because `zeyn.js` imports it itself to
 /// hand it the shared functions.
 pub(crate) const MODULES: &[Builtin] = &[

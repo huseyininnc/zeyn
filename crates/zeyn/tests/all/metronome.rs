@@ -8,7 +8,7 @@
 //!
 //! ```text
 //! docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55437:5432 postgres:17
-//! ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55437/postgres cargo test -p zeyn --features metronome,postgres --test metronome
+//! ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55437/postgres cargo test -p zeyn --features metronome,postgres --test all metronome::
 //! ```
 
 use std::collections::{HashMap, HashSet};

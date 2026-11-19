@@ -185,13 +185,13 @@ App::new("Back office")
 
 ## 테스트
 
-`crates/zeyn/tests/oidc.rs`는 테스트 실행을 위해 만든 키로 서명하는 테스트 안의 작은 발급자를 상대로 모든 흐름을 실행하며, 만료된 토큰, 잘못된 대상과 발급자, `alg=none`, 공개 키를 키로 쓴 HMAC 토큰, 변경된 클레임, 변조된 쿠키, 재사용되었거나 일치하지 않는 `state`, 잘못된 `nonce`가 거부되는지 검사합니다. `crates/zeyn/tests/totp.rs`는 등록, 검증, 재전송, 복구 코드, 속도 제한을 다룹니다.
+`crates/zeyn/tests/all/oidc.rs`는 테스트 실행을 위해 만든 키로 서명하는 테스트 안의 작은 발급자를 상대로 모든 흐름을 실행하며, 만료된 토큰, 잘못된 대상과 발급자, `alg=none`, 공개 키를 키로 쓴 HMAC 토큰, 변경된 클레임, 변조된 쿠키, 재사용되었거나 일치하지 않는 `state`, 잘못된 `nonce`가 거부되는지 검사합니다. `crates/zeyn/tests/all/totp.rs`는 등록, 검증, 재전송, 복구 코드, 속도 제한을 다룹니다.
 
 개발 모드의 Keycloak이 있으면 같은 흐름을 그것을 상대로도 실행합니다.
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 테스트는 자체 클라이언트와 사용자가 있는 `zeyn-test` 렐름을 만들고 마지막에 삭제합니다. `ZEYN_TEST_OIDC`가 없으면 건너뜁니다.

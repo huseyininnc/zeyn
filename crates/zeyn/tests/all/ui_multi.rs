@@ -17,6 +17,7 @@ pub enum Channel {
     Post,
 }
 
+#[allow(dead_code)]
 #[entity(table = "customers")]
 pub struct Customer {
     #[key]

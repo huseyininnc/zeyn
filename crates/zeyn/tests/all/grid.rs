@@ -961,7 +961,7 @@ fn run(key: &str, item: &str) -> Request<Body> {
 
 #[test]
 fn pinned_cells_are_found_by_class_not_by_position() {
-    let css = include_str!("../assets/zeyn.css");
+    let css = include_str!("../../assets/zeyn.css");
     assert!(
         !css.contains(":nth-child(-n +") && !css.contains("tr > :nth-child("),
         "positional rules match every cell of every grid and cost about a third of style time"
@@ -1023,7 +1023,7 @@ async fn cells_render_badges_progress_and_icons() {
             .contains(r#"<span class="z-cell-progress"><span class="z-cell-progress-track""#),
         "grid cells have classes of their own, so the Progress widget's layout cannot squeeze them"
     );
-    let css = include_str!("../assets/zeyn.css");
+    let css = include_str!("../../assets/zeyn.css");
     assert!(
         css.contains(".z-button[hidden] { display: none; }"),
         "a hidden button, such as a card grid's load more without more rows, stays hidden"

@@ -186,13 +186,13 @@ App::new("Back office")
 
 ## टेस्टिंग
 
-`crates/zeyn/tests/oidc.rs` हर फ़्लो को टेस्ट में एक छोटे issuer के विरुद्ध चलाता है जो रन के लिए बनाई कुंजी से हस्ताक्षर करता है, और जाँचता है कि समाप्त टोकन, गलत audience और issuer, `alg=none`, सार्वजनिक कुंजी से keyed HMAC टोकन, बदले claim, छेड़ी गई कुकी, दोबारा इस्तेमाल हुआ या बेमेल `state` और गलत `nonce` अस्वीकार होते हैं। `crates/zeyn/tests/totp.rs` नामांकन, सत्यापन, replay, रिकवरी कोड और दर सीमा कवर करता है।
+`crates/zeyn/tests/all/oidc.rs` हर फ़्लो को टेस्ट में एक छोटे issuer के विरुद्ध चलाता है जो रन के लिए बनाई कुंजी से हस्ताक्षर करता है, और जाँचता है कि समाप्त टोकन, गलत audience और issuer, `alg=none`, सार्वजनिक कुंजी से keyed HMAC टोकन, बदले claim, छेड़ी गई कुकी, दोबारा इस्तेमाल हुआ या बेमेल `state` और गलत `nonce` अस्वीकार होते हैं। `crates/zeyn/tests/all/totp.rs` नामांकन, सत्यापन, replay, रिकवरी कोड और दर सीमा कवर करता है।
 
 डेवलपमेंट मोड में Keycloak के साथ वही फ़्लो उसके विरुद्ध भी चलते हैं:
 
 ```
 docker run --rm -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak start-dev
-ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test oidc
+ZEYN_TEST_OIDC=http://127.0.0.1:8080 cargo test -p zeyn --features oidc --test all oidc::
 ```
 
 टेस्ट अपने क्लाइंट और उपयोगकर्ता के साथ `zeyn-test` realm बनाता है और अंत में उसे हटा देता है। `ZEYN_TEST_OIDC` के बिना यह छोड़ा जाता है।
