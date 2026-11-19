@@ -17,3 +17,9 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 opt-level = 1
+
+# The framework crate is rebuilt after every change to it and is the longest step of most builds;
+# without line tables its one line rebuild is about 12 percent faster and its rlib 20 percent
+# smaller (CONTRIBUTING.md, "Where the build time goes"). Panic messages keep their file and line.
+[profile.dev.package.zeyn]
+debug = false

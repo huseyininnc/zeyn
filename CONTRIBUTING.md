@@ -54,6 +54,46 @@ Windows Defender scans every file the compiler writes, which slows a build a lot
 
 CI builds the workspace with `cargo build --workspace --timings`, then touches `crates/zeyn/src/lib.rs` and rebuilds `zeyn` (the cost of a one line change), measures the size of `target/`, and fails when one of the three is over its budget in `ci/build-budget.txt` by more than `tolerance_percent` (`sh ci/check-build-budget.sh <build seconds> <rebuild seconds> <target megabytes>` is the check). The job uploads the report as the artifact `cargo-timings`; open `cargo-timing.html` to see which crate took the time. A change that makes a crate much slower to compile, or the target folder much larger, should bring the numbers back under the budget, or raise the budget in the same change and say why in the commit; a change that costs compile time states the before and after numbers in its commit. After the first CI runs on a new runner or toolchain, set the budgets to the measured numbers (the step summary prints them); the tolerance of 30 percent keeps noise from failing the job.
 
+### Where the build time goes
+
+`crates/zeyn` is one crate of about 99,000 lines, and every example waits for it. Measured on 2026-11-19 on Windows (20 cores, `CARGO_BUILD_JOBS=12`, `CARGO_INCREMENTAL=0` as in CI, the dev profile above), median of three runs. A one line rebuild edits a doc comment in `crates/zeyn/src/lib.rs`.
+
+| Build | Before | After |
+|---|---|---|
+| `cargo build -p zeyn`, one line rebuild | 13.3 s | 12.0 s |
+| `cargo build -p zeyn-example-showcase`, one line rebuild | 28.7 s | 25.9 s |
+| of which `zeyn` with the showcase features | 21.8 s | 19.9 s |
+| of which the showcase binary | 6.2 s | 5.7 s |
+| `cargo build --workspace` from an empty target | 167 s | 158 s |
+| size of `target/` after it | 2483 MB | 2027 MB |
+| LLVM IR lines of `zeyn` with the showcase features (`cargo llvm-lines`) | 1,758,032 | 1,623,967 |
+| LLVM IR lines of the showcase binary | 886,195 | 716,911 |
+
+Where `rustc` spends the time on `zeyn` with the showcase features (`RUSTC_BOOTSTRAP=1 cargo rustc -p zeyn --lib --features ... -- -Ztime-passes`, before the changes; 26.8 s in all, the codegen passes overlap):
+
+| Pass | Seconds |
+|---|---|
+| LLVM passes | 7.9 |
+| `generate_crate_metadata` (the `.rmeta` dependents wait for) | 6.4 |
+| monomorphization collector | 5.4 |
+| codegen to LLVM IR | 5.0 |
+| type check | 4.0 |
+| borrow check | 3.8 |
+| macro expansion | 2.2 |
+| coherence check | 1.8 |
+| finishing codegen | 1.8 |
+| link (rlib) | 1.0 |
+
+No single function dominates: the largest is 0.2 percent of the IR. Generic types instantiated once per model do: in the showcase binary `DataGrid<E>` was 25 percent of the IR, `Form<M>` 16 percent and `SubmitForm<M, A>` 5 percent; a `Form` cost about 8,600 lines for each model. The changes so far:
+
+- `Form<M>` keeps only the model in its generic part. Its fields read values through `&dyn Any`, and rendering, reading, picker checks, the schema and the tool schema live in a private `FormBody` that is compiled once. `Form` lines in the showcase binary: 139,865 to 30,123.
+- The AI tool schema of a `DataGrid` is a plain function (2,698 lines for each row type before).
+- `[profile.dev.package.zeyn] debug = false` drops the line tables of the framework crate: 1.4 s off its one line rebuild and its rlib from 116 to 92 MB. Panic messages still name the file and line; a backtrace shows the framework's functions without lines. For a debugging session inside the framework, build with `--config 'profile.dev.package.zeyn.debug="line-tables-only"'` or `"full"`.
+
+`DataGrid<E>` is the next target: it is still 198,294 lines (28 percent) of the showcase binary, because its columns, rows and render code take `E` throughout. Moving the parts that only read column metadata and cell values into a non generic body, as `Form` does, is the same refactor at larger scale.
+
+The crate is not split. The modules that do not depend on the rest (`time`, `ui/sanitize`, `ui/markdown`, `ui/barcode`, `ui/code`, `metronome/cron`, `i18n`) are about 6,000 lines, so a crate of them would take at most about 6 percent off a rebuild after a change elsewhere, while a change in them would still rebuild `zeyn`. Everything else depends on everything: `server` on all of it, and `screen`, `ui`, `grid` and `form` on each other through `Component`, `Render` and `Node`. A split along those lines needs a trait crate with re-exports for every public path, and in a clean build `zeyn` already starts late because of its dependencies (at 123 s of 167 s), not because of its size. The parallel front end (`-Zthreads=8`, 20.9 to 15.0 s for a one line rebuild) is the bigger lever once it is stable.
+
 ### Browser tests
 
 The browser tests in `e2e/` open every page of the component catalog in Chromium and check

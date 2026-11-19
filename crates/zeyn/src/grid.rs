@@ -2779,6 +2779,94 @@ impl<E: Model> DataGrid<E> {
     }
 }
 
+/// The JSON schema of a grid's data query for AI tools: `fields` can be sorted and totalled,
+/// `filterable` filtered, and `search` adds the free text query. Not generic, so it is compiled
+/// once and not once for every row type.
+fn tool_schema(fields: &[&str], filterable: &[&str], search: bool) -> serde_json::Value {
+    let filter = json!({
+        "type": "object",
+        "properties": {
+            "field": { "type": "string", "enum": filterable },
+            "contains": { "type": "string" },
+            "starts_with": { "type": "string" },
+            "equals": { "type": "string" },
+            "from": { "type": "string" },
+            "to": { "type": "string" },
+            "any_of": { "type": "array", "items": { "type": "string" } },
+            "is": { "type": "boolean" }
+        },
+        "required": ["field"]
+    });
+    let mut group = serde_json::Value::Null;
+    for _ in 0..MAX_FILTER_DEPTH {
+        let mut properties = json!({
+            "any": { "type": "boolean" },
+            "filters": { "type": "array", "items": filter }
+        });
+        if !group.is_null() {
+            properties["groups"] = json!({ "type": "array", "items": group });
+        }
+        group = json!({ "type": "object", "properties": properties });
+    }
+    let mut schema = json!({
+        "type": "object",
+        "properties": {
+            "page": {
+                "type": "object",
+                "description": "Which rows to return. Use type offset with offset and limit (max 500).",
+                "properties": {
+                    "type": { "type": "string", "enum": ["offset", "after"] },
+                    "offset": { "type": "integer", "minimum": 0 },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE },
+                    "cursor": { "type": ["string", "null"] }
+                },
+                "required": ["type", "limit"]
+            },
+            "sort": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": { "field": { "type": "string", "enum": fields }, "desc": { "type": "boolean" } },
+                    "required": ["field", "desc"]
+                }
+            },
+            "filters": {
+                "type": "array",
+                "description": "Every set condition must hold. Numbers as 1234.56, dates as YYYY-MM-DD (a whole day in the user's time zone for moments), times as HH:MM.",
+                "items": filter
+            },
+            "filter_groups": {
+                "type": "array",
+                "description": format!(
+                    "Groups that must also hold, for OR conditions. A group with any true matches when one of its filters or groups matches, with any false when all match. Groups nest up to {MAX_FILTER_DEPTH} deep; at most {MAX_FILTERS} filters in all."
+                ),
+                "items": group
+            },
+            "with_total": { "type": "boolean" },
+            "aggregates": {
+                "type": "array",
+                "description": "Column totals over all matching rows. Only the totals the grid shows are computed.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "field": { "type": "string", "enum": fields },
+                        "op": { "type": "string", "enum": ["sum", "avg", "min", "max", "count"] }
+                    },
+                    "required": ["field", "op"]
+                }
+            }
+        }
+    });
+    if search {
+        schema["properties"]["q"] = json!({
+            "type": "string",
+            "maxLength": crate::MAX_SEARCH_QUERY,
+            "description": "Free text: rows whose text fields contain it, ignoring case and accents."
+        });
+    }
+    schema
+}
+
 impl<E: Model> GridSource for DataGrid<E> {
     fn action(&self) -> ActionMeta {
         self.action
@@ -3226,88 +3314,7 @@ impl<E: Model> GridSource for DataGrid<E> {
             .filter(|c| c.filter)
             .map(|c| c.meta.name)
             .collect();
-        let filter = json!({
-            "type": "object",
-            "properties": {
-                "field": { "type": "string", "enum": filterable },
-                "contains": { "type": "string" },
-                "starts_with": { "type": "string" },
-                "equals": { "type": "string" },
-                "from": { "type": "string" },
-                "to": { "type": "string" },
-                "any_of": { "type": "array", "items": { "type": "string" } },
-                "is": { "type": "boolean" }
-            },
-            "required": ["field"]
-        });
-        let mut group = serde_json::Value::Null;
-        for _ in 0..MAX_FILTER_DEPTH {
-            let mut properties = json!({
-                "any": { "type": "boolean" },
-                "filters": { "type": "array", "items": filter }
-            });
-            if !group.is_null() {
-                properties["groups"] = json!({ "type": "array", "items": group });
-            }
-            group = json!({ "type": "object", "properties": properties });
-        }
-        let mut schema = json!({
-            "type": "object",
-            "properties": {
-                "page": {
-                    "type": "object",
-                    "description": "Which rows to return. Use type offset with offset and limit (max 500).",
-                    "properties": {
-                        "type": { "type": "string", "enum": ["offset", "after"] },
-                        "offset": { "type": "integer", "minimum": 0 },
-                        "limit": { "type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE },
-                        "cursor": { "type": ["string", "null"] }
-                    },
-                    "required": ["type", "limit"]
-                },
-                "sort": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": { "field": { "type": "string", "enum": fields }, "desc": { "type": "boolean" } },
-                        "required": ["field", "desc"]
-                    }
-                },
-                "filters": {
-                    "type": "array",
-                    "description": "Every set condition must hold. Numbers as 1234.56, dates as YYYY-MM-DD (a whole day in the user's time zone for moments), times as HH:MM.",
-                    "items": filter
-                },
-                "filter_groups": {
-                    "type": "array",
-                    "description": format!(
-                        "Groups that must also hold, for OR conditions. A group with any true matches when one of its filters or groups matches, with any false when all match. Groups nest up to {MAX_FILTER_DEPTH} deep; at most {MAX_FILTERS} filters in all."
-                    ),
-                    "items": group
-                },
-                "with_total": { "type": "boolean" },
-                "aggregates": {
-                    "type": "array",
-                    "description": "Column totals over all matching rows. Only the totals the grid shows are computed.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "field": { "type": "string", "enum": fields },
-                            "op": { "type": "string", "enum": ["sum", "avg", "min", "max", "count"] }
-                        },
-                        "required": ["field", "op"]
-                    }
-                }
-            }
-        });
-        if self.search {
-            schema["properties"]["q"] = json!({
-                "type": "string",
-                "maxLength": crate::MAX_SEARCH_QUERY,
-                "description": "Free text: rows whose text fields contain it, ignoring case and accents."
-            });
-        }
-        schema
+        tool_schema(&fields, &filterable, self.search)
     }
 }
 
