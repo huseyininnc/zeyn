@@ -138,7 +138,42 @@ Sunucunun `POST /_zeyn/files/{store}` için yaptıkları:
 
 `FileRules::quota(bytes, window)` bir kullanıcının bir depoya belirli bir sürede yükleyebileceği miktarı sınırlar ve uygulamanın rate store'u ile sayılır; sınırı aşan yükleme yine kaydedilir, sonraki `429` alır. `DiskStore`, bir saatten eski `.part` dosyalarını (çökme nedeniyle yarım kalan yüklemeler) saatte en fazla bir kez siler. `ZipGuard`, ZIP tabanlı yüklemeler (ZIP, Word, Excel, PowerPoint) için bir tarayıcıdır: merkezi dizini 10.000'den fazla girdi, toplam 1 GiB'tan fazla veya dosya boyutunun 200 katından fazla açılacağını söyleyen arşivleri ve ZIP64 arşivlerini reddeder; kabul edilen bir arşivi açan kod da bu sınırlarda durmalıdır.
 
-Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 17 KB ve gzip 6 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+Bütçe: 256 MiB'lık bir yükleme sunucu heap'ini yaklaşık 0,4 MiB büyütür (`tests/files_memory.rs`); kontrol 10 DOM düğümü artı dosya başına 5 düğüm çizer; `files.js` ham 21 KB ve gzip 7 KB, `files.css` ham 3 KB ve gzip 1 KB ekler.
+
+### Sürdürülebilir yüklemeler
+
+`resumable` Cargo özelliği açıkken yükleme alanı ve `FileDrop`, dosyaları tus 1.0 protokolünün bir alt kümesiyle gönderir; ağı kaybeden bir yükleme baştan başlamak yerine kaldığı yerden sürer. Kontrolde değişiklik gerekmez:
+
+```toml
+zeyn = { version = "0.0", features = ["resumable"] }
+```
+
+```rust
+App::new("Support").resumable_uploads(
+    ResumableUploads::new("data/uploads")
+        .expires(Duration::from_secs(6 * 3600))
+        .max_per_user(3)
+        .max_open(500),
+)
+```
+
+`resumable_uploads` çağrılmazsa bitmemiş yüklemeler sistemin geçici klasörüne gider, son baytlarından sonra 24 saat tutulur ve kullanıcı başına en çok 5, toplamda en çok 1000 yükleme açık olabilir.
+
+| İstek | Yanıt |
+|---|---|
+| `Upload-Length` ve `Upload-Metadata: filename <base64>` ile `POST /_zeyn/uploads/{store}` | `Location`, `Upload-Offset: 0` ve `Upload-Expires` ile `201`; deponun sınırını aşarsa `413`, boş dosyada `422`, kotayı ya da açık yükleme sınırlarını aşarsa `429` |
+| konuma `HEAD` | `Upload-Offset` ve `Upload-Length` ile `200` |
+| `Content-Type: application/offset+octet-stream` ve `Upload-Offset` ile `PATCH` | yeni `Upload-Offset` ile `204`; ofset sunucununki değilse `409`, aynı yüklemenin başka bir `PATCH`'i sürerken `423`, bildirilenden fazla baytta `413` |
+| son baytı getiren `PATCH` | düz bir yükleme gibi `{id, name, size, type}` ile `200` |
+| konuma `DELETE` | `204`; yükleme ve baytları silinir |
+
+Her istek `Tus-Resumable: 1.0.0` (yoksa `412`), deponun yazma iznini ve feature'ın guard'larını ister; `POST`, `PATCH` ve `DELETE` ayrıca CSRF başlığını ister. Bir yüklemeyi yalnızca onu açan kullanıcı ve tenant bulur; başka herkes `404` alır. Yükleme açmak düz bir yükleme gibi yazma sınırına sayılır; `PATCH`'leri sayılmaz, çünkü bildirilen uzunluktan fazlasını taşıyamazlar. Tarayıcı dosyayı, yaygın ters vekil sunucuların varsayılan gövde sınırı olan 1 MiB'lık `PATCH`'lerle gönderir; kopan bir bağlantı en çok bu kadarını yeniden göndermeye mal olur.
+
+Baytlar geldikçe yükleme klasöründeki `{id}.part` dosyasına yazılır; bağlantı kopmadan önce sunucuya ulaşan baytlar korunur ve `HEAD` onları bildirir. Son bayt geldiğinde dosya `POST /_zeyn/files/{store}` ile aynı adımlardan geçer: içerikten bulunan tür, boyut sınırı, kota, depo, tarayıcı ve interceptor'lar (`CallKind::Upload`). Ardından part dosyası silinir; bir denetim dosyayı reddettiğinde de. Süresi boyunca yeni bayt almayan bir yükleme, bir sonraki sorulduğunda ya da bir sonraki yükleme açıldığında silinir; yeniden başlatmadan kalan part dosyaları süre başına bir kez süpürülür.
+
+Tarayıcıda başarısız bir istek (kopan ağ, `409`, `423`, `429` ya da sunucu hatası) tarayıcı yeniden çevrim içi olduktan sonra 1, 2, 4, 8 ve sonra her 15 saniyede, art arda en çok 12 kez yeniden denenir; her deneme önce ofseti sorar ve yalnızca kalanı gönderir. İptal isteği durdurur ve sunucudaki yüklemeyi siler. Son bir başarısızlıktan sonra Yeniden dene, sunucu hâlâ tutuyorsa aynı yüklemeyi sürdürür.
+
+tus 1.0'dan farklar: yalnızca creation, expiration ve termination eklentileri; `OPTIONS` keşfi, sağlama toplamı, ertelenmiş uzunluk ve birleştirme yok; son `PATCH`, alan dosyanın kimliğini başka bir istek olmadan alsın diye `204` yerine saklanan dosyayla `200` yanıtı verir. Açık yüklemeleri yalnızca onları açan süreç bilir; bu yüzden birden çok örnekli bir yük dengeleyicinin arkasında `/_zeyn/uploads/` yolları yapışkan oturum (sticky session) ister.
 
 ## File drop
 

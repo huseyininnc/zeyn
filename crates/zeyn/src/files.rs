@@ -735,7 +735,7 @@ pub(crate) fn render_upload(
     };
     let multiple = if many { " multiple" } else { "" };
     out.push_str(&format!(
-        r#"<label for="{id}-pick" id="{id}-label">{label}{star}</label><div class="z-upload" data-zeyn-upload="{store}" data-multiple="{many}" data-max-bytes="{max}" data-max-files="{n}" data-texts="{texts}"><input type="text" hidden class="z-upload-value" id="{id}" name="{name}" data-testid="{scope}.field.{name}" value="{value}"><div class="z-upload-drop"><input type="file" class="z-upload-input" id="{id}-pick" accept="{accept}"{multiple}{required} aria-describedby="{id}-hint {id}-error"><p class="z-upload-hint" id="{id}-hint">{drop} {hint}</p></div><ul class="z-upload-list" aria-label="{list}">"#,
+        r#"<label for="{id}-pick" id="{id}-label">{label}{star}</label><div class="z-upload" data-zeyn-upload="{store}" data-multiple="{many}" data-max-bytes="{max}" data-max-files="{n}"{resumable} data-texts="{texts}"><input type="text" hidden class="z-upload-value" id="{id}" name="{name}" data-testid="{scope}.field.{name}" value="{value}"><div class="z-upload-drop"><input type="file" class="z-upload-input" id="{id}-pick" accept="{accept}"{multiple}{required} aria-describedby="{id}-hint {id}-error"><p class="z-upload-hint" id="{id}-hint">{drop} {hint}</p></div><ul class="z-upload-list" aria-label="{list}">"#,
         label = r.text(m.label),
         store = escape(rules.store()),
         max = rules.limit(),
@@ -747,6 +747,11 @@ pub(crate) fn render_upload(
         accept = escape(&rules.accept_attr()),
         drop = t("drop"),
         list = t("list"),
+        resumable = if cfg!(feature = "resumable") {
+            r#" data-resumable"#
+        } else {
+            ""
+        },
     ));
     for f in &files {
         out.push_str(&format!(
@@ -1092,9 +1097,9 @@ mod store {
     /// How old a `.part` file of a stopped upload must be before a sweep removes it.
     pub const STALE_PART: std::time::Duration = std::time::Duration::from_secs(3600);
 
-    /// Removes the `.part` files under `root` older than [`STALE_PART`]: uploads stopped by a
-    /// crash or a restart. Returns how many it removed.
-    pub(crate) fn sweep_parts(root: &std::path::Path) -> u64 {
+    /// Removes the `.part` files under `root` older than `max_age`: uploads stopped by a crash
+    /// or a restart ([`STALE_PART`] for a [`DiskStore`]). Returns how many it removed.
+    pub(crate) fn sweep_parts(root: &std::path::Path, max_age: std::time::Duration) -> u64 {
         let Ok(dir) = std::fs::read_dir(root) else {
             return 0;
         };
@@ -1107,7 +1112,7 @@ mod store {
                     .and_then(|m| m.modified())
                     .ok()
                     .and_then(|m| m.elapsed().ok())
-                    .is_some_and(|age| age > STALE_PART);
+                    .is_some_and(|age| age > max_age);
             if stale && std::fs::remove_file(&path).is_ok() {
                 removed += 1;
             }
@@ -1144,7 +1149,7 @@ mod store {
                 let work = tokio::task::spawn_blocking(move || {
                     std::fs::create_dir_all(&*root).map_err(io)?;
                     if sweep {
-                        sweep_parts(&root);
+                        sweep_parts(&root, STALE_PART);
                     }
                     let mut file = std::fs::File::create_new(&part).map_err(io)?;
                     let written = (|| {
@@ -1321,6 +1326,70 @@ mod store {
                 f.remove(&id);
             }
             Box::pin(async { Ok(()) })
+        }
+    }
+
+    /// Settings of resumable uploads (feature `resumable`), set with
+    /// [`App::resumable_uploads`](crate::App::resumable_uploads).
+    ///
+    /// Parts of unfinished uploads are kept as `{id}.part` files in `dir`; when the last byte
+    /// arrives the file goes through the same checks as a plain upload into its store. An upload
+    /// with no new bytes for `expires` is removed, and caps limit the open uploads of one user and
+    /// of the whole app. Open uploads are known to the process that created them, so several
+    /// instances need sticky sessions for these paths.
+    ///
+    /// ```ignore
+    /// App::new("Docs").resumable_uploads(
+    ///     ResumableUploads::new("data/uploads")
+    ///         .expires(Duration::from_secs(6 * 3600))
+    ///         .max_per_user(3),
+    /// )
+    /// ```
+    #[cfg(feature = "resumable")]
+    #[derive(Clone, Debug)]
+    pub struct ResumableUploads {
+        pub(crate) dir: PathBuf,
+        pub(crate) expires: std::time::Duration,
+        pub(crate) per_user: usize,
+        pub(crate) open: usize,
+    }
+
+    #[cfg(feature = "resumable")]
+    impl Default for ResumableUploads {
+        fn default() -> Self {
+            ResumableUploads::new(std::env::temp_dir().join("zeyn-uploads"))
+        }
+    }
+
+    #[cfg(feature = "resumable")]
+    impl ResumableUploads {
+        /// Unfinished uploads in `dir`, kept 24 hours after their last bytes, at most 5 open
+        /// per user and 1000 in all.
+        pub fn new(dir: impl Into<PathBuf>) -> Self {
+            ResumableUploads {
+                dir: dir.into(),
+                expires: std::time::Duration::from_secs(24 * 3600),
+                per_user: 5,
+                open: 1000,
+            }
+        }
+
+        /// How long an upload with no new bytes is kept.
+        pub fn expires(mut self, after: std::time::Duration) -> Self {
+            self.expires = after;
+            self
+        }
+
+        /// Open uploads one user may have; the next creation answers `429`.
+        pub fn max_per_user(mut self, n: usize) -> Self {
+            self.per_user = n.max(1);
+            self
+        }
+
+        /// Open uploads of the whole app; the next creation answers `429`.
+        pub fn max_open(mut self, n: usize) -> Self {
+            self.open = n.max(1);
+            self
         }
     }
 

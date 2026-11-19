@@ -149,6 +149,8 @@ pub use feature::{
     Feature, Guard, GuardResult, MENU_DEPTH, Menu, MenuGroup, MenuItem, Route, ScreenEntry,
     SignedIn,
 };
+#[cfg(feature = "resumable")]
+pub use files::ResumableUploads;
 #[cfg(feature = "server")]
 pub use files::{
     DiskStore, FileAccess, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore,

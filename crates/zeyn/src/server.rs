@@ -47,6 +47,8 @@ mod media;
 mod menus;
 mod modules;
 mod ops;
+#[cfg(feature = "resumable")]
+mod resumable;
 mod seo;
 mod session;
 mod telemetry;
@@ -808,6 +810,8 @@ pub struct App {
     islands_dir: Option<std::path::PathBuf>,
     #[cfg(feature = "realtime")]
     realtime: Option<realtime::Socket>,
+    #[cfg(feature = "resumable")]
+    resumable: crate::ResumableUploads,
 }
 
 impl App {
@@ -870,6 +874,8 @@ impl App {
             islands_dir: None,
             #[cfg(feature = "realtime")]
             realtime: None,
+            #[cfg(feature = "resumable")]
+            resumable: crate::ResumableUploads::default(),
         }
     }
 
@@ -889,6 +895,15 @@ impl App {
     /// Pages that hold an [`Island`](crate::ui::Island) get the loader and a policy that allows
     /// WebAssembly; other pages are unchanged. When `dir` has no manifest, islands show their
     /// fallback and the server logs a warning.
+    /// Where and how long unfinished resumable uploads are kept, and how many may be open (see
+    /// [`ResumableUploads`](crate::ResumableUploads)). Without this call they go to the system's
+    /// temporary folder with the defaults of [`ResumableUploads::new`](crate::ResumableUploads::new).
+    #[cfg(feature = "resumable")]
+    pub fn resumable_uploads(mut self, settings: crate::ResumableUploads) -> Self {
+        self.resumable = settings;
+        self
+    }
+
     #[cfg(feature = "islands")]
     pub fn islands(mut self, dir: impl Into<std::path::PathBuf>) -> Self {
         self.islands_dir = Some(dir.into());
@@ -2035,6 +2050,8 @@ impl App {
             islands,
             #[cfg(feature = "realtime")]
             realtime: self.realtime,
+            #[cfg(feature = "resumable")]
+            uploads: resumable::Uploads::new(self.resumable),
         });
         ops::start_jobs(&state);
         let mut router = Router::new();
@@ -2183,6 +2200,8 @@ impl App {
         let router = realtime::routes(router);
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
+        #[cfg(feature = "resumable")]
+        let router = resumable::routes(router);
         let router = modules::routes(site::routes(charts::routes(files::routes(router))));
         #[cfg(debug_assertions)]
         let router = devtools::routes(router);
@@ -2401,6 +2420,8 @@ struct AppState {
     islands: Option<islands::Islands>,
     #[cfg(feature = "realtime")]
     realtime: Option<realtime::Socket>,
+    #[cfg(feature = "resumable")]
+    uploads: resumable::Uploads,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
