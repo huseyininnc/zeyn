@@ -135,4 +135,17 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 `FileRules::quota(bytes, window)`는 한 사용자가 창(window)마다 저장소에 업로드할 수 있는 양을 제한하며 앱의 rate store로 셉니다. 한도를 넘긴 업로드는 그대로 저장되고 다음 업로드가 `429`를 받습니다. `DiskStore`는 한 시간보다 오래된 `.part` 파일(충돌로 멈춘 업로드)을 한 시간에 최대 한 번 지웁니다. `ZipGuard`는 ZIP 기반 업로드(ZIP, Word, Excel, PowerPoint)를 위한 스캐너로, 중앙 디렉터리가 10,000개를 넘는 항목, 합계 1 GiB 초과 또는 파일 크기의 200배 초과를 선언하는 아카이브와 ZIP64 아카이브를 거부합니다. 받아들인 아카이브를 푸는 코드도 이 한도에서 멈춰야 합니다.
 
-예산: 256 MiB 업로드는 서버 힙을 약 0.4 MiB 늘립니다(`tests/files_memory.rs`). 컨트롤은 DOM 노드 10개에 파일당 5개를 렌더링하며, `files.js`는 원본 12 KB(gzip 4 KB), `files.css`는 원본 3 KB(gzip 1 KB)를 추가합니다.
+예산: 256 MiB 업로드는 서버 힙을 약 0.4 MiB 늘립니다(`tests/files_memory.rs`). 컨트롤은 DOM 노드 10개에 파일당 5개를 렌더링하며, `files.js`는 원본 17 KB(gzip 6 KB), `files.css`는 원본 3 KB(gzip 1 KB)를 추가합니다.
+
+## File drop
+
+`FileDrop::new(label, rules)`는 같은 업로드 컨트롤을 폼 밖에서 단독으로 쓰는 것으로, 문서 받은편지함처럼 파일이 작업의 전부인 화면을 위한 것입니다. 폼 필드처럼 폴더, 붙여넣은 파일, accept 목록을 받고, `rules`의 저장소에 업로드합니다. 저장소는 `Feature::files`가 권한과 함께 등록합니다. `.single()`은 한 번에 파일 하나를 받습니다. `.on_upload(action)`은 저장된 각 `File`로 액션을 실행합니다. 서버는 먼저 id가 자신이 만드는 형식인지 확인하고, 이름을 다시 정리하며, 규칙에 있는 콘텐츠 형식만 남기므로 액션은 브라우저가 지어낸 것을 받지 않습니다. 액션이 거부하면 항목에 이유가 표시됩니다. 영역 안의 파일 선택기가 키보드와 단일 포인터 경로입니다.
+
+```rust
+#[action(permission = "support.ticket.files")]
+pub async fn attach(file: File, tickets: Tickets) -> Result<()> {
+    tickets.attach(file).await
+}
+
+FileDrop::new(t!("ticket.attachments"), ATTACHMENTS).on_upload(attach)
+```

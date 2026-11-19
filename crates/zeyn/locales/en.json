@@ -601,7 +601,8 @@
         "remove": "Remove",
         "remove_name": "Remove {name}",
         "waiting": "{name} is waiting to upload",
-        "skipped": "{n} files of a type this field does not take were skipped."
+        "skipped": "{n} files of a type this field does not take were skipped.",
+        "not_added": "The file was uploaded but could not be added."
       },
       "kpi": {
         "up": "Up {pct}% from the previous period",

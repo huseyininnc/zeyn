@@ -204,6 +204,7 @@ catalog! {
         color_input "/ui/color-input";
         length_input "/ui/length-input";
         action_button "/ui/action-button";
+        file_drop "/ui/file-drop";
     }
     "data" Table {
         data_grid "/ui/data-grid";

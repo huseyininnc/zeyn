@@ -9,6 +9,10 @@
  * while it uploads, retried when it failed and removed when it is done. The field's value, a JSON text in a hidden text input, holds the files the server
  * accepted; the form submits it like any other input.
  *
+ * Inside a `FileDrop` with an upload action (`[data-zeyn-file-drop][data-save]`), each stored
+ * file is then posted to the drop's `upload` source, which runs the action; a refusal shows on
+ * the item like a failed upload.
+ *
  * Image previews use object URLs of the chosen file, revoked when the item goes away. Nothing the
  * user picked is ever put into the page as HTML: names are set with `textContent`.
  * Progress, results and errors are announced in the field's polite live region.
@@ -16,7 +20,7 @@
  */
 
 /** The shared request helpers (`net.js`). */
-const { BASE, csrf, parse } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
+const { BASE, csrf, parse, post } = await import(new URL(`net.js${new URL(import.meta.url).search}`, import.meta.url).href);
 const PREVIEW = /^image\/(png|jpeg|gif|webp)$/;
 const ANNOUNCE_STEP = 25;
 /** Uploads of one field that run at the same time; the others wait for a free slot. */
@@ -216,6 +220,7 @@ async function send(f, li) {
       done(f, li, body);
       sync(f);
       announce(f, fill(f.texts.uploaded, { name: body.name }));
+      report(f, li, body);
     } else {
       const final = [413, 415, 422].includes(xhr.status) || xhr.status === 403;
       failed(f, li, body?.message ?? String(xhr.status), !final);
@@ -230,6 +235,24 @@ async function send(f, li) {
     failed(f, li, fill(f.texts.canceled, { name: s.file.name }), true);
   });
   xhr.send(s.file);
+}
+
+/** Runs the upload action of a `FileDrop` for a stored file; a refusal marks the item failed. */
+async function report(f, li, file) {
+  const drop = f.root.closest('[data-zeyn-file-drop][data-save]');
+  if (!drop) return;
+  const screen = drop.closest('[data-zeyn-screen]');
+  const r = await post('/_zeyn/data', {
+    screen: screen?.dataset.zeynScreen ?? null,
+    params: parse(screen?.dataset.zeynParams ?? 'null'),
+    node: drop.closest('[data-zeyn-node]')?.dataset.zeynNode ?? null,
+    key: 'upload',
+    input: file,
+  });
+  if (r.ok) return;
+  li.removeAttribute('data-id');
+  sync(f);
+  failed(f, li, r.body?.message || f.texts.not_added, false);
 }
 
 /** Adds an item for a chosen file, with a preview for images, and starts its upload. */
