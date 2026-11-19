@@ -69,7 +69,7 @@ App::new("Billing")
 
 ### 密度
 
-两种密度，通过令牌切换。舒适是默认值：40 px 表格行、36 px 表头、36 px 控件、20 px 卡片内边距。紧凑（`<html data-density="compact">`）的行、表头和控件均为 32 px，并把间距单位缩放到 0.8。用户在顶栏的账户菜单中选择它（`App::header(|h| h.account())`）；该选择保存在 `zeyn_density` cookie 中，服务器把它渲染到 `<html>` 上，因此首次绘制就是正确的。控件和表格行永远不会小于 24 px，因此紧凑模式仍满足 WCAG 2.2 的目标尺寸要求。`Theme::new().compact()` 让紧凑间距成为组织的默认值。
+两种密度，通过令牌切换。舒适是默认值：40 px 表格行、36 px 表头、36 px 控件、20 px 卡片内边距。紧凑（`<html data-density="compact">`）的行、表头和控件均为 32 px，并把间距单位缩放到 0.8。用户在顶栏的账户菜单中选择它（`App::header(|h| h.account())`）；该选择保存在 `zeyn_density` cookie 中，服务器把它渲染到 `<html>` 上，因此首次绘制就是正确的。控件和表格行永远不会小于 24 px，因此紧凑模式仍满足 WCAG 2.2 的目标尺寸要求。`Theme::new().compact()` 让紧凑间距成为组织的默认值。对于有视图存储的应用中已登录的用户，密度与主题一起保存(`POST /_zeyn/density`，检查 CSRF)，因此会跟随用户到新设备：缺少主题或密度 Cookie 的页面只读一次存储就取得两者并设置 Cookie，两个 Cookie 都有的页面不会访问存储。
 
 虚拟表格的行高由服务器固定，因为运行时依据它计算滚动位置。`Paging::virtual_scroll()` 跟随密度（舒适 40 px，紧凑 32 px）；`Paging::virtual_rows(px)` 保持给定的高度。密度变化从下一页起作用于虚拟表格。
 
