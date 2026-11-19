@@ -9,6 +9,10 @@ license = "MIT OR Apache-2.0"
 # Invoice and list report PDFs. Off by default: Typst is large, and turning it on in the
 # workspace links it into every test binary. Run with `cargo run -p zeyn-example-showcase --features pdf`.
 pdf = ["zeyn/pdf"]
+# Scheduled jobs. Run with `--features metronome`.
+metronome = ["zeyn/metronome"]
+# The operations screen at /ops/jobs as well. Run with `--features metronome-ops`.
+metronome-ops = ["metronome", "zeyn/metronome-ops"]
 
 [dependencies]
 zeyn = { path = "../../crates/zeyn", features = ["assistant", "islands", "realtime", "xlsx", "email", "accounts", "markdown", "resumable"] }

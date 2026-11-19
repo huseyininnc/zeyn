@@ -38,7 +38,7 @@ fn is_leap(y: i32) -> bool {
     (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
 }
 
-fn days_in_month(y: i32, m: u8) -> u8 {
+pub(crate) fn days_in_month(y: i32, m: u8) -> u8 {
     match m {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
@@ -1058,6 +1058,17 @@ impl TimeZone {
             jiff::tz::AmbiguousOffset::Fold { before, after } => {
                 Ok(before.seconds().max(after.seconds()))
             }
+        }
+    }
+
+    /// The zone as a `jiff` zone, for code that walks its transitions.
+    #[cfg_attr(not(feature = "metronome"), allow(dead_code))]
+    pub(crate) fn jiff(&self) -> jiff::tz::TimeZone {
+        match self.zone {
+            Zone::Fixed(minutes) => jiff::tz::TimeZone::fixed(
+                jiff::tz::Offset::from_seconds(minutes * 60).unwrap_or(jiff::tz::Offset::UTC),
+            ),
+            Zone::Iana(tz) => tz.clone(),
         }
     }
 
