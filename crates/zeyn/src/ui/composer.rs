@@ -97,7 +97,7 @@ where
 
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
         let checked = self.check(input);
-        let store = self.files.map_or("", |r| r.store());
+        let store = self.files.map(|r| r.store());
         Box::pin(async move {
             let send = checked?;
             let ids = send

@@ -1056,7 +1056,9 @@ fn ticket_app(store: MemoryStore, saved: SavedTickets) -> Router {
         .feature(
             Feature::new("crm")
                 .files(DOCS, "crm.files", store)
-                .screen(edit_ticket),
+                .screen(edit_ticket)
+                .screen(ticket_grid)
+                .api(save_ticket),
         )
         .router()
         .unwrap()
@@ -1231,4 +1233,247 @@ async fn a_refused_upload_leaves_no_file_in_either_store() {
         "no .part, .bin or .json file is left: {left:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The ticket of [`edit_ticket`], with a file another user attached before.
+fn held_ticket() -> Ticket {
+    let mut t = ticket();
+    t.attachments = vec![File {
+        id: KEPT.into(),
+        name: "old.png".into(),
+        size: 50,
+        content_type: "image/png".into(),
+    }];
+    t
+}
+
+#[action(permission = "crm.files")]
+pub async fn search_tickets(q: DataQuery) -> Result<Page<Ticket>> {
+    Ok(q.apply(vec![held_ticket()]))
+}
+
+#[screen(route = "/tickets", permission = "crm.files")]
+pub fn ticket_grid() -> Screen {
+    Screen::new("Tickets").body(
+        DataGrid::of(search_tickets)
+            .column(Ticket::title)
+            .editable()
+            .column(Ticket::attachments)
+            .editable()
+            .add_with(save_ticket)
+            .edit_with(save_ticket),
+    )
+}
+
+/// The `attachments` value of a submit naming `ids`.
+fn attachments(ids: &[&str]) -> serde_json::Value {
+    serde_json::Value::Array(
+        ids.iter()
+            .map(|id| file_json(id, "a.png"))
+            .collect(),
+    )
+    .to_string()
+    .into()
+}
+
+#[test]
+fn file_fields_without_an_upload_store_keep_only_the_files_their_record_held() {
+    let new = "0000000000000000000000000000000c";
+    let of = Form::of(held_ticket())
+        .field(Ticket::title)
+        .field(Ticket::contract)
+        .field(Ticket::attachments);
+    let auto = Form::auto(held_ticket());
+    for form in [of, auto] {
+        let read = |contract: serde_json::Value, ids: &[&str]| {
+            let mut values = serde_json::Map::new();
+            values.insert("title".into(), "Printer".into());
+            values.insert("contract".into(), contract);
+            values.insert("attachments".into(), attachments(ids));
+            form.read(&values, "en", TimeZone::UTC)
+        };
+        let kept = read("".into(), &[KEPT]).unwrap();
+        assert_eq!(kept.attachments[0].id, KEPT, "a file the record held stays");
+        let errors = read("".into(), &[KEPT, new]).unwrap_err();
+        assert_eq!(errors.errors[0].field, "attachments");
+        let errors = read(
+            file_json(new, "c.png")
+                .to_string()
+                .into(),
+            &[KEPT],
+        )
+        .unwrap_err();
+        assert_eq!(errors.errors[0].field, "contract");
+    }
+}
+
+/// One part of a job, with a scan attached.
+#[entity(table = "job_parts")]
+pub struct JobPart {
+    #[key]
+    pub id: JobPartId,
+    pub name: String,
+    pub scan: Option<File>,
+}
+
+#[model]
+pub struct Job {
+    pub title: String,
+    pub parts: Vec<JobPart>,
+}
+
+#[test]
+fn file_columns_of_lines_keep_only_the_files_their_line_held() {
+    let new = "0000000000000000000000000000000d";
+    let job = Job {
+        title: "Repair".into(),
+        parts: vec![JobPart {
+            id: JobPartId(1),
+            name: "Fan".into(),
+            scan: Some(File {
+                id: KEPT.into(),
+                name: "fan.png".into(),
+                size: 50,
+                content_type: "image/png".into(),
+            }),
+        }],
+    };
+    let form = Form::of(job)
+        .field(Job::title)
+        .lines(Job::parts, |l| {
+            l.column(JobPart::name)
+                .column(JobPart::scan)
+        });
+    let read = |pairs: &[(&str, String)]| {
+        let values: serde_json::Map<String, serde_json::Value> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), serde_json::Value::String(v.clone())))
+            .collect();
+        form.read(&values, "en", TimeZone::UTC)
+    };
+    let scan = |id: &str| file_json(id, "s.png").to_string();
+    let kept = read(&[
+        ("title", "Repair".into()),
+        ("parts", "rows".into()),
+        ("parts.0._i", "0".into()),
+        ("parts.0.name", "Fan".into()),
+        ("parts.0.scan", scan(KEPT)),
+    ])
+    .unwrap();
+    assert_eq!(kept.parts[0].scan.as_ref().unwrap().id, KEPT);
+    for pairs in [
+        vec![
+            ("title", "Repair".to_string()),
+            ("parts", "rows".into()),
+            ("parts.0._i", "0".into()),
+            ("parts.0.name", "Fan".into()),
+            ("parts.0.scan", scan(new)),
+        ],
+        vec![
+            ("title", "Repair".to_string()),
+            ("parts", "rows".into()),
+            ("parts.0.name", "Belt".into()),
+            ("parts.0.scan", scan(KEPT)),
+        ],
+    ] {
+        let errors = read(&pairs).unwrap_err();
+        assert_eq!(errors.errors[0].field, "parts", "{pairs:?}");
+    }
+}
+
+async fn post_as(router: &Router, user: &str, path: &str, body: serde_json::Value) -> StatusCode {
+    let req = Request::post(path)
+        .header("x-user", user)
+        .header(header::AUTHORIZATION, "Bearer test")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-zeyn-csrf", TOKEN)
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    send(router, req).await.0
+}
+
+#[tokio::test]
+async fn grid_rows_and_the_api_refuse_file_ids_the_caller_did_not_upload() {
+    let store = MemoryStore::default();
+    let saved = SavedTickets::default();
+    let router = ticket_app(store.clone(), saved.clone());
+    let bobs = upload_as(&router, "bob").await;
+    let adas = upload_as(&router, "ada").await;
+    let edit = |ids: &[&str]| {
+        serde_json::json!({
+            "screen": "ticket_grid",
+            "node": 0,
+            "key": "1",
+            "values": { "title": "Printer", "attachments": attachments(ids) },
+        })
+    };
+    let add = |ids: &[&str]| {
+        serde_json::json!({
+            "screen": "ticket_grid",
+            "node": 0,
+            "values": { "title": "Printer", "attachments": attachments(ids) },
+        })
+    };
+    for (path, body) in [
+        ("/_zeyn/grid/edit", edit(&[KEPT, &bobs])),
+        ("/_zeyn/grid/edit", edit(&[KEPT, &adas])),
+        ("/_zeyn/grid/add", add(&[&bobs])),
+        ("/_zeyn/grid/add", add(&[&adas])),
+    ] {
+        let status = post_as(&router, "ada", path, body.clone()).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{path} {body}");
+    }
+    assert!(saved.0.lock().unwrap().is_empty());
+    let status = post_as(&router, "ada", "/_zeyn/grid/edit", edit(&[KEPT])).await;
+    assert_eq!(status, StatusCode::OK, "a row keeps the files it held");
+
+    let api = |contract: &str, ids: &[&str]| {
+        let mut t = ticket();
+        t.contract = (!contract.is_empty()).then(|| File {
+            id: contract.into(),
+            name: "c.png".into(),
+            size: 10,
+            content_type: "image/png".into(),
+        });
+        t.attachments = ids
+            .iter()
+            .map(|id| File {
+                id: id.to_string(),
+                name: "a.png".into(),
+                size: 10,
+                content_type: "image/png".into(),
+            })
+            .collect();
+        serde_json::to_value(t).unwrap()
+    };
+    let before = saved.0.lock().unwrap().len();
+    for body in [api(&bobs, &[]), api("", &[&adas, &bobs]), api("", &[KEPT])] {
+        let status = post_as(&router, "ada", "/api/v1/crm/save_ticket", body.clone()).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    }
+    assert_eq!(saved.0.lock().unwrap().len(), before);
+    let status = post_as(
+        &router,
+        "ada",
+        "/api/v1/crm/save_ticket",
+        api(&adas, &[&adas]),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "own uploads pass");
+}
+
+#[test]
+fn a_file_store_name_registered_twice_stops_the_app() {
+    let problems = App::new("Test")
+        .feature(Feature::new("crm").files(DOCS, "crm.files", MemoryStore::default()))
+        .feature(Feature::new("sales").files(DOCS, "sales.files", MemoryStore::default()))
+        .check()
+        .unwrap_err();
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("Z0509") && p.contains("file store `docs`")),
+        "{problems:?}"
+    );
 }

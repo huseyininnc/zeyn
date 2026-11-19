@@ -780,7 +780,7 @@ pub(crate) use store::check_owned;
 #[cfg(not(feature = "server"))]
 pub(crate) async fn check_owned(
     _ctx: &crate::Ctx,
-    _store: &str,
+    _store: Option<&str>,
     ids: Vec<String>,
 ) -> crate::action::Result<()> {
     if ids.is_empty() {
@@ -1050,26 +1050,46 @@ mod store {
 
     impl crate::ctx::Service for FileStores {}
 
-    /// Refuses with [`Error::NotFound`] when `store` does not hold every file of `ids` for the
-    /// user of `ctx`: a file another user uploaded, one of another tenant, or an id never
-    /// uploaded. Uploads without a signed in user have no owner, so a request without one may
-    /// name only such uploads, by ids of 128 random bits nobody else learns.
-    pub(crate) async fn check_owned(ctx: &crate::Ctx, store: &str, ids: Vec<String>) -> Result<()> {
+    /// Refuses with [`Error::NotFound`] when `store` (any store of the app when `None`) does
+    /// not hold every file of `ids` for the user of `ctx`: a file another user uploaded, one of
+    /// another tenant, or an id never uploaded. Uploads without a signed in user have no owner,
+    /// so a request without one may name only such uploads, by ids of 128 random bits nobody
+    /// else learns.
+    pub(crate) async fn check_owned(
+        ctx: &crate::Ctx,
+        store: Option<&str>,
+        ids: Vec<String>,
+    ) -> Result<()> {
         if ids.is_empty() {
             return Ok(());
         }
-        let store = ctx
+        let all = ctx
             .service::<FileStores>()
-            .and_then(|s| s.0.get(store).cloned())
-            .ok_or(Error::NotFound)?;
+            .unwrap_or_default();
+        let stores: Vec<Arc<dyn FileStore>> = match store {
+            Some(name) => all
+                .0
+                .get(name)
+                .cloned()
+                .into_iter()
+                .collect(),
+            None => all.0.values().cloned().collect(),
+        };
         let user = ctx.identity().user.as_deref();
         let tenant = ctx.tenant().map(|t| t.id());
         for id in ids {
-            let meta = store
-                .meta(id.clone())
-                .await
-                .map_err(|_| Error::NotFound)?;
-            if meta.id != id || meta.owner.as_deref() != user || meta.tenant.as_deref() != tenant {
+            let mut found = false;
+            for store in &stores {
+                if let Ok(meta) = store.meta(id.clone()).await {
+                    found = meta.id == id
+                        && meta.owner.as_deref() == user
+                        && meta.tenant.as_deref() == tenant;
+                    if found {
+                        break;
+                    }
+                }
+            }
+            if !found {
                 return Err(Error::NotFound);
             }
         }

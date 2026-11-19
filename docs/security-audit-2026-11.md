@@ -93,6 +93,13 @@ by requests without one. Refused uploads (size, type, accept list, scanner, a br
 were already deleted from both `DiskStore` and `MemoryStore`; a regression test now covers both
 stores.
 
+The same hole was open through file fields that are not upload fields of a store: `Form::auto`,
+`.field(...)`, editable grid columns, imports and lines editors read any id. Those fields now keep
+only the files their record or line held. API actions that take `Valid<M>` check every file id of
+the input against the app's stores, so an API save can name only the caller's own uploads. A store
+name registered twice now stops the app (`Z0509`), since uploads found the first store and the
+checks the last.
+
 ## Not found
 
 CSRF coverage of the other `POST` handlers, node path handling, masked fields in grid filters,

@@ -628,6 +628,8 @@ fn general_error() -> ValidationErrors {
 pub(crate) enum Unreadable {
     Format,
     SkippedTime,
+    /// A file field names a file its record did not hold and no store vouches for.
+    File,
 }
 
 impl From<()> for Unreadable {
@@ -691,12 +693,15 @@ pub(crate) fn read_moment(
 }
 
 /// Reads one submitted value as the field's type. Text arrives as typed by the user; wall clock
-/// date times are read in the user's time zone.
+/// date times are read in the user's time zone. A file field that is not an upload field of a
+/// store (`stored` false) keeps only files `current` already holds: nothing could have uploaded
+/// a new one for it, so any other id is refused.
 pub(crate) fn parse_value(
     meta: &FieldMeta,
     raw: &Json,
     reading: &Reading,
     current: &Json,
+    stored: bool,
 ) -> std::result::Result<Json, Unreadable> {
     let locale = reading.locale;
     if let FieldKind::Bool = meta.kind {
@@ -709,8 +714,17 @@ pub(crate) fn parse_value(
         editor: editor @ ("file" | "files"),
     } = meta.kind
     {
-        return crate::files::parse_files(raw, editor == "files", meta.optional)
-            .ok_or(Unreadable::Format);
+        let value = crate::files::parse_files(raw, editor == "files", meta.optional)
+            .ok_or(Unreadable::Format)?;
+        let held = crate::files::file_ids(Some(current));
+        if !stored
+            && crate::files::file_ids(Some(&value))
+                .iter()
+                .any(|id| !held.contains(id))
+        {
+            return Err(Unreadable::File);
+        }
+        return Ok(value);
     }
     if let FieldKind::Choices(options) = meta.kind {
         return crate::ui::read_choices(options, raw).ok_or(Unreadable::Format);
@@ -913,7 +927,7 @@ type FileCheck = (FieldError, &'static str, Vec<String>);
 async fn check_files(ctx: &Ctx, checks: Vec<FileCheck>) -> Result<()> {
     let mut errors = ValidationErrors::default();
     for (error, store, ids) in checks {
-        if crate::files::check_owned(ctx, store, ids)
+        if crate::files::check_owned(ctx, Some(store), ids)
             .await
             .is_err()
         {
@@ -1784,7 +1798,11 @@ impl FormBody {
                 .get(meta.name)
                 .cloned()
                 .unwrap_or(Json::Null);
-            match parse_value(meta, raw, reading, &current) {
+            let stored = self
+                .files
+                .iter()
+                .any(|(name, ..)| *name == meta.name);
+            match parse_value(meta, raw, reading, &current, stored) {
                 Ok(Json::String(s)) if meta.rules.contains(&Rule::Embed) => {
                     let url = crate::csp::embed_url(&s).unwrap_or(s);
                     object.insert(meta.name.to_string(), Json::String(url));
@@ -1796,6 +1814,7 @@ impl FormBody {
                     let key = match problem {
                         Unreadable::Format => "zeyn.validation.format",
                         Unreadable::SkippedTime => "zeyn.validation.skipped_time",
+                        Unreadable::File => "zeyn.files.not_found",
                     };
                     errors.errors.push(FieldError {
                         field: meta.name,

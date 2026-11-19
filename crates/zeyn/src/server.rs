@@ -1687,6 +1687,23 @@ impl App {
                 }
             }
         }
+        let mut stores: HashMap<&str, &str> = HashMap::new();
+        for f in &self.features {
+            for e in f.file_stores() {
+                if let Some(other) = stores.insert(e.rules.store(), f.name()) {
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0509",
+                            format!("file store `{}` is registered twice, in features `{other}` and `{}`", e.rules.store(), f.name()),
+                        )
+                        .why("uploads, downloads and the file id checks of forms find a store by its name, so a name used twice would send them to different stores")
+                        .fix("register each `FileRules` with `Feature::files` once, or give one of them another name in `FileRules::new`")
+                        .docs("language/forms#file-uploads")
+                        .to_string(),
+                    );
+                }
+            }
+        }
         for s in [self.errors.not_found, self.errors.server_error]
             .into_iter()
             .flatten()
