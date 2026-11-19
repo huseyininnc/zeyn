@@ -77,6 +77,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Pages and screen fragments of signed in users, and of screens that are not public, are sent with `Cache-Control: private, no-store`, so records do not stay in the browser's disk cache or a shared cache after sign out. Public screens opened without a session keep their caching.
 - `DocStore::allow(ctx, key, write)` decides per document who may open and change a collaborative document; it runs on every join, also while the room is open for others. Before, the kind's permission let every user of a tenant open every document of the kind by its id. The default keeps that behavior, so stores whose documents belong to people should implement it.
 - `GET /_zeyn/devtools` (debug builds only) answers only signed in users with the `zeyn.devtools` permission (`DevAuth` has it) and lists only their own requests. Before, anyone who reached a debug build read the requests of every user.
+- `POST /_zeyn/reason`, `/_zeyn/socket/open` and `/_zeyn/auth/totp/enroll` count against the write limit.
 
 ## [0.0.10] - 2026-11-10
 

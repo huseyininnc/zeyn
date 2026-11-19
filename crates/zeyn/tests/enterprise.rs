@@ -636,6 +636,45 @@ async fn reveals_and_exports_count_against_the_write_limit() {
 }
 
 #[tokio::test]
+async fn reasons_socket_tickets_and_enrollment_count_against_the_write_limit() {
+    for path in [
+        "/_zeyn/reason",
+        "/_zeyn/socket/open",
+        "/_zeyn/auth/totp/enroll",
+    ] {
+        let identity = officer();
+        let router = App::new("Test")
+            .service(People::seeded())
+            .write_limit(zeyn::RateLimit::per_user(
+                1,
+                std::time::Duration::from_secs(60),
+            ))
+            .auth(move |h: &HeaderMap| {
+                h.contains_key("x-user")
+                    .then(|| identity.clone())
+            })
+            .feature(Feature::new("hr").screen(people))
+            .router()
+            .unwrap();
+        let body = serde_json::json!({ "screen": "people", "node": "0" });
+        assert_ne!(
+            send(&router, post(path, body.clone()))
+                .await
+                .status,
+            StatusCode::TOO_MANY_REQUESTS,
+            "{path}"
+        );
+        assert_eq!(
+            send(&router, post(path, body))
+                .await
+                .status,
+            StatusCode::TOO_MANY_REQUESTS,
+            "{path}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn head_requests_to_exports_count_against_the_write_limit() {
     let identity = officer();
     let router = App::new("Test")
