@@ -5,6 +5,8 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::{Identity, MemoryViewStore};
@@ -475,5 +477,88 @@ async fn a_signed_in_users_density_is_saved_next_to_the_theme_and_follows_them_t
         html_tag(&other).contains(r#"data-density="compact""#),
         "choosing a theme keeps the saved density: {}",
         html_tag(&other)
+    );
+}
+
+/// A view store that counts its reads.
+#[derive(Clone, Default)]
+struct CountingStore {
+    inner: MemoryViewStore,
+    loads: Arc<AtomicUsize>,
+}
+
+impl zeyn::DataGridViewStore for CountingStore {
+    fn load(
+        &self,
+        user: &str,
+        grid: &str,
+    ) -> zeyn::BoxFuture<zeyn::Result<Option<zeyn::DataGridView>>> {
+        self.loads
+            .fetch_add(1, Ordering::SeqCst);
+        self.inner.load(user, grid)
+    }
+
+    fn save(
+        &self,
+        user: &str,
+        grid: &str,
+        view: Option<zeyn::DataGridView>,
+    ) -> zeyn::BoxFuture<zeyn::Result<()>> {
+        self.inner.save(user, grid, view)
+    }
+}
+
+/// The `Set-Cookie` values of a response that set the theme or the density.
+fn look_cookies(h: &HeaderMap) -> Vec<String> {
+    h.get_all(header::SET_COOKIE)
+        .iter()
+        .map(|v| v.to_str().unwrap().to_string())
+        .filter(|c| c.starts_with("zeyn_theme=") || c.starts_with("zeyn_density="))
+        .collect()
+}
+
+#[tokio::test]
+async fn a_signed_in_user_with_nothing_saved_reads_the_store_once_and_then_carries_a_marker() {
+    let store = CountingStore::default();
+    let loads = store.loads.clone();
+    let r = build(
+        App::new("T")
+            .auth(|h: &HeaderMap| Some(Identity::user(h.get("x-user")?.to_str().ok()?)))
+            .datagrid_views(store),
+    );
+    let (_, h, plain) = get(&r, "/home", "").await;
+    assert_eq!(loads.load(Ordering::SeqCst), 1);
+    let cookies = look_cookies(&h);
+    assert!(
+        cookies
+            .iter()
+            .any(|c| c.starts_with("zeyn_theme=_; Path=/; Max-Age=86400;")),
+        "{cookies:?}"
+    );
+    assert!(
+        cookies
+            .iter()
+            .any(|c| c.starts_with("zeyn_density=_; Path=/; Max-Age=86400;")),
+        "{cookies:?}"
+    );
+    let (_, h, marked) = get(&r, "/home", "zeyn_theme=_; zeyn_density=_").await;
+    assert_eq!(
+        loads.load(Ordering::SeqCst),
+        1,
+        "the second page skips the store"
+    );
+    assert!(look_cookies(&h).is_empty());
+    assert_eq!(
+        html_tag(&marked),
+        html_tag(&plain),
+        "the marker renders the default look"
+    );
+    assert!(!html_tag(&marked).contains("data-density"));
+    assert_eq!(choose(&r, "dark").await.0, StatusCode::NO_CONTENT);
+    let (_, _, chosen) = get(&r, "/home", "zeyn_density=_").await;
+    assert!(
+        html_tag(&chosen).contains(r#"data-theme="dark""#),
+        "a saved theme replaces the marker: {}",
+        html_tag(&chosen)
     );
 }

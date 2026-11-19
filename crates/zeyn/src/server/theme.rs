@@ -903,9 +903,15 @@ fn density_value(name: &str) -> Option<&'static str> {
     }
 }
 
+/// Cookie value that marks a look the store does not hold. No theme can have this name and no
+/// density this value, so every reader ignores it and renders the default.
+const NOTHING_SAVED: &str = "_";
+
 /// On a full page load that lacks the `zeyn_theme` or the `zeyn_density` cookie, the signed in
 /// user's saved look from the view store (one read for both), with the cookies to set so later
-/// pages do not ask again. Pages that carry both cookies never touch the store.
+/// pages do not ask again. When the store holds no value for a missing cookie, that cookie is set
+/// to [`NOTHING_SAVED`] for a day, so later pages skip the store until it is read again. Pages
+/// that carry both cookies never touch the store.
 pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (Ctx, Vec<String>) {
     let want_theme = st.look.picker && cookie(headers, "zeyn_theme").is_none();
     let want_density = cookie(headers, "zeyn_density").is_none();
@@ -919,10 +925,9 @@ pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (C
         .timed(store.load(&user, &store_key(&ctx)))
         .await
     {
-        Ok(Some(v)) => v,
-        Ok(None) => return (ctx, Vec::new()),
+        Ok(v) => v.unwrap_or_default(),
         Err(_) => {
-            eprintln!("warning: the view store failed to load a theme; using the default");
+            eprintln!("warning: the view store failed to load the look; using the default");
             return (ctx, Vec::new());
         }
     };
@@ -935,37 +940,51 @@ pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (C
     };
     let mut ctx = ctx;
     let mut cookies = Vec::new();
-    if want_theme && let Some(theme) = saved_as(STORE_PREFIX).and_then(|n| st.look.allowed(&n)) {
-        cookies.push(theme_cookie(st, &theme));
-        ctx = ctx.with_theme(theme);
+    if want_theme {
+        match saved_as(STORE_PREFIX).and_then(|n| st.look.allowed(&n)) {
+            Some(theme) => {
+                cookies.push(look_cookie(st, "zeyn_theme", &theme, YEAR));
+                ctx = ctx.with_theme(theme);
+            }
+            None => cookies.push(look_cookie(st, "zeyn_theme", NOTHING_SAVED, DAY)),
+        }
     }
-    if want_density
-        && let Some(density) = saved_as(DENSITY_PREFIX)
+    if want_density {
+        match saved_as(DENSITY_PREFIX)
             .as_deref()
             .and_then(density_value)
-    {
-        cookies.push(density_cookie(st, density));
-        if density == "compact" {
-            ctx = ctx.with_compact();
+        {
+            Some(density) => {
+                cookies.push(density_cookie(st, density));
+                if density == "compact" {
+                    ctx = ctx.with_compact();
+                }
+            }
+            None => cookies.push(look_cookie(st, "zeyn_density", NOTHING_SAVED, DAY)),
         }
     }
     (ctx, cookies)
 }
 
-fn theme_cookie(st: &AppState, name: &str) -> String {
+const YEAR: u32 = 31_536_000;
+
+const DAY: u32 = 86_400;
+
+/// A look cookie: `zeyn_theme` or `zeyn_density` with its value and lifetime in seconds.
+fn look_cookie(st: &AppState, name: &str, value: &str, max_age: u32) -> String {
     let secure = if st.secure_cookies { "; Secure" } else { "" };
     format!(
-        "zeyn_theme={name}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
+        "{name}={value}; Path={}; Max-Age={max_age}; SameSite=Lax{secure}",
         st.cookie_path()
     )
 }
 
+fn theme_cookie(st: &AppState, name: &str) -> String {
+    look_cookie(st, "zeyn_theme", name, YEAR)
+}
+
 fn density_cookie(st: &AppState, value: &str) -> String {
-    let secure = if st.secure_cookies { "; Secure" } else { "" };
-    format!(
-        "zeyn_density={value}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
-        st.cookie_path()
-    )
+    look_cookie(st, "zeyn_density", value, YEAR)
 }
 
 /// Saves a signed in user's look in the view store: the theme and density given, the other one
@@ -1031,7 +1050,7 @@ async fn save_look(
         .await
         .is_err()
     {
-        eprintln!("warning: the view store failed to save a theme; the cookie still keeps it");
+        eprintln!("warning: the view store failed to save the look; the cookies still keep it");
     }
 }
 
