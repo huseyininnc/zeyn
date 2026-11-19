@@ -583,6 +583,43 @@ async fn a_user_over_the_upload_quota_gets_429_until_the_window_refills() {
 }
 
 #[tokio::test]
+async fn uploads_at_the_same_time_cannot_pass_the_quota_together() {
+    const QUOTA: FileRules = DOCS.quota(150, std::time::Duration::from_secs(3600));
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|_: &HeaderMap| Some(Identity::user("ada").with_permissions(["crm.files"])))
+        .feature(Feature::new("crm").files(QUOTA, "crm.files", MemoryStore::default()))
+        .router()
+        .unwrap();
+    let up = |name: &str, body: Vec<u8>| {
+        upload(name, "")
+            .header(header::CONTENT_LENGTH, body.len())
+            .body(body.into())
+            .unwrap()
+    };
+    let refused = send(&router, up("a.exe", vec![1; 100]))
+        .await
+        .0;
+    assert_eq!(refused, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    let (a, b, c) = tokio::join!(
+        send(&router, up("a.png", png(100))),
+        send(&router, up("b.png", png(100))),
+        send(&router, up("c.png", png(100))),
+    );
+    let mut statuses = [a.0, b.0, c.0];
+    statuses.sort();
+    assert_eq!(
+        statuses,
+        [
+            StatusCode::CREATED,
+            StatusCode::CREATED,
+            StatusCode::TOO_MANY_REQUESTS
+        ],
+        "a failed upload gives its reservation back, and the third parallel one is over the quota"
+    );
+}
+
+#[tokio::test]
 async fn put_patch_and_delete_count_against_the_write_limit() {
     let router = App::new("Test")
         .write_limit(RateLimit::per_ip(1, std::time::Duration::from_secs(60)))

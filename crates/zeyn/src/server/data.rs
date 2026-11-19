@@ -43,13 +43,27 @@ fn valid_reason(reason: &str) -> bool {
     (3..=300).contains(&n) && !reason.chars().any(char::is_control)
 }
 
-/// Reads the reason cookie (`<screen>.<reason>`) into the request's trail. The server only uses it
-/// for that screen.
+/// Reads the reason cookie (`<screen>.<holder>.<expires>.<reason>`) into the request's trail. The
+/// server only uses it for that screen, for the user and tenant it was given by, and until it
+/// expires, so a reason left in a shared browser never opens a screen for the next user.
 pub(super) fn read_reason(ctx: &Ctx, headers: &HeaderMap) {
-    let Some((screen, reason)) = cookie(headers, REASON_COOKIE).and_then(|v| v.split_once('.'))
+    let Some(value) = cookie(headers, REASON_COOKIE) else {
+        return;
+    };
+    let mut parts = value.splitn(4, '.');
+    let (Some(screen), Some(holder), Some(expires), Some(reason)) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
     else {
         return;
     };
+    if holder != reason_holder(ctx)
+        || expires
+            .parse::<u64>()
+            .ok()
+            .is_none_or(|e| e <= unix_now())
+    {
+        return;
+    }
     let reason = percent_decode(reason)
         .trim()
         .to_string();
@@ -57,6 +71,33 @@ pub(super) fn read_reason(ctx: &Ctx, headers: &HeaderMap) {
         let screen = screen.to_string();
         ctx.update_trail(|t| t.given_reason = Some((screen, reason)));
     }
+}
+
+/// Hash of the user and tenant a reason was given by, as written into the reason cookie.
+fn reason_holder(ctx: &Ctx) -> String {
+    use std::hash::Hasher;
+    let mut h = std::hash::DefaultHasher::new();
+    h.write(
+        ctx.identity()
+            .user
+            .as_deref()
+            .unwrap_or("")
+            .as_bytes(),
+    );
+    h.write_u8(0xff);
+    h.write(
+        ctx.tenant()
+            .map_or("", |t| t.id())
+            .as_bytes(),
+    );
+    format!("{:016x}", h.finish())
+}
+
+/// Seconds since the Unix epoch.
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 /// Refuses screens that ask for a reason until the user has given one; records it otherwise.
@@ -144,7 +185,9 @@ impl ImportCall {
 }
 
 /// Previews (`commit: false`) or imports a CSV or XLSX file through an import component. Both
-/// need the import action's permission; the file is read and validated again on commit.
+/// need the import action's permission and run through the interceptors with the app's time
+/// limit; the preview parses on a blocking thread, and the file is read and validated again on
+/// commit.
 async fn import(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -159,26 +202,44 @@ async fn import(
         let (_, entry, screen) = st
             .open(&ctx, &call.screen, call.params)
             .await?;
-        let source = screen
+        let action = screen
             .node(&call.node)
             .and_then(|n| n.import())
-            .ok_or(Failure::App(Error::NotFound))?;
-        let action = source.action();
+            .ok_or(Failure::App(Error::NotFound))?
+            .action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
         let file = file?;
-        if !call.commit {
-            return source
-                .preview(&ctx, &file)
-                .map_err(Failure::App);
-        }
-        let info = Call {
+        let mut info = Call {
             kind: CallKind::Import,
             screen: entry.meta.name,
             action: Some(action),
-            via_agent: false,
+            via_agent: ctx.via_agent(),
         };
+        if !call.commit {
+            info.kind = CallKind::ImportPreview;
+            let node = call.node;
+            let preview_ctx = ctx.clone();
+            let work = async move {
+                tokio::task::spawn_blocking(move || {
+                    screen
+                        .node(&node)
+                        .and_then(|n| n.import())
+                        .ok_or(Error::NotFound)?
+                        .preview(&preview_ctx, &file)
+                })
+                .await
+                .map_err(|e| Error::Internal(e.to_string()))?
+            };
+            return st
+                .intercept(&ctx, &info, || st.timed(work))
+                .await;
+        }
+        let source = screen
+            .node(&call.node)
+            .and_then(|n| n.import())
+            .ok_or(Failure::App(Error::NotFound))?;
         st.intercept(&ctx, &info, || st.timed(source.commit(ctx.clone(), file)))
             .await
     }
@@ -230,7 +291,9 @@ async fn give_reason(
     }
     let secure = if st.secure_cookies { "; Secure" } else { "" };
     let c = format!(
-        "{REASON_COOKIE}={name}.{}; Path={}; Max-Age={REASON_SECONDS}; HttpOnly; SameSite=Strict{secure}",
+        "{REASON_COOKIE}={name}.{}.{}.{}; Path={}; Max-Age={REASON_SECONDS}; HttpOnly; SameSite=Strict{secure}",
+        reason_holder(&ctx),
+        unix_now() + u64::from(REASON_SECONDS),
         encode(reason),
         st.cookie_path()
     );
