@@ -61,6 +61,9 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- On a 390 px screen a `Kpi` value stays on one line (the font shrinks with the width, a value that still does not fit ends in an ellipsis and keeps its full text in the title and for screen readers), and the search button of the top bar shows its icon again instead of an empty box.
+- A `Kanban` board no longer widens the page on a phone: its hidden status line sat outside the scroll box of the board and stretched the document to about 1040 px.
+
 - `Db::migrate` and `Db::migrate_dir` ignore line endings in migration checksums, so a migration checked out with CRLF on Windows and LF elsewhere validates on both. A checksum stored before this change, computed with the `` bytes, is still accepted; a real content change still fails.
 
 - The test of the rate store eviction counts how often a full store scans its map (`MemoryRateStore::evictions`) instead of measuring seconds, so it no longer fails on a busy machine.
