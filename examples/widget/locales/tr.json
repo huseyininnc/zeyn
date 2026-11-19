@@ -1,0 +1,10 @@
+{
+  "demo": {
+    "title": "Bileşen",
+    "menu": "Örnek",
+    "home": "Başlangıç",
+    "favorite": "Favori",
+    "intro": "Bu sayfada anahtar yok, bu yüzden bileşen modülünü bağlamaz. Menüden Favori sayfasını açın.",
+    "label": "Favori olarak işaretle"
+  }
+}
