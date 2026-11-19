@@ -17,11 +17,11 @@ use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use std::fmt::Write as _;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// A browser module: `/_zeyn/{name}.js` when `script` has markers, `/_zeyn/{name}.css` when
 /// `style` has markers.
-pub(crate) struct Module {
+pub(crate) struct Builtin {
     /// The file name without its extension.
     pub(crate) name: &'static str,
     /// Markers of the components that run the script: attribute names (`data-zeyn-*`) and
@@ -34,8 +34,8 @@ pub(crate) struct Module {
 }
 
 /// A script module that imports the shared part of the component library.
-const fn control(name: &'static str, script: &'static [&'static str]) -> Module {
-    Module {
+const fn control(name: &'static str, script: &'static [&'static str]) -> Builtin {
+    Builtin {
         name,
         script,
         style: &[],
@@ -44,8 +44,8 @@ const fn control(name: &'static str, script: &'static [&'static str]) -> Module 
 }
 
 /// A stylesheet module without a script.
-const fn style(name: &'static str, style: &'static [&'static str]) -> Module {
-    Module {
+const fn style(name: &'static str, style: &'static [&'static str]) -> Builtin {
+    Builtin {
         name,
         script: &[],
         style,
@@ -54,8 +54,8 @@ const fn style(name: &'static str, style: &'static [&'static str]) -> Module {
 }
 
 /// A script module that imports nothing.
-const fn script(name: &'static str, script: &'static [&'static str]) -> Module {
-    Module {
+const fn script(name: &'static str, script: &'static [&'static str]) -> Builtin {
+    Builtin {
         name,
         script,
         style: &[],
@@ -67,8 +67,8 @@ const fn script(name: &'static str, script: &'static [&'static str]) -> Module {
 /// (and its file to [`FILES`]); `tests/ui_modules.rs` fails when a page links a module it does not
 /// use. The grid runtime is linked as a `modulepreload`, because `zeyn.js` imports it itself to
 /// hand it the shared functions.
-pub(crate) const MODULES: &[Module] = &[
-    Module {
+pub(crate) const MODULES: &[Builtin] = &[
+    Builtin {
         name: "grid",
         script: &["data-zeyn-grid"],
         style: &[],
@@ -114,7 +114,7 @@ pub(crate) const MODULES: &[Module] = &[
     control("lines", &["data-zeyn-lines"]),
     control("steps", &["data-zeyn-steps"]),
     control("tree", &["data-zeyn-tree"]),
-    Module {
+    Builtin {
         name: "treedrag",
         script: &["data-zeyn-tree-drag", "data-zeyn-tree-move"],
         style: &["z-tree-movable"],
@@ -139,7 +139,7 @@ pub(crate) const MODULES: &[Module] = &[
             "data-zeyn-command-run",
         ],
     ),
-    Module {
+    Builtin {
         name: "pro",
         script: &[
             "data-zeyn-menubar",
@@ -152,20 +152,20 @@ pub(crate) const MODULES: &[Module] = &[
         needs: &["palette"],
     },
     script("reveal", &["data-zeyn-reveal"]),
-    Module {
+    Builtin {
         name: "forms",
         script: &["data-zeyn-submit", "data-zeyn-transition"],
         style: &["z-form-settings"],
         needs: &[],
     },
     script("import", &["data-zeyn-import"]),
-    Module {
+    Builtin {
         name: "catalog",
         script: &["data-zeyn-cards", "data-zeyn-searchbox"],
         style: &["z-cards", "z-rail", "z-poster", "z-search"],
         needs: &["drag"],
     },
-    Module {
+    Builtin {
         name: "media",
         script: &["data-zeyn-player", "z-embed", "data-zeyn-img"],
         style: &[
@@ -181,13 +181,13 @@ pub(crate) const MODULES: &[Module] = &[
         ],
         needs: &[],
     },
-    Module {
+    Builtin {
         name: "files",
         script: &["z-upload"],
         style: &["z-upload"],
         needs: &["net"],
     },
-    Module {
+    Builtin {
         name: "charts",
         script: &["data-zeyn-chart"],
         style: &["z-chart", "z-spark", "z-kpi", "z-skeleton-kpi", "z-bullet"],
@@ -199,7 +199,7 @@ pub(crate) const MODULES: &[Module] = &[
     script("hero", &["data-zeyn-hero"]),
     script("state", &["data-zeyn-prefs-clear"]),
     script("topics", &["data-zeyn-listens", "data-zeyn-drives"]),
-    Module {
+    Builtin {
         name: "vlist",
         script: &["data-zeyn-vlist"],
         style: &[],
@@ -207,32 +207,32 @@ pub(crate) const MODULES: &[Module] = &[
     },
     style("diff", &["z-diff"]),
     style("code", &["z-codeview"]),
-    Module {
+    Builtin {
         name: "codeedit",
         script: &["data-zeyn-code"],
         style: &["z-codeedit"],
         needs: &[],
     },
     style("barcode", &["z-barcode"]),
-    Module {
+    Builtin {
         name: "inbox",
         script: &["data-zeyn-inbox", "data-zeyn-notify"],
         style: &["z-inbox", "z-notify"],
         needs: &[],
     },
-    Module {
+    Builtin {
         name: "sortable",
         script: &["data-zeyn-sortable"],
         style: &["z-sortable"],
         needs: &["drag", "net"],
     },
-    Module {
+    Builtin {
         name: "kanban",
         script: &["data-zeyn-kanban"],
         style: &["z-kanban"],
         needs: &["drag", "net"],
     },
-    Module {
+    Builtin {
         name: "calendar",
         script: &["data-zeyn-calendar"],
         style: &["z-cal"],
@@ -276,7 +276,7 @@ pub(crate) const MODULES: &[Module] = &[
     ),
     script("imgcompare", &["data-zeyn-imgcompare"]),
     script("tour", &["data-zeyn-tour"]),
-    Module {
+    Builtin {
         name: "commerce",
         script: &[],
         style: &[
@@ -295,50 +295,50 @@ pub(crate) const MODULES: &[Module] = &[
         needs: &[],
     },
     script("stream", &[]),
-    Module {
+    Builtin {
         name: "thread",
         script: &["data-zeyn-thread"],
         style: &["z-thread"],
         needs: &["stream"],
     },
-    Module {
+    Builtin {
         name: "composer",
         script: &["data-zeyn-composer"],
         style: &["z-composer"],
         needs: &[],
     },
-    Module {
+    Builtin {
         name: "typing",
         script: &["data-zeyn-typing"],
         style: &["z-typing"],
         needs: &[],
     },
     style("stories", &["z-stories", "z-story"]),
-    Module {
+    Builtin {
         name: "lightbox",
         script: &["data-zeyn-lightbox"],
         style: &["z-lightbox-open", "z-lightbox"],
         needs: &[],
     },
-    Module {
+    Builtin {
         name: "feed",
         script: &["data-zeyn-feed"],
         style: &["z-feed", "z-post"],
         needs: &[],
     },
-    Module {
+    Builtin {
         name: "document",
         script: &["data-zeyn-doc"],
         style: &["z-doc"],
         needs: &[],
     },
-    Module {
+    Builtin {
         name: "gridchips",
         script: &["data-zeyn-filter-chips"],
         style: &["z-filter-chips"],
         needs: &[],
     },
-    Module {
+    Builtin {
         name: "surface",
         script: &["data-zeyn-surface"],
         style: &["z-surface"],
@@ -389,6 +389,8 @@ const STYLES: [&str; 27] = [
 pub(crate) struct Used {
     script: u64,
     style: u64,
+    /// The extension modules ([`Extensions`]) the page uses, one bit each in registration order.
+    ext: u64,
 }
 
 /// Every marker with the modules it brings, sorted by marker for a binary search.
@@ -404,13 +406,21 @@ fn markers() -> &'static [(&'static str, Used)] {
             let entries = m
                 .script
                 .iter()
-                .map(|k| (*k, Used { script, style: 0 }))
+                .map(|k| {
+                    (
+                        *k,
+                        Used {
+                            script,
+                            ..Used::default()
+                        },
+                    )
+                })
                 .chain(m.style.iter().map(|k| {
                     (
                         *k,
                         Used {
-                            script: 0,
                             style: 1 << i,
+                            ..Used::default()
                         },
                     )
                 }));
@@ -446,11 +456,13 @@ impl Used {
     fn add(&mut self, other: Used) {
         self.script |= other.script;
         self.style |= other.style;
+        self.ext |= other.ext;
     }
 
-    /// Adds the modules whose markers are in `html`, in one pass over the bytes that looks up
-    /// every whole name starting with `z-` or `data-zeyn-`.
-    pub(crate) fn scan(&mut self, html: &str) {
+    /// Adds the modules whose markers are in `html`, the framework's and the app's extensions,
+    /// in one pass over the bytes that looks up every whole name starting with `z-` or
+    /// `data-zeyn-`.
+    pub(crate) fn scan(&mut self, html: &str, ext: &Extensions) {
         let table = markers();
         let b = html.as_bytes();
         let mut i = 0;
@@ -465,10 +477,16 @@ impl Used {
                 i += 1;
             }
             let name = &html[start..i];
-            if (name.starts_with("z-") || name.starts_with("data-zeyn-"))
-                && let Ok(k) = table.binary_search_by_key(&name, |(m, _)| *m)
-            {
+            if !name.starts_with("z-") && !name.starts_with("data-zeyn-") {
+                continue;
+            }
+            if let Ok(k) = table.binary_search_by_key(&name, |(m, _)| *m) {
                 self.add(table[k].1);
+            } else if let Ok(k) = ext
+                .markers
+                .binary_search_by_key(&name, |(m, _)| *m)
+            {
+                self.ext |= ext.markers[k].1;
             }
         }
     }
@@ -476,7 +494,7 @@ impl Used {
     /// Writes the links of the component library for the page head: the stylesheets every page
     /// links ([`STYLES`]) with those of the used modules in their cascade order, then the scripts
     /// of the used modules (with the modules they import), the grid runtime as a `modulepreload`.
-    pub(crate) fn head(&self, base: &str, out: &mut String) {
+    pub(crate) fn head(&self, base: &str, ext: &Extensions, out: &mut String) {
         let v = super::ops::asset_version();
         for name in STYLES {
             let on = match MODULES
@@ -510,38 +528,325 @@ impl Used {
                 );
             }
         }
+        let used = || {
+            ext.list
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| self.ext & (1 << i) != 0)
+                .map(|(_, m)| m)
+        };
+        for m in used().filter(|m| m.css.is_some()) {
+            let _ = write!(
+                out,
+                r#"<link rel="stylesheet" href="{base}/_zeyn/ext/{}.css{v}">"#,
+                m.name
+            );
+        }
+        for m in used().filter(|m| m.js.is_some()) {
+            let _ = write!(
+                out,
+                r#"<script type="module" src="{base}/_zeyn/ext/{}.js{v}"></script>"#,
+                m.name
+            );
+        }
     }
 }
 
-/// The browser runtime `zeyn.js` with the table of [`MODULES`] in place of its empty
-/// `const MODULES = [];`: `[name, script selector, style selector]` per module, a selector empty
-/// when the module has no script or no style. The grid runtime is left out; `zeyn.js` loads it
-/// itself. Built once.
-pub(crate) fn runtime(js: &'static str) -> &'static str {
-    static JS: OnceLock<String> = OnceLock::new();
-    JS.get_or_init(|| {
-        let selector = |markers: &[&str]| {
-            markers
-                .iter()
-                .map(|m| match m.starts_with("data-") {
-                    true => format!("[{m}]"),
-                    false => format!(".{m}"),
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        let table: Vec<_> = MODULES
+/// The browser runtime `zeyn.js` with the table of [`MODULES`] and the app's extension modules
+/// in place of its empty `const MODULES = [];`: `[name, script selector, style selector]` per
+/// module, a selector empty when the module has no script or no style. An extension module is
+/// listed as `ext/{name}`, so the runtime loads it from `/_zeyn/ext/`. The grid runtime is left
+/// out; `zeyn.js` loads it itself. Built once per distinct table and kept for the life of the
+/// process, so its address stays the key of the compressed copy (`static_files`).
+pub(crate) fn runtime(js: &'static str, ext: &[Module]) -> &'static str {
+    static BUILT: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+    let selector = |markers: &[&str]| {
+        markers
             .iter()
-            .filter(|m| m.name != "grid")
-            .map(|m| (m.name, selector(m.script), selector(m.style)))
+            .map(|m| match m.starts_with("data-") {
+                true => format!("[{m}]"),
+                false => format!(".{m}"),
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let mut table: Vec<_> = MODULES
+        .iter()
+        .filter(|m| m.name != "grid")
+        .map(|m| (m.name.to_string(), selector(m.script), selector(m.style)))
+        .collect();
+    for m in ext {
+        let all = selector(&m.markers);
+        let pick = |on: bool| if on { all.clone() } else { String::new() };
+        table.push((
+            format!("ext/{}", m.name),
+            pick(m.js.is_some()),
+            pick(m.css.is_some()),
+        ));
+    }
+    let table = serde_json::to_string(&table).unwrap_or_else(|_| "[]".into());
+    let text = js.replacen(
+        "const MODULES = [];",
+        &format!("const MODULES = {table};"),
+        1,
+    );
+    let mut built = BUILT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if let Some(known) = built.iter().find(|k| ***k == text) {
+        return known;
+    }
+    let kept: &'static str = Box::leak(text.into_boxed_str());
+    built.push(kept);
+    kept
+}
+
+/// The most extension modules one app registers.
+pub const MAX_EXTENSION_MODULES: usize = 64;
+
+const _: () = assert!(
+    MAX_EXTENSION_MODULES <= 64,
+    "Used keeps one bit per extension module"
+);
+
+/// Names an extension module cannot take: the framework's own modules and the files the core
+/// serves under `/_zeyn/`.
+const RESERVED: [&str; 8] = [
+    "zeyn",
+    "nav",
+    "enterprise",
+    "assistant",
+    "inspect",
+    "icons",
+    "theme",
+    "ext",
+];
+
+/// The browser module of a component from a crate outside the framework: its script, its
+/// stylesheet, the markers its HTML carries and its texts. Register it with `App::module`,
+/// usually from a [`crate::Plugin`] the crate ships.
+///
+/// A page links the module only when its HTML holds one of the markers, and `zeyn.js` loads it
+/// when such content arrives later, as for the framework's own modules. The files are served at
+/// `/_zeyn/ext/{name}.js` and `/_zeyn/ext/{name}.css` with the build in the URL, so browsers
+/// keep them until the next build. Both are files, never inline, so the Content Security Policy
+/// stays strict.
+///
+/// The naming rule, checked when the module is registered: a crate `zeyn-{name}` registers the
+/// module `{name}`, its classes start with `z-{name}-` and its attributes with
+/// `data-zeyn-{name}-`. The name is lower case letters, digits and single hyphens, at most 32
+/// characters, and no framework module has it.
+///
+/// ```
+/// use zeyn::{App, Module};
+///
+/// let app = App::new("Shop").module(
+///     Module::new("rating")
+///         .js("export {};")
+///         .css(".z-rating-stars { color: var(--z-accent); }")
+///         .marker("data-zeyn-rating-stars")
+///         .marker("z-rating-stars")
+///         .texts(&[("en", r#"{ "rating": { "label": "Rating" } }"#)]),
+/// );
+/// # let _ = app;
+/// ```
+#[derive(Clone, Debug)]
+pub struct Module {
+    name: &'static str,
+    js: Option<&'static str>,
+    css: Option<&'static str>,
+    markers: Vec<&'static str>,
+    texts: &'static [(&'static str, &'static str)],
+}
+
+impl Module {
+    /// A module named `name`, the crate name without `zeyn-`.
+    pub fn new(name: &'static str) -> Self {
+        Module {
+            name,
+            js: None,
+            css: None,
+            markers: Vec::new(),
+            texts: &[],
+        }
+    }
+
+    /// The script, an ES module, usually `include_str!("../assets/{name}.js")`. It sets up
+    /// what it finds when it runs and listens to `zeyn:content` for content that arrives later.
+    pub fn js(mut self, source: &'static str) -> Self {
+        self.js = Some(source);
+        self
+    }
+
+    /// The stylesheet. Colors, spacing and radii come from the theme tokens (`var(--z-...)`),
+    /// so the module follows the light and the dark theme.
+    pub fn css(mut self, source: &'static str) -> Self {
+        self.css = Some(source);
+        self
+    }
+
+    /// A marker of the component's HTML: an attribute name `data-zeyn-{name}-...` or a class
+    /// `z-{name}-...`, matched as a whole name.
+    pub fn marker(mut self, marker: &'static str) -> Self {
+        self.markers.push(marker);
+        self
+    }
+
+    /// Message catalogs of the component, by locale (nested JSON, keys under `{name}.`). The
+    /// app's own catalogs win over them, so an app can reword any text.
+    pub fn texts(mut self, catalogs: &'static [(&'static str, &'static str)]) -> Self {
+        self.texts = catalogs;
+        self
+    }
+
+    /// The module's name.
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub(crate) fn catalogs(&self) -> &'static [(&'static str, &'static str)] {
+        self.texts
+    }
+
+    /// Checks the naming rule and that the module clashes with neither the framework nor the
+    /// modules registered before it.
+    pub(crate) fn check(&self, before: &[Module]) -> Result<(), String> {
+        let name = self.name;
+        let fix = "The naming rule: a crate zeyn-NAME registers Module::new(\"NAME\"), its classes \
+                   start with z-NAME- and its attributes with data-zeyn-NAME-.";
+        let shape = !name.is_empty()
+            && name.len() <= 32
+            && name.starts_with(|c: char| c.is_ascii_lowercase())
+            && !name.ends_with('-')
+            && !name.contains("--")
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+        if !shape {
+            return Err(format!(
+                "browser module `{name}`: a name is lower case letters, digits and single \
+                 hyphens, starts with a letter and has at most 32 characters. {fix}"
+            ));
+        }
+        if RESERVED.contains(&name) || MODULES.iter().any(|m| m.name == name) {
+            return Err(format!(
+                "browser module `{name}`: the framework has a module or file with this name; \
+                 pick the name of your crate without `zeyn-`. {fix}"
+            ));
+        }
+        if before.iter().any(|m| m.name == name) {
+            return Err(format!(
+                "browser module `{name}` is registered twice; register each module once, \
+                 usually in the Plugin of its crate."
+            ));
+        }
+        if before.len() >= MAX_EXTENSION_MODULES {
+            return Err(format!(
+                "browser module `{name}`: an app registers at most {MAX_EXTENSION_MODULES} \
+                 extension modules; join the components of one crate into one module."
+            ));
+        }
+        if self.js.is_none() && self.css.is_none() {
+            return Err(format!(
+                "browser module `{name}` has neither a script nor a stylesheet; add \
+                 .js(include_str!(..)) or .css(include_str!(..))."
+            ));
+        }
+        if self.markers.is_empty() {
+            return Err(format!(
+                "browser module `{name}` has no marker, so no page would load it; add \
+                 .marker(\"data-zeyn-{name}-...\") with an attribute its HTML carries."
+            ));
+        }
+        let attr = format!("data-zeyn-{name}-");
+        let class = format!("z-{name}-");
+        for marker in &self.markers {
+            let rest = marker
+                .strip_prefix(attr.as_str())
+                .or_else(|| marker.strip_prefix(class.as_str()));
+            let whole = marker.bytes().all(name_byte);
+            if rest.is_none_or(str::is_empty) || !whole {
+                return Err(format!(
+                    "browser module `{name}`: marker `{marker}` must be an attribute \
+                     `{attr}...` or a class `{class}...` of letters, digits, `-` and `_`. {fix}"
+                ));
+            }
+            if markers()
+                .binary_search_by_key(marker, |(m, _)| *m)
+                .is_ok()
+            {
+                return Err(format!(
+                    "browser module `{name}`: marker `{marker}` belongs to a framework \
+                     module; pick another."
+                ));
+            }
+            if let Some(other) = before
+                .iter()
+                .find(|m| m.markers.contains(marker))
+            {
+                return Err(format!(
+                    "browser module `{name}`: marker `{marker}` is already a marker of module \
+                     `{}`; pick another.",
+                    other.name
+                ));
+            }
+        }
+        for (locale, json) in self.texts {
+            crate::I18n::new("en")
+                .catalog(locale, json)
+                .map_err(|e| format!("browser module `{name}`: {e}"))?;
+        }
+        Ok(())
+    }
+}
+
+/// The extension modules of an app ([`Module`]), with their markers sorted for a binary search
+/// and the runtime that knows them.
+pub(crate) struct Extensions {
+    list: Vec<Module>,
+    markers: Vec<(&'static str, u64)>,
+    /// `zeyn.js` with the module table of the framework and of these modules.
+    pub(crate) runtime: &'static str,
+}
+
+impl Extensions {
+    pub(crate) fn new(list: Vec<Module>, js: &'static str) -> Self {
+        let mut markers: Vec<(&'static str, u64)> = list
+            .iter()
+            .enumerate()
+            .flat_map(|(i, m)| {
+                m.markers
+                    .iter()
+                    .map(move |k| (*k, 1u64 << i))
+            })
             .collect();
-        let table = serde_json::to_string(&table).unwrap_or_else(|_| "[]".into());
-        js.replacen(
-            "const MODULES = [];",
-            &format!("const MODULES = {table};"),
-            1,
-        )
-    })
+        markers.sort_unstable_by_key(|(k, _)| *k);
+        let runtime = runtime(js, &list);
+        Extensions {
+            list,
+            markers,
+            runtime,
+        }
+    }
+
+    /// Adds the routes of the modules' files, `/_zeyn/ext/{name}.js` and `.css`.
+    pub(crate) fn routes(&self, mut router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
+        for m in &self.list {
+            if let Some(js) = m.js {
+                router = router.route(
+                    &format!("/_zeyn/ext/{}.js", m.name),
+                    get(move || async move { asset(js, "text/javascript; charset=utf-8") }),
+                );
+            }
+            if let Some(css) = m.css {
+                router = router.route(
+                    &format!("/_zeyn/ext/{}.css", m.name),
+                    get(move || async move { asset(css, "text/css; charset=utf-8") }),
+                );
+            }
+        }
+        router
+    }
 }
 
 /// Script and style files of component modules, by path; the others are served next to their

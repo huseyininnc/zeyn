@@ -16,6 +16,7 @@ Zeyn は 2 つの側面のエージェントを想定して作られています
 | `zeyn_inspect` | 1 つの画面のノードツリー：パス、コンポーネントの種類、各ノードを置いた Rust の `file:line:column` |
 | `zeyn_devtools` | デバッグモードで動くアプリの DevTools リクエストログ: 新しいリクエストから順に、画面、アクション、ステータス、時間、SQL 文（文と時間のみ、値は含まない）。`addr` と `limit` は省略可能 |
 | `zeyn_check` | コンパイルして問題を報告します。`fix: true` を付けると、先に名前が変わった API を書き換えます |
+| `zeyn_doctor` | プロジェクトのビルド方法を読み取ります: target のサイズ、リンカー、dev プロファイル、ツールチェーン、Windows のスキャン除外。`fix: true` は高速な dev プロファイルとリンカーを追加します（`Cargo.toml` と `.cargo/config.toml` のみ） |
 | `zeyn_test` | `cargo test` を実行し、出力の末尾を返します |
 | `zeyn_new_feature` | Feature のフォルダを作成して登録します |
 | `zeyn_new_screen` | Feature に画面ファイルを追加して登録します |
