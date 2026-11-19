@@ -403,6 +403,7 @@ impl Dock {
 }
 
 /// Panel ids of a dock from its schema; `None` when the schema is not a dock's.
+#[cfg(feature = "server")]
 pub(crate) fn panel_ids(schema: &Json) -> Option<Vec<String>> {
     if schema.get("type")?.as_str()? != "dock" {
         return None;

@@ -5,7 +5,9 @@
 use super::catalog::check_masks;
 use super::embed::{Fit, Image, Placeholder};
 use super::{dom_id, topic_list};
-use crate::action::{Action, ActionMeta, DataQuery, Error, Page, PageRequest, Result, Sort};
+#[cfg(feature = "server")]
+use crate::action::Error;
+use crate::action::{Action, ActionMeta, DataQuery, Page, PageRequest, Result, Sort};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::files::{File, FileRules, valid_file_id};
 use crate::i18n::Text;

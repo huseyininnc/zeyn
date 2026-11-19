@@ -32,6 +32,7 @@ impl<T: Read + Seek + Send + 'static> MediaReader for T {}
 
 /// An opened media file: its reader, length, content type and optional entity tag.
 pub struct Media {
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     pub(crate) reader: Box<dyn MediaReader>,
     pub(crate) len: u64,
     pub(crate) content_type: String,
@@ -210,6 +211,7 @@ pub fn media_type(name: &str) -> &'static str {
 /// Whether a content type is safe to serve inline from the app's origin: audio, video, raster
 /// images, captions and streaming playlists. Anything else (HTML, SVG, scripts) is sent as a
 /// download so it can never run as a page of the app.
+#[cfg(feature = "server")]
 pub(crate) fn inline_type(content_type: &str) -> bool {
     let t = content_type
         .split(';')

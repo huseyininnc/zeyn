@@ -75,6 +75,7 @@ pub struct Trail {
     pub export: Option<ExportRecord>,
     /// Reason the user gave, with the screen it was given for. Checked by the server.
     #[serde(skip)]
+    #[cfg(feature = "server")]
     pub(crate) given_reason: Option<(String, String)>,
 }
 
