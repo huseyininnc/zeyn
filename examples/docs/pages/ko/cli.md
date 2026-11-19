@@ -56,6 +56,7 @@ cargo run
 
   `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`처럼 쓰지 않습니다.
 - `build.rs`와 `Cargo.toml`의 `[package.metadata.zeyn]`에 있는 `max_file_lines = 300`: `src/`의 파일에 비어 있지 않은 줄이 더 많으면 `cargo build`가 멈춥니다. clippy `too_many_lines`(60, `clippy.toml`)는 함수에 같은 일을 합니다. [Project structure](structure.md)를 참고하세요.
+- `Cargo.toml`의 `[profile.dev]`, `.cargo/config.toml`, `.vscode/settings.json`: 빠른 빌드 루프입니다. 의존성은 `opt-level = 1`과 디버그 정보 없이 빌드되고, 내 코드는 줄 테이블만 유지하며(백트레이스에 파일과 줄이 표시됩니다. 지역 변수로 디버깅하려면 `CARGO_PROFILE_DEV_DEBUG=full`을 설정하세요), Windows는 `rust-lld`로 링크하고, rust-analyzer는 자체 target 폴더를 사용하므로 `cargo build`를 기다리지 않습니다.
 - `Dockerfile`과 `.dockerignore`: 작은 컨테이너 이미지입니다.
 - 일반적인 CI 서버용 파이프라인이며, 모두 같은 검사(`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`)를 실행하고 `Cargo.toml`과 일치하지 않는 태그 `vX.Y.Z`를 거부합니다.
   - GitHub Actions용 `.github/workflows/ci.yml`, 그리고 `.github/dependabot.yml`(Cargo와 action의 주간 업데이트)과 pull request 체크리스트

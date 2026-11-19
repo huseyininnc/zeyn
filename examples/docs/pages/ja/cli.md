@@ -54,6 +54,7 @@ cargo run
 
   次のような書き方ではありません: `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`。
 - `build.rs` と、`Cargo.toml` の `[package.metadata.zeyn]` にある `max_file_lines = 300`: `src/` のファイルの空でない行がそれより多いと `cargo build` が止まります。clippy の `too_many_lines`（60、`clippy.toml`）は関数について同じことをします。[Project structure](structure.md) を参照してください。
+- `Cargo.toml` の `[profile.dev]`、`.cargo/config.toml`、`.vscode/settings.json`: 速いビルドの繰り返しのための設定です。依存関係は `opt-level = 1` でデバッグ情報なしにビルドされ、自分のコードは行テーブルだけを持ち（バックトレースにはファイルと行が表示されます。ローカル変数でデバッグするには `CARGO_PROFILE_DEV_DEBUG=full` を設定します）、Windows では `rust-lld` でリンクし、rust-analyzer は専用の target フォルダを使うので `cargo build` を待ちません。
 - `Dockerfile` と `.dockerignore`: 小さなコンテナイメージ。
 - 代表的な CI サーバー向けのパイプライン。いずれも同じ検査（`cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`、`cargo deny check`）を実行し、`Cargo.toml` と一致しない `vX.Y.Z` タグを拒否します。
   - `.github/workflows/ci.yml`: GitHub Actions 用。`.github/dependabot.yml`（Cargo とアクションの週次更新）とプルリクエストのチェックリストが付きます。

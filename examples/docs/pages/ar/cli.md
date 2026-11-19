@@ -56,6 +56,7 @@ cargo run
 
   وليس `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
 - `build.rs` و`max_file_lines = 300` تحت `[package.metadata.zeyn]` في `Cargo.toml`: يتوقف `cargo build` عندما يزيد عدد الأسطر غير الفارغة في ملف داخل `src/`؛ ويفعل clippy `too_many_lines` (60، في `clippy.toml`) الشيء نفسه للدوال. انظر [Project structure](structure.md).
+- `[profile.dev]` في `Cargo.toml` و`.cargo/config.toml` و`.vscode/settings.json`: حلقة بناء سريعة. تُبنى الاعتماديات بـ `opt-level = 1` ودون معلومات تصحيح، ويحتفظ كودك بجداول الأسطر فقط (تعرض آثار الاستدعاء الملف والسطر؛ اضبط `CARGO_PROFILE_DEV_DEBUG=full` للتصحيح مع المتغيرات المحلية)، ويربط Windows عبر `rust-lld`، ويستخدم rust-analyzer مجلد target خاصا به فلا ينتظر `cargo build`.
 - `Dockerfile` و`.dockerignore`: صورة حاوية صغيرة.
 - خطوط إنتاج (pipelines) لخوادم CI الشائعة، وكلها تجري الفحوص نفسها (`cargo fmt --check` و`cargo clippy -D warnings` و`cargo test` و`cargo deny check`) وترفض وسمًا `vX.Y.Z` لا يطابق `Cargo.toml`:
   - `.github/workflows/ci.yml` لـ GitHub Actions، مع `.github/dependabot.yml` (تحديثات أسبوعية لـ Cargo والإجراءات) وقائمة مراجعة لطلبات السحب (pull requests)؛

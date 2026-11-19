@@ -56,6 +56,7 @@ cargo run
 
   y no `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
 - `build.rs` y `max_file_lines = 300` en `[package.metadata.zeyn]` de `Cargo.toml`: `cargo build` se detiene cuando un archivo de `src/` tiene más líneas no vacías; clippy `too_many_lines` (60, en `clippy.toml`) hace lo mismo con las funciones. Consulta [Project structure](structure.md).
+- `[profile.dev]` en `Cargo.toml`, `.cargo/config.toml` y `.vscode/settings.json`: un ciclo de compilación rápido. Las dependencias se compilan con `opt-level = 1` y sin información de depuración, tu propio código conserva solo las tablas de líneas (las trazas muestran archivo y línea; define `CARGO_PROFILE_DEV_DEBUG=full` para depurar con variables locales), Windows enlaza con `rust-lld` y rust-analyzer usa su propia carpeta target para no esperar a `cargo build`.
 - `Dockerfile` y `.dockerignore`: una imagen de contenedor pequeña.
 - Pipelines para los servidores de CI habituales, todos con las mismas comprobaciones (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) y que rechazan una etiqueta `vX.Y.Z` que no coincida con `Cargo.toml`:
   - `.github/workflows/ci.yml` para GitHub Actions, con `.github/dependabot.yml` (actualizaciones semanales de Cargo y de actions) y una lista de verificación para pull requests;

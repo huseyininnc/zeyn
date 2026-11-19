@@ -121,6 +121,14 @@ const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/src/features/notes/screens.rs"),
     ),
     ("tests/app.rs", include_str!("../templates/tests/app.rs")),
+    (
+        ".cargo/config.toml",
+        include_str!("../templates/cargo-config.toml"),
+    ),
+    (
+        ".vscode/settings.json",
+        include_str!("../templates/vscode-settings.json"),
+    ),
     ("build.rs", include_str!("../templates/common/build.rs")),
 ];
 
@@ -216,6 +224,14 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
     (
         "tests/lib.rs",
         include_str!("../templates/lib/tests/lib.rs"),
+    ),
+    (
+        ".cargo/config.toml",
+        include_str!("../templates/cargo-config.toml"),
+    ),
+    (
+        ".vscode/settings.json",
+        include_str!("../templates/vscode-settings.json"),
     ),
     ("build.rs", include_str!("../templates/common/build.rs")),
 ];
@@ -1500,6 +1516,56 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         let lib = base.join("ci-lib");
         new_project_at(&lib, "ci-lib", None, true, false).unwrap();
         assert!(lib.join("Jenkinsfile").is_file() && !lib.join(".git").exists());
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// Every new project builds dependencies lean, links with `rust-lld` on Windows and keeps
+    /// rust-analyzer in its own target folder.
+    #[test]
+    fn new_projects_ship_the_fast_dev_profile_linker_and_analyzer_target() {
+        let base = std::env::temp_dir().join(format!("zeyn-fast-{}", std::process::id()));
+        std::fs::remove_dir_all(&base).ok();
+        std::fs::create_dir_all(&base).unwrap();
+        for (name, lib) in [("fast-app", false), ("fast-lib", true)] {
+            let root = base.join(name);
+            new_project_at(&root, name, None, lib, false).unwrap();
+            let manifest = read(&root, "Cargo.toml");
+            assert!(
+                manifest.contains(
+                    "[profile.dev]
+debug = \"line-tables-only\""
+                ) && manifest.contains(
+                    "[profile.dev.package.\"*\"]
+debug = false
+opt-level = 1"
+                ),
+                "{name}: {manifest}"
+            );
+            let cargo = read(&root, ".cargo/config.toml");
+            assert!(
+                cargo.contains("x86_64-pc-windows-msvc") && cargo.contains("rust-lld.exe"),
+                "{name}: {cargo}"
+            );
+            let editor = read(&root, ".vscode/settings.json");
+            let editor: serde_json::Value = serde_json::from_str(&editor).unwrap();
+            assert_eq!(editor["rust-analyzer.cargo.targetDir"], true, "{name}");
+        }
+        if std::env::var("ZEYN_TEST_NEW_BUILD").is_ok() {
+            let zeyn = format!("{}/../zeyn", env!("CARGO_MANIFEST_DIR"));
+            let root = base.join("built");
+            new_project_at(&root, "built", Some(&zeyn), false, false).unwrap();
+            let out = Command::new("cargo")
+                .args(["check", "--quiet"])
+                .current_dir(&root)
+                .env("CARGO_TARGET_DIR", base.join("target"))
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
         std::fs::remove_dir_all(&base).ok();
     }
 
