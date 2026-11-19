@@ -7227,6 +7227,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeyn-example-admin"
+version = "0.0.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "serde_json",
+ "tokio",
+ "tower",
+ "zeyn",
+]
+
+[[package]]
 name = "zeyn-example-big-grid"
 version = "0.0.0"
 dependencies = [

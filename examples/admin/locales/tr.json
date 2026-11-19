@@ -1,0 +1,186 @@
+{
+  "app": {
+    "name": "Acme Yönetim"
+  },
+  "menu": {
+    "overview": "Genel bakış",
+    "sales": "Satış",
+    "catalog": "Katalog",
+    "admin": "Yönetim",
+    "access": "Erişim",
+    "new": "Yeni"
+  },
+  "months": {
+    "m1": "Oca",
+    "m2": "Şub",
+    "m3": "Mar",
+    "m4": "Nis",
+    "m5": "May",
+    "m6": "Haz",
+    "m7": "Tem",
+    "m8": "Ağu",
+    "m9": "Eyl",
+    "m10": "Eki",
+    "m11": "Kas",
+    "m12": "Ara"
+  },
+  "dashboard": {
+    "title": "Pano",
+    "subtitle": "Son 30 gün, önceki 30 güne göre. {open} sipariş işlem bekliyor.",
+    "revenue": "Ciro",
+    "orders": "Siparişler",
+    "average": "Ortalama sipariş",
+    "new_customers": "Yeni müşteriler",
+    "revenue_by_month": "Aylara göre ciro",
+    "by_status": "Durumlara göre siparişler, son 30 gün",
+    "latest": "Son siparişler"
+  },
+  "orders": {
+    "title": "Siparişler",
+    "subtitle": "Süzün, görünümü kaydedin ya da gördüğünüz satırları dışa aktarın.",
+    "order_title": "Sipariş {number}",
+    "tabs": "Sipariş bölümleri",
+    "details": "Ayrıntılar",
+    "history": "Geçmiş",
+    "edit": "Durum ve notlar",
+    "save": "Siparişi kaydet",
+    "saved": "{number} siparişi kaydedildi.",
+    "go_to": "Siparişlere git",
+    "event_saved": "Kaydedildi",
+    "event_by": "{user}: {changes}",
+    "event_placed": "Verildi",
+    "event_placed_detail": "Siparişi veren: {customer}"
+  },
+  "customers": {
+    "title": "Müşteriler",
+    "new": "Yeni müşteri",
+    "edit": "Müşteriyi düzenle",
+    "customer": "Müşteri",
+    "save": "Müşteriyi kaydet",
+    "saved": "{name} kaydedildi.",
+    "tabs": "Müşteri bölümleri",
+    "profile": "Profil",
+    "orders": "Siparişler",
+    "spent": "Toplam harcama"
+  },
+  "products": {
+    "title": "Ürünler",
+    "new": "Yeni ürün",
+    "product": "Ürün",
+    "save": "Ürünü kaydet",
+    "saved": "{sku} ürünü kaydedildi."
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "subtitle": "Şirket bilgileri ve siparişlerin nasıl işlendiği.",
+    "company": "Şirket",
+    "orders": "Siparişler",
+    "notifications": "Bildirimler",
+    "save": "Ayarları kaydet",
+    "saved": "Ayarlar kaydedildi."
+  },
+  "users": {
+    "title": "Kullanıcılar",
+    "new": "Yeni kullanıcı",
+    "user": "Kullanıcı",
+    "save": "Kullanıcıyı kaydet",
+    "saved": "{name} kaydedildi."
+  },
+  "roles": {
+    "title": "Roller",
+    "subtitle": "Her rolün yapabildikleri. Roller kodda, src/roles.rs içinde tanımlıdır.",
+    "caption": "Rollere göre izinler",
+    "permission": "İzin",
+    "granted": "Evet",
+    "denied": "Hayır"
+  },
+  "permissions": {
+    "admin.dashboard.read": "Panoyu görme",
+    "admin.orders.read": "Siparişleri görme",
+    "admin.orders.write": "Siparişleri değiştirme",
+    "admin.customers.read": "Müşterileri görme",
+    "admin.customers.write": "Müşterileri değiştirme",
+    "admin.products.read": "Ürünleri görme",
+    "admin.products.write": "Ürünleri değiştirme",
+    "admin.settings.read": "Ayarları görme",
+    "admin.settings.write": "Ayarları değiştirme",
+    "admin.users.read": "Kullanıcıları ve rolleri görme",
+    "admin.users.write": "Kullanıcıları değiştirme"
+  },
+  "Customer": {
+    "name": "Ad",
+    "email": "E-posta",
+    "city": "Şehir",
+    "segment": "Segment",
+    "active": "Etkin",
+    "since": "Müşteri olduğu tarih"
+  },
+  "Segment": {
+    "Retail": "Perakende",
+    "Business": "Kurumsal",
+    "Partner": "İş ortağı"
+  },
+  "Product": {
+    "sku": "Stok kodu",
+    "name": "Ad",
+    "category": "Kategori",
+    "price": "Fiyat",
+    "stock": "Eldeki",
+    "active": "Etkin"
+  },
+  "Category": {
+    "Hardware": "Donanım",
+    "Software": "Yazılım",
+    "Service": "Hizmet",
+    "Supplies": "Sarf malzemesi"
+  },
+  "Order": {
+    "number": "Numara",
+    "customer_id": "Müşteri no",
+    "customer_name": "Müşteri",
+    "placed": "Sipariş tarihi",
+    "status": "Durum",
+    "items": "Kalem",
+    "total": "Tutar",
+    "notes": "Notlar"
+  },
+  "OrderStatus": {
+    "New": "Yeni",
+    "Processing": "Hazırlanıyor",
+    "Shipped": "Kargoda",
+    "Delivered": "Teslim edildi",
+    "Cancelled": "İptal"
+  },
+  "OrderEvent": {
+    "order_id": "Sipariş",
+    "at": "Zaman",
+    "user_name": "Kullanıcı",
+    "kind": "Tür",
+    "detail": "Ayrıntı"
+  },
+  "User": {
+    "name": "Ad",
+    "email": "E-posta",
+    "role": "Rol",
+    "active": "Etkin"
+  },
+  "Role": {
+    "Admin": "Yönetici",
+    "Manager": "Müdür",
+    "Viewer": "İzleyici"
+  },
+  "Settings": {
+    "company": "Şirket adı",
+    "company_help": "Faturalarda ve e-postalarda görünür.",
+    "support_email": "Destek e-postası",
+    "support_email_help": "Müşteriler bu adrese yazar.",
+    "ship_within_days": "Gönderim süresi (gün)",
+    "ship_within_days_help": "Bundan eski siparişler gecikmiş sayılır.",
+    "low_stock": "Düşük stok düzeyi",
+    "low_stock_help": "Bu sayıda ya da altında olan ürünler işaretlenir.",
+    "notify_new_orders": "Yeni siparişleri e-postayla bildir",
+    "notify_new_orders_help": "Her sipariş için destek adresine bir ileti.",
+    "weekly_report": "Haftalık rapor",
+    "weekly_report_help": "Her pazartesi sabahı bir özet."
+  }
+}

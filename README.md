@@ -26,6 +26,7 @@ The docs are at https://docs.zeynsoft.com, every component runs live with its so
 ```
 cargo run -p zeyn-example-components   # http://127.0.0.1:3010, every component live next to its code
 cargo run -p zeyn-example-showcase     # http://127.0.0.1:3002, the components together in sample screens
+cargo run -p zeyn-example-admin        # http://127.0.0.1:3011, an admin template on PostgreSQL or sample data
 cargo run -p zeyn-example-big-grid     # http://127.0.0.1:3000, one million rows
 cargo run -p zeyn-example-billing      # http://127.0.0.1:3004, an app using the shared-domain library
 cargo run -p zeyn-example-docs         # http://127.0.0.1:3008, the documentation site, written with Zeyn
