@@ -67,6 +67,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- `cargo clippy -p zeyn-cli` and builds of `zeyn` without the `server` feature no longer fail on unused imports and dead code (`platform.rs`, `ui/thread.rs` and 28 more items that only the server reads). CI runs clippy on `zeyn` with no default features, the features that build without `server` and the default features (`ci/clippy-features.sh`).
 - On a 390 px screen a `Kpi` value stays on one line (the font shrinks with the width, a value that still does not fit ends in an ellipsis and keeps its full text in the title and for screen readers), and the search button of the top bar shows its icon again instead of an empty box.
 - A `Kanban` board no longer widens the page on a phone: its hidden status line sat outside the scroll box of the board and stretched the document to about 1040 px.
 

@@ -239,6 +239,7 @@ impl Ctx {
 
     /// The context of one request, built in one step.
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "server")]
     pub(crate) fn for_request(
         identity: Identity,
         locale: String,
@@ -295,6 +296,7 @@ impl Ctx {
     }
 
     /// Same context marked as a prefetch.
+    #[cfg(feature = "server")]
     pub(crate) fn as_prefetch(&self) -> Self {
         self.rebuild(|i| i.prefetch = true)
     }
@@ -315,6 +317,7 @@ impl Ctx {
     }
 
     /// Same context in compact density (`zeyn_density=compact`).
+    #[cfg(feature = "server")]
     pub(crate) fn with_compact(&self) -> Self {
         self.rebuild(|i| i.compact = true)
     }
@@ -326,6 +329,7 @@ impl Ctx {
     }
 
     /// Same context with the side menu folded to an icon rail.
+    #[cfg(feature = "server")]
     pub(crate) fn with_rail(&self) -> Self {
         self.rebuild(|i| i.rail = true)
     }

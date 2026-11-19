@@ -11,7 +11,9 @@ use crate::time::Date;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+#[cfg(feature = "server")]
+use std::sync::Mutex;
 
 /// A value that must never appear in logs: `Debug` and `Display` print `[redacted]`.
 ///

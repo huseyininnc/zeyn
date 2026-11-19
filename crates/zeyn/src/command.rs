@@ -64,6 +64,7 @@ use crate::ctx::{BoxFuture, Ctx, Outcome};
 use crate::i18n::Text;
 use crate::render::{Render, attr, escape};
 use crate::screen::{Effect, Icon, RowCall, ScreenDef, Window};
+#[cfg(feature = "server")]
 use serde_json::{Value as Json, json};
 use std::sync::Arc;
 
@@ -388,6 +389,7 @@ impl Command {
 
     /// A hidden button that runs the command, placed in the page shell for the palette and for
     /// the shortcut.
+    #[cfg(feature = "server")]
     pub(crate) fn button(&self, r: &Render) -> String {
         let hint = self
             .hint()
@@ -408,6 +410,7 @@ impl Command {
         )
     }
 
+    #[cfg(feature = "server")]
     pub(crate) fn schema(&self) -> Json {
         json!({
             "id": self.id,
@@ -664,6 +667,7 @@ pub(crate) fn link_shortcut(raw: Option<&str>) -> (String, String) {
 /// Problems of link shortcuts (`Chips::link`, `PrevNext`): shortcuts that cannot be read, that
 /// the browser keeps or uses, single character ones, and ones another link of the same set, a
 /// command or the palette already uses. `links` holds where each link is and its shortcut.
+#[cfg(feature = "server")]
 pub(crate) fn link_problems(
     links: &[(String, &str)],
     commands: &[(&str, &Command)],

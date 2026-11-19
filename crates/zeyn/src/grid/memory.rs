@@ -452,6 +452,7 @@ fn total_as(values: impl Iterator<Item = Value>, op: Aggregate, bytes: bool) -> 
 /// Lists of at least this many rows are filtered and sorted with `tokio::task::block_in_place`
 /// when [`DataQuery::apply`] runs on a worker of the multi threaded runtime, so the worker's other
 /// tasks move to another thread instead of waiting for the sort.
+#[cfg(feature = "server")]
 pub(crate) const BLOCKING_ROWS: usize = 50_000;
 
 /// One sort value of a row, read once: the value and, for text, its lower case form when it
