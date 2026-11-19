@@ -89,6 +89,7 @@ pub use live::Live;
 #[cfg(feature = "realtime")]
 pub use live::{EventNode, OnEvent, OnEvents};
 
+#[cfg(feature = "server")]
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
 pub use embed::{
@@ -132,7 +133,9 @@ pub(crate) use controls::{
 };
 pub use countdown::Countdown;
 pub use date::DateOptions;
-pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+#[cfg(feature = "server")]
+pub(crate) use date::picker_config;
+pub(crate) use date::{input_text, range_reversed, render_date_input, render_range};
 pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
 pub use document::{
     DocPage, DocSearch, DocumentViewer, MAX_DOCUMENT_PAGES, MAX_DOCUMENT_QUERY, MAX_PAGE_BYTES,

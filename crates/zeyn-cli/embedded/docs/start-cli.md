@@ -136,6 +136,17 @@ zeyn check --json
 
 `zeyn check` also reads the app's source and warns, with file and line, about `W0106` a string that holds a `<script>` without `src` or an inline event handler such as `onclick=` (the CSP blocks both), `W0107` a hand written component that writes HTML without `escape(..)`, `r.text(..)` or `r.value(..)`, `W0108` an action that returns a whole `Vec` without a query that bounds it, and `W0109` a `DocumentViewer` marked `.trusted()`. A missing `permission` or `public` needs no warning: it does not compile.
 
+## Moving to a new Zeyn version
+
+`zeyn migrate` moves an app to a newer Zeyn version, like `ng update`. It reads the Zeyn version the app is on from `Cargo.lock` (or `Cargo.toml`), runs every migration step between that version and the target in order, moves the Zeyn dependencies in `Cargo.toml` to the target and prints what it did: each change with its file and line, and the places a person has to look at, each with the reason.
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+A step renames names and methods (`Hub` to `Socket`, `.realtime(live)` to `.socket(live)`), changes the shape of a call (`.sort_by(Order::date, true)` to `.sort_by_desc(Order::date)`), moves `use` paths and points out what it cannot rewrite safely, such as a `bool` flag that is not a literal, a sign out link to a removed address, a `match` on `CallKind` that needs an arm for `ImportPreview`, or an `impl` of `RateStore` or `DocStore` that may want the new `refund` or `allow` method. It edits only the tokens it replaces, so formatting and comments stay, and a second run changes nothing. `--dry-run` writes nothing and prints a unified diff; `--json` prints the report as one JSON document with `changes`, `todos` and `errors`. The exit code is 0 unless a file cannot be read, parsed or written. `zeyn check --fix` applies the renames of every step. The MCP tool `zeyn_migrate` does the same for an agent.
+
 ## Build speed and disk use
 
 `zeyn doctor` reads how the project builds and reports what makes it slow or large: the size of the target folder and its largest folders, the linker, the dev profile (debug info and dependency optimization), rustc and cargo against `rust-version`, artifacts left by an older toolchain, the rust-analyzer target folder and, on Windows, whether the target folder and `~/.cargo` are outside Defender's scans (an exclusion or a Dev Drive; it says so when Windows does not let it read them). Each finding has a stable code and a one line fix. `--json` prints them as one document, `--target-limit-gb` sets the size that counts as large (default 20), and the exit code is always 0. `zeyn doctor --fix` adds the fast dev profile to `Cargo.toml` and the `rust-lld` linker to `.cargo/config.toml` and edits nothing else; a second run changes nothing. The MCP tool `zeyn_doctor` does the same for an agent.

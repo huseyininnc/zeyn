@@ -137,3 +137,17 @@ pub(crate) fn stream<E: Entity>(pool: PgPool, sql: Sql, tx: tokio::sync::mpsc::S
         }
     });
 }
+
+/// Reads the checksums of the applied migrations from the migrations table, by version. A
+/// missing table or any read error gives an empty map, so the first run on a new database works.
+pub(crate) async fn applied_checksums(
+    pool: &PgPool,
+    table: &str,
+) -> std::collections::HashMap<i64, Vec<u8>> {
+    let sql = format!("SELECT version, checksum FROM {table}");
+    sqlx::query_as::<_, (i64, Vec<u8>)>(AssertSqlSafe(sql))
+        .fetch_all(pool)
+        .await
+        .map(|rows| rows.into_iter().collect())
+        .unwrap_or_default()
+}

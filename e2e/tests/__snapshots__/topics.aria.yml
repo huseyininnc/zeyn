@@ -1,0 +1,80 @@
+- main:
+  - region "Topics":
+    - heading "Topics" [level=1]
+    - paragraph: Filters and actions that refresh other parts of the screen in place.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/effects#topics
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Effect
+    - tablist "Topics sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Filter chips that drive a KPI, a chart and a grid" [level=3]
+      - group "Kind":
+        - list:
+          - listitem:
+            - button "Books"
+          - listitem:
+            - button "Tools"
+          - listitem:
+            - button "Plants"
+      - group "Units in stock":
+        - paragraph: Units in stock
+        - paragraph: /\d+,\d+/
+      - figure "Stock of the first six":
+        - text: ""
+        - 'group /Stock of the first six Bar chart of 1 series over 6 categories\. Highest: P-\d+, \d+\./':
+          - paragraph: "/Bar chart of 1 series over 6 categories\\. Highest: P-\\d+, \\d+\\./"
+          - img:
+            - 'img /P-\d+, Units: \d+/'
+            - 'img /P-\d+, Units: \d+/'
+            - 'img /P-\d+, Units: \d+/'
+            - 'img /P-\d+, Units: \d+/'
+            - 'img /P-\d+, Units: 5/'
+            - 'img /P-\d+, Units: \d+/'
+        - group: Show data
+      - grid:
+        - rowgroup:
+          - 'row "Name Column options: Name Resize Name Kind Column options: Kind Resize Kind Stock Column options: Stock Resize Stock"':
+            - 'columnheader "Name Column options: Name Resize Name"':
+              - button "Name"
+              - 'button "Column options: Name"'
+              - separator "Resize Name"
+            - 'columnheader "Kind Column options: Kind Resize Kind"':
+              - button "Kind"
+              - 'button "Column options: Kind"'
+              - separator "Resize Kind"
+            - 'columnheader "Stock Column options: Stock Resize Stock"':
+              - button "Stock"
+              - 'button "Column options: Stock"'
+              - separator "Resize Stock"
+        - rowgroup:
+          - row /Field notes \d+ Book \d+/:
+            - gridcell /Field notes \d+/
+            - gridcell "Book"
+            - gridcell /\d+/
+          - row /Garden trowel \d+ Tool \d+/:
+            - gridcell /Garden trowel \d+/
+            - gridcell "Tool"
+            - gridcell /\d+/
+          - row /Fern \d+ Plant \d+/:
+            - gridcell /Fern \d+/
+            - gridcell "Plant"
+            - gridcell /\d+/
+          - row /City atlas \d+ Book \d+/:
+            - gridcell /City atlas \d+/
+            - gridcell "Book"
+            - gridcell /\d+/
+          - row /Hand saw \d+ Tool 5/:
+            - gridcell /Hand saw \d+/
+            - gridcell "Tool"
+            - gridcell "5"
+      - navigation "Pagination":
+        - button "Previous page" [disabled]: ‹
+        - text: /1-5 of \d+/
+        - button "Next page": ›
+      - group: Show code
+      - button "Copy"
+      - status

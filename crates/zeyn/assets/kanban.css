@@ -4,7 +4,7 @@
 .z-kanban-title { margin: 0; font-size: var(--z-text-lg); line-height: var(--z-leading-lg); }
 .z-kanban-board {
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: var(--z-s-3);
-  overflow-x: auto; padding-block-end: var(--z-s-2); align-items: start;
+  position: relative; overflow-x: auto; padding-block-end: var(--z-s-2); align-items: start;
 }
 .z-kanban-col {
   display: grid; gap: var(--z-s-2); align-content: start; min-inline-size: 0; padding: var(--z-s-2);

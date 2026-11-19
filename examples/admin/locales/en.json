@@ -1,0 +1,186 @@
+{
+  "app": {
+    "name": "Acme Admin"
+  },
+  "menu": {
+    "overview": "Overview",
+    "sales": "Sales",
+    "catalog": "Catalog",
+    "admin": "Administration",
+    "access": "Access",
+    "new": "New"
+  },
+  "months": {
+    "m1": "Jan",
+    "m2": "Feb",
+    "m3": "Mar",
+    "m4": "Apr",
+    "m5": "May",
+    "m6": "Jun",
+    "m7": "Jul",
+    "m8": "Aug",
+    "m9": "Sep",
+    "m10": "Oct",
+    "m11": "Nov",
+    "m12": "Dec"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Last 30 days against the 30 days before. {open} orders need work.",
+    "revenue": "Revenue",
+    "orders": "Orders",
+    "average": "Average order",
+    "new_customers": "New customers",
+    "revenue_by_month": "Revenue by month",
+    "by_status": "Orders by status, last 30 days",
+    "latest": "Latest orders"
+  },
+  "orders": {
+    "title": "Orders",
+    "subtitle": "Filter, save a view or export the rows you see.",
+    "order_title": "Order {number}",
+    "tabs": "Order sections",
+    "details": "Details",
+    "history": "History",
+    "edit": "Status and notes",
+    "save": "Save order",
+    "saved": "Order {number} saved.",
+    "go_to": "Go to orders",
+    "event_saved": "Saved",
+    "event_by": "{user}: {changes}",
+    "event_placed": "Placed",
+    "event_placed_detail": "Order placed by {customer}"
+  },
+  "customers": {
+    "title": "Customers",
+    "new": "New customer",
+    "edit": "Edit customer",
+    "customer": "Customer",
+    "save": "Save customer",
+    "saved": "{name} saved.",
+    "tabs": "Customer sections",
+    "profile": "Profile",
+    "orders": "Orders",
+    "spent": "Total spent"
+  },
+  "products": {
+    "title": "Products",
+    "new": "New product",
+    "product": "Product",
+    "save": "Save product",
+    "saved": "Product {sku} saved."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Company details and how orders are handled.",
+    "company": "Company",
+    "orders": "Orders",
+    "notifications": "Notifications",
+    "save": "Save settings",
+    "saved": "Settings saved."
+  },
+  "users": {
+    "title": "Users",
+    "new": "New user",
+    "user": "User",
+    "save": "Save user",
+    "saved": "{name} saved."
+  },
+  "roles": {
+    "title": "Roles",
+    "subtitle": "What each role may do. Roles are defined in code, in src/roles.rs.",
+    "caption": "Permissions by role",
+    "permission": "Permission",
+    "granted": "Yes",
+    "denied": "No"
+  },
+  "permissions": {
+    "admin.dashboard.read": "See the dashboard",
+    "admin.orders.read": "See orders",
+    "admin.orders.write": "Change orders",
+    "admin.customers.read": "See customers",
+    "admin.customers.write": "Change customers",
+    "admin.products.read": "See products",
+    "admin.products.write": "Change products",
+    "admin.settings.read": "See settings",
+    "admin.settings.write": "Change settings",
+    "admin.users.read": "See users and roles",
+    "admin.users.write": "Change users"
+  },
+  "Customer": {
+    "name": "Name",
+    "email": "Email",
+    "city": "City",
+    "segment": "Segment",
+    "active": "Active",
+    "since": "Customer since"
+  },
+  "Segment": {
+    "Retail": "Retail",
+    "Business": "Business",
+    "Partner": "Partner"
+  },
+  "Product": {
+    "sku": "SKU",
+    "name": "Name",
+    "category": "Category",
+    "price": "Price",
+    "stock": "On hand",
+    "active": "Active"
+  },
+  "Category": {
+    "Hardware": "Hardware",
+    "Software": "Software",
+    "Service": "Service",
+    "Supplies": "Supplies"
+  },
+  "Order": {
+    "number": "Number",
+    "customer_id": "Customer id",
+    "customer_name": "Customer",
+    "placed": "Placed",
+    "status": "Status",
+    "items": "Items",
+    "total": "Total",
+    "notes": "Notes"
+  },
+  "OrderStatus": {
+    "New": "New",
+    "Processing": "Processing",
+    "Shipped": "Shipped",
+    "Delivered": "Delivered",
+    "Cancelled": "Cancelled"
+  },
+  "OrderEvent": {
+    "order_id": "Order",
+    "at": "At",
+    "user_name": "User",
+    "kind": "Kind",
+    "detail": "Detail"
+  },
+  "User": {
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "active": "Active"
+  },
+  "Role": {
+    "Admin": "Administrator",
+    "Manager": "Manager",
+    "Viewer": "Viewer"
+  },
+  "Settings": {
+    "company": "Company name",
+    "company_help": "Shown on invoices and in emails.",
+    "support_email": "Support email",
+    "support_email_help": "Customers write to this address.",
+    "ship_within_days": "Ship within (days)",
+    "ship_within_days_help": "Orders older than this are marked late.",
+    "low_stock": "Low stock level",
+    "low_stock_help": "Products at or below this count are flagged.",
+    "notify_new_orders": "Email me new orders",
+    "notify_new_orders_help": "One message per order to the support address.",
+    "weekly_report": "Weekly report",
+    "weekly_report_help": "A summary every Monday morning."
+  }
+}

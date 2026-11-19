@@ -282,6 +282,7 @@ impl ClientPrefs {
     }
 
     /// Names registered twice.
+    #[cfg(feature = "server")]
     pub(crate) fn problems(&self) -> Vec<String> {
         self.keys
             .iter()

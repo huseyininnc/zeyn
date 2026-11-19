@@ -1,0 +1,29 @@
+- main:
+  - region "Markdown":
+    - heading "Markdown" [level=1]
+    - paragraph: Safe Markdown rendered on the server.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#markdown
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Markdown
+    - tablist "Markdown sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - paragraph:
+        - strong: Bold
+        - text: ","
+        - emphasis: italic
+        - text: and
+        - code: code
+        - text: .
+      - list:
+        - listitem: One
+        - listitem: Two
+      - paragraph:
+        - link "A link":
+          - /url: https://example.com
+      - group: Show code
+      - button "Copy"
+      - status

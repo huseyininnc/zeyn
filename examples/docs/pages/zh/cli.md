@@ -136,6 +136,17 @@ zeyn check --json
 
 `zeyn check` 还会读取应用的源代码，并附上文件和行号对以下情况发出警告：`W0106` 字符串包含没有 `src` 的 `<script>` 或 `onclick=` 这类内联事件处理器（CSP 会阻止两者），`W0107` 手写组件在没有 `escape(..)`、`r.text(..)` 或 `r.value(..)` 的情况下写出 HTML，`W0108` action 在没有限制范围的查询时返回整个 `Vec`，`W0109` 标记为 `.trusted()` 的 `DocumentViewer`。缺少 `permission` 或 `public` 不需要警告：它无法编译。
 
+## 迁移到新的 Zeyn 版本
+
+`zeyn migrate` 把应用迁移到更新的 Zeyn 版本，类似 `ng update`。它从 `Cargo.lock`（或 `Cargo.toml`）读取应用所用的 Zeyn 版本，按顺序执行该版本与目标版本之间的每个迁移步骤，把 `Cargo.toml` 中的 Zeyn 依赖改为目标版本，并输出它做了什么：每处更改及其文件和行号，以及需要人工查看的地方和原因。
+
+```sh
+zeyn migrate --dry-run
+zeyn migrate --from 0.0.9 --to 0.0.11 --json
+```
+
+一个步骤会重命名名称和方法（`Hub` 改为 `Socket`，`.realtime(live)` 改为 `.socket(live)`），改变调用的形式（`.sort_by(Order::date, true)` 改为 `.sort_by_desc(Order::date)`），移动 `use` 路径，并指出无法安全改写的地方，例如不是字面量的 `bool` 标志，或指向已移除地址的退出登录链接。它只编辑要替换的 token，因此格式和注释保持不变，第二次运行不会再改动任何内容。`--dry-run` 不写入任何文件，并输出统一 diff；`--json` 把报告输出为一个包含 `changes`、`todos` 和 `errors` 的 JSON 文档。除非某个文件无法读取、解析或写入，退出码为 0。`zeyn check --fix` 会应用所有步骤中的重命名。MCP 工具 `zeyn_migrate` 为代理做同样的事。
+
 ## 构建速度与磁盘占用
 
 `zeyn doctor` 读取项目的构建方式，并报告导致构建缓慢或体积过大的原因：target 文件夹的大小及其最大的子文件夹、链接器、dev 配置（调试信息和依赖项优化）、rustc 和 cargo 与 `rust-version` 的对比、旧工具链留下的产物、rust-analyzer 的 target 文件夹，以及在 Windows 上 target 文件夹和 `~/.cargo` 是否不在 Defender 扫描范围内（排除项或 Dev Drive；如果 Windows 不允许读取，会如实说明）。每项发现都有稳定的代码和一行修复方法。`--json` 把它们输出为一个文档，`--target-limit-gb` 设定多大算大（默认 20），退出码始终为 0。`zeyn doctor --fix` 把快速 dev 配置加入 `Cargo.toml`，把 `rust-lld` 链接器加入 `.cargo/config.toml`，不改动其他任何内容；再运行一次不会有任何变化。MCP 工具 `zeyn_doctor` 为智能体做同样的事。

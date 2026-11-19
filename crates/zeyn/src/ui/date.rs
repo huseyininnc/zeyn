@@ -204,6 +204,7 @@ fn root_attrs(r: &Render, kind: &str, m: &FieldMeta, options: Option<&DateOption
 
 /// Locale settings and texts for pickers the browser builds itself (grid filters), as
 /// `data-*` names in camel case.
+#[cfg(feature = "server")]
 pub(crate) fn picker_config(r: &Render) -> Json {
     let (order, sep, pad) = Date::pattern(r.locale);
     json!({

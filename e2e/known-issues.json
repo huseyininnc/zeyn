@@ -1,0 +1,3 @@
+{
+  "line_editor:reflow": "On GitHub's Ubuntu runner at 412 px with touch the page is 414 px wide; no element outside a scrolling or clipping box reaches past the viewport, so the cause is probably a pseudo element or font metrics of that runner. Not seen in the Playwright noble container or on Windows (ZEYN-311)."
+}

@@ -151,6 +151,7 @@ impl SiteShell {
     }
 
     /// Screens the footer and the bottom bar link to, for the app's structure check.
+    #[cfg(feature = "server")]
     pub(crate) fn linked_screens(&self) -> impl Iterator<Item = &'static str> + '_ {
         self.footer
             .columns
@@ -164,6 +165,7 @@ impl SiteShell {
     }
 
     /// Footer addresses that are not a path, `https:`, `http:` or `mailto:`.
+    #[cfg(feature = "server")]
     pub(crate) fn bad_urls(&self) -> impl Iterator<Item = &'static str> + '_ {
         self.footer
             .columns
@@ -176,6 +178,7 @@ impl SiteShell {
     }
 }
 
+#[cfg(feature = "server")]
 fn safe_url(url: &str) -> bool {
     (url.starts_with('/') && !url.starts_with("//"))
         || ["https://", "http://", "mailto:"]
@@ -251,6 +254,7 @@ pub struct SiteHeader {
 }
 
 /// Index of each slot in [`SiteHeader`]: the first number of a slot node's path.
+#[cfg(feature = "server")]
 pub(crate) const SLOT_NAMES: [&str; 4] = ["start", "center", "end", "bottom"];
 
 impl SiteHeader {
@@ -299,6 +303,7 @@ impl SiteHeader {
     }
 
     /// The slot node at `path`: the slot index, the node's index in it, then child indexes.
+    #[cfg(feature = "server")]
     pub(crate) fn node(&self, path: &crate::ui::NodePath) -> Option<&Node> {
         let mut at = path.indexes();
         let mut node = self
@@ -390,17 +395,22 @@ impl SiteFooter {
 }
 
 pub(crate) enum FooterTarget {
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     Screen(&'static str),
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     Url(&'static str),
 }
 
 pub(crate) struct FooterLink {
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     pub(crate) label: Text,
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     pub(crate) target: FooterTarget,
 }
 
 /// One column of footer links.
 pub struct FooterColumn {
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     pub(crate) title: Text,
     pub(crate) links: Vec<FooterLink>,
 }
@@ -436,7 +446,9 @@ impl FooterColumn {
 /// One link of the site shell's bottom bar ([`SiteShell::bottom_nav`]): a label, a screen with a
 /// route and an optional icon above the label.
 pub struct BottomNavItem {
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     pub(crate) label: Text,
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     pub(crate) screen: &'static str,
     pub(crate) icon: Option<Icon>,
 }

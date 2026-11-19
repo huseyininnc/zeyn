@@ -402,6 +402,14 @@ impl I18n {
             self.merge(locale, json, false)
                 .expect("built in catalog");
         }
+        #[cfg(feature = "metronome-ops")]
+        if let Some((_, json)) = crate::metronome::screen::CATALOGS
+            .iter()
+            .find(|(l, _)| *l == locale)
+        {
+            self.merge(locale, json, false)
+                .expect("built in catalog of the operations screen");
+        }
     }
 
     /// Locales whose framework texts are compiled into this build, English first.
@@ -445,6 +453,7 @@ impl I18n {
 
     /// Adds the texts of a component's catalog that no catalog has yet, without offering its
     /// locale, so the app's own catalogs and the built in texts win.
+    #[cfg(feature = "server")]
     pub(crate) fn defaults(&mut self, locale: &str, json: &str) -> Result<(), String> {
         let value: serde_json::Value = serde_json::from_str(json)
             .map_err(|e| format!("catalog `{locale}` is not valid JSON: {e}"))?;

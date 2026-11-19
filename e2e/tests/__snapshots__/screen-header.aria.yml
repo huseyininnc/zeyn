@@ -1,0 +1,22 @@
+- main:
+  - region "Screen header":
+    - heading "Screen header" [level=1]
+    - paragraph: "The title row of a screen: a subtitle and the main actions."
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/language/screens#header
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Screen
+    - tablist "Screen header sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "A page header" [level=3]
+      - article:
+        - paragraph: The header is part of the page, so the example opens as one.
+        - link "Open the orders page":
+          - /url: /ui/screen-header/orders?params=%7B%22status%22%3Anull%7D
+        - link "Only open orders":
+          - /url: /ui/screen-header/orders?params=%7B%22status%22%3A%22open%22%7D
+      - group: Show code
+      - button "Copy"
+      - status

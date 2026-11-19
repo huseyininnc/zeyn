@@ -193,6 +193,9 @@ struct CtxInner {
     prefetch: bool,
     /// The live connection an action was called over, when it was (feature `realtime`).
     conn: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// The trigger and tick of a scheduled job run (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    run: Option<(Arc<str>, Option<i64>)>,
 }
 
 /// How recent a sign in counts as recent unless the app sets another age.
@@ -229,11 +232,14 @@ impl Ctx {
             csp: None,
             prefetch: false,
             conn: None,
+            #[cfg(feature = "metronome")]
+            run: None,
         }))
     }
 
     /// The context of one request, built in one step.
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "server")]
     pub(crate) fn for_request(
         identity: Identity,
         locale: String,
@@ -265,6 +271,8 @@ impl Ctx {
             csp: Some(csp),
             prefetch: false,
             conn: None,
+            #[cfg(feature = "metronome")]
+            run: None,
         }))
     }
 
@@ -288,6 +296,7 @@ impl Ctx {
     }
 
     /// Same context marked as a prefetch.
+    #[cfg(feature = "server")]
     pub(crate) fn as_prefetch(&self) -> Self {
         self.rebuild(|i| i.prefetch = true)
     }
@@ -308,6 +317,7 @@ impl Ctx {
     }
 
     /// Same context in compact density (`zeyn_density=compact`).
+    #[cfg(feature = "server")]
     pub(crate) fn with_compact(&self) -> Self {
         self.rebuild(|i| i.compact = true)
     }
@@ -319,6 +329,7 @@ impl Ctx {
     }
 
     /// Same context with the side menu folded to an icon rail.
+    #[cfg(feature = "server")]
     pub(crate) fn with_rail(&self) -> Self {
         self.rebuild(|i| i.rail = true)
     }
@@ -370,9 +381,37 @@ impl Ctx {
             csp: i.csp.clone(),
             prefetch: i.prefetch,
             conn: i.conn.clone(),
+            #[cfg(feature = "metronome")]
+            run: i.run.clone(),
         };
         change(&mut inner);
         Ctx(Arc::new(inner))
+    }
+
+    /// Same context for a run of a scheduled job (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub(crate) fn with_run(&self, trigger: Option<&str>, scheduled_ms: Option<i64>) -> Self {
+        match trigger {
+            Some(t) => self.rebuild(|i| i.run = Some((Arc::from(t), scheduled_ms))),
+            None => self.clone(),
+        }
+    }
+
+    /// The tick a scheduled run is for, in UTC; `None` outside a run queued by a trigger
+    /// (feature `metronome`). A daily report run late still knows which day it reports.
+    #[cfg(feature = "metronome")]
+    pub fn scheduled_at(&self) -> Option<DateTime> {
+        self.0
+            .run
+            .as_ref()
+            .and_then(|(_, at)| *at)
+            .map(DateTime::from_unix_ms)
+    }
+
+    /// The trigger that queued this run: its id, `manual` or `chain` (feature `metronome`).
+    #[cfg(feature = "metronome")]
+    pub fn trigger_id(&self) -> Option<&str> {
+        self.0.run.as_ref().map(|(t, _)| &**t)
     }
 
     /// Same context for an action called over a live connection.

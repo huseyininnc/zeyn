@@ -1,0 +1,17 @@
+- main:
+  - region "SideMenu":
+    - heading "SideMenu" [level=1]
+    - paragraph: The app shell menu with badges, counts, filter, icon rail and phone drawer.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/shell
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=Menu
+    - tablist "SideMenu sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - paragraph: "Information: The menu on the side of this catalog is the side menu: type in its filter box, pin a link to Favorites, fold it to an icon rail with the button in its bar, or make the window narrow to see it as a drawer."
+      - group: Show code
+      - button "Copy"
+      - status

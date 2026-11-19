@@ -751,7 +751,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 @media (max-width: 640px) {
   .z-topbar-search { width: 32px; padding: 0; justify-content: center; }
   .z-topbar-search > kbd { display: none; }
-  .z-topbar-search > span {
+  .z-topbar-search > span:not(.z-icon) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1522,7 +1522,7 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-col-menu:hover { background: var(--z-hover); color: var(--z-text); }
 
-@media (hover: none) { .z-col-menu { opacity: 1; } }
+@media (hover: none) { .z-col-menu { opacity: 1; width: 24px; height: 24px; } }
 
 .z-resize {
   position: absolute;

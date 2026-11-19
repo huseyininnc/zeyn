@@ -391,6 +391,7 @@ pub struct Feature {
     sitemap: Option<crate::seo::Sitemap>,
     site: Option<crate::site::SiteShell>,
     /// Screens of this feature that open in the sign in shell while the others keep theirs.
+    #[cfg(feature = "server")]
     auth: Option<(crate::site::SiteShell, Vec<&'static str>)>,
     #[cfg(feature = "server")]
     files: Vec<crate::files::FileEntry>,
@@ -413,6 +414,7 @@ impl Feature {
             sitemap: None,
             media: Vec::new(),
             site: None,
+            #[cfg(feature = "server")]
             auth: None,
             #[cfg(feature = "server")]
             files: Vec::new(),
@@ -661,6 +663,7 @@ impl Feature {
 
     /// The shell a screen of this feature opens in: its sign in shell, the feature's site shell,
     /// or `None` for the app shell.
+    #[cfg(feature = "server")]
     pub(crate) fn shell_of(&self, screen: &str) -> Option<&crate::site::SiteShell> {
         match &self.auth {
             Some((shell, names)) if names.contains(&screen) => Some(shell),

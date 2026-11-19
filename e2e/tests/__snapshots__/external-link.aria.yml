@@ -1,0 +1,20 @@
+- main:
+  - region "ExternalLink":
+    - heading "ExternalLink" [level=1]
+    - paragraph: A link that leaves the app safely.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#externallink
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=ExternalLink
+    - tablist "ExternalLink sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - link "Help center (external site)":
+        - /url: https://example.com/help
+      - link "Website (external site, opens in a new tab)":
+        - /url: https://example.org
+      - group: Show code
+      - button "Copy"
+      - status

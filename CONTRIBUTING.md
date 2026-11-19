@@ -13,11 +13,13 @@ cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,ac
 cargo check -p zeyn --all-features --tests
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
+sh ci/clippy-features.sh
 ```
 
 - Tests that need PostgreSQL, Oracle, Redis or an identity provider skip unless `ZEYN_TEST_PG`, `ZEYN_TEST_ORACLE`, `ZEYN_TEST_REDIS` or `ZEYN_TEST_OIDC` is set. Each test file says how to start the server in Docker.
 - Disk space can be tight. Use `CARGO_INCREMENTAL=0`, and delete your own `target` directory when you are done. The `pdf` feature links Typst (about 40 MB); do not turn it on for the whole workspace.
 - `cargo test` does not rebuild a binary you then run by hand. Run `cargo build -p <example>` first.
+- The workspace clippy run unifies Cargo features, so an unused import or item in a smaller feature set stays hidden. `sh ci/clippy-features.sh` runs clippy on the `zeyn` library with no default features, with each feature that builds without `server` (`signed-licenses`, `postgres`, `oracle`, `xlsx`, `markdown`, `lang-all`) and with the default features; CI runs it too. Code that only the `server` feature reads gets `#[cfg(feature = "server")]`, not `#[allow]`.
 - Run an example to see a change: `cargo run -p zeyn-example-showcase` (http://127.0.0.1:3002), `cargo run -p zeyn-example-docs` (http://127.0.0.1:3008) or `cargo run -p zeyn-example-components` (http://127.0.0.1:3010).
 
 ### Build speed and disk use
@@ -46,6 +48,22 @@ Windows Defender scans every file the compiler writes, which slows a build a lot
 
 CI builds the workspace with `cargo build --workspace --timings`, then touches `crates/zeyn/src/lib.rs` and rebuilds `zeyn` (the cost of a one line change), measures the size of `target/`, and fails when one of the three is over its budget in `ci/build-budget.txt` by more than `tolerance_percent` (`sh ci/check-build-budget.sh <build seconds> <rebuild seconds> <target megabytes>` is the check). The job uploads the report as the artifact `cargo-timings`; open `cargo-timing.html` to see which crate took the time. A change that makes a crate much slower to compile, or the target folder much larger, should bring the numbers back under the budget, or raise the budget in the same change and say why in the commit; a change that costs compile time states the before and after numbers in its commit. After the first CI runs on a new runner or toolchain, set the budgets to the measured numbers (the step summary prints them); the tolerance of 30 percent keeps noise from failing the job.
 
+### Browser tests
+
+The browser tests in `e2e/` open every page of the component catalog in Chromium and check
+rendering, keys, visible focus, accessibility (axe), both themes, right to left, touch targets,
+console errors, accessibility tree snapshots and size budgets. They need Node.js 20 or later:
+
+```
+cd e2e && npm ci && npx playwright install chromium && npm test
+```
+
+The suite starts the catalog with `cargo run -p zeyn-example-components` on port 3110 (set
+`ZEYN_E2E_PORT` to change it) unless one already runs there. `npm run update` rewrites the
+accessibility tree snapshots after an intended change. See
+[docs/component-quality.md](docs/component-quality.md#4-browser-tests) for what each check does,
+the budgets and the known issues list.
+
 ## Branches and pull requests
 
 - Create your work branch from `dev`.
@@ -63,6 +81,7 @@ The sections of [AGENTS.md](AGENTS.md) under "The rules" are not style preferenc
 - **Security.** Every action and screen declares access. Every `POST` endpoint calls `check_csrf`. User data in HTML goes through `render::escape`. The CSP stays strict. Secrets never go in code, logs or tests.
 - **Accessibility and UI.** WCAG 2.2 AA, both themes, colors from theme tokens, every user facing text in the locale files in English and Turkish.
 - **Code.** Everything in English. No inline `//` comments, use `///` and `//!` doc comments on items. `rustfmt.toml` sets `chain_width = 40`; do not raise it. Generated macro code uses `::zeyn::` paths. Follow the existing patterns instead of adding a second way to do something.
+- **Breaking changes.** A breaking change to a public API adds a `zeyn migrate` step in the same pull request (`crates/zeyn-cli/src/migrate/`, one module per version): a rename, a new call shape or a moved path, or a review pattern with the reason when an automatic rewrite is not safe.
 - **Tests.** New logic gets a test in the matching file under `crates/zeyn/tests/`. A security fix gets a regression test that fails without the fix.
 - **Browser check.** Browser behavior is checked in a real browser (the showcase or the docs app) with no console errors.
 

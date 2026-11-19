@@ -1,0 +1,17 @@
+- main:
+  - region "StatusBar":
+    - heading "StatusBar" [level=1]
+    - paragraph: A bar of short status texts.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/shell
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=StatusBar
+    - tablist "StatusBar sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - group "Status": Ready UTF-8
+      - group: Show code
+      - button "Copy"
+      - status

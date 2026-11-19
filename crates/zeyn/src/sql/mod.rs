@@ -509,14 +509,20 @@ impl Db {
     }
 
     /// Runs pending migrations, such as the ones `sqlx::migrate!("./migrations")` embeds.
-    /// PostgreSQL only.
+    /// PostgreSQL only. Checksums ignore line endings, so a migration checked out with CRLF on
+    /// one machine and LF on another still validates. A checksum stored the old way (computed
+    /// with the `\r` bytes) is accepted as it is.
     #[cfg(feature = "postgres")]
     pub async fn migrate(&self, migrator: &sqlx::migrate::Migrator) -> Result<()> {
         match &self.inner.backend {
-            Backend::Postgres(pool) => migrator
-                .run(pool)
-                .await
-                .map_err(|e| Error::Internal(format!("migration: {e}"))),
+            Backend::Postgres(pool) => {
+                let applied = pg::applied_checksums(pool, &migrator.table_name).await;
+                let migrator = reconcile_migrator(migrator, &applied);
+                migrator
+                    .run(pool)
+                    .await
+                    .map_err(|e| Error::Internal(format!("migration: {e}")))
+            }
             #[cfg(feature = "oracle")]
             Backend::Oracle(..) => Err(Error::Internal(
                 "sqlx migrations run on PostgreSQL only".into(),
@@ -532,6 +538,59 @@ impl Db {
             .map_err(|e| Error::Internal(format!("migration: {e}")))?;
         self.migrate(&migrator).await
     }
+}
+
+/// Checksum of a migration with every `\r` left out, so CRLF and LF files agree.
+#[cfg(feature = "postgres")]
+pub(crate) fn line_ending_checksum(m: &sqlx::migrate::Migration) -> Vec<u8> {
+    let sql: String = m
+        .sql
+        .as_str()
+        .chars()
+        .filter(|c| *c != '\r')
+        .collect();
+    use sqlx::SqlSafeStr;
+    sqlx::migrate::Migration::new(
+        m.version,
+        m.description.clone(),
+        m.migration_type,
+        sqlx::AssertSqlSafe(sql).into_sql_str(),
+        m.no_tx,
+    )
+    .checksum
+    .into_owned()
+}
+
+/// Copy of a migrator whose checksums ignore line endings. A migration whose stored checksum
+/// equals the checksum it was built with (the old way, `\r` included) keeps that checksum, so
+/// migrations applied before this rule still validate. `applied` maps version to the stored
+/// checksum.
+#[cfg(feature = "postgres")]
+pub(crate) fn reconcile_migrator(
+    migrator: &sqlx::migrate::Migrator,
+    applied: &std::collections::HashMap<i64, Vec<u8>>,
+) -> sqlx::migrate::Migrator {
+    let migrations = migrator
+        .migrations
+        .iter()
+        .map(|m| {
+            let mut m = m.clone();
+            let old = applied
+                .get(&m.version)
+                .is_some_and(|c| c[..] == m.checksum[..]);
+            if !old {
+                m.checksum = line_ending_checksum(&m).into();
+            }
+            m
+        })
+        .collect();
+    let mut copy = sqlx::migrate::Migrator::with_migrations(migrations);
+    copy.ignore_missing = migrator.ignore_missing;
+    copy.locking = migrator.locking;
+    copy.no_tx = migrator.no_tx;
+    copy.table_name = migrator.table_name.clone();
+    copy.create_schemas = migrator.create_schemas.clone();
+    copy
 }
 
 /// Checks a table prefix for the crate's own tables: lower case letters, digits and `_`, at most

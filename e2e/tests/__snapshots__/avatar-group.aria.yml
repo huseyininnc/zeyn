@@ -1,0 +1,24 @@
+- main:
+  - region "AvatarGroup":
+    - heading "AvatarGroup" [level=1]
+    - paragraph: The people of one thing, with a count for the rest.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/content#avatargroup
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=AvatarGroup
+    - tablist "AvatarGroup sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - group "Assignees":
+        - img "Ada Lovelace"
+        - img "Alan Turing"
+        - img "İlknur Şahin"
+        - img "Grace Hopper"
+        - img "Ömer Çelik"
+        - img "2 more"
+      - group: Show code
+      - button "Copy"
+      - status

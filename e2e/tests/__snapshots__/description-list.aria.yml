@@ -1,0 +1,24 @@
+- main:
+  - region "DescriptionList":
+    - heading "DescriptionList" [level=1]
+    - paragraph: Label and value pairs of a record.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/display#descriptionlist
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=DescriptionList
+    - tablist "DescriptionList sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - term: Code
+      - definition: /P-\d+/
+      - term: Name
+      - definition: /Field notes \d+/
+      - term: Kind
+      - definition: Book
+      - term: Price
+      - definition: /₺\d+\.\d+/
+      - group: Show code
+      - button "Copy"
+      - status

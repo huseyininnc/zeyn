@@ -1,0 +1,21 @@
+- main:
+  - region "FileDrop":
+    - heading "FileDrop" [level=1]
+    - paragraph: A drop zone outside a form that uploads files, folders and pasted images into a store.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/language/forms#file-drop
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=FileDrop
+    - tablist "FileDrop sections":
+      - tab "Overview" [selected]
+      - tab "API"
+      - tab "Examples"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - text: Documents
+      - button "Documents"
+      - paragraph: Drop files or folders here, paste them, or choose them. PNG, JPG, WEBP, PDF, up to 1.0 MB each, at most 4 files.
+      - status
+      - group: Show code
+      - button "Copy"
+      - status

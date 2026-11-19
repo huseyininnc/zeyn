@@ -1,0 +1,28 @@
+- main:
+  - region "TypingIndicator":
+    - heading "TypingIndicator" [level=1]
+    - paragraph: Who else is typing in a conversation, over the realtime channel.
+    - link "Documentation (external site)":
+      - /url: https://docs.zeynsoft.com/components/chat#typingindicator
+    - link "API reference on docs.rs (external site)":
+      - /url: https://docs.rs/zeyn/latest/zeyn/?search=TypingIndicator
+    - tablist "TypingIndicator sections":
+      - tab "Overview" [selected]
+      - tab "API"
+    - tabpanel "Overview":
+      - heading "Example" [level=3]
+      - heading "Support" [level=2]
+      - region "Support":
+        - paragraph: No messages yet
+      - status
+      - form "Message":
+        - text: ""
+        - textbox "Message":
+          - /placeholder: Write a message
+        - button "Send" [disabled]
+        - paragraph: Enter sends, Shift+Enter starts a new line
+        - status
+      - paragraph: "Information: This catalog runs without the realtime channel, so the indicator stays empty and the composer sends no typing signals. In an app with App::realtime and the topic declared, the names of the others show here while they type."
+      - group: Show code
+      - button "Copy"
+      - status
