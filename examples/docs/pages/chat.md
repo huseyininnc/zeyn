@@ -91,7 +91,7 @@ The send action takes a `ChatSend`: the conversation, which the server takes fro
 
 `SendKey::Enter`, the default, sends with Enter and starts a new line with Shift+Enter; `.send_key(SendKey::CtrlEnter)` sends with Ctrl+Enter (Cmd+Enter on a Mac) and leaves Enter for new lines. The send button is disabled while the message is empty or too long, and a counter shows near the limit. After a send the composer names its topics (`"chat"` unless `.topic(..)` says otherwise), so a `MessageThread` of the same conversation shows the message at once, and streams its AI reply when it has `.reply(..)`.
 
-`.attachments(rules)` adds the upload field of a store registered with `Feature::files`: files upload one by one to `POST /_zeyn/files/{store}` with a progress bar, under the store's write permission and type checks, and their ids go with the message.
+`.attachments(rules)` adds the upload field of a store registered with `Feature::files`: files upload one by one to `POST /_zeyn/files/{store}` with a progress bar, under the store's write permission and type checks, and their ids go with the message. A send that names a file the same user did not upload into that store in the same tenant is refused.
 
 `.mentions(action)` searches people after `@` with a lookup action (`LookupQuery` in, a page of `LookupItem` out). The search starts 200 ms after the last key, a newer search cancels the older one, and the server asks for at most `MAX_MENTIONS` (8) people and sends at most that many back. The list is a listbox driven from the text area: arrows move, Enter or Tab picks, Escape closes.
 

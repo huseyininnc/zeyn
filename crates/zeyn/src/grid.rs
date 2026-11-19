@@ -19,6 +19,7 @@ use crate::value::{
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use std::any::Any;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -369,9 +370,12 @@ where
     }
 }
 
-type CellFn<E> = Box<dyn Fn(&E, &Render) -> String + Send + Sync>;
-type RunFn<E> =
-    Box<dyn Fn(&E) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
+/// The closures of a grid read their row as `&dyn Any` and downcast it to the row type, so the
+/// grid code around them is compiled once, not once for every row type.
+type CellFn = Box<dyn Fn(&dyn Any, &Render) -> String + Send + Sync>;
+type RunFn = Box<
+    dyn Fn(&dyn Any) -> Option<Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>> + Send + Sync,
+>;
 
 /// Most rows one bulk action may cover; larger selections are refused.
 pub const MAX_BULK: usize = 10_000;
@@ -420,11 +424,11 @@ impl Ask {
 }
 
 /// A button on every row that runs an action with input built from the row.
-struct RowAction<E> {
+struct RowAction {
     label: Text,
     icon: Option<Icon>,
     meta: ActionMeta,
-    run: RunFn<E>,
+    run: RunFn,
     ask: Ask,
 }
 
@@ -465,18 +469,124 @@ fn key_text(value: &Value) -> String {
     }
 }
 
-type ValueFn<E> = Box<dyn for<'a> Fn(&'a E) -> std::borrow::Cow<'a, Value> + Send + Sync>;
-type StyleFn<E> = Box<dyn Fn(&E) -> Option<RowStyle> + Send + Sync>;
-type OpenFn<E> = Box<dyn Fn(&E) -> Effect + Send + Sync>;
+type ValueFn = Box<dyn for<'a> Fn(&'a dyn Any) -> std::borrow::Cow<'a, Value> + Send + Sync>;
+type StyleFn = Box<dyn Fn(&dyn Any) -> Option<RowStyle> + Send + Sync>;
+type OpenFn = Box<dyn Fn(&dyn Any) -> Option<Effect> + Send + Sync>;
 pub(crate) type FetchFn<E> = fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>;
 
-struct Column<E> {
+/// A grid's action with its rows boxed, so the code that loads pages does not depend on the
+/// row type.
+type AnyFetch = Arc<dyn Fn(Ctx, DataQuery) -> BoxFuture<Result<AnyPage>> + Send + Sync>;
+
+/// A [`Page`] whose rows are boxed as the `Vec<E>` of the grid's row type.
+struct AnyPage {
+    items: Box<dyn Any + Send + Sync>,
+    count: usize,
+    total: Option<u64>,
+    next: Option<Cursor>,
+    totals: Vec<Total>,
+    groups: Vec<crate::action::Group>,
+}
+
+/// Boxes the rows of every page `fetch` loads.
+fn any_fetch<E: Model>(fetch: FetchFn<E>) -> AnyFetch {
+    Arc::new(move |ctx, query| {
+        Box::pin(async move {
+            let page = fetch(ctx, query).await?;
+            Ok(AnyPage {
+                count: page.items.len(),
+                items: Box::new(page.items),
+                total: page.total,
+                next: page.next,
+                totals: page.totals,
+                groups: page.groups,
+            })
+        })
+    })
+}
+
+/// What the grid code that does not depend on the row type reads of one row. Keeping that code
+/// out of `DataGrid<E>` compiles it once instead of once for every row type of an app.
+trait GridRow: Sync {
+    fn any(&self) -> &dyn Any;
+    fn value_at(&self, index: usize) -> Option<Value>;
+    /// Audits that the user was shown this row.
+    fn record_read(&self, ctx: &Ctx);
+    /// The cell of a masked field of this row.
+    fn masked_cell(&self, r: &Render, meta: &FieldMeta, value: &Value) -> String;
+    /// The key of the row as audits name it.
+    fn record_id(&self) -> Option<String>;
+    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed>;
+}
+
+impl<E: Model> GridRow for E {
+    fn any(&self) -> &dyn Any {
+        self
+    }
+
+    fn value_at(&self, index: usize) -> Option<Value> {
+        Model::value_at(self, index)
+    }
+
+    fn record_read(&self, ctx: &Ctx) {
+        ctx.record_read(self);
+    }
+
+    fn masked_cell(&self, r: &Render, meta: &FieldMeta, value: &Value) -> String {
+        crate::privacy::cell(r, meta, value, self)
+    }
+
+    fn record_id(&self) -> Option<String> {
+        crate::audit::RecordRef::of(self).id
+    }
+
+    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
+        crate::privacy::reveal_in(self, field)
+    }
+}
+
+/// A list of rows of one type.
+trait GridRows: Sync {
+    fn count(&self) -> usize;
+    fn row(&self, index: usize) -> &dyn GridRow;
+}
+
+impl<E: Model> GridRows for Vec<E> {
+    fn count(&self) -> usize {
+        self.len()
+    }
+
+    fn row(&self, index: usize) -> &dyn GridRow {
+        &self[index]
+    }
+}
+
+impl<E: Model> GridRows for &[E] {
+    fn count(&self) -> usize {
+        self.len()
+    }
+
+    fn row(&self, index: usize) -> &dyn GridRow {
+        &self[index]
+    }
+}
+
+/// The rows of a page's items when they are a `Vec` of the grid's row type.
+type RowsFn = for<'a> fn(&'a (dyn Any + Send + Sync)) -> Option<&'a dyn GridRows>;
+
+fn rows_of<E: Model>(items: &(dyn Any + Send + Sync)) -> Option<&dyn GridRows> {
+    items
+        .downcast_ref::<Vec<E>>()
+        .map(|rows| rows as &dyn GridRows)
+}
+
+struct Column {
     meta: &'static FieldMeta,
     /// Field name the client and views use: the field's own, or a dynamic column's.
     name: std::borrow::Cow<'static, str>,
     /// Header label as given, for dynamic columns; `None` uses the field's label text.
     label: Option<String>,
-    value: ValueFn<E>,
+    value: ValueFn,
     width: Option<u32>,
     flex: Option<u32>,
     filter: bool,
@@ -484,7 +594,7 @@ struct Column<E> {
     aggregates: Vec<Aggregate>,
     pin: Option<Pin>,
     hidden: bool,
-    cell: Option<CellFn<E>>,
+    cell: Option<CellFn>,
     editable: bool,
     /// Whole numbers shown without group separators, for codes and years.
     plain: bool,
@@ -499,7 +609,7 @@ struct Column<E> {
     summary: Option<(Text, SummaryFn)>,
 }
 
-impl<E> Column<E> {
+impl Column {
     /// Column of `meta` with every option off, showing no value until `value` is set.
     fn of(meta: &'static FieldMeta) -> Self {
         Column {
@@ -542,14 +652,28 @@ impl<E> Column<E> {
 /// DataGrid::of(search_products).column(Product::code).width(120).filter()
 /// ```
 pub struct DataGrid<E: Model> {
+    body: GridBody,
+    save: Option<SaveDef<E>>,
+    add: Option<SaveDef<E>>,
+}
+
+/// Everything of a [`DataGrid`] but its row type. Its methods do not depend on the row type, so
+/// they are compiled once instead of once for every row type of an app.
+struct GridBody {
     action: ActionMeta,
-    fetch: FetchFn<E>,
+    fetch: AnyFetch,
+    /// The rows of a loaded page, read through the row type.
+    rows_of: RowsFn,
+    /// `E::fields()`, `E::NAME` and `E::SENSITIVE` of the row type.
+    fields: &'static [FieldMeta],
+    model: &'static str,
+    sensitive: bool,
     mode: DataMode,
     paging: Paging,
-    columns: Vec<Column<E>>,
-    row_style: Option<StyleFn<E>>,
-    on_open: Option<OpenFn<E>>,
-    row_actions: Vec<RowAction<E>>,
+    columns: Vec<Column>,
+    row_style: Option<StyleFn>,
+    on_open: Option<OpenFn>,
+    row_actions: Vec<RowAction>,
     selectable: bool,
     zebra: bool,
     /// What shows when there are no rows, and when there are none because of the filters.
@@ -558,10 +682,11 @@ pub struct DataGrid<E: Model> {
     bulk: Vec<BulkDef>,
     /// Whether the last added action is a bulk action, the one `confirm` and `tone` set.
     last_bulk: bool,
-    row_menu: Option<MenuFn<E>>,
-    save: Option<SaveDef<E>>,
+    row_menu: Option<MenuFn>,
+    /// The action that saves inline edits; its runner is in `DataGrid::save`.
+    save: Option<ActionMeta>,
     export: Option<(crate::action::Access, usize)>,
-    detail: Option<DetailDef<E>>,
+    detail: Option<DetailDef>,
     scope: Vec<Filter>,
     default_sort: Vec<crate::action::Sort>,
     group_by: Vec<&'static FieldMeta>,
@@ -572,8 +697,9 @@ pub struct DataGrid<E: Model> {
     search: bool,
     /// Labels of the band headers, which group columns under one header cell.
     bands: Vec<Text>,
-    /// Action that creates a row from the editable columns of a new row.
-    add: Option<SaveDef<E>>,
+    /// Action that creates a row from the editable columns of a new row; its runner is in
+    /// `DataGrid::add`.
+    add: Option<ActionMeta>,
     /// Index in `bulk` of the bulk action the Delete key runs.
     delete: Option<usize>,
     /// Whether inline edits wait until the user saves every changed row at once.
@@ -599,13 +725,13 @@ struct Branch<'a> {
     parents: &'a [String],
 }
 
-type ParamsFn<E> = Box<dyn Fn(&E) -> serde_json::Value + Send + Sync>;
+type ParamsFn = Box<dyn Fn(&dyn Any) -> serde_json::Value + Send + Sync>;
 
 /// The screen a row expands into and how its params are built from the row.
-struct DetailDef<E> {
+struct DetailDef {
     screen: &'static str,
     access: crate::action::Access,
-    params: ParamsFn<E>,
+    params: ParamsFn,
 }
 
 /// A value in the fixed machine form group paths and scopes use: numbers and money as `1234.56`,
@@ -789,7 +915,7 @@ struct SaveDef<E: Model> {
     run: SaveRun<E>,
 }
 
-type MenuFn<E> = Box<dyn Fn(&E) -> crate::menu::ContextMenu + Send + Sync>;
+type MenuFn = Box<dyn Fn(&dyn Any) -> Option<crate::menu::ContextMenu> + Send + Sync>;
 
 pub(crate) fn fetch_via<A, E>(ctx: Ctx, query: DataQuery) -> BoxFuture<Result<Page<E>>>
 where
@@ -810,9 +936,13 @@ impl<E: Model> DataGrid<E> {
 
     /// DataGrid of an action's access rule and the function that loads its rows.
     fn of_fetch(action: ActionMeta, fetch: FetchFn<E>) -> Self {
-        Self {
+        let body = GridBody {
             action,
-            fetch,
+            fetch: any_fetch(fetch),
+            rows_of: rows_of::<E>,
+            fields: E::fields(),
+            model: E::NAME,
+            sensitive: E::SENSITIVE,
             mode: DataMode::default(),
             paging: Paging::default(),
             columns: Vec::new(),
@@ -842,6 +972,11 @@ impl<E: Model> DataGrid<E> {
             builder: false,
             chips: false,
             page_sizes: Vec::new(),
+        };
+        Self {
+            body,
+            save: None,
+            add: None,
         }
     }
 
@@ -863,11 +998,12 @@ impl<E: Model> DataGrid<E> {
             return self;
         }
         if !self
+            .body
             .group_by
             .iter()
             .any(|m| m.name == meta.name)
         {
-            self.group_by.push(meta);
+            self.body.group_by.push(meta);
         }
         self
     }
@@ -881,10 +1017,520 @@ impl<E: Model> DataGrid<E> {
     where
         Option<K>: FieldType,
     {
-        self.tree = Some(parent.meta());
+        self.body.tree = Some(parent.meta());
         self
     }
 
+    /// Lets every row expand into a screen built from the row, loaded only when the user opens
+    /// it: `.detail(|o: &Order| (order_lines, OrderParams { id: o.id }))`. Params of the wrong type
+    /// do not compile. The detail can hold anything a screen holds, such as another grid with its
+    /// own detail, to any depth. The expander shows only for users who may open the screen, and
+    /// the server checks the screen's permission again when it loads, as for any screen. The
+    /// params travel through the browser like a window's, so the detail screen checks that the
+    /// user may see the record they name.
+    ///
+    /// Virtual grids (`Paging::Virtual`) keep every row at one fixed height and show no expander;
+    /// use pages or infinite paging for grids with details.
+    pub fn detail<S: ScreenDef>(
+        mut self,
+        detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static,
+    ) -> Self {
+        self.body.detail = Some(DetailDef {
+            screen: S::META.name,
+            access: S::META.access,
+            params: Box::new(move |row| {
+                row.downcast_ref::<E>()
+                    .and_then(|row| serde_json::to_value(detail(row).1).ok())
+                    .unwrap_or(serde_json::Value::Null)
+            }),
+        });
+        self
+    }
+
+    /// The order rows come in before the user sorts: `.sort_by_desc(Order::id)` for newest
+    /// first. The header shows it, and clicking that column only switches between ascending and
+    /// descending; other columns go back to this order on their third click. Call it again to add
+    /// further keys. The action still receives it in `DataQuery::sort`.
+    pub fn sort_by<T: FieldType>(self, field: Field<E, T>) -> Self {
+        self.sort_field(field, false)
+    }
+
+    /// Same as [`DataGrid::sort_by`], falling: newest, largest or last first.
+    pub fn sort_by_desc<T: FieldType>(self, field: Field<E, T>) -> Self {
+        self.sort_field(field, true)
+    }
+
+    fn sort_field<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
+        self.body
+            .default_sort
+            .push(crate::action::Sort {
+                field: field.meta().name.to_string(),
+                desc,
+            });
+        self
+    }
+
+    /// Keeps only the rows whose `field` equals `value`, on every request, whatever the client
+    /// sends: `.scope(OrderLine::order_id, params.id)` for the lines of one order. The filter goes
+    /// first in `DataQuery::filters`, so a data layer that reads the filters keeps it. Text
+    /// compares ignoring case.
+    pub fn scope<T: FieldType>(mut self, field: Field<E, T>, value: T) -> Self {
+        self.body.scope.push(key_filter(
+            field.meta(),
+            value_key(&value.to_value()).as_deref(),
+        ));
+        self
+    }
+
+    /// Keeps only the rows whose `field` is one of `values`, on every request, like
+    /// [`DataGrid::scope`]: `.scope_any(Product::color, p.colors.clone())` for the colors a facet
+    /// panel chose. No values keep every row.
+    pub fn scope_any<T: FieldType>(
+        mut self,
+        field: Field<E, T>,
+        values: impl IntoIterator<Item = T>,
+    ) -> Self {
+        self.body
+            .scope
+            .extend(any_filter(field.meta(), values));
+        self
+    }
+
+    /// Keeps only the rows whose `field` is between `from` and `to`, both inclusive, on every
+    /// request, like [`DataGrid::scope`]; `None` leaves that end open.
+    pub fn scope_range<T: FieldType>(
+        mut self,
+        field: Field<E, T>,
+        from: Option<T>,
+        to: Option<T>,
+    ) -> Self {
+        self.body
+            .scope
+            .extend(range_filter(field.meta(), from, to));
+        self
+    }
+
+    /// Lets users export every row that matches their filters as CSV, in their column layout and
+    /// language. The server pages through the grid's action and streams the file, up to
+    /// [`DEFAULT_EXPORT_LIMIT`] rows. Exporting needs the grid's read access. The toolbar's
+    /// `Export::Csv` button uses this export when the grid has it.
+    pub fn exportable(mut self) -> Self {
+        self.body.export = Some((self.body.action.access, DEFAULT_EXPORT_LIMIT));
+        self
+    }
+
+    /// Like `exportable`, but exporting also needs `permission`.
+    pub fn export_permission(mut self, permission: &'static str) -> Self {
+        let limit = self
+            .body
+            .export
+            .map_or(DEFAULT_EXPORT_LIMIT, |e| e.1);
+        self.body.export = Some((crate::action::Access::Permission(permission), limit));
+        self
+    }
+
+    /// Most rows one export may hold; bigger results are cut there. At most 1,000,000.
+    pub fn export_limit(mut self, rows: usize) -> Self {
+        let access = self
+            .body
+            .export
+            .map_or(self.body.action.access, |e| e.0);
+        self.body.export = Some((access, rows.clamp(1, 1_000_000)));
+        self
+    }
+
+    /// Lets users edit cells of the columns marked `editable()` in place, saved with `save`, an
+    /// action that takes `Valid<E>` like a form's. The server loads the row again by key, applies
+    /// only the editable columns and the row version (`#[version]`) the client sends, validates
+    /// and runs the action; a changed row comes back as a conflict. F2 or a double click on an
+    /// editable cell starts editing, Enter saves, Escape cancels, Ctrl+Z undoes the last save.
+    pub fn edit_with<A>(mut self, _save: A) -> Self
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.body.save = Some(A::META);
+        self.save = Some(SaveDef {
+            meta: A::META,
+            run: Box::new(|valid| runner::<A>(valid)),
+        });
+        self
+    }
+
+    /// Shows an "Add row" button above the grid. It opens an empty row at the top with an input
+    /// for every `editable()` column; Enter saves it through `create`, which takes `Valid<E>` as
+    /// an inline edit's save does, and the grid reloads. The server starts from `E::default()`,
+    /// reads only the editable columns as a form would and checks `create`'s permission. Escape
+    /// drops the new row. Virtual grids do not add rows.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products)
+    ///     .column(Product::name).editable()
+    ///     .add_with(create_product)
+    /// ```
+    pub fn add_with<A>(mut self, _create: A) -> Self
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.body.add = Some(A::META);
+        self.add = Some(SaveDef {
+            meta: A::META,
+            run: Box::new(|valid| runner::<A>(valid)),
+        });
+        self
+    }
+
+    /// Lets users delete the selected rows: a "Delete" button in the selection bar that asks
+    /// first, and the Delete key on a row, which deletes the selection or, with none, that row.
+    /// The action takes the keys as a bulk action does (`Vec<K>` of the key field), so it must
+    /// check each record it is given.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products).delete_with(delete_products, Product::id)
+    /// ```
+    pub fn delete_with<A, K>(self, action: A, key: Field<E, K>) -> Self
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        let mut grid = self.bulk_action(Text::key("zeyn.grid.delete"), action, key);
+        grid.body.delete = Some(grid.body.bulk.len() - 1);
+        grid.confirm(Text::key("zeyn.grid.delete_confirm"))
+            .tone(Tone::Danger)
+    }
+
+    /// Keeps inline edits until the user saves them all: Enter leaves a changed row in place,
+    /// marked, and a bar above the grid counts the changed rows with "Save changes" and
+    /// "Discard changes". Saving sends each row through the inline edit path, one after
+    /// another, so each is read, validated and checked like a single edit; rows that fail keep
+    /// their changes and show the errors. Loading other rows asks before it drops changes.
+    pub fn batch_edit(mut self) -> Self {
+        self.body.batch = true;
+        self
+    }
+
+    /// Shows a "Filter" button above the grid that opens the filter builder: a dialog listing a
+    /// condition per row (a column with `filter()` and its operator and values, the same inputs
+    /// as the filter row), with "Add condition", "Clear all" and "Apply". Conditions hold
+    /// together; a later condition on the same column replaces an earlier one. Applying writes
+    /// the conditions into the grid's filters, so the filter row, saved views, exports and the
+    /// `zeyn:filter` event an AI agent sends all see the same list, and the server checks it as
+    /// always.
+    pub fn filter_builder(mut self) -> Self {
+        self.body.builder = true;
+        self
+    }
+
+    /// Shows the active filters as chips above the grid: one per filtered column and one per
+    /// condition group of the filter builder, each with a remove button, and "Clear all" when
+    /// there are two or more. The chips follow the filter row, the filter builder, the saved
+    /// view and the `zeyn:filter` event; removing one reloads the grid and saves the view.
+    /// Pressing a chip opens the filter builder when the grid has one, otherwise it moves focus
+    /// to the column's filter. The chips run in a browser module of their own, so grids without
+    /// them load nothing more.
+    pub fn filter_chips(mut self) -> Self {
+        self.body.chips = true;
+        self
+    }
+
+    /// Lets users pick how many rows a page shows, from `sizes`, in a "Rows per page" list next
+    /// to the pager. Each size is kept between 1 and [`MAX_PAGE_SIZE`]; the grid's own page size
+    /// is always offered. The pick is part of the user's view and is saved with it. Only grids
+    /// with numbered pages show it.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_orders).paging(Paging::pages(25)).page_sizes(&[10, 25, 50, 100])
+    /// ```
+    pub fn page_sizes(mut self, sizes: &[u32]) -> Self {
+        self.body.page_sizes = sizes
+            .iter()
+            .map(|s| (*s).clamp(1, MAX_PAGE_SIZE))
+            .collect();
+        self
+    }
+
+    /// Context menu of each row, built on the server from the row. Right click, Shift+F10 or the
+    /// context menu key opens it. See [`crate::ContextMenu`].
+    pub fn row_menu(
+        mut self,
+        menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static,
+    ) -> Self {
+        self.body.row_menu = Some(Box::new(move |row| row.downcast_ref::<E>().map(&menu)));
+        self
+    }
+
+    /// DataGrid with a column for every field of the model except the row version, in declaration
+    /// order, and filter boxes on text and choice columns. The quickest list for a simple model.
+    pub fn auto<A>(source: A) -> Self
+    where
+        A: Action<Input = DataQuery, Output = Result<Page<E>>>,
+    {
+        let mut grid = Self::of(source);
+        for (i, meta) in E::fields()
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| !m.version)
+        {
+            let filter = matches!(
+                meta.kind,
+                crate::value::FieldKind::Text | crate::value::FieldKind::Choice(_)
+            );
+            grid.body.columns.push(Column {
+                value: Box::new(move |e| {
+                    std::borrow::Cow::Owned(
+                        e.downcast_ref::<E>()
+                            .and_then(|e| e.value_at(i))
+                            .unwrap_or(Value::Null),
+                    )
+                }),
+                filter,
+                ..Column::of(meta)
+            });
+        }
+        grid
+    }
+
+    /// Shades every other row, for very wide grids where the eye loses the row. Rows are
+    /// divided by lines only unless set.
+    /// What the grid shows when it has no rows, in place of "No records": a title, a text and
+    /// an action, such as "No orders yet" with "New order". With [`DataGrid::empty_filtered`]
+    /// it shows only while no filter is on.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_orders)
+    ///     .empty(EmptyState::new(t!("orders.none")).opens(t!("orders.new"), new_order, ()))
+    ///     .empty_filtered(EmptyState::new(t!("orders.no_match")).text(t!("orders.no_match_help")))
+    /// ```
+    pub fn empty(mut self, state: crate::ui::EmptyState) -> Self {
+        self.body.empty = Some(state);
+        self
+    }
+
+    /// What the grid shows when its filters leave no rows, such as "No orders match" with a hint
+    /// to change the filters.
+    pub fn empty_filtered(mut self, state: crate::ui::EmptyState) -> Self {
+        self.body.empty_filtered = Some(state);
+        self
+    }
+
+    pub fn zebra(mut self) -> Self {
+        self.body.zebra = true;
+        self
+    }
+
+    pub fn mode(mut self, mode: DataMode) -> Self {
+        self.body.mode = mode;
+        self
+    }
+
+    /// Paging style. Numbered pages of 50 rows unless set.
+    pub fn paging(mut self, paging: Paging) -> Self {
+        self.body.paging = paging;
+        self
+    }
+
+    /// Adds a column. The following settings (`width`, `filter`...) apply to it.
+    pub fn column<T: FieldType + 'static>(mut self, field: Field<E, T>) -> DataGridColumn<E, T> {
+        self.body.columns.push(Column {
+            value: Box::new(move |e| {
+                std::borrow::Cow::Owned(
+                    e.downcast_ref::<E>()
+                        .map_or(Value::Null, |e| field.get(e).to_value()),
+                )
+            }),
+            ..Column::of(field.meta())
+        });
+        DataGridColumn {
+            grid: self,
+            field,
+            _type: PhantomData,
+        }
+    }
+
+    /// Shows a search box above the grid. What the user types goes to the action as
+    /// [`DataQuery::q`] with every page, block and export, and the action searches the text
+    /// fields with it ([`DataQuery::apply`] and the SQL data layers do). Masked fields are never
+    /// searched. Grids without it drop any `q` the client sends.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products).search().column(Product::name)
+    /// ```
+    pub fn search(mut self) -> Self {
+        self.body.search = true;
+        self
+    }
+
+    /// Groups the columns the closure adds under one header cell labelled `label`, in a header
+    /// row above the column headers. Columns of a band that the user hides drop out of it; a
+    /// band shows one cell per run of its columns that stay next to each other and on the same
+    /// pinned side, so moving a column out of a band splits it.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products)
+    ///     .column(Product::name)
+    ///     .band(t!("stock.prices"), |b| b
+    ///         .column(Product::price)
+    ///         .column(Product::cost))
+    /// ```
+    pub fn band<G: Into<DataGrid<E>>>(
+        mut self,
+        label: impl Into<Text>,
+        columns: impl FnOnce(DataGrid<E>) -> G,
+    ) -> Self {
+        let first = self.body.columns.len();
+        let band = self.body.bands.len();
+        self.body.bands.push(label.into());
+        let mut grid = columns(self).into();
+        for c in grid.body.columns.iter_mut().skip(first) {
+            c.band = c.band.or(Some(band));
+        }
+        grid
+    }
+
+    /// Picks a highlight per row.
+    pub fn row_style(
+        mut self,
+        style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static,
+    ) -> Self {
+        self.body.row_style = Some(Box::new(move |row| {
+            row.downcast_ref::<E>().and_then(&style)
+        }));
+        self
+    }
+
+    /// What happens when a row is opened (double click or Enter).
+    pub fn on_open(mut self, open: impl Fn(&E) -> Effect + Send + Sync + 'static) -> Self {
+        self.body.on_open = Some(Box::new(move |row| row.downcast_ref::<E>().map(&open)));
+        self
+    }
+
+    /// Adds a button to every row that runs `action` with input built from the row:
+    /// `.row_action(t!("stock.archive"), archive_product, |p| p.id)`. The button only shows for
+    /// users with the action's permission. When pressed, the server loads the row again by its key
+    /// through the grid's action, builds the input from it, checks the permission again and runs
+    /// the action; the client never sends the input.
+    pub fn row_action<A>(
+        mut self,
+        label: impl Into<Text>,
+        _action: A,
+        input: impl Fn(&E) -> A::Input + Send + Sync + 'static,
+    ) -> Self
+    where
+        A: Action,
+        A::Output: Outcome,
+    {
+        self.body.row_actions.push(RowAction {
+            label: label.into(),
+            icon: None,
+            meta: A::META,
+            run: Box::new(move |row| {
+                row.downcast_ref::<E>()
+                    .map(|row| runner::<A>(input(row)))
+            }),
+            ask: Ask::default(),
+        });
+        self.body.last_bulk = false;
+        self
+    }
+
+    /// Adds a checkbox to every row and a selection bar above the grid. Shift selects a range,
+    /// the header box selects the page, and the bar offers every row that matches the filters.
+    pub fn selectable(mut self) -> Self {
+        self.body.selectable = true;
+        self
+    }
+
+    /// Adds a button to the selection bar that runs `action` with the keys of the selected rows:
+    /// `.bulk_action(t!("stock.archive"), archive_products, Product::id)` where `archive_products`
+    /// takes `Vec<ProductId>`. Makes the grid selectable. The button shows only for users with the
+    /// action's permission, which the server checks again. When the user picks every matching
+    /// row, the server collects the keys itself (at most [`MAX_BULK`]). Keys picked one by one come
+    /// from the client, so the action must check that the user may change each record, as an API
+    /// action would.
+    pub fn bulk_action<A, K>(
+        mut self,
+        label: impl Into<Text>,
+        _action: A,
+        _key: Field<E, K>,
+    ) -> Self
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        self.body.selectable = true;
+        self.body.bulk.push(BulkDef {
+            label: label.into(),
+            meta: A::META,
+            run: Box::new(|keys| {
+                let keys: Vec<K> = keys
+                    .into_iter()
+                    .map(serde_json::from_value)
+                    .collect::<std::result::Result<_, _>>()
+                    .ok()?;
+                Some(runner::<A>(keys))
+            }),
+            ask: Ask::default(),
+        });
+        self.body.last_bulk = true;
+        self
+    }
+
+    /// Asks the user to confirm with this message before the last added row or bulk action
+    /// runs, in the same dialog as [`crate::ui::ActionButton::confirm`]. Cancel has the focus
+    /// first. The question is asked in the browser; an action that must never run without a
+    /// person also declares `confirm` for AI agents.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_customers)
+    ///     .bulk_action(t!("customers.delete"), delete_customers, Customer::id)
+    ///     .confirm(t!("customers.delete_confirm"))
+    ///     .tone(Tone::Danger)
+    /// ```
+    pub fn confirm(mut self, message: impl Into<Text>) -> Self {
+        if let Some(a) = self.body.last_ask() {
+            a.confirm = Some(message.into());
+        }
+        self
+    }
+
+    /// `Tone::Danger` draws the last added row or bulk action, and its confirmation, in red for
+    /// actions that remove or cancel things. Other tones keep the normal look.
+    pub fn tone(mut self, tone: Tone) -> Self {
+        if let Some(a) = self.body.last_ask() {
+            a.danger = tone == Tone::Danger;
+        }
+        self
+    }
+
+    /// Icon of the last added row action.
+    pub fn icon(mut self, icon: Icon) -> Self {
+        if let Some(a) = self.body.row_actions.last_mut() {
+            a.icon = Some(icon);
+        }
+        self
+    }
+
+    /// Effect produced when the row is opened.
+    pub fn open_effect(&self, row: &E) -> Option<Effect> {
+        self.body.open_effect(row)
+    }
+
+    /// Renders rows as HTML in English. For tests and tools; the server uses the user's language.
+    pub fn rows_html(&self, rows: &[E]) -> String {
+        self.body.rows(
+            &rows,
+            0..rows.len(),
+            &Render::english("grid"),
+            &self.body.layout(None),
+            &Branch::default(),
+        )
+    }
+}
+
+impl GridBody {
     /// Whether rows are grouped or in a tree.
     fn nested(&self) -> bool {
         !matches!(self.paging, Paging::Virtual { .. })
@@ -941,90 +1587,6 @@ impl<E: Model> DataGrid<E> {
     /// Whether rows are grouped or a tree for a view.
     fn nested_in(&self, view: Option<&DataGridView>) -> bool {
         self.nested() || !self.picked_groups(view).is_empty()
-    }
-
-    /// Lets every row expand into a screen built from the row, loaded only when the user opens
-    /// it: `.detail(|o: &Order| (order_lines, OrderParams { id: o.id }))`. Params of the wrong type
-    /// do not compile. The detail can hold anything a screen holds, such as another grid with its
-    /// own detail, to any depth. The expander shows only for users who may open the screen, and
-    /// the server checks the screen's permission again when it loads, as for any screen. The
-    /// params travel through the browser like a window's, so the detail screen checks that the
-    /// user may see the record they name.
-    ///
-    /// Virtual grids (`Paging::Virtual`) keep every row at one fixed height and show no expander;
-    /// use pages or infinite paging for grids with details.
-    pub fn detail<S: ScreenDef>(
-        mut self,
-        detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static,
-    ) -> Self {
-        self.detail = Some(DetailDef {
-            screen: S::META.name,
-            access: S::META.access,
-            params: Box::new(move |row| {
-                serde_json::to_value(detail(row).1).unwrap_or(serde_json::Value::Null)
-            }),
-        });
-        self
-    }
-
-    /// The order rows come in before the user sorts: `.sort_by_desc(Order::id)` for newest
-    /// first. The header shows it, and clicking that column only switches between ascending and
-    /// descending; other columns go back to this order on their third click. Call it again to add
-    /// further keys. The action still receives it in `DataQuery::sort`.
-    pub fn sort_by<T: FieldType>(self, field: Field<E, T>) -> Self {
-        self.sort_field(field, false)
-    }
-
-    /// Same as [`DataGrid::sort_by`], falling: newest, largest or last first.
-    pub fn sort_by_desc<T: FieldType>(self, field: Field<E, T>) -> Self {
-        self.sort_field(field, true)
-    }
-
-    fn sort_field<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
-        self.default_sort
-            .push(crate::action::Sort {
-                field: field.meta().name.to_string(),
-                desc,
-            });
-        self
-    }
-
-    /// Keeps only the rows whose `field` equals `value`, on every request, whatever the client
-    /// sends: `.scope(OrderLine::order_id, params.id)` for the lines of one order. The filter goes
-    /// first in `DataQuery::filters`, so a data layer that reads the filters keeps it. Text
-    /// compares ignoring case.
-    pub fn scope<T: FieldType>(mut self, field: Field<E, T>, value: T) -> Self {
-        self.scope.push(key_filter(
-            field.meta(),
-            value_key(&value.to_value()).as_deref(),
-        ));
-        self
-    }
-
-    /// Keeps only the rows whose `field` is one of `values`, on every request, like
-    /// [`DataGrid::scope`]: `.scope_any(Product::color, p.colors.clone())` for the colors a facet
-    /// panel chose. No values keep every row.
-    pub fn scope_any<T: FieldType>(
-        mut self,
-        field: Field<E, T>,
-        values: impl IntoIterator<Item = T>,
-    ) -> Self {
-        self.scope
-            .extend(any_filter(field.meta(), values));
-        self
-    }
-
-    /// Keeps only the rows whose `field` is between `from` and `to`, both inclusive, on every
-    /// request, like [`DataGrid::scope`]; `None` leaves that end open.
-    pub fn scope_range<T: FieldType>(
-        mut self,
-        field: Field<E, T>,
-        from: Option<T>,
-        to: Option<T>,
-    ) -> Self {
-        self.scope
-            .extend(range_filter(field.meta(), from, to));
-        self
     }
 
     /// Whether rows show the detail expander for this page's user.
@@ -1111,7 +1673,7 @@ impl<E: Model> DataGrid<E> {
             query.filters.insert(0, f);
         }
         query.time_zone = ctx.time_zone();
-        let fetch = self.fetch;
+        let fetch = self.fetch.clone();
         let offset = match &query.page {
             PageRequest::Offset { offset, .. } => *offset,
             PageRequest::After { .. } => 0,
@@ -1119,12 +1681,12 @@ impl<E: Model> DataGrid<E> {
         Box::pin(async move {
             let page = fetch(ctx, query).await?;
             Ok(LoadedPage {
-                count: page.items.len(),
+                count: page.count,
                 total: page.total,
                 next: page.next,
                 offset,
                 totals: page.totals,
-                items: Box::new(page.items),
+                items: page.items,
                 view: None,
                 saved_views: false,
                 depth: 0,
@@ -1142,143 +1704,6 @@ impl<E: Model> DataGrid<E> {
                 .filters
                 .splice(0..0, self.scope.iter().cloned());
         }
-    }
-
-    /// Lets users export every row that matches their filters as CSV, in their column layout and
-    /// language. The server pages through the grid's action and streams the file, up to
-    /// [`DEFAULT_EXPORT_LIMIT`] rows. Exporting needs the grid's read access. The toolbar's
-    /// `Export::Csv` button uses this export when the grid has it.
-    pub fn exportable(mut self) -> Self {
-        self.export = Some((self.action.access, DEFAULT_EXPORT_LIMIT));
-        self
-    }
-
-    /// Like `exportable`, but exporting also needs `permission`.
-    pub fn export_permission(mut self, permission: &'static str) -> Self {
-        let limit = self
-            .export
-            .map_or(DEFAULT_EXPORT_LIMIT, |e| e.1);
-        self.export = Some((crate::action::Access::Permission(permission), limit));
-        self
-    }
-
-    /// Most rows one export may hold; bigger results are cut there. At most 1,000,000.
-    pub fn export_limit(mut self, rows: usize) -> Self {
-        let access = self
-            .export
-            .map_or(self.action.access, |e| e.0);
-        self.export = Some((access, rows.clamp(1, 1_000_000)));
-        self
-    }
-
-    /// Lets users edit cells of the columns marked `editable()` in place, saved with `save`, an
-    /// action that takes `Valid<E>` like a form's. The server loads the row again by key, applies
-    /// only the editable columns and the row version (`#[version]`) the client sends, validates
-    /// and runs the action; a changed row comes back as a conflict. F2 or a double click on an
-    /// editable cell starts editing, Enter saves, Escape cancels, Ctrl+Z undoes the last save.
-    pub fn edit_with<A>(mut self, _save: A) -> Self
-    where
-        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
-        A::Output: Outcome,
-    {
-        self.save = Some(SaveDef {
-            meta: A::META,
-            run: Box::new(|valid| runner::<A>(valid)),
-        });
-        self
-    }
-
-    /// Shows an "Add row" button above the grid. It opens an empty row at the top with an input
-    /// for every `editable()` column; Enter saves it through `create`, which takes `Valid<E>` as
-    /// an inline edit's save does, and the grid reloads. The server starts from `E::default()`,
-    /// reads only the editable columns as a form would and checks `create`'s permission. Escape
-    /// drops the new row. Virtual grids do not add rows.
-    ///
-    /// ```ignore
-    /// DataGrid::of(search_products)
-    ///     .column(Product::name).editable()
-    ///     .add_with(create_product)
-    /// ```
-    pub fn add_with<A>(mut self, _create: A) -> Self
-    where
-        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
-        A::Output: Outcome,
-    {
-        self.add = Some(SaveDef {
-            meta: A::META,
-            run: Box::new(|valid| runner::<A>(valid)),
-        });
-        self
-    }
-
-    /// Lets users delete the selected rows: a "Delete" button in the selection bar that asks
-    /// first, and the Delete key on a row, which deletes the selection or, with none, that row.
-    /// The action takes the keys as a bulk action does (`Vec<K>` of the key field), so it must
-    /// check each record it is given.
-    ///
-    /// ```ignore
-    /// DataGrid::of(search_products).delete_with(delete_products, Product::id)
-    /// ```
-    pub fn delete_with<A, K>(self, action: A, key: Field<E, K>) -> Self
-    where
-        A: BulkAction<K> + Action<Input = Vec<K>>,
-        A::Output: Outcome,
-        K: serde::de::DeserializeOwned + Send + 'static,
-    {
-        let mut grid = self.bulk_action(Text::key("zeyn.grid.delete"), action, key);
-        grid.delete = Some(grid.bulk.len() - 1);
-        grid.confirm(Text::key("zeyn.grid.delete_confirm"))
-            .tone(Tone::Danger)
-    }
-
-    /// Keeps inline edits until the user saves them all: Enter leaves a changed row in place,
-    /// marked, and a bar above the grid counts the changed rows with "Save changes" and
-    /// "Discard changes". Saving sends each row through the inline edit path, one after
-    /// another, so each is read, validated and checked like a single edit; rows that fail keep
-    /// their changes and show the errors. Loading other rows asks before it drops changes.
-    pub fn batch_edit(mut self) -> Self {
-        self.batch = true;
-        self
-    }
-
-    /// Shows a "Filter" button above the grid that opens the filter builder: a dialog listing a
-    /// condition per row (a column with `filter()` and its operator and values, the same inputs
-    /// as the filter row), with "Add condition", "Clear all" and "Apply". Conditions hold
-    /// together; a later condition on the same column replaces an earlier one. Applying writes
-    /// the conditions into the grid's filters, so the filter row, saved views, exports and the
-    /// `zeyn:filter` event an AI agent sends all see the same list, and the server checks it as
-    /// always.
-    pub fn filter_builder(mut self) -> Self {
-        self.builder = true;
-        self
-    }
-
-    /// Shows the active filters as chips above the grid: one per filtered column and one per
-    /// condition group of the filter builder, each with a remove button, and "Clear all" when
-    /// there are two or more. The chips follow the filter row, the filter builder, the saved
-    /// view and the `zeyn:filter` event; removing one reloads the grid and saves the view.
-    /// Pressing a chip opens the filter builder when the grid has one, otherwise it moves focus
-    /// to the column's filter. The chips run in a browser module of their own, so grids without
-    /// them load nothing more.
-    pub fn filter_chips(mut self) -> Self {
-        self.chips = true;
-        self
-    }
-
-    /// Lets users pick how many rows a page shows, from `sizes`, in a "Rows per page" list next
-    /// to the pager. Each size is kept between 1 and [`MAX_PAGE_SIZE`]; the grid's own page size
-    /// is always offered. The pick is part of the user's view and is saved with it. Only grids
-    /// with numbered pages show it.
-    ///
-    /// ```ignore
-    /// DataGrid::of(search_orders).paging(Paging::pages(25)).page_sizes(&[10, 25, 50, 100])
-    /// ```
-    pub fn page_sizes(mut self, sizes: &[u32]) -> Self {
-        self.page_sizes = sizes
-            .iter()
-            .map(|s| (*s).clamp(1, MAX_PAGE_SIZE))
-            .collect();
-        self
     }
 
     /// The page sizes offered, in order with the grid's own; empty when the grid has none to
@@ -1310,17 +1735,17 @@ impl<E: Model> DataGrid<E> {
             && self
                 .add
                 .as_ref()
-                .is_some_and(|s| r.can(&s.meta.access))
+                .is_some_and(|s| r.can(&s.access))
     }
 
-    /// Indexes in `E::fields()` of the columns users may edit: marked `editable()`, not keys, read
+    /// Indexes in the row type's fields of the columns users may edit: marked `editable()`, not keys, read
     /// only fields or row versions.
     fn editable_fields(&self) -> Vec<usize> {
         self.columns
             .iter()
             .filter(|c| c.editable && !c.meta.key && !c.meta.readonly && !c.meta.version)
             .filter_map(|c| {
-                E::fields()
+                self.fields
                     .iter()
                     .position(|f| f.name == c.meta.name)
             })
@@ -1331,220 +1756,7 @@ impl<E: Model> DataGrid<E> {
     fn can_edit(&self, r: &Render) -> bool {
         self.save
             .as_ref()
-            .is_some_and(|s| r.can(&s.meta.access))
-    }
-
-    /// Context menu of each row, built on the server from the row. Right click, Shift+F10 or the
-    /// context menu key opens it. See [`crate::ContextMenu`].
-    pub fn row_menu(
-        mut self,
-        menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static,
-    ) -> Self {
-        self.row_menu = Some(Box::new(menu));
-        self
-    }
-
-    /// DataGrid with a column for every field of the model except the row version, in declaration
-    /// order, and filter boxes on text and choice columns. The quickest list for a simple model.
-    pub fn auto<A>(source: A) -> Self
-    where
-        A: Action<Input = DataQuery, Output = Result<Page<E>>>,
-    {
-        let mut grid = Self::of(source);
-        for (i, meta) in E::fields()
-            .iter()
-            .enumerate()
-            .filter(|(_, m)| !m.version)
-        {
-            let filter = matches!(
-                meta.kind,
-                crate::value::FieldKind::Text | crate::value::FieldKind::Choice(_)
-            );
-            grid.columns.push(Column {
-                value: Box::new(move |e: &E| {
-                    std::borrow::Cow::Owned(e.value_at(i).unwrap_or(Value::Null))
-                }),
-                filter,
-                ..Column::of(meta)
-            });
-        }
-        grid
-    }
-
-    /// Shades every other row, for very wide grids where the eye loses the row. Rows are
-    /// divided by lines only unless set.
-    /// What the grid shows when it has no rows, in place of "No records": a title, a text and
-    /// an action, such as "No orders yet" with "New order". With [`DataGrid::empty_filtered`]
-    /// it shows only while no filter is on.
-    ///
-    /// ```ignore
-    /// DataGrid::of(search_orders)
-    ///     .empty(EmptyState::new(t!("orders.none")).opens(t!("orders.new"), new_order, ()))
-    ///     .empty_filtered(EmptyState::new(t!("orders.no_match")).text(t!("orders.no_match_help")))
-    /// ```
-    pub fn empty(mut self, state: crate::ui::EmptyState) -> Self {
-        self.empty = Some(state);
-        self
-    }
-
-    /// What the grid shows when its filters leave no rows, such as "No orders match" with a hint
-    /// to change the filters.
-    pub fn empty_filtered(mut self, state: crate::ui::EmptyState) -> Self {
-        self.empty_filtered = Some(state);
-        self
-    }
-
-    pub fn zebra(mut self) -> Self {
-        self.zebra = true;
-        self
-    }
-
-    pub fn mode(mut self, mode: DataMode) -> Self {
-        self.mode = mode;
-        self
-    }
-
-    /// Paging style. Numbered pages of 50 rows unless set.
-    pub fn paging(mut self, paging: Paging) -> Self {
-        self.paging = paging;
-        self
-    }
-
-    /// Adds a column. The following settings (`width`, `filter`...) apply to it.
-    pub fn column<T: FieldType + 'static>(mut self, field: Field<E, T>) -> DataGridColumn<E, T> {
-        self.columns.push(Column {
-            value: Box::new(move |e| std::borrow::Cow::Owned(field.get(e).to_value())),
-            ..Column::of(field.meta())
-        });
-        DataGridColumn {
-            grid: self,
-            field,
-            _type: PhantomData,
-        }
-    }
-
-    /// Shows a search box above the grid. What the user types goes to the action as
-    /// [`DataQuery::q`] with every page, block and export, and the action searches the text
-    /// fields with it ([`DataQuery::apply`] and the SQL data layers do). Masked fields are never
-    /// searched. Grids without it drop any `q` the client sends.
-    ///
-    /// ```ignore
-    /// DataGrid::of(search_products).search().column(Product::name)
-    /// ```
-    pub fn search(mut self) -> Self {
-        self.search = true;
-        self
-    }
-
-    /// Groups the columns the closure adds under one header cell labelled `label`, in a header
-    /// row above the column headers. Columns of a band that the user hides drop out of it; a
-    /// band shows one cell per run of its columns that stay next to each other and on the same
-    /// pinned side, so moving a column out of a band splits it.
-    ///
-    /// ```ignore
-    /// DataGrid::of(search_products)
-    ///     .column(Product::name)
-    ///     .band(t!("stock.prices"), |b| b
-    ///         .column(Product::price)
-    ///         .column(Product::cost))
-    /// ```
-    pub fn band<G: Into<DataGrid<E>>>(
-        mut self,
-        label: impl Into<Text>,
-        columns: impl FnOnce(DataGrid<E>) -> G,
-    ) -> Self {
-        let first = self.columns.len();
-        let band = self.bands.len();
-        self.bands.push(label.into());
-        let mut grid = columns(self).into();
-        for c in grid.columns.iter_mut().skip(first) {
-            c.band = c.band.or(Some(band));
-        }
-        grid
-    }
-
-    /// Picks a highlight per row.
-    pub fn row_style(
-        mut self,
-        style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static,
-    ) -> Self {
-        self.row_style = Some(Box::new(style));
-        self
-    }
-
-    /// What happens when a row is opened (double click or Enter).
-    pub fn on_open(mut self, open: impl Fn(&E) -> Effect + Send + Sync + 'static) -> Self {
-        self.on_open = Some(Box::new(open));
-        self
-    }
-
-    /// Adds a button to every row that runs `action` with input built from the row:
-    /// `.row_action(t!("stock.archive"), archive_product, |p| p.id)`. The button only shows for
-    /// users with the action's permission. When pressed, the server loads the row again by its key
-    /// through the grid's action, builds the input from it, checks the permission again and runs
-    /// the action; the client never sends the input.
-    pub fn row_action<A>(
-        mut self,
-        label: impl Into<Text>,
-        _action: A,
-        input: impl Fn(&E) -> A::Input + Send + Sync + 'static,
-    ) -> Self
-    where
-        A: Action,
-        A::Output: Outcome,
-    {
-        self.row_actions.push(RowAction {
-            label: label.into(),
-            icon: None,
-            meta: A::META,
-            run: Box::new(move |row| runner::<A>(input(row))),
-            ask: Ask::default(),
-        });
-        self.last_bulk = false;
-        self
-    }
-
-    /// Adds a checkbox to every row and a selection bar above the grid. Shift selects a range,
-    /// the header box selects the page, and the bar offers every row that matches the filters.
-    pub fn selectable(mut self) -> Self {
-        self.selectable = true;
-        self
-    }
-
-    /// Adds a button to the selection bar that runs `action` with the keys of the selected rows:
-    /// `.bulk_action(t!("stock.archive"), archive_products, Product::id)` where `archive_products`
-    /// takes `Vec<ProductId>`. Makes the grid selectable. The button shows only for users with the
-    /// action's permission, which the server checks again. When the user picks every matching
-    /// row, the server collects the keys itself (at most [`MAX_BULK`]). Keys picked one by one come
-    /// from the client, so the action must check that the user may change each record, as an API
-    /// action would.
-    pub fn bulk_action<A, K>(
-        mut self,
-        label: impl Into<Text>,
-        _action: A,
-        _key: Field<E, K>,
-    ) -> Self
-    where
-        A: BulkAction<K> + Action<Input = Vec<K>>,
-        A::Output: Outcome,
-        K: serde::de::DeserializeOwned + Send + 'static,
-    {
-        self.selectable = true;
-        self.bulk.push(BulkDef {
-            label: label.into(),
-            meta: A::META,
-            run: Box::new(|keys| {
-                let keys: Vec<K> = keys
-                    .into_iter()
-                    .map(serde_json::from_value)
-                    .collect::<std::result::Result<_, _>>()
-                    .ok()?;
-                Some(runner::<A>(keys))
-            }),
-            ask: Ask::default(),
-        });
-        self.last_bulk = true;
-        self
+            .is_some_and(|s| r.can(&s.access))
     }
 
     /// The ask of the last added row or bulk action.
@@ -1558,59 +1770,16 @@ impl<E: Model> DataGrid<E> {
         }
     }
 
-    /// Asks the user to confirm with this message before the last added row or bulk action
-    /// runs, in the same dialog as [`crate::ui::ActionButton::confirm`]. Cancel has the focus
-    /// first. The question is asked in the browser; an action that must never run without a
-    /// person also declares `confirm` for AI agents.
-    ///
-    /// ```ignore
-    /// DataGrid::of(search_customers)
-    ///     .bulk_action(t!("customers.delete"), delete_customers, Customer::id)
-    ///     .confirm(t!("customers.delete_confirm"))
-    ///     .tone(Tone::Danger)
-    /// ```
-    pub fn confirm(mut self, message: impl Into<Text>) -> Self {
-        if let Some(a) = self.last_ask() {
-            a.confirm = Some(message.into());
-        }
-        self
-    }
-
-    /// `Tone::Danger` draws the last added row or bulk action, and its confirmation, in red for
-    /// actions that remove or cancel things. Other tones keep the normal look.
-    pub fn tone(mut self, tone: Tone) -> Self {
-        if let Some(a) = self.last_ask() {
-            a.danger = tone == Tone::Danger;
-        }
-        self
-    }
-
-    /// Icon of the last added row action.
-    pub fn icon(mut self, icon: Icon) -> Self {
-        if let Some(a) = self.row_actions.last_mut() {
-            a.icon = Some(icon);
-        }
-        self
-    }
-
     /// Index of the `#[key]` field, if the model has one.
-    fn key_index() -> Option<usize> {
-        E::fields().iter().position(|f| f.key)
+    fn key_index(&self) -> Option<usize> {
+        self.fields.iter().position(|f| f.key)
     }
 
     /// Effect produced when the row is opened.
-    pub fn open_effect(&self, row: &E) -> Option<Effect> {
-        self.on_open.as_ref().map(|f| f(row))
-    }
-
-    /// Renders rows as HTML in English. For tests and tools; the server uses the user's language.
-    pub fn rows_html(&self, rows: &[E]) -> String {
-        self.rows(
-            rows,
-            &Render::english("grid"),
-            &self.layout(None),
-            &Branch::default(),
-        )
+    fn open_effect(&self, row: &dyn Any) -> Option<Effect> {
+        self.on_open
+            .as_ref()
+            .and_then(|f| f(row))
     }
 
     /// The view's columns that exist, in its order, without repeats; may be empty.
@@ -1756,7 +1925,7 @@ impl<E: Model> DataGrid<E> {
     /// grid (pages, exports, bulk runs, saved views, agents) is cleaned the same way.
     fn allow(&self, query: &mut DataQuery, ctx: Option<&Ctx>) {
         if let Some(ctx) = ctx {
-            crate::privacy::strip_masked(query, E::fields(), ctx);
+            crate::privacy::strip_masked(query, self.fields, ctx);
         }
         let allowed = self.aggregate_requests();
         query
@@ -1958,16 +2127,23 @@ impl<E: Model> DataGrid<E> {
     /// The `<tr>` of each row. Work that is the same for every row (access checks, labels, the
     /// row action cell, which columns are editable) is done once, and cells are written straight
     /// into the output without a string per cell.
-    fn rows(&self, rows: &[E], r: &Render, cols: &[Shown], b: &Branch) -> String {
+    fn rows(
+        &self,
+        rows: &dyn GridRows,
+        range: std::ops::Range<usize>,
+        r: &Render,
+        cols: &[Shown],
+        b: &Branch,
+    ) -> String {
         use std::fmt::Write;
-        let mut out = String::with_capacity(rows.len() * (cols.len() + 1) * 32);
+        let mut out = String::with_capacity(range.len() * (cols.len() + 1) * 32);
         let nested = self.nested() || b.nested;
         let tree = nested && self.tree.is_some();
         let edit = self.can_edit(r);
-        let key_at = Self::key_index();
+        let key_at = self.key_index();
         let version_at = edit
             .then(|| {
-                E::fields()
+                self.fields
                     .iter()
                     .position(|f| f.version)
             })
@@ -2028,9 +2204,11 @@ impl<E: Model> DataGrid<E> {
                     && c.meta.mask.is_none()
             })
             .collect();
-        for row in rows {
-            if let (true, Some(ctx)) = (E::SENSITIVE, r.ctx) {
-                ctx.record_read(row);
+        for i in range {
+            let row = rows.row(i);
+            let any = row.any();
+            if let (true, Some(ctx)) = (self.sensitive, r.ctx) {
+                row.record_read(ctx);
             }
             out.push_str("<tr");
             let mut toggle = "";
@@ -2066,11 +2244,11 @@ impl<E: Model> DataGrid<E> {
             if let Some(style) = self
                 .row_style
                 .as_ref()
-                .and_then(|f| f(row))
+                .and_then(|f| f(any))
             {
                 let _ = write!(out, r#" class="{}""#, style.css());
             }
-            if let Some(effect) = self.open_effect(row) {
+            if let Some(effect) = self.open_effect(any) {
                 let _ = write!(
                     out,
                     r#" tabindex="-1" data-zeyn-effect="{}""#,
@@ -2087,7 +2265,11 @@ impl<E: Model> DataGrid<E> {
                 key_into(&mut out, &v);
                 out.push('"');
             }
-            if let Some(menu) = self.row_menu.as_ref().map(|f| f(row)) {
+            if let Some(menu) = self
+                .row_menu
+                .as_ref()
+                .and_then(|f| f(any))
+            {
                 let items = menu.to_json(r);
                 if items
                     .as_array()
@@ -2097,7 +2279,7 @@ impl<E: Model> DataGrid<E> {
                 }
             }
             if let Some(d) = detail {
-                let target = json!({ "screen": d.screen, "params": (d.params)(row) });
+                let target = json!({ "screen": d.screen, "params": (d.params)(any) });
                 let _ = write!(
                     out,
                     r#" aria-expanded="false" data-zeyn-detail="{}""#,
@@ -2117,7 +2299,7 @@ impl<E: Model> DataGrid<E> {
             );
             for (n, s) in cols.iter().enumerate() {
                 let c = &self.columns[s.index];
-                let value = (c.value)(row);
+                let value = (c.value)(any);
                 let num = matches!(
                     *value,
                     Value::Int(_) | Value::Money(_) | Value::Decimal(_) | Value::Number(_)
@@ -2157,8 +2339,8 @@ impl<E: Model> DataGrid<E> {
                     );
                 }
                 match (c.meta.mask, &c.cell) {
-                    (Some(_), _) => out.push_str(&crate::privacy::cell(r, c.meta, &value, row)),
-                    (None, Some(cell)) => out.push_str(&cell(row, r)),
+                    (Some(_), _) => out.push_str(&row.masked_cell(r, c.meta, &value)),
+                    (None, Some(cell)) => out.push_str(&cell(any, r)),
                     (None, None) => match *value {
                         Value::Int(n) if c.plain => {
                             let _ = write!(out, "{n}");
@@ -2344,7 +2526,7 @@ impl<E: Model> DataGrid<E> {
             out.push_str(r#" data-zeyn-batch"#);
         }
         if self.can_edit(r)
-            && let Some(v) = E::fields().iter().find(|f| f.version)
+            && let Some(v) = self.fields.iter().find(|f| f.version)
         {
             out.push_str(&format!(r#" data-zeyn-version-field="{}""#, v.name));
         }
@@ -2366,9 +2548,9 @@ impl<E: Model> DataGrid<E> {
             VIRTUAL_LIVE_ROWS
         };
         if let Some(p) = page {
-            match (self.paging, Self::items(p)) {
+            match (self.paging, self.items(p)) {
                 (Paging::Virtual { .. }, Some(rows))
-                    if p.groups.is_none() && rows.len() > live_rows =>
+                    if p.groups.is_none() && rows.count() > live_rows =>
                 {
                     let branch = Branch {
                         nested: false,
@@ -2376,8 +2558,8 @@ impl<E: Model> DataGrid<E> {
                         path: &p.path,
                         parents: &p.parents,
                     };
-                    out.push_str(&self.rows(&rows[..live_rows], r, &cols, &branch));
-                    later = self.rows(&rows[live_rows..], r, &cols, &branch);
+                    out.push_str(&self.rows(rows, 0..live_rows, r, &cols, &branch));
+                    later = self.rows(rows, live_rows..rows.count(), r, &cols, &branch);
                 }
                 _ => out.push_str(&self.rows_html_erased(p, r)),
             }
@@ -2504,7 +2686,7 @@ impl<E: Model> DataGrid<E> {
     }
 
     /// The cell of one column with its totals, or an empty cell.
-    fn total_cell(&self, c: &Column<E>, totals: &[Total], r: &Render) -> String {
+    fn total_cell(&self, c: &Column, totals: &[Total], r: &Render) -> String {
         if c.aggregates.is_empty() && c.summary.is_none() {
             return "<td></td>".to_string();
         }
@@ -2633,23 +2815,21 @@ impl<E: Model> DataGrid<E> {
             path: &page.path,
             parents: &page.parents,
         };
-        Self::items(page)
-            .map(|rows| self.rows(rows, r, &cols, &branch))
+        self.items(page)
+            .map(|rows| self.rows(rows, 0..rows.count(), r, &cols, &branch))
             .unwrap_or_default()
     }
 
     /// The rows of a loaded page: the action's own, or the rows of a dynamic page.
-    fn items(page: &LoadedPage) -> Option<&[E]> {
-        match page.items.downcast_ref::<Vec<E>>() {
+    fn items<'a>(&self, page: &'a LoadedPage) -> Option<&'a dyn GridRows> {
+        match (self.rows_of)(&*page.items) {
             Some(rows) => Some(rows),
-            None => {
-                let rows: &dyn std::any::Any = &page
+            None => (self.rows_of)(
+                &page
                     .items
                     .downcast_ref::<dynamic::DynamicItems>()?
-                    .rows;
-                rows.downcast_ref::<Vec<E>>()
-                    .map(Vec::as_slice)
-            }
+                    .rows,
+            ),
         }
     }
 
@@ -2701,7 +2881,9 @@ impl<E: Model> DataGrid<E> {
             PageRequest::Offset { offset, .. } => *offset,
             PageRequest::After { .. } => 0,
         };
-        let fetch = self.fetch;
+        let fetch = self.fetch.clone();
+        let rows_of = self.rows_of;
+        let key_at = self.key_index();
         let parent = self.tree;
         let scope = self.scope.clone();
         Box::pin(async move {
@@ -2724,11 +2906,9 @@ impl<E: Model> DataGrid<E> {
                 });
             let page = fetch(ctx.clone(), query.clone()).await?;
             let mut parents = Vec::new();
-            if let (Some(parent), Some(ki)) = (parent, Self::key_index()) {
-                let keys: Vec<String> = page
-                    .items
-                    .iter()
-                    .filter_map(|row| row.value_at(ki))
+            if let (Some(parent), Some(ki), Some(rows)) = (parent, key_at, rows_of(&*page.items)) {
+                let keys: Vec<String> = (0..rows.count())
+                    .filter_map(|i| rows.row(i).value_at(ki))
                     .filter_map(|v| value_key(&v))
                     .collect();
                 if !keys.is_empty() {
@@ -2761,13 +2941,13 @@ impl<E: Model> DataGrid<E> {
                 count: if grouped {
                     page.groups.len()
                 } else {
-                    page.items.len()
+                    page.count
                 },
                 total: page.total,
                 next: page.next,
                 offset,
                 totals,
-                items: Box::new(page.items),
+                items: page.items,
                 view: None,
                 saved_views: false,
                 depth,
@@ -2779,11 +2959,96 @@ impl<E: Model> DataGrid<E> {
     }
 }
 
-impl<E: Model> GridSource for DataGrid<E> {
-    fn action(&self) -> ActionMeta {
-        self.action
+/// The JSON schema of a grid's data query for AI tools: `fields` can be sorted and totalled,
+/// `filterable` filtered, and `search` adds the free text query. Not generic, so it is compiled
+/// once and not once for every row type.
+fn tool_schema(fields: &[&str], filterable: &[&str], search: bool) -> serde_json::Value {
+    let filter = json!({
+        "type": "object",
+        "properties": {
+            "field": { "type": "string", "enum": filterable },
+            "contains": { "type": "string" },
+            "starts_with": { "type": "string" },
+            "equals": { "type": "string" },
+            "from": { "type": "string" },
+            "to": { "type": "string" },
+            "any_of": { "type": "array", "items": { "type": "string" } },
+            "is": { "type": "boolean" }
+        },
+        "required": ["field"]
+    });
+    let mut group = serde_json::Value::Null;
+    for _ in 0..MAX_FILTER_DEPTH {
+        let mut properties = json!({
+            "any": { "type": "boolean" },
+            "filters": { "type": "array", "items": filter }
+        });
+        if !group.is_null() {
+            properties["groups"] = json!({ "type": "array", "items": group });
+        }
+        group = json!({ "type": "object", "properties": properties });
     }
+    let mut schema = json!({
+        "type": "object",
+        "properties": {
+            "page": {
+                "type": "object",
+                "description": "Which rows to return. Use type offset with offset and limit (max 500).",
+                "properties": {
+                    "type": { "type": "string", "enum": ["offset", "after"] },
+                    "offset": { "type": "integer", "minimum": 0 },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE },
+                    "cursor": { "type": ["string", "null"] }
+                },
+                "required": ["type", "limit"]
+            },
+            "sort": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": { "field": { "type": "string", "enum": fields }, "desc": { "type": "boolean" } },
+                    "required": ["field", "desc"]
+                }
+            },
+            "filters": {
+                "type": "array",
+                "description": "Every set condition must hold. Numbers as 1234.56, dates as YYYY-MM-DD (a whole day in the user's time zone for moments), times as HH:MM.",
+                "items": filter
+            },
+            "filter_groups": {
+                "type": "array",
+                "description": format!(
+                    "Groups that must also hold, for OR conditions. A group with any true matches when one of its filters or groups matches, with any false when all match. Groups nest up to {MAX_FILTER_DEPTH} deep; at most {MAX_FILTERS} filters in all."
+                ),
+                "items": group
+            },
+            "with_total": { "type": "boolean" },
+            "aggregates": {
+                "type": "array",
+                "description": "Column totals over all matching rows. Only the totals the grid shows are computed.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "field": { "type": "string", "enum": fields },
+                        "op": { "type": "string", "enum": ["sum", "avg", "min", "max", "count"] }
+                    },
+                    "required": ["field", "op"]
+                }
+            }
+        }
+    });
+    if search {
+        schema["properties"]["q"] = json!({
+            "type": "string",
+            "maxLength": crate::MAX_SEARCH_QUERY,
+            "description": "Free text: rows whose text fields contain it, ignoring case and accents."
+        });
+    }
+    schema
+}
 
+/// The [`GridSource`] of a [`DataGrid`], apart from the edits that build a `Valid<E>`.
+impl GridBody {
     fn first_query(&self, view: Option<&DataGridView>) -> DataQuery {
         let page = match self.paging {
             Paging::Infinite { batch } => PageRequest::After {
@@ -2813,19 +3078,15 @@ impl<E: Model> GridSource for DataGrid<E> {
         }
     }
 
-    fn clean_view(&self, view: DataGridView) -> DataGridView {
-        self.clean(view)
-    }
-
     fn head_html(&self, r: &Render, view: Option<&DataGridView>) -> String {
         self.head_row(r, &self.layout(view))
     }
 
     fn find_row(&self, ctx: Ctx, key: String) -> BoxFuture<Result<LoadedPage>> {
-        let Some(i) = Self::key_index() else {
+        let Some(i) = self.key_index() else {
             return Box::pin(async { Err(crate::action::Error::NotFound) });
         };
-        let meta = &E::fields()[i];
+        let meta = &self.fields[i];
         let filter = match meta.kind {
             FieldKind::Id | FieldKind::Integer => Filter::range(meta.name, Some(&key), Some(&key)),
             _ => Filter {
@@ -2844,16 +3105,16 @@ impl<E: Model> GridSource for DataGrid<E> {
             ..DataQuery::default()
         };
         self.scoped(&mut query);
-        let fetch = self.fetch;
+        let fetch = self.fetch.clone();
         Box::pin(async move {
             let page = fetch(ctx, query).await?;
             Ok(LoadedPage {
-                count: page.items.len(),
+                count: page.count,
                 total: page.total,
                 next: None,
                 offset: 0,
                 totals: Vec::new(),
-                items: Box::new(page.items),
+                items: page.items,
                 view: None,
                 saved_views: false,
                 depth: 0,
@@ -2877,7 +3138,7 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn key_json(&self, key: &str) -> Option<serde_json::Value> {
-        let meta = &E::fields()[Self::key_index()?];
+        let meta = &self.fields[self.key_index()?];
         match meta.kind {
             FieldKind::Id | FieldKind::Integer => key
                 .parse::<i64>()
@@ -2888,26 +3149,17 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn page_keys(&self, page: &LoadedPage) -> Vec<serde_json::Value> {
-        let Some(i) = Self::key_index() else {
+        let Some(i) = self.key_index() else {
             return Vec::new();
         };
-        page.items
-            .downcast_ref::<Vec<E>>()
+        (self.rows_of)(&*page.items)
             .map(|rows| {
-                rows.iter()
-                    .filter_map(|r| r.value_at(i))
+                (0..rows.count())
+                    .filter_map(|n| rows.row(n).value_at(i))
                     .filter_map(|v| serde_json::to_value(v).ok())
                     .collect()
             })
             .unwrap_or_default()
-    }
-
-    fn export_access(&self) -> Option<crate::action::Access> {
-        self.export.map(|e| e.0)
-    }
-
-    fn export_limit(&self) -> usize {
-        self.export.map_or(0, |e| e.1)
     }
 
     fn csv_head(&self, r: &Render, view: Option<&DataGridView>) -> String {
@@ -2924,11 +3176,12 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
         let cols = self.layout(page.view.as_ref());
-        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
+        let Some(rows) = (self.rows_of)(&*page.items) else {
             return String::new();
         };
-        let mut out = String::with_capacity(rows.len() * cols.len() * 12);
-        for row in rows {
+        let mut out = String::with_capacity(rows.count() * cols.len() * 12);
+        for n in 0..rows.count() {
+            let row = rows.row(n).any();
             for (i, slot) in cols.iter().enumerate() {
                 if i > 0 {
                     out.push(',');
@@ -2969,11 +3222,12 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     fn export_text(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<String>> {
         let cols = self.layout(page.view.as_ref());
-        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
+        let Some(rows) = (self.rows_of)(&*page.items) else {
             return Vec::new();
         };
-        rows.iter()
-            .map(|row| {
+        (0..rows.count())
+            .map(|n| {
+                let row = rows.row(n).any();
                 cols.iter()
                     .map(|s| {
                         let c = &self.columns[s.index];
@@ -2991,11 +3245,12 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     fn export_values(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<Value>> {
         let cols = self.layout(page.view.as_ref());
-        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
+        let Some(rows) = (self.rows_of)(&*page.items) else {
             return Vec::new();
         };
-        rows.iter()
-            .map(|row| {
+        (0..rows.count())
+            .map(|n| {
+                let row = rows.row(n).any();
                 cols.iter()
                     .map(|s| {
                         let c = &self.columns[s.index];
@@ -3011,35 +3266,25 @@ impl<E: Model> GridSource for DataGrid<E> {
             .collect()
     }
 
-    fn edit_call(
+    /// The position in the page of the row an inline edit changes, and the editable fields,
+    /// after checking that the values name only editable fields or the row version.
+    fn edit_target(
         &self,
         page: &LoadedPage,
         key: &str,
         values: &serde_json::Map<String, serde_json::Value>,
-        locale: &str,
-        tz: TimeZone,
-    ) -> Result<RowCall> {
+    ) -> Result<(usize, Vec<usize>)> {
         use crate::action::Error;
-        let save = self
-            .save
-            .as_ref()
+        let i = self
+            .key_index()
             .ok_or(Error::NotFound)?;
-        let i = Self::key_index().ok_or(Error::NotFound)?;
-        let rows = page
-            .items
-            .downcast_ref::<Vec<E>>()
-            .ok_or(Error::NotFound)?;
-        let row = rows
-            .iter()
-            .find(|r| {
-                r.value_at(i)
-                    .is_some_and(|v| key_text(&v) == key)
-            })
+        let rows = (self.rows_of)(&*page.items).ok_or(Error::NotFound)?;
+        let at = self
+            .find(rows, i, key)
             .ok_or(Error::NotFound)?;
         let editable = self.editable_fields();
-        let fields = E::fields();
         let allowed = |name: &str| {
-            fields
+            self.fields
                 .iter()
                 .enumerate()
                 .any(|(j, f)| f.name == name && (f.version || editable.contains(&j)))
@@ -3047,34 +3292,27 @@ impl<E: Model> GridSource for DataGrid<E> {
         if values.is_empty() || values.keys().any(|k| !allowed(k)) {
             return Err(Error::Forbidden);
         }
-        let valid =
-            crate::form::Form::with_fields(row.clone(), &editable).read(values, locale, tz)?;
-        Ok(RowCall {
-            meta: save.meta,
-            run: (save.run)(valid),
-        })
+        Ok((at, editable))
     }
 
-    fn add_call(
+    /// The editable fields of a new row, after checking that the grid adds rows, that the user
+    /// may run `add` and that the values name only editable fields.
+    fn add_target(
         &self,
+        add: &ActionMeta,
         values: &serde_json::Map<String, serde_json::Value>,
         ctx: &Ctx,
-    ) -> Result<RowCall> {
+    ) -> Result<Vec<usize>> {
         use crate::action::Error;
-        let add = self
-            .add
-            .as_ref()
-            .ok_or(Error::NotFound)?;
         if matches!(self.paging, Paging::Virtual { .. }) {
             return Err(Error::NotFound);
         }
-        if !ctx.identity().can(&add.meta.access) {
+        if !ctx.identity().can(&add.access) {
             return Err(Error::Forbidden);
         }
         let editable = self.editable_fields();
-        let fields = E::fields();
         let allowed = |name: &str| {
-            fields
+            self.fields
                 .iter()
                 .enumerate()
                 .any(|(j, f)| f.name == name && editable.contains(&j))
@@ -3082,23 +3320,25 @@ impl<E: Model> GridSource for DataGrid<E> {
         if values.keys().any(|k| !allowed(k)) {
             return Err(Error::Forbidden);
         }
-        let valid =
-            crate::form::Form::with_fields(E::default(), &editable).read_for(values, ctx)?;
-        Ok(RowCall {
-            meta: add.meta,
-            run: (add.run)(valid),
+        Ok(editable)
+    }
+
+    /// The position of the row whose key field (at `key_at`) has the text `key`.
+    fn find(&self, rows: &dyn GridRows, key_at: usize, key: &str) -> Option<usize> {
+        (0..rows.count()).find(|n| {
+            rows.row(*n)
+                .value_at(key_at)
+                .is_some_and(|v| key_text(&v) == key)
         })
     }
 
     fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
-        let i = Self::key_index()?;
-        let rows = page.items.downcast_ref::<Vec<E>>()?;
-        let row = rows.iter().find(|row| {
-            row.value_at(i)
-                .is_some_and(|v| key_text(&v) == key)
-        })?;
+        let i = self.key_index()?;
+        let rows = (self.rows_of)(&*page.items)?;
+        let at = self.find(rows, i, key)?;
         Some(self.rows(
-            std::slice::from_ref(row),
+            rows,
+            at..at + 1,
             r,
             &self.layout(page.view.as_ref()),
             &Branch::default(),
@@ -3106,20 +3346,17 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
-        let i = Self::key_index()?;
-        let rows = page.items.downcast_ref::<Vec<E>>()?;
-        let row = rows.iter().find(|r| {
-            r.value_at(i)
-                .is_some_and(|v| key_text(&v) == key)
-        })?;
+        let i = self.key_index()?;
+        let rows = (self.rows_of)(&*page.items)?;
+        let row = rows.row(self.find(rows, i, key)?).any();
         if let Some(path) = item.strip_prefix('m') {
-            return self.row_menu.as_ref()?(row).take(path);
+            return self.row_menu.as_ref()?(row)?.take(path);
         }
         let index: usize = item.strip_prefix('a')?.parse().ok()?;
         let action = self.row_actions.get(index)?;
         Some(RowCall {
             meta: action.meta,
-            run: (action.run)(row),
+            run: (action.run)(row)?,
         })
     }
 
@@ -3133,11 +3370,11 @@ impl<E: Model> GridSource for DataGrid<E> {
         query: DataQuery,
         keys: &[String],
     ) -> BoxFuture<Result<LoadedPage>> {
-        match Self::key_index() {
+        match self.key_index() {
             Some(i) => self.fetch_only(
                 ctx,
                 query,
-                Some(Filter::any_of(E::fields()[i].name, keys.to_vec())),
+                Some(Filter::any_of(self.fields[i].name, keys.to_vec())),
             ),
             None => Box::pin(async { Err(crate::action::Error::NotFound) }),
         }
@@ -3158,14 +3395,6 @@ impl<E: Model> GridSource for DataGrid<E> {
         }
     }
 
-    fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
-        self.rows_html_erased(page, r)
-    }
-
-    fn render_loaded(&self, out: &mut String, r: &Render, page: &LoadedPage) {
-        self.render_with(out, r, Some(page));
-    }
-
     fn foot_html(&self, page: &LoadedPage, r: &Render) -> Option<String> {
         let has = self
             .columns
@@ -3173,14 +3402,6 @@ impl<E: Model> GridSource for DataGrid<E> {
             .any(|c| !c.aggregates.is_empty());
         (has && !page.totals.is_empty())
             .then(|| self.foot_row(r, &page.totals, &self.layout(page.view.as_ref())))
-    }
-
-    fn fields(&self) -> &'static [FieldMeta] {
-        E::fields()
-    }
-
-    fn sensitive_model(&self) -> Option<&'static str> {
-        E::SENSITIVE.then_some(E::NAME)
     }
 
     /// Reveals a masked column of one row. The row is loaded like a row action's, through the
@@ -3199,18 +3420,15 @@ impl<E: Model> GridSource for DataGrid<E> {
             return Box::pin(async { Ok(None) });
         }
         let find = self.find_row(ctx, key.clone());
+        let rows_of = self.rows_of;
         Box::pin(async move {
             let page = find.await?;
-            let rows = page.items.downcast_ref::<Vec<E>>();
-            let row = rows.and_then(|rows| {
-                rows.iter().find(|r| {
-                    crate::audit::RecordRef::of(*r)
-                        .id
-                        .as_deref()
-                        == Some(key.as_str())
-                })
+            let row = rows_of(&*page.items).and_then(|rows| {
+                (0..rows.count())
+                    .map(|n| rows.row(n))
+                    .find(|r| r.record_id().as_deref() == Some(key.as_str()))
             });
-            Ok(row.and_then(|row| crate::privacy::reveal_in(row, &field)))
+            Ok(row.and_then(|row| row.reveal(&field)))
         })
     }
 
@@ -3226,100 +3444,13 @@ impl<E: Model> GridSource for DataGrid<E> {
             .filter(|c| c.filter)
             .map(|c| c.meta.name)
             .collect();
-        let filter = json!({
-            "type": "object",
-            "properties": {
-                "field": { "type": "string", "enum": filterable },
-                "contains": { "type": "string" },
-                "starts_with": { "type": "string" },
-                "equals": { "type": "string" },
-                "from": { "type": "string" },
-                "to": { "type": "string" },
-                "any_of": { "type": "array", "items": { "type": "string" } },
-                "is": { "type": "boolean" }
-            },
-            "required": ["field"]
-        });
-        let mut group = serde_json::Value::Null;
-        for _ in 0..MAX_FILTER_DEPTH {
-            let mut properties = json!({
-                "any": { "type": "boolean" },
-                "filters": { "type": "array", "items": filter }
-            });
-            if !group.is_null() {
-                properties["groups"] = json!({ "type": "array", "items": group });
-            }
-            group = json!({ "type": "object", "properties": properties });
-        }
-        let mut schema = json!({
-            "type": "object",
-            "properties": {
-                "page": {
-                    "type": "object",
-                    "description": "Which rows to return. Use type offset with offset and limit (max 500).",
-                    "properties": {
-                        "type": { "type": "string", "enum": ["offset", "after"] },
-                        "offset": { "type": "integer", "minimum": 0 },
-                        "limit": { "type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE },
-                        "cursor": { "type": ["string", "null"] }
-                    },
-                    "required": ["type", "limit"]
-                },
-                "sort": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": { "field": { "type": "string", "enum": fields }, "desc": { "type": "boolean" } },
-                        "required": ["field", "desc"]
-                    }
-                },
-                "filters": {
-                    "type": "array",
-                    "description": "Every set condition must hold. Numbers as 1234.56, dates as YYYY-MM-DD (a whole day in the user's time zone for moments), times as HH:MM.",
-                    "items": filter
-                },
-                "filter_groups": {
-                    "type": "array",
-                    "description": format!(
-                        "Groups that must also hold, for OR conditions. A group with any true matches when one of its filters or groups matches, with any false when all match. Groups nest up to {MAX_FILTER_DEPTH} deep; at most {MAX_FILTERS} filters in all."
-                    ),
-                    "items": group
-                },
-                "with_total": { "type": "boolean" },
-                "aggregates": {
-                    "type": "array",
-                    "description": "Column totals over all matching rows. Only the totals the grid shows are computed.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "field": { "type": "string", "enum": fields },
-                            "op": { "type": "string", "enum": ["sum", "avg", "min", "max", "count"] }
-                        },
-                        "required": ["field", "op"]
-                    }
-                }
-            }
-        });
-        if self.search {
-            schema["properties"]["q"] = json!({
-                "type": "string",
-                "maxLength": crate::MAX_SEARCH_QUERY,
-                "description": "Free text: rows whose text fields contain it, ignoring case and accents."
-            });
-        }
-        schema
-    }
-}
-
-impl<E: Model> Component for DataGrid<E> {
-    fn render(&self, out: &mut String, r: &Render) {
-        self.render_with(out, r, None);
+        tool_schema(&fields, &filterable, self.search)
     }
 
     fn schema(&self) -> serde_json::Value {
         json!({
             "type": "grid",
-            "model": E::NAME,
+            "model": self.model,
             "action": self.action,
             "mode": self.mode,
             "paging": self.paging,
@@ -3344,10 +3475,206 @@ impl<E: Model> Component for DataGrid<E> {
             "filter_chips": self.chips,
             "page_sizes": self.size_choices(),
             "groupable": self.columns.iter().filter(|c| c.group).map(|c| c.meta.name).collect::<Vec<_>>(),
-            "add": self.add.as_ref().map(|a| a.meta),
+            "add": self.add,
             "delete": self.delete.map(|i| self.bulk[i].meta),
             "batch_edit": self.batch,
         })
+    }
+}
+
+/// Each method hands over to the [`GridBody`], which is compiled once; only the edits, which
+/// build a `Valid<E>`, depend on the row type.
+impl<E: Model> GridSource for DataGrid<E> {
+    fn action(&self) -> ActionMeta {
+        self.body.action
+    }
+
+    fn first_query(&self, view: Option<&DataGridView>) -> DataQuery {
+        self.body.first_query(view)
+    }
+
+    fn clean_view(&self, view: DataGridView) -> DataGridView {
+        self.body.clean(view)
+    }
+
+    fn head_html(&self, r: &Render, view: Option<&DataGridView>) -> String {
+        self.body.head_html(r, view)
+    }
+
+    fn find_row(&self, ctx: Ctx, key: String) -> BoxFuture<Result<LoadedPage>> {
+        self.body.find_row(ctx, key)
+    }
+
+    fn bulk_call(&self, index: usize, keys: Vec<serde_json::Value>) -> Option<RowCall> {
+        self.body.bulk_call(index, keys)
+    }
+
+    fn bulk_meta(&self, index: usize) -> Option<ActionMeta> {
+        self.body.bulk_meta(index)
+    }
+
+    fn key_json(&self, key: &str) -> Option<serde_json::Value> {
+        self.body.key_json(key)
+    }
+
+    fn page_keys(&self, page: &LoadedPage) -> Vec<serde_json::Value> {
+        self.body.page_keys(page)
+    }
+
+    fn export_access(&self) -> Option<crate::action::Access> {
+        self.body.export.map(|e| e.0)
+    }
+
+    fn export_limit(&self) -> usize {
+        self.body.export.map_or(0, |e| e.1)
+    }
+
+    fn csv_head(&self, r: &Render, view: Option<&DataGridView>) -> String {
+        self.body.csv_head(r, view)
+    }
+
+    fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
+        self.body.csv_rows(page, r)
+    }
+
+    fn export_columns(&self, r: &Render, view: Option<&DataGridView>) -> Vec<ExportColumn> {
+        self.body.export_columns(r, view)
+    }
+
+    fn export_text(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<String>> {
+        self.body.export_text(page, r)
+    }
+
+    fn export_values(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<Value>> {
+        self.body.export_values(page, r)
+    }
+
+    fn edit_call(
+        &self,
+        page: &LoadedPage,
+        key: &str,
+        values: &serde_json::Map<String, serde_json::Value>,
+        locale: &str,
+        tz: TimeZone,
+    ) -> Result<RowCall> {
+        use crate::action::Error;
+        let save = self
+            .save
+            .as_ref()
+            .ok_or(Error::NotFound)?;
+        let (at, editable) = self
+            .body
+            .edit_target(page, key, values)?;
+        let row = page
+            .items
+            .downcast_ref::<Vec<E>>()
+            .and_then(|rows| rows.get(at))
+            .ok_or(Error::NotFound)?;
+        let valid =
+            crate::form::Form::with_fields(row.clone(), &editable).read(values, locale, tz)?;
+        Ok(RowCall {
+            meta: save.meta,
+            run: (save.run)(valid),
+        })
+    }
+
+    fn add_call(
+        &self,
+        values: &serde_json::Map<String, serde_json::Value>,
+        ctx: &Ctx,
+    ) -> Result<RowCall> {
+        use crate::action::Error;
+        let add = self
+            .add
+            .as_ref()
+            .ok_or(Error::NotFound)?;
+        let editable = self
+            .body
+            .add_target(&add.meta, values, ctx)?;
+        let valid =
+            crate::form::Form::with_fields(E::default(), &editable).read_for(values, ctx)?;
+        Ok(RowCall {
+            meta: add.meta,
+            run: (add.run)(valid),
+        })
+    }
+
+    fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
+        self.body.row_html(page, key, r)
+    }
+
+    fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
+        self.body.row_call(page, key, item)
+    }
+
+    fn fetch(&self, ctx: Ctx, query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
+        self.body.fetch(ctx, query)
+    }
+
+    fn fetch_keys(
+        &self,
+        ctx: Ctx,
+        query: DataQuery,
+        keys: &[String],
+    ) -> BoxFuture<Result<LoadedPage>> {
+        self.body.fetch_keys(ctx, query, keys)
+    }
+
+    fn fetch_at(
+        &self,
+        ctx: Ctx,
+        query: DataQuery,
+        path: Vec<Option<String>>,
+        view: Option<&DataGridView>,
+    ) -> BoxFuture<Result<LoadedPage>> {
+        self.body
+            .fetch_at(ctx, query, path, view)
+    }
+
+    fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
+        self.body.rows_html_erased(page, r)
+    }
+
+    fn render_loaded(&self, out: &mut String, r: &Render, page: &LoadedPage) {
+        self.body
+            .render_with(out, r, Some(page));
+    }
+
+    fn foot_html(&self, page: &LoadedPage, r: &Render) -> Option<String> {
+        self.body.foot_html(page, r)
+    }
+
+    fn fields(&self) -> &'static [FieldMeta] {
+        self.body.fields
+    }
+
+    fn sensitive_model(&self) -> Option<&'static str> {
+        self.body
+            .sensitive
+            .then_some(self.body.model)
+    }
+
+    fn reveal(
+        &self,
+        ctx: Ctx,
+        key: String,
+        field: String,
+    ) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
+        self.body.reveal(ctx, key, field)
+    }
+
+    fn tool_schema(&self) -> serde_json::Value {
+        self.body.tool_schema()
+    }
+}
+
+impl<E: Model> Component for DataGrid<E> {
+    fn render(&self, out: &mut String, r: &Render) {
+        self.body.render_with(out, r, None);
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        self.body.schema()
     }
 
     fn grid(&self) -> Option<&dyn GridSource> {

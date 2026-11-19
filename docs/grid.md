@@ -431,6 +431,78 @@ Scrolling down is about twice as fast and the page holds a third of the cells. S
 was already smooth; frames where the window moves cost up to 29 ms. The rest of the cost is
 parsing blocks of 200 rows with every column, which column virtualization does not change.
 
+Measured again on an idle machine, with no builds running, a release server and one Chromium
+session (isolated context) on a 144 Hz display. Each run scrolls the grid body by 60 px per frame for 150 frames; the table shows
+the range of three runs. Frame times are quantized to the 6.9 ms refresh. The machine is a
+Windows 11 desktop with 20 logical cores. The grids are the gallery's wide grid (62 columns,
+100,000 rows) and the same screen cut to 12, 30, 39 and 40 columns, counting the selection
+column. Column windowing starts at 40.
+
+| Case | Columns | CPU | Scroll | p50 | p95 | fps |
+|---|---|---|---|---|---|---|
+| Wide grid, windowed | 40 | none | sideways | 6.9 to 7.0 ms | 7.1 to 7.2 ms | 140 to 144 |
+| Wide grid, windowed | 40 | none | down | 6.9 to 7.0 ms | 7.1 ms | 143 |
+| Wide grid, windowed | 62 | none | sideways and down | 6.9 to 7.0 ms | 7.1 to 7.2 ms | 138 to 144 |
+| Wide grid | 12 | 4x | sideways | 6.9 ms | 7.1 ms | 144 |
+| Wide grid | 12 | 4x | down | 14.0 ms | 27.8 ms | 57 |
+| Wide grid | 30 | 4x | sideways | 6.9 ms | 7.1 ms | 144 |
+| Wide grid | 30 | 4x | down | 27.8 to 34.7 ms | 41.7 ms | 31 |
+| Wide grid | 39 | 4x | sideways | 6.9 ms | 7.1 ms | 139 to 144 |
+| Wide grid | 39 | 4x | down | 34.8 to 41.6 ms | 48.7 ms | 26 |
+| Wide grid, windowed | 40 | 4x | sideways | 7.0 ms | 41.5 to 41.7 ms | 98 to 107 |
+| Wide grid, windowed | 40 | 4x | down | 20.8 ms | 27.8 ms | 50 |
+| Wide grid, windowed | 62 | 4x | sideways | 7.0 ms | 41.8 to 48.6 ms | 94 to 97 |
+| Wide grid, windowed | 62 | 4x | down | 20.9 ms | 34.8 to 41.6 ms | 41 to 43 |
+| Card grid, 390 by 844 phone at 3x | 2,000 cards | 4x | down, 30 px per frame | 6.9 to 7.0 ms | 7.1 ms | 136 to 145 |
+| Card grid, 390 by 844 phone at 3x | 2,000 cards | 4x | fling, 300 px per frame | 7.0 to 13.8 ms | 14.0 to 55.7 ms | 56 to 113 |
+
+In the card grid fling, the first run was the slow one; the other two ended at 7.0 and 14.0 ms
+at p50 and 14.0 ms at p95.
+
+The threshold stays at 40. A trial build with the threshold at 24 put the 30 column grid in the
+window: scrolling down at 4x went from 34.7 to 27.7 ms at p50, but p95 stayed at 41.7 to 48.6 ms,
+so the long frames remained. Sideways, the window costs frames when it moves (41 ms at p95 for
+40 columns). A 12 column grid shows no gain from windowing, so the data does not support a lower
+number.
+
+Frames stay over 16 ms when scrolling down at 4x. Turning off box shadows, sticky pinned cells,
+transitions or cell borders in the page changed the mean frame by less than 1 ms (about 25 ms in
+every case), and `contain: layout paint style` on rows gained about 0.8 ms. Paint is therefore not
+dominated by one of these, and the windowed grid has no cheap style change left.
+
+A performance trace of the same scroll (40 columns, 4x, 60 px per frame) shows where the frame
+goes: per frame about 3.5 ms script, 2.8 ms style, 3.7 ms layout, 3.4 ms prepaint, 4.8 ms paint,
+3.1 ms layerize and 0.5 ms commit. HTML parsing is not on the list: a block of 200 rows is parsed
+once every 107 frames (one task of 30 to 43 ms, the longest frame of a run), so smaller blocks,
+cloning a template instead of parsing, or inserting off frame (`requestIdleCallback`,
+`scheduler.yield`) only move the slowest frame and leave p50 and p95 as they were.
+`content-visibility` does not apply, since table rows cannot take containment. The cost is the
+rendering of a window move: the frame restyles, lays out and paints every kept row again, and it
+costs nearly the same for one new row as for ten (scrolling 32 px per frame gave the same 20.8 ms
+p50 as 60 px; 1 px per frame, where the window rarely moves, gave 6.9 ms).
+
+So the window of rows now moves less often. It stays where it is while ten rows (`V_OVERSCAN`)
+remain on both sides of the visible ones, and when it moves it takes four more rows ahead in the
+scroll direction (`V_LEAD`). Most frames then only move the rows `tbody`, and the frames that move
+the window add a few rows more. Same machine and method, three runs, 4x, down at 60 px per frame:
+
+| Columns | Before (p50 / p95) | After (p50 / p95) | After, mean fps |
+|---|---|---|---|
+| 40, windowed | 20.8 ms / 27.8 to 41.6 ms | 7.0 ms / 27.8 to 34.6 ms | 75 to 84 |
+| 62, windowed | 20.9 to 27.8 ms / 34.8 to 41.6 ms | 7.0 ms / 27.8 to 34.7 ms | 74 to 82 |
+
+The trace of the 62 column run after the change: the 117 frames that leave the window in place
+take 3.3 ms of main thread work, the 39 that move it 32.7 ms (4.2 script, 4.2 style, 6.7 layout,
+4.7 prepaint, 7.5 paint, 4.8 layerize). At 30 px per frame on 62 columns the p95 went from 34.7 to
+41.7 ms to 27.7 to 27.9 ms. A larger lead was tried and left out: 10 to 30 rows made the frames
+that move the window longer than the frames it saved (p95 34.7 to 48.5 ms), and 40 rows brought p95
+to 14 ms at 60 px per frame only by making one frame in twenty take 70 to 146 ms. A spacer row
+above the rows instead of `translateY`, so kept rows do not move inside the `tbody`, saved about
+1.5 ms of paint a frame but counted every window move as a layout shift (CLS 3.5), and was left
+out. On the 40 column grid p95 stays at the 27.8 ms of the earlier table in two runs of three:
+the frames that still move the window cost the same as before, so the p95 frame is one of them;
+there are fewer of them, which shows in p50 and fps.
+
 ## Export
 
 `exportable()` (and optionally `export_permission(...)`, `export_limit(n)`) lets the toolbar's

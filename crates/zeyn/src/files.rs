@@ -774,6 +774,38 @@ pub(crate) fn render_upload(
 pub use store::*;
 
 #[cfg(feature = "server")]
+pub(crate) use store::check_owned;
+
+/// Without the server no store can vouch for a file, so any id is refused.
+#[cfg(not(feature = "server"))]
+pub(crate) async fn check_owned(
+    _ctx: &crate::Ctx,
+    _store: Option<&str>,
+    ids: Vec<String>,
+) -> crate::action::Result<()> {
+    if ids.is_empty() {
+        Ok(())
+    } else {
+        Err(crate::action::Error::NotFound)
+    }
+}
+
+/// Ids of the files in a `File`, `Option<File>` or `Vec<File>` value as JSON.
+pub(crate) fn file_ids(value: Option<&serde_json::Value>) -> Vec<String> {
+    let id = |v: &serde_json::Value| {
+        v.get("id")
+            .and_then(serde_json::Value::as_str)
+            .filter(|id| !id.is_empty())
+            .map(String::from)
+    };
+    match value {
+        Some(serde_json::Value::Array(list)) => list.iter().filter_map(id).collect(),
+        Some(v) => id(v).into_iter().collect(),
+        None => Vec::new(),
+    }
+}
+
+#[cfg(feature = "server")]
 mod store {
     use super::{File, FileRules, FileType, valid_file_id};
     use crate::action::{Error, Result};
@@ -1009,6 +1041,59 @@ mod store {
                 Ok(verdict)
             })
         }
+    }
+
+    /// The file stores of a running app by name. The server keeps it as a service on every
+    /// request, so a form or a drop zone can check the file ids the browser names.
+    #[derive(Clone, Default)]
+    pub(crate) struct FileStores(pub(crate) Arc<HashMap<&'static str, Arc<dyn FileStore>>>);
+
+    impl crate::ctx::Service for FileStores {}
+
+    /// Refuses with [`Error::NotFound`] when `store` (any store of the app when `None`) does
+    /// not hold every file of `ids` for the user of `ctx`: a file another user uploaded, one of
+    /// another tenant, or an id never uploaded. Uploads without a signed in user have no owner,
+    /// so a request without one may name only such uploads, by ids of 128 random bits nobody
+    /// else learns.
+    pub(crate) async fn check_owned(
+        ctx: &crate::Ctx,
+        store: Option<&str>,
+        ids: Vec<String>,
+    ) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let all = ctx
+            .service::<FileStores>()
+            .unwrap_or_default();
+        let stores: Vec<Arc<dyn FileStore>> = match store {
+            Some(name) => all
+                .0
+                .get(name)
+                .cloned()
+                .into_iter()
+                .collect(),
+            None => all.0.values().cloned().collect(),
+        };
+        let user = ctx.identity().user.as_deref();
+        let tenant = ctx.tenant().map(|t| t.id());
+        for id in ids {
+            let mut found = false;
+            for store in &stores {
+                if let Ok(meta) = store.meta(id.clone()).await {
+                    found = meta.id == id
+                        && meta.owner.as_deref() == user
+                        && meta.tenant.as_deref() == tenant;
+                    if found {
+                        break;
+                    }
+                }
+            }
+            if !found {
+                return Err(Error::NotFound);
+            }
+        }
+        Ok(())
     }
 
     /// A store registered on a feature.

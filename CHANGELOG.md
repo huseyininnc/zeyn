@@ -4,6 +4,23 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.0.12] - 2026-11-20
+
+### Security
+
+- Form submits, `FileDrop` upload actions and `Composer` sends accept only file ids the same user uploaded into the store in the same tenant. Before, any id of the server's shape passed, so a user who learned the id of another user's or tenant's file could attach it to a record of their own and download it from there. Files a record already held stay on edit; an anonymous request can name only uploads made without a signed in user. File fields without an upload store (`Form::auto`, `.field(...)`, editable grid columns, imports and lines editors) keep only the files their record or line held, and API actions that take `Valid<M>` accept only file ids the caller uploaded into one of the app's stores. A file store name registered in two features stops the app with problem `Z0509`.
+
+### Fixed
+
+- The line editor no longer makes the page scroll sideways on a narrow touch screen: its screen reader only text sat outside the scroll box of the table and reached past the viewport.
+
+### Changed
+
+- Virtual grids move their window of rows less often while scrolling: it stays while ten rows remain on both sides of the visible ones and then takes four more ahead. Scrolling down at 4x CPU throttling, 60 px per frame, the median frame went from 20.8 to 7.0 ms on the 40 and 62 column grids and p95 from 34.8 to 41.6 ms to 27.8 to 34.7 ms on 62 columns; the trace breakdown is in `docs/grid.md`. `grid.js` grows by 329 bytes gzipped.
+- Idle machine reruns of the wide grid and card grid frame times are recorded in `docs/grid.md`; the column windowing threshold stays at 40.
+- Faster builds of apps and of the framework. The code of `Form<M>` that does not depend on the model type is compiled once instead of once for every model, and so is the AI tool schema of `DataGrid<E>`: the showcase binary has 19 percent less LLVM IR (886,195 to 716,911 lines, `Form` 139,865 to 30,123) and the framework with the showcase features 8 percent less. `zeyn` builds without line tables in the dev profile (`[profile.dev.package.zeyn] debug = false`); panic messages keep their file and line. One line rebuild of `zeyn` 13.3 to 12.0 s, of the showcase 28.7 to 25.9 s (Windows, 12 jobs). CONTRIBUTING.md has the profile and why the crate is not split.
+- `DataGrid<E>` keeps only the inline edit runners in its generic part: rendering, views, queries, exports, row actions and the schema live in a private `GridBody` compiled once, and its closures read rows through `&dyn Any`. `DataGrid` IR in the showcase binary 221,702 to 15,045 lines, the whole binary 716,911 to 501,713; one line rebuild of the showcase 26.8 to 25.2 s, of `zeyn` 12.9 to 12.4 s (Windows, 12 jobs).
+
 ## [0.0.11] - 2026-11-19
 
 ### Added
@@ -75,7 +92,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - On a 390 px screen a `Kpi` value stays on one line (the font shrinks with the width, a value that still does not fit ends in an ellipsis and keeps its full text in the title and for screen readers), and the search button of the top bar shows its icon again instead of an empty box.
 - A `Kanban` board no longer widens the page on a phone: its hidden status line sat outside the scroll box of the board and stretched the document to about 1040 px.
 
-- `Db::migrate` and `Db::migrate_dir` ignore line endings in migration checksums, so a migration checked out with CRLF on Windows and LF elsewhere validates on both. A checksum stored before this change, computed with the `` bytes, is still accepted; a real content change still fails.
+- `Db::migrate` and `Db::migrate_dir` ignore line endings in migration checksums, so a migration checked out with CRLF on Windows and LF elsewhere validates on both. A checksum stored before this change, computed with the `
+` bytes, is still accepted; a real content change still fails.
 
 - Findings of the new browser tests: a select whose label has no id (the card grid's sort) gets an accessible name; the code editor's text area no longer carries `aria-expanded`, which a text area may not have; an empty message thread is a region with its empty text and becomes a feed with its first message; the inbox's bulk action bar is a group instead of a toolbar without arrow keys; external links are at least 24 px tall; the grid's column menu button is 24 px on touch screens; the component catalog adds its stylesheet and script to compressed pages too.
 - The test of the rate store eviction counts how often a full store scans its map (`MemoryRateStore::evictions`) instead of measuring seconds, so it no longer fails on a busy machine.
@@ -350,7 +368,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Navigation without page reloads.
 - MIT and Apache-2.0 licenses.
 
-[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.11...HEAD
+[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.12...HEAD
+[0.0.12]: https://github.com/huseyininnc/zeyn/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/huseyininnc/zeyn/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/huseyininnc/zeyn/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/huseyininnc/zeyn/compare/v0.0.8...v0.0.9

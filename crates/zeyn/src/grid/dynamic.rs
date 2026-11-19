@@ -480,7 +480,7 @@ impl DataGrid<DynamicRow> {
         A: Action<Input = DataQuery, Output = Result<DynamicPage>>,
     {
         let mut grid = DataGrid::of_fetch(A::META, no_rows);
-        grid.paging = Paging::default();
+        grid.body.paging = Paging::default();
         DynamicGrid {
             grid,
             fetch: fetch_dynamic::<A>,
@@ -497,23 +497,28 @@ fn shaped(
     columns: &[DynamicColumn],
 ) -> DataGrid<DynamicRow> {
     let mut grid = DataGrid::of_fetch(action, no_rows);
-    grid.paging = paging;
-    grid.zebra = zebra;
-    grid.shape = Some(shape(columns));
+    grid.body.paging = paging;
+    grid.body.zebra = zebra;
+    grid.body.shape = Some(shape(columns));
     for (i, c) in columns.iter().enumerate() {
         let kind = if c.mask.is_some() {
             DynamicKind::Text
         } else {
             c.kind
         };
-        grid.columns.push(Column {
+        grid.body.columns.push(Column {
             name: Cow::Owned(c.name.clone()),
             label: Some(c.label.clone()),
             sort: false,
             width: Some(kind.width()),
-            value: Box::new(move |row: &DynamicRow| match row.0.get(i) {
-                Some(v) => Cow::Borrowed(v),
-                None => Cow::Owned(Value::Null),
+            value: Box::new(move |row| {
+                match row
+                    .downcast_ref::<DynamicRow>()
+                    .and_then(|row| row.0.get(i))
+                {
+                    Some(v) => Cow::Borrowed(v),
+                    None => Cow::Owned(Value::Null),
+                }
             }),
             ..Column::of(kind.meta())
         });
@@ -524,13 +529,13 @@ fn shaped(
 impl DynamicGrid {
     /// How rows are paged; see [`Paging`].
     pub fn paging(mut self, paging: Paging) -> Self {
-        self.grid.paging = paging;
+        self.grid.body.paging = paging;
         self
     }
 
     /// Shades every other row, for very wide results where the eye loses the row.
     pub fn zebra(mut self) -> Self {
-        self.grid.zebra = true;
+        self.grid.body.zebra = true;
         self
     }
 
@@ -549,7 +554,7 @@ impl DynamicGrid {
 
 impl GridSource for DynamicGrid {
     fn action(&self) -> ActionMeta {
-        self.grid.action
+        self.grid.body.action
     }
 
     fn first_query(&self, view: Option<&DataGridView>) -> DataQuery {
@@ -594,14 +599,14 @@ impl GridSource for DynamicGrid {
         asked: bool,
     ) -> Option<serde_json::Value> {
         let grid = &Self::items(page)?.grid;
-        let now = grid.shape.as_deref()?;
+        let now = grid.body.shape.as_deref()?;
         if !asked && shape_seen == Some(now) {
             return None;
         }
         Some(json!({
             "head": grid.head_html(r, page.view.as_ref()),
             "shape": now,
-            "columns": grid.columns_json(r),
+            "columns": grid.body.columns_json(r),
         }))
     }
 
@@ -631,9 +636,9 @@ impl GridSource for DynamicGrid {
         };
         let (fetch, action, paging, zebra) = (
             self.fetch,
-            self.grid.action,
-            self.grid.paging,
-            self.grid.zebra,
+            self.grid.body.action,
+            self.grid.body.paging,
+            self.grid.body.zebra,
         );
         let sensitive = self.sensitive;
         let audit = ctx.clone();
@@ -694,7 +699,12 @@ impl GridSource for DynamicGrid {
 
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
         Self::items(page)
-            .map(|items| items.grid.rows_html_erased(page, r))
+            .map(|items| {
+                items
+                    .grid
+                    .body
+                    .rows_html_erased(page, r)
+            })
             .unwrap_or_default()
     }
 
@@ -706,9 +716,11 @@ impl GridSource for DynamicGrid {
         match Self::items(page) {
             Some(items) => items
                 .grid
+                .body
                 .render_with(out, r, Some(page)),
             None => self
                 .grid
+                .body
                 .render_with(out, r, Some(page)),
         }
     }
@@ -724,15 +736,15 @@ impl GridSource for DynamicGrid {
 
 impl Component for DynamicGrid {
     fn render(&self, out: &mut String, r: &Render) {
-        self.grid.render_with(out, r, None);
+        self.grid.body.render_with(out, r, None);
     }
 
     fn schema(&self) -> serde_json::Value {
         json!({
             "type": "grid",
             "dynamic": true,
-            "action": self.grid.action,
-            "paging": self.grid.paging,
+            "action": self.grid.body.action,
+            "paging": self.grid.body.paging,
         })
     }
 

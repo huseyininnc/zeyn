@@ -1232,6 +1232,7 @@
 }
 
 .z-lines-scroll {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--z-border);
   border-radius: var(--z-radius);

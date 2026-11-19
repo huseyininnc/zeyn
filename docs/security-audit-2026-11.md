@@ -16,6 +16,7 @@ integration test. Every reproduced finding has a fix and a regression test that 
 | S-06 | Low | The access reason cookie was not bound to the user | yes | `94a9d7a6` | `enterprise::a_reason_given_by_one_user_does_not_open_the_screen_for_another` |
 | S-07 | Low | Import previews ran outside the interceptors and the time limit | yes | `b4073e7a` | `enterprise::import_previews_run_through_the_interceptors` |
 | S-08 | Info | A passkey challenge could be used more than once | yes | `bbedf185` | `accounts_passkeys::a_passkey_answer_with_its_ceremony_cookie_signs_in_only_once` |
+| S-09 | Medium | Forms, `FileDrop` and `Composer` took file ids of other users (addendum) | yes | ZEYN-321 | `files::a_form_refuses_file_ids_another_user_or_tenant_uploaded` |
 
 ## Findings
 
@@ -79,6 +80,25 @@ With a passkey whose signature counter stays 0, the same assertion and ceremony 
 twice. The server now marks each challenge as used in the app's rate store until the ceremony
 would expire, and refuses a second use. Capturing both values already needs control of the TLS
 session, so this is defense in depth.
+
+### S-09 File ids of other users accepted (addendum, ZEYN-321)
+
+Found after the audit, during a `FileDrop` review. A form submit, a `FileDrop` upload action and a
+`Composer` send took any file id with the server's shape, so a user who learned the id of a file
+another user or tenant uploaded could attach it to their own record and then download it through
+that record. Each of them now checks the store's record of every new id: the uploader
+(`FileMeta.owner`) and tenant must be those of the request, and the id must exist. Files a record
+already held are kept on edit. Uploads without a signed in user have no owner and can be named only
+by requests without one. Refused uploads (size, type, accept list, scanner, a broken connection)
+were already deleted from both `DiskStore` and `MemoryStore`; a regression test now covers both
+stores.
+
+The same hole was open through file fields that are not upload fields of a store: `Form::auto`,
+`.field(...)`, editable grid columns, imports and lines editors read any id. Those fields now keep
+only the files their record or line held. API actions that take `Valid<M>` check every file id of
+the input against the app's stores, so an API save can name only the caller's own uploads. A store
+name registered twice now stops the app (`Z0509`), since uploads found the first store and the
+checks the last.
 
 ## Not found
 

@@ -12,6 +12,7 @@ use crate::ui::{
 };
 use crate::value::{Currency, FieldKind, FieldType, Money, Value};
 use serde_json::{Map, Value as Json, json};
+use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -25,34 +26,71 @@ pub trait FormAction<M>: Action {}
 
 impl<M: Model, A: Action<Input = Valid<M>>> FormAction<M> for A {}
 
-type ValueFn<M> = Box<dyn Fn(&M) -> Value + Send + Sync>;
+/// Reads a field's value from the form's model, given as `&dyn Any` so the form code that holds
+/// these is compiled once, not once for every model.
+type ValueFn = Box<dyn Fn(&dyn Any) -> Value + Send + Sync>;
 
-struct FormField<M> {
+struct FormField {
     meta: &'static FieldMeta,
-    value: ValueFn<M>,
+    value: ValueFn,
 }
 
-impl<M: Model> FormField<M> {
-    fn of<T: FieldType + 'static>(field: Field<M, T>) -> Self {
+impl FormField {
+    fn of<M: Model, T: FieldType + 'static>(field: Field<M, T>) -> Self {
         Self {
             meta: field.meta(),
-            value: Box::new(move |m| field.get(m).to_value()),
+            value: Box::new(move |m| {
+                m.downcast_ref::<M>()
+                    .map_or(Value::Null, |m| field.get(m).to_value())
+            }),
         }
     }
 
-    fn at(index: usize) -> Self {
+    fn at<M: Model>(index: usize) -> Self {
         Self {
             meta: &M::fields()[index],
-            value: Box::new(move |m| m.value_at(index).unwrap_or(Value::Null)),
+            value: Box::new(move |m| {
+                m.downcast_ref::<M>()
+                    .and_then(|m| m.value_at(index))
+                    .unwrap_or(Value::Null)
+            }),
         }
     }
 }
 
-enum FormItem<M> {
-    Field(FormField<M>),
-    Row(Vec<FormField<M>>),
+/// What the form code that does not depend on the model type reads of the model. Keeping that
+/// code out of `Form<M>` compiles it once instead of once for every model of an app.
+trait FormModel {
+    fn form_any(&self) -> &dyn Any;
+    fn form_fields(&self) -> &'static [FieldMeta];
+    fn form_value_at(&self, index: usize) -> Option<Value>;
+    /// The model as JSON, `Null` when it cannot be written.
+    fn form_json(&self) -> Json;
+}
+
+impl<M: Model> FormModel for M {
+    fn form_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn form_fields(&self) -> &'static [FieldMeta] {
+        M::fields()
+    }
+
+    fn form_value_at(&self, index: usize) -> Option<Value> {
+        self.value_at(index)
+    }
+
+    fn form_json(&self) -> Json {
+        serde_json::to_value(self).unwrap_or(Json::Null)
+    }
+}
+
+enum FormItem {
+    Field(FormField),
+    Row(Vec<FormField>),
     /// A from and to date pair edited with one range picker.
-    Range(FormField<M>, FormField<M>),
+    Range(FormField, FormField),
     /// Starts a step of a stepped form.
     Step(Text),
     /// Starts a titled, foldable group of fields.
@@ -61,7 +99,8 @@ enum FormItem<M> {
 
 /// Fields placed side by side.
 pub struct FormRow<M> {
-    fields: Vec<FormField<M>>,
+    fields: Vec<FormField>,
+    _model: PhantomData<fn() -> M>,
 }
 
 impl<M: Model> FormRow<M> {
@@ -79,7 +118,12 @@ impl<M: Model> FormRow<M> {
 /// ```
 pub struct Form<M: Model> {
     model: M,
-    items: Vec<FormItem<M>>,
+    body: FormBody,
+}
+
+/// Everything of a [`Form`] but its model. Its methods do not depend on the model type.
+struct FormBody {
+    items: Vec<FormItem>,
     options: Vec<(&'static str, DateOptions)>,
     controls: Vec<(&'static str, Control)>,
     lookups: Vec<(&'static str, Box<dyn DataSource>, bool)>,
@@ -103,9 +147,9 @@ impl<M: Model> Form<M> {
     /// Form over the fields at these indexes of `M::fields()`. Used for grid row edits.
     pub(crate) fn with_fields(model: M, indexes: &[usize]) -> Self {
         let mut form = Self::of(model);
-        form.items = indexes
+        form.body.items = indexes
             .iter()
-            .map(|i| FormItem::Field(FormField::at(*i)))
+            .map(|i| FormItem::Field(FormField::at::<M>(*i)))
             .collect();
         form
     }
@@ -114,18 +158,20 @@ impl<M: Model> Form<M> {
     pub fn of(model: M) -> Self {
         Self {
             model,
-            items: Vec::new(),
-            options: Vec::new(),
-            controls: Vec::new(),
-            lookups: Vec::new(),
-            lookup_columns: Vec::new(),
-            lines: Vec::new(),
-            files: Vec::new(),
-            tips: Vec::new(),
-            depends: Vec::new(),
-            drives: Vec::new(),
-            codes: Vec::new(),
-            settings: false,
+            body: FormBody {
+                items: Vec::new(),
+                options: Vec::new(),
+                controls: Vec::new(),
+                lookups: Vec::new(),
+                lookup_columns: Vec::new(),
+                lines: Vec::new(),
+                files: Vec::new(),
+                tips: Vec::new(),
+                depends: Vec::new(),
+                drives: Vec::new(),
+                codes: Vec::new(),
+                settings: false,
+            },
         }
     }
 
@@ -134,23 +180,27 @@ impl<M: Model> Form<M> {
     pub fn auto(model: M) -> Self {
         let items = (0..M::fields().len())
             .filter(|i| !M::fields()[*i].version)
-            .map(|i| FormItem::Field(FormField::at(i)))
+            .map(|i| FormItem::Field(FormField::at::<M>(i)))
             .collect();
-        Self {
-            items,
-            ..Self::of(model)
-        }
+        let mut form = Self::of(model);
+        form.body.items = items;
+        form
     }
 
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
-        self.items
+        self.body
+            .items
             .push(FormItem::Field(FormField::of(field)));
         self
     }
 
     pub fn row(mut self, build: impl FnOnce(FormRow<M>) -> FormRow<M>) -> Self {
-        let row = build(FormRow { fields: Vec::new() });
-        self.items
+        let row = build(FormRow {
+            fields: Vec::new(),
+            _model: PhantomData,
+        });
+        self.body
+            .items
             .push(FormItem::Row(row.fields));
         self
     }
@@ -159,7 +209,8 @@ impl<M: Model> Form<M> {
     /// quick ranges (today, last 7 days, this month...). The server checks that `to` is not
     /// before `from`.
     pub fn range<T: FieldType + 'static>(mut self, from: Field<M, T>, to: Field<M, T>) -> Self {
-        self.items
+        self.body
+            .items
             .push(FormItem::Range(FormField::of(from), FormField::of(to)));
         self
     }
@@ -175,7 +226,8 @@ impl<M: Model> Form<M> {
     ///     .submit("Apply", apply)
     /// ```
     pub fn step(mut self, title: impl Into<Text>) -> Self {
-        self.items
+        self.body
+            .items
             .push(FormItem::Step(title.into()));
         self
     }
@@ -188,7 +240,8 @@ impl<M: Model> Form<M> {
     ///     .section("Look").field(Shape::fill)
     /// ```
     pub fn section(mut self, title: impl Into<Text>) -> Self {
-        self.items
+        self.body
+            .items
             .push(FormItem::Section(title.into()));
         self
     }
@@ -203,32 +256,8 @@ impl<M: Model> Form<M> {
     /// Form::of(settings).settings().section("Mail").field(Settings::sender).submit("Save", save)
     /// ```
     pub fn settings(mut self) -> Self {
-        self.settings = true;
+        self.body.settings = true;
         self
-    }
-
-    /// Field names of each step, in order. Empty when the form has no steps.
-    pub fn steps(&self) -> Vec<Vec<&'static str>> {
-        let mut steps: Vec<Vec<&'static str>> = Vec::new();
-        for item in &self.items {
-            match item {
-                FormItem::Step(_) => steps.push(Vec::new()),
-                FormItem::Section(_) => {}
-                FormItem::Field(f) => steps
-                    .last_mut()
-                    .into_iter()
-                    .for_each(|s| s.push(f.meta.name)),
-                FormItem::Row(fs) => steps
-                    .last_mut()
-                    .into_iter()
-                    .for_each(|s| s.extend(fs.iter().map(|f| f.meta.name))),
-                FormItem::Range(a, b) => steps
-                    .last_mut()
-                    .into_iter()
-                    .for_each(|s| s.extend([a.meta.name, b.meta.name])),
-            }
-        }
-        steps
     }
 
     /// Calendar and clock options of a date or time field: days that cannot be chosen, minute
@@ -243,8 +272,10 @@ impl<M: Model> Form<M> {
         options: DateOptions,
     ) -> Self {
         let name = field.meta().name;
-        self.options.retain(|(n, _)| *n != name);
-        self.options.push((name, options));
+        self.body
+            .options
+            .retain(|(n, _)| *n != name);
+        self.body.options.push((name, options));
         self
     }
 
@@ -252,9 +283,10 @@ impl<M: Model> Form<M> {
     /// segmented control or an open list for a `#[choice]`. See [`Control`].
     pub fn control<T: FieldType + 'static>(mut self, field: Field<M, T>, control: Control) -> Self {
         let name = field.meta().name;
-        self.controls
+        self.body
+            .controls
             .retain(|(n, _)| *n != name);
-        self.controls.push((name, control));
+        self.body.controls.push((name, control));
         self
     }
 
@@ -270,9 +302,11 @@ impl<M: Model> Form<M> {
         T: FieldType + LookupValue + 'static,
         A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
     {
-        self.items
+        self.body
+            .items
             .push(FormItem::Field(FormField::of(field)));
-        self.lookups
+        self.body
+            .lookups
             .push((field.meta().name, Box::new(ActionSource::<A>::new()), false));
         self
     }
@@ -292,9 +326,11 @@ impl<M: Model> Form<M> {
         A: Action<Input = crate::ui::CodeQuery, Output = Result<Vec<crate::ui::Completion>>>,
     {
         let name = field.meta().name;
-        self.codes
+        self.body
+            .codes
             .retain(|(n, k, _)| !(*n == name && *k == "complete"));
-        self.codes
+        self.body
+            .codes
             .push((name, "complete", crate::ui::CompleteSource::<A>::boxed()));
         self
     }
@@ -308,21 +344,13 @@ impl<M: Model> Form<M> {
         A: Action<Input = crate::ui::CodeQuery, Output = Result<Vec<crate::ui::CodeError>>>,
     {
         let name = field.meta().name;
-        self.codes
+        self.body
+            .codes
             .retain(|(n, k, _)| !(*n == name && *k == "check"));
-        self.codes
+        self.body
+            .codes
             .push((name, "check", crate::ui::CheckSource::<A>::boxed()));
         self
-    }
-
-    /// The completion or check source of a code field, by the key the browser sends:
-    /// `field:complete` or `field:check`.
-    fn code_source(&self, key: &str) -> Option<&dyn DataSource> {
-        let (field, kind) = key.split_once(':')?;
-        self.codes
-            .iter()
-            .find(|(n, k, _)| *n == field && *k == kind)
-            .map(|(_, _, s)| s.as_ref())
     }
 
     /// A tooltip for a field: an info button after its label shows `text` on hover, focus, tap
@@ -339,8 +367,10 @@ impl<M: Model> Form<M> {
         text: impl Into<Text>,
     ) -> Self {
         let name = field.meta().name;
-        self.tips.retain(|(n, _)| *n != name);
-        self.tips.push((name, text.into()));
+        self.body
+            .tips
+            .retain(|(n, _)| *n != name);
+        self.body.tips.push((name, text.into()));
         self
     }
 
@@ -364,7 +394,8 @@ impl<M: Model> Form<M> {
             .take(crate::ui::MAX_LOOKUP_COLUMNS)
             .map(Into::into)
             .collect();
-        self.lookup_columns
+        self.body
+            .lookup_columns
             .push((field.meta().name, headers));
         self.lookup(field, action)
     }
@@ -375,9 +406,11 @@ impl<M: Model> Form<M> {
     where
         A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
     {
-        self.items
+        self.body
+            .items
             .push(FormItem::Field(FormField::of(field)));
-        self.lookups
+        self.body
+            .lookups
             .push((field.meta().name, Box::new(ActionSource::<A>::new()), true));
         self
     }
@@ -402,8 +435,11 @@ impl<M: Model> Form<M> {
         S: FieldType + 'static,
     {
         let name = field.meta().name;
-        self.depends.retain(|(n, _)| *n != name);
-        self.depends
+        self.body
+            .depends
+            .retain(|(n, _)| *n != name);
+        self.body
+            .depends
             .push((name, source.meta().name));
         self
     }
@@ -422,77 +458,8 @@ impl<M: Model> Form<M> {
     ///     .drives("sales")
     /// ```
     pub fn drives(mut self, topics: impl crate::ui::Topics) -> Self {
-        self.drives = crate::ui::topic_list(topics);
+        self.body.drives = crate::ui::topic_list(topics);
         self
-    }
-
-    /// The `page_check` of the form: its topics, its dependent lookups and its code fields.
-    fn check_form(&self, check: &mut crate::ui::PageCheck) {
-        for t in &self.drives {
-            check.drives(t);
-        }
-        for (field, kind, _) in &self.codes {
-            if !matches!(self.control_of(field), Some(Control::Code(_))) {
-                check.problem(
-                    crate::Problem::new(
-                        "Z0603",
-                        format!("`{kind}` is set for `{field}`, which has no code control"),
-                    )
-                    .why("the setting only applies to a code editor, so it would do nothing on the field's current control")
-                    .fix(format!("add `.control({field}, Control::Code(CodeLang::Expression))` or another language"))
-                    .docs("components/controls#code-editor"),
-                );
-            }
-        }
-        for (field, source) in &self.depends {
-            if self.lookup_of(field).is_none() {
-                check.problem(
-                    crate::Problem::new(
-                        "Z0604",
-                        format!("`depends_on` names `{field}`, which is not a lookup of this form"),
-                    )
-                    .why("only lookups load their options from the server, so there is nothing to reload when the other field changes")
-                    .fix(format!("add it with `.lookup({field}, ...)` first"))
-                    .docs("language/forms#dependent-lookups"),
-                );
-            }
-            if field == source
-                || !self
-                    .fields()
-                    .any(|f| f.meta.name == *source)
-            {
-                check.problem(
-                    crate::Problem::new(
-                        "Z0605",
-                        format!("lookup `{field}` depends on `{source}`, which is not another field of this form"),
-                    )
-                    .why("the lookup reloads when the field it depends on changes, and that field is not on the form")
-                    .fix("add the field it depends on")
-                    .docs("language/forms#dependent-lookups"),
-                );
-            }
-        }
-    }
-
-    /// The `data-zeyn-kinds` attribute of a filter form: which params are numbers or booleans,
-    /// so the browser sends them typed. Empty when no field is.
-    fn drive_kinds(&self) -> String {
-        let kinds: serde_json::Map<String, Json> = self
-            .fields()
-            .filter_map(|f| {
-                let kind = match f.meta.kind {
-                    FieldKind::Integer | FieldKind::Id => "number",
-                    FieldKind::Bool => "bool",
-                    _ => return None,
-                };
-                Some((f.meta.name.to_string(), Json::from(kind)))
-            })
-            .collect();
-        if kinds.is_empty() {
-            String::new()
-        } else {
-            format!(r#" data-zeyn-kinds="{}""#, crate::render::attr(&kinds))
-        }
     }
 
     /// Adds a lines field (order lines, invoice lines) edited as a table: add, remove and move
@@ -509,9 +476,11 @@ impl<M: Model> Form<M> {
         field: Field<M, Vec<L>>,
         build: impl FnOnce(Lines<L>) -> Lines<L>,
     ) -> Self {
-        self.items
+        self.body
+            .items
             .push(FormItem::Field(FormField::of(field)));
-        self.lines
+        self.body
+            .lines
             .push((field.meta().name, Box::new(build(Lines::new()))));
         self
     }
@@ -520,7 +489,8 @@ impl<M: Model> Form<M> {
     /// cancel and retry, previews for images. Files go to the store registered with the same
     /// `rules` on the feature ([`Feature::files`](crate::Feature::files)), which checks size,
     /// type and permission again on the server. A `Vec<File>` field takes up to
-    /// `rules.files()` files.
+    /// `rules.files()` files. On submit, a file the record did not hold before must have been
+    /// uploaded into that store by the same user in the same tenant; any other id is refused.
     ///
     /// ```ignore
     /// Form::of(ticket).file(Ticket::attachments, ATTACHMENTS)
@@ -529,60 +499,13 @@ impl<M: Model> Form<M> {
     where
         T: FieldType + crate::files::UploadValue + 'static,
     {
-        self.items
+        self.body
+            .items
             .push(FormItem::Field(FormField::of(field)));
-        self.files
+        self.body
+            .files
             .push((field.meta().name, rules, T::MANY));
         self
-    }
-
-    fn files_of(&self, name: &str) -> Option<(crate::files::FileRules, bool)> {
-        self.files
-            .iter()
-            .find(|(n, _, _)| *n == name)
-            .map(|(_, r, many)| (*r, *many))
-    }
-
-    fn lines_of(&self, name: &str) -> Option<&dyn LinesEditor> {
-        self.lines
-            .iter()
-            .find(|(n, _)| *n == name)
-            .map(|(_, e)| e.as_ref())
-    }
-
-    /// Whether the field is edited with a password or one time code control. Its values never
-    /// reach the audit trail.
-    fn is_secret(&self, name: &str) -> bool {
-        matches!(
-            self.control_of(name),
-            Some(
-                Control::Password
-                    | Control::NewPassword
-                    | Control::PasswordMeter
-                    | Control::OneTimeCode
-            )
-        )
-    }
-
-    fn control_of(&self, name: &str) -> Option<Control> {
-        self.controls
-            .iter()
-            .find(|(n, _)| *n == name)
-            .map(|(_, c)| *c)
-    }
-
-    fn lookup_of(&self, name: &str) -> Option<(&dyn DataSource, bool)> {
-        self.lookups
-            .iter()
-            .find(|(n, _, _)| *n == name)
-            .map(|(_, s, many)| (s.as_ref(), *many))
-    }
-
-    fn options_of(&self, name: &str) -> Option<&DateOptions> {
-        self.options
-            .iter()
-            .find(|(n, _)| *n == name)
-            .map(|(_, o)| o)
     }
 
     /// Submit button and action. Does not compile unless the action takes `Valid<M>`.
@@ -593,150 +516,6 @@ impl<M: Model> Form<M> {
             on_success: None,
             _action: PhantomData,
         }
-    }
-
-    fn fields(&self) -> impl Iterator<Item = &FormField<M>> {
-        self.items
-            .iter()
-            .flat_map(|item| match item {
-                FormItem::Field(f) => std::slice::from_ref(f).iter(),
-                FormItem::Row(fs) => fs.iter(),
-                FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
-                FormItem::Step(_) | FormItem::Section(_) => [].iter(),
-            })
-            .chain(
-                self.items
-                    .iter()
-                    .filter_map(|item| match item {
-                        FormItem::Range(_, b) => Some(b),
-                        _ => None,
-                    }),
-            )
-    }
-
-    fn render_fields(&self, out: &mut String, r: &Render) {
-        if M::SENSITIVE
-            && let Some(ctx) = r.ctx
-        {
-            ctx.record_read(&self.model);
-        }
-        let titles: Vec<&Text> = self
-            .items
-            .iter()
-            .filter_map(|i| {
-                if let FormItem::Step(t) = i {
-                    Some(t)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        if !titles.is_empty() {
-            out.push_str(&format!(
-                r#"<ol class="z-steps" data-zeyn-steps aria-label="{}" data-text-progress="{}">"#,
-                r.text(&Text::key("zeyn.ui.steps.label")),
-                r.text(&Text::key("zeyn.ui.steps.progress"))
-            ));
-            for (i, t) in titles.iter().enumerate() {
-                let current = if i == 0 {
-                    r#" aria-current="step""#
-                } else {
-                    ""
-                };
-                out.push_str(&format!(r#"<li data-step="{i}"{current}><span class="z-step-n" aria-hidden="true">{}</span><span class="z-step-title">{}</span></li>"#, i + 1, r.text(t)));
-            }
-            out.push_str("</ol>");
-        }
-        let mut step = 0usize;
-        let mut open = false;
-        let mut section = false;
-        for item in &self.items {
-            if section && matches!(item, FormItem::Step(_) | FormItem::Section(_)) {
-                out.push_str("</div></details>");
-                section = false;
-            }
-            match item {
-                FormItem::Section(title) => {
-                    crate::ui::open_section(out, &r.text(title));
-                    section = true;
-                }
-                FormItem::Step(title) => {
-                    if open {
-                        out.push_str("</fieldset>");
-                    }
-                    out.push_str(&format!(
-                        r#"<fieldset class="z-step" data-zeyn-step="{step}"><legend class="z-step-legend">{}</legend>"#,
-                        r.text(title)
-                    ));
-                    step += 1;
-                    open = true;
-                }
-                FormItem::Field(f) => render_field(out, r, f, self),
-                FormItem::Range(from, to) => crate::ui::render_range(
-                    out,
-                    r,
-                    [
-                        (from.meta, (from.value)(&self.model)),
-                        (to.meta, (to.value)(&self.model)),
-                    ],
-                    self.options_of(from.meta.name),
-                ),
-                FormItem::Row(fields) => {
-                    out.push_str(r#"<div class="z-form-row">"#);
-                    for f in fields {
-                        render_field(out, r, f, self);
-                    }
-                    out.push_str("</div>");
-                }
-            }
-        }
-        if section {
-            out.push_str("</div></details>");
-        }
-        if open {
-            out.push_str("</fieldset>");
-        }
-        for (i, meta) in M::fields()
-            .iter()
-            .enumerate()
-            .filter(|(_, m)| m.version)
-        {
-            let v = match self.model.value_at(i) {
-                Some(Value::Int(n)) => n.to_string(),
-                _ => String::new(),
-            };
-            out.push_str(&format!(
-                r#"<input type="hidden" name="{}" value="{v}" data-zeyn-version>"#,
-                meta.name
-            ));
-        }
-    }
-
-    fn fields_schema(&self) -> Vec<Json> {
-        let mut list = Vec::new();
-        for (row, item) in self.items.iter().enumerate() {
-            let fields: Vec<&FormField<M>> = match item {
-                FormItem::Field(f) => vec![f],
-                FormItem::Row(fs) => fs.iter().collect(),
-                FormItem::Range(a, b) => vec![a, b],
-                FormItem::Step(title) => {
-                    list.push(json!({ "row": row, "step": title }));
-                    Vec::new()
-                }
-                FormItem::Section(title) => {
-                    list.push(json!({ "row": row, "section": title }));
-                    Vec::new()
-                }
-            };
-            for f in fields {
-                let mut entry = json!({ "row": row, "field": f.meta });
-                if let Some(editor) = self.lines_of(f.meta.name) {
-                    entry["lines"] = editor.schema();
-                }
-                list.push(entry);
-            }
-        }
-        list
     }
 
     /// Applies submitted values to a copy of the loaded model and validates it. All problems are
@@ -784,6 +563,22 @@ impl<M: Model> Form<M> {
         )
     }
 
+    /// Field names of each step, in order. Empty when the form has no steps.
+    pub fn steps(&self) -> Vec<Vec<&'static str>> {
+        self.body.steps()
+    }
+
+    /// Writes the fields with the model's values, and audits the read of a sensitive model.
+    fn render_fields(&self, out: &mut String, r: &Render) {
+        if M::SENSITIVE
+            && let Some(ctx) = r.ctx
+        {
+            ctx.record_read(&self.model);
+        }
+        self.body
+            .render_fields(&self.model, out, r);
+    }
+
     fn read_with(
         &self,
         values: &Map<String, Json>,
@@ -791,8 +586,12 @@ impl<M: Model> Form<M> {
         unmask: &dyn Fn(&FieldMeta) -> bool,
         csp: Option<&crate::csp::Csp>,
     ) -> std::result::Result<Valid<M>, ValidationErrors> {
-        let (model, mut errors) = self.merge(values, reading, unmask)?;
-        self.check_pickers(&model, reading.tz, &mut errors);
+        let (object, mut errors) = self
+            .body
+            .merge(&self.model, values, reading, unmask)?;
+        let model: M = serde_json::from_value(Json::Object(object)).map_err(|_| general_error())?;
+        self.body
+            .check_pickers(&model, reading.tz, &mut errors);
         if let Err(rules) = model.validate() {
             let unreadable: Vec<(&str, Rule)> = errors
                 .errors
@@ -817,189 +616,6 @@ impl<M: Model> Form<M> {
         errors.into_result()?;
         Valid::new(model)
     }
-
-    /// Server side checks of picker options and ranges: days that cannot be chosen, minute
-    /// steps and a `to` before its `from`.
-    fn check_pickers(&self, model: &M, tz: TimeZone, errors: &mut ValidationErrors) {
-        let unreadable: Vec<&str> = errors
-            .errors
-            .iter()
-            .map(|e| e.field)
-            .collect();
-        let value_of = |name: &str| {
-            M::fields()
-                .iter()
-                .position(|m| m.name == name)
-                .and_then(|i| model.value_at(i))
-                .unwrap_or(Value::Null)
-        };
-        for (name, options) in &self.options {
-            let Some(meta) = M::fields()
-                .iter()
-                .find(|m| m.name == *name)
-            else {
-                continue;
-            };
-            if unreadable.contains(name) {
-                continue;
-            }
-            if let Some(key) = options.problem(&value_of(name), tz) {
-                let mut message = Text::key(key).arg("label", meta.label_text());
-                if key == "zeyn.validation.time_step" {
-                    message = message.arg("n", options.step().to_string());
-                }
-                errors.errors.push(FieldError {
-                    field: meta.name,
-                    rule: Rule::Custom,
-                    message,
-                });
-            }
-        }
-        for (name, control) in &self.controls {
-            if let Control::Color { .. } = control
-                && let Value::Text(text) = value_of(name)
-                && !text.is_empty()
-                && !crate::ui::is_hex_color(&text)
-                && !unreadable.contains(name)
-                && let Some(meta) = M::fields()
-                    .iter()
-                    .find(|m| m.name == *name)
-            {
-                errors.errors.push(FieldError {
-                    field: meta.name,
-                    rule: Rule::Format,
-                    message: Text::key("zeyn.validation.color").arg("label", meta.label_text()),
-                });
-            }
-            let Some(meta) = M::fields()
-                .iter()
-                .find(|m| m.name == *name && m.kind == FieldKind::Decimal)
-            else {
-                continue;
-            };
-            let value = value_of(name);
-            if *control == Control::Rating
-                && value != Value::Null
-                && crate::ui::rating_halves(&value).is_none()
-                && !unreadable.contains(name)
-            {
-                errors.errors.push(FieldError {
-                    field: meta.name,
-                    rule: Rule::Custom,
-                    message: Text::key("zeyn.ui.shop.rating.half").arg("label", meta.label_text()),
-                });
-            }
-        }
-        if !self.files.is_empty() {
-            let object = serde_json::to_value(model).unwrap_or(Json::Null);
-            for (name, rules, many) in &self.files {
-                let count = object
-                    .get(*name)
-                    .and_then(Json::as_array)
-                    .map_or(0, Vec::len);
-                let Some(meta) = M::fields()
-                    .iter()
-                    .find(|m| m.name == *name)
-                else {
-                    continue;
-                };
-                if *many && count > rules.files() as usize && !unreadable.contains(name) {
-                    errors.errors.push(FieldError {
-                        field: meta.name,
-                        rule: Rule::Custom,
-                        message: Text::key("zeyn.files.too_many")
-                            .arg("label", meta.label_text())
-                            .arg("n", rules.files().to_string()),
-                    });
-                }
-            }
-        }
-        for item in &self.items {
-            let FormItem::Range(from, to) = item else {
-                continue;
-            };
-            let (a, b) = (value_of(from.meta.name), value_of(to.meta.name));
-            if crate::ui::range_reversed(&a, &b) && !unreadable.contains(&to.meta.name) {
-                errors.errors.push(FieldError {
-                    field: to.meta.name,
-                    rule: Rule::Custom,
-                    message: Text::key("zeyn.validation.range_order")
-                        .arg("label", to.meta.label_text())
-                        .arg("other", from.meta.label_text()),
-                });
-            }
-        }
-    }
-
-    fn merge(
-        &self,
-        values: &Map<String, Json>,
-        reading: &Reading,
-        unmask: &dyn Fn(&FieldMeta) -> bool,
-    ) -> std::result::Result<(M, ValidationErrors), ValidationErrors> {
-        let mut object = match serde_json::to_value(&self.model) {
-            Ok(Json::Object(o)) => o,
-            _ => return Err(general_error()),
-        };
-        let mut errors = ValidationErrors::default();
-        let empty = |name: &str| {
-            matches!(object.get(name), None | Some(Json::Null))
-                || object.get(name) == Some(&Json::String(String::new()))
-        };
-        let editable: Vec<&FieldMeta> = self
-            .fields()
-            .map(|f| f.meta)
-            .filter(|m| {
-                !m.key
-                    && !m.readonly
-                    && !m.version
-                    && (m.mask.is_none() || unmask(m) || empty(m.name))
-            })
-            .collect();
-        let versions = M::fields().iter().filter(|m| m.version);
-        for meta in editable.into_iter().chain(versions) {
-            if let Some(editor) = self.lines_of(meta.name) {
-                let current = object
-                    .get(meta.name)
-                    .cloned()
-                    .unwrap_or(Json::Null);
-                if let Some((lines, problems)) = editor.read(values, meta, reading, &current) {
-                    object.insert(meta.name.to_string(), lines);
-                    errors.errors.extend(problems);
-                }
-                continue;
-            }
-            let Some(raw) = values.get(meta.name) else {
-                continue;
-            };
-            let current = object
-                .get(meta.name)
-                .cloned()
-                .unwrap_or(Json::Null);
-            match parse_value(meta, raw, reading, &current) {
-                Ok(Json::String(s)) if meta.rules.contains(&Rule::Embed) => {
-                    let url = crate::csp::embed_url(&s).unwrap_or(s);
-                    object.insert(meta.name.to_string(), Json::String(url));
-                }
-                Ok(v) => {
-                    object.insert(meta.name.to_string(), v);
-                }
-                Err(problem) => {
-                    let key = match problem {
-                        Unreadable::Format => "zeyn.validation.format",
-                        Unreadable::SkippedTime => "zeyn.validation.skipped_time",
-                    };
-                    errors.errors.push(FieldError {
-                        field: meta.name,
-                        rule: Rule::Format,
-                        message: Text::key(key).arg("label", meta.label_text()),
-                    })
-                }
-            }
-        }
-        let model = serde_json::from_value(Json::Object(object)).map_err(|_| general_error())?;
-        Ok((model, errors))
-    }
 }
 
 fn general_error() -> ValidationErrors {
@@ -1012,6 +628,8 @@ fn general_error() -> ValidationErrors {
 pub(crate) enum Unreadable {
     Format,
     SkippedTime,
+    /// A file field names a file its record did not hold and no store vouches for.
+    File,
 }
 
 impl From<()> for Unreadable {
@@ -1075,12 +693,15 @@ pub(crate) fn read_moment(
 }
 
 /// Reads one submitted value as the field's type. Text arrives as typed by the user; wall clock
-/// date times are read in the user's time zone.
+/// date times are read in the user's time zone. A file field that is not an upload field of a
+/// store (`stored` false) keeps only files `current` already holds: nothing could have uploaded
+/// a new one for it, so any other id is refused.
 pub(crate) fn parse_value(
     meta: &FieldMeta,
     raw: &Json,
     reading: &Reading,
     current: &Json,
+    stored: bool,
 ) -> std::result::Result<Json, Unreadable> {
     let locale = reading.locale;
     if let FieldKind::Bool = meta.kind {
@@ -1093,8 +714,17 @@ pub(crate) fn parse_value(
         editor: editor @ ("file" | "files"),
     } = meta.kind
     {
-        return crate::files::parse_files(raw, editor == "files", meta.optional)
-            .ok_or(Unreadable::Format);
+        let value = crate::files::parse_files(raw, editor == "files", meta.optional)
+            .ok_or(Unreadable::Format)?;
+        let held = crate::files::file_ids(Some(current));
+        if !stored
+            && crate::files::file_ids(Some(&value))
+                .iter()
+                .any(|id| !held.contains(id))
+        {
+            return Err(Unreadable::File);
+        }
+        return Ok(value);
     }
     if let FieldKind::Choices(options) = meta.kind {
         return crate::ui::read_choices(options, raw).ok_or(Unreadable::Format);
@@ -1181,9 +811,15 @@ pub(crate) fn edit_value(value: &Value, locale: &str, tz: TimeZone) -> String {
 }
 
 /// Writes the input that fits the field kind, with the validation attributes the client mirrors.
-fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: &Form<M>) {
+fn render_field(
+    out: &mut String,
+    r: &Render,
+    f: &FormField,
+    form: &FormBody,
+    model: &dyn FormModel,
+) {
     let m = f.meta;
-    let value = (f.value)(&form.model);
+    let value = (f.value)(model.form_any());
     let options = form.options_of(m.name);
     if m.key {
         let v = match &value {
@@ -1209,9 +845,10 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         .map(|(_, t)| t);
     let special = |out: &mut String, slot: &Slot| {
         let current = || {
-            serde_json::to_value(&form.model)
-                .ok()
-                .and_then(|v| v.get(m.name).cloned())
+            model
+                .form_json()
+                .get(m.name)
+                .cloned()
                 .unwrap_or(Json::Null)
         };
         if let Some(editor) = form.lines_of(m.name) {
@@ -1282,45 +919,24 @@ type PairCheck = (
     Option<crate::ctx::BoxFuture<Result<Json>>>,
 );
 
-impl<M: Model> Form<M> {
-    /// Starts the checks of the dependent lookups of a read form: for each one with a value, the
-    /// lookup's action runs with the chosen ids and the submitted value of its source field.
-    fn pair_checks(&self, saved: &M, values: &Map<String, Json>, ctx: &Ctx) -> Vec<PairCheck> {
-        let mut out = Vec::new();
-        for (field, source) in &self.depends {
-            let Some((lookup, _)) = self.lookup_of(field) else {
-                continue;
-            };
-            let ids = match M::fields()
-                .iter()
-                .position(|f| f.name == *field)
-                .and_then(|i| saved.value_at(i))
-            {
-                Some(Value::Int(n)) => vec![n],
-                Some(Value::Text(t)) => crate::ui::parse_ids(&t).unwrap_or_default(),
-                _ => Vec::new(),
-            };
-            if ids.is_empty() {
-                continue;
-            }
-            let parent = match values.get(*source) {
-                Some(Json::String(s)) if !s.trim().is_empty() => Some(s.trim().to_string()),
-                Some(Json::Number(n)) => Some(n.to_string()),
-                _ => None,
-            };
-            let fetch = ctx
-                .identity()
-                .can(&lookup.action().access)
-                .then(|| {
-                    lookup.fetch(
-                        ctx.clone(),
-                        json!({ "ids": ids, "parent": parent, "limit": ids.len() }),
-                    )
-                });
-            out.push((*field, ids, fetch));
+/// New files of an upload field to check on submit: the error to show, the store and the ids.
+type FileCheck = (FieldError, &'static str, Vec<String>);
+
+/// Refuses a submit that names a file the user did not upload, see
+/// [`check_owned`](crate::files::check_owned).
+async fn check_files(ctx: &Ctx, checks: Vec<FileCheck>) -> Result<()> {
+    let mut errors = ValidationErrors::default();
+    for (error, store, ids) in checks {
+        if crate::files::check_owned(ctx, Some(store), ids)
+            .await
+            .is_err()
+        {
+            errors.errors.push(error);
         }
-        out
     }
+    errors
+        .into_result()
+        .map_err(Error::Validation)
 }
 
 /// Refuses a submit whose dependent lookups hold an id their lookup does not return for the
@@ -1413,7 +1029,7 @@ where
                 for c in t
                     .changes
                     .iter_mut()
-                    .filter(|c| self.form.is_secret(c.field))
+                    .filter(|c| self.form.body.is_secret(c.field))
                 {
                     c.old = None;
                     c.new = None;
@@ -1423,12 +1039,21 @@ where
         let pairs = match &valid {
             Ok(saved) => self
                 .form
-                .pair_checks(saved, &values, &ctx),
+                .body
+                .pair_checks(&**saved, &values, &ctx),
+            Err(_) => Vec::new(),
+        };
+        let files = match &valid {
+            Ok(saved) => self
+                .form
+                .body
+                .file_checks(&**saved, &self.form.model),
             Err(_) => Vec::new(),
         };
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;
+            check_files(&ctx, files).await?;
             check_pairs(pairs).await?;
             let output = A::call(ctx, valid).await?;
             if let Some(error) = output.failure() {
@@ -1443,10 +1068,198 @@ where
     }
 
     fn tool_schema(&self) -> Json {
+        self.form.body.tool_schema(M::fields())
+    }
+}
+
+/// Checks one step of a stepped form: reads every submitted value the way a save would and
+/// returns the errors of the step's fields only. Nothing is saved; the submit action's
+/// permission is required, as for saving.
+impl<M: Model, A> DataSource for SubmitForm<M, A>
+where
+    A: Action<Input = Valid<M>>,
+    A::Output: Outcome,
+{
+    fn action(&self) -> ActionMeta {
+        A::META
+    }
+
+    fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
+        let step = input
+            .get("step")
+            .and_then(Json::as_u64)
+            .unwrap_or(u64::MAX) as usize;
+        let values = input
+            .get("values")
+            .and_then(Json::as_object)
+            .cloned()
+            .unwrap_or_default();
+        let fields = self
+            .form
+            .body
+            .steps()
+            .get(step)
+            .cloned();
+        let result = fields.map(|fields| match self.form.read_for(&values, &ctx) {
+            Ok(_) => Vec::new(),
+            Err(errors) => errors
+                .errors
+                .into_iter()
+                .filter(|e| fields.contains(&e.field))
+                .map(|e| json!({ "field": e.field, "rule": e.rule, "message": ctx.t(&e.message) }))
+                .collect(),
+        });
+        Box::pin(async move {
+            let errors = result.ok_or(Error::NotFound)?;
+            Ok(json!({ "errors": errors }))
+        })
+    }
+}
+
+impl<M: Model> Component for Form<M> {
+    fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        self.body
+            .code_source(key)
+            .or_else(|| self.body.lookup_of(key).map(|(s, _)| s))
+    }
+
+    fn render(&self, out: &mut String, r: &Render) {
+        let drives = if self.body.drives.is_empty() {
+            String::new()
+        } else {
+            crate::ui::topics_attr("data-zeyn-drives", &self.body.drives) + &self.body.drive_kinds()
+        };
+        out.push_str(&format!(
+            r#"<form class="z-form" data-testid="{}.form"{drives} novalidate>"#,
+            r.scope
+        ));
+        self.render_fields(out, r);
+        out.push_str("</form>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "form", "model": M::NAME, "fields": self.body.fields_schema(), "submit": null, "drives": self.body.drives })
+    }
+
+    fn page_check(&self, check: &mut crate::ui::PageCheck) {
+        self.body.check_form(check);
+    }
+
+    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
+        self.body
+            .fields()
+            .find(|f| f.meta.name == field)?;
+        crate::privacy::reveal_in(&self.model, field)
+    }
+}
+
+impl<M: Model, A> Component for SubmitForm<M, A>
+where
+    A: Action<Input = Valid<M>>,
+    A::Output: Outcome,
+{
+    fn render(&self, out: &mut String, r: &Render) {
+        let settings = self.form.body.settings;
+        out.push_str(&format!(
+            r#"<form class="z-form{}" data-testid="{}.form" data-zeyn-submit="{}" novalidate>"#,
+            if settings { " z-form-settings" } else { "" },
+            r.scope,
+            A::META.name
+        ));
+        self.form.render_fields(out, r);
+        let steps = if self.form.body.steps().is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<button type="button" class="z-button" data-zeyn-step-back hidden data-testid="{0}.form.back">{1}</button><button type="button" class="z-button z-primary" data-zeyn-step-next hidden data-testid="{0}.form.next">{2}</button>"#,
+                r.scope,
+                r.text(&Text::key("zeyn.ui.steps.back")),
+                r.text(&Text::key("zeyn.ui.steps.next"))
+            )
+        };
+        let note = if settings {
+            format!(
+                r#"<span class="z-form-unsaved">{}</span>"#,
+                r.text(&Text::key("zeyn.draft.unsaved"))
+            )
+        } else {
+            String::new()
+        };
+        out.push_str(&format!(
+            r#"<div class="z-form-actions">{note}{steps}<button type="submit" class="z-button z-primary" data-testid="{}.form.submit">{}</button></div></form>"#,
+            r.scope,
+            r.text(&self.label)
+        ));
+    }
+
+    fn schema(&self) -> Json {
+        json!({
+            "type": "form",
+            "model": M::NAME,
+            "fields": self.form.body.fields_schema(),
+            "submit": { "label": self.label, "action": A::META },
+        })
+    }
+
+    fn form(&self) -> Option<&dyn FormSource> {
+        Some(self)
+    }
+
+    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
+        self.form.reveal(field)
+    }
+
+    fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        if key == "_step" && !self.form.body.steps().is_empty() {
+            return Some(self);
+        }
+        self.form
+            .body
+            .code_source(key)
+            .or_else(|| {
+                self.form
+                    .body
+                    .lookup_of(key)
+                    .map(|(s, _)| s)
+            })
+    }
+
+    fn page_check(&self, check: &mut crate::ui::PageCheck) {
+        if !self.form.body.drives.is_empty() {
+            check.problem(
+                crate::Problem::new("Z0606", "a form with `submit` cannot also `drive` topics")
+                    .why("a submit form saves first, so refreshing listeners on every change would show data that is not saved")
+                    .fix("drive with a form without submit, or refresh after saving with `ui.refresh(...)` in `on_success`")
+                    .docs("language/forms#filter-forms"),
+            );
+        }
+        self.form.body.check_form(check);
+    }
+}
+
+impl<M: Model> From<Form<M>> for Node {
+    fn from(f: Form<M>) -> Self {
+        Node::new(f)
+    }
+}
+
+impl<M: Model, A> From<SubmitForm<M, A>> for Node
+where
+    A: Action<Input = Valid<M>>,
+    A::Output: Outcome,
+{
+    fn from(f: SubmitForm<M, A>) -> Self {
+        Node::new(f)
+    }
+}
+
+impl FormBody {
+    /// The JSON schema of the values a submit takes, for AI tools: the editable fields and the
+    /// row versions of `all`, the model's fields.
+    fn tool_schema(&self, all: &'static [FieldMeta]) -> Json {
         let mut properties = Map::new();
         let mut required = Vec::new();
         for m in self
-            .form
             .fields()
             .map(|f| f.meta)
             .filter(|m| !m.key && !m.readonly && !m.version && m.mask.is_none())
@@ -1517,7 +1330,7 @@ where
                 required.push(m.name);
             }
         }
-        for m in M::fields().iter().filter(|m| m.version) {
+        for m in all.iter().filter(|m| m.version) {
             properties.insert(
                 m.name.to_string(),
                 json!({ "type": "string", "description": "Row version as loaded. Send it back unchanged." }),
@@ -1525,172 +1338,571 @@ where
         }
         json!({ "type": "object", "properties": properties, "required": required })
     }
-}
 
-/// Checks one step of a stepped form: reads every submitted value the way a save would and
-/// returns the errors of the step's fields only. Nothing is saved; the submit action's
-/// permission is required, as for saving.
-impl<M: Model, A> DataSource for SubmitForm<M, A>
-where
-    A: Action<Input = Valid<M>>,
-    A::Output: Outcome,
-{
-    fn action(&self) -> ActionMeta {
-        A::META
+    /// Field names of each step, in order. Empty when the form has no steps.
+    fn steps(&self) -> Vec<Vec<&'static str>> {
+        let mut steps: Vec<Vec<&'static str>> = Vec::new();
+        for item in &self.items {
+            match item {
+                FormItem::Step(_) => steps.push(Vec::new()),
+                FormItem::Section(_) => {}
+                FormItem::Field(f) => steps
+                    .last_mut()
+                    .into_iter()
+                    .for_each(|s| s.push(f.meta.name)),
+                FormItem::Row(fs) => steps
+                    .last_mut()
+                    .into_iter()
+                    .for_each(|s| s.extend(fs.iter().map(|f| f.meta.name))),
+                FormItem::Range(a, b) => steps
+                    .last_mut()
+                    .into_iter()
+                    .for_each(|s| s.extend([a.meta.name, b.meta.name])),
+            }
+        }
+        steps
     }
 
-    fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
-        let step = input
-            .get("step")
-            .and_then(Json::as_u64)
-            .unwrap_or(u64::MAX) as usize;
-        let values = input
-            .get("values")
-            .and_then(Json::as_object)
-            .cloned()
-            .unwrap_or_default();
-        let fields = self.form.steps().get(step).cloned();
-        let result = fields.map(|fields| match self.form.read_for(&values, &ctx) {
-            Ok(_) => Vec::new(),
-            Err(errors) => errors
-                .errors
+    /// The completion or check source of a code field, by the key the browser sends:
+    /// `field:complete` or `field:check`.
+    fn code_source(&self, key: &str) -> Option<&dyn DataSource> {
+        let (field, kind) = key.split_once(':')?;
+        self.codes
+            .iter()
+            .find(|(n, k, _)| *n == field && *k == kind)
+            .map(|(_, _, s)| s.as_ref())
+    }
+
+    /// The `page_check` of the form: its topics, its dependent lookups and its code fields.
+    fn check_form(&self, check: &mut crate::ui::PageCheck) {
+        for t in &self.drives {
+            check.drives(t);
+        }
+        for (field, kind, _) in &self.codes {
+            if !matches!(self.control_of(field), Some(Control::Code(_))) {
+                check.problem(
+                    crate::Problem::new(
+                        "Z0603",
+                        format!("`{kind}` is set for `{field}`, which has no code control"),
+                    )
+                    .why("the setting only applies to a code editor, so it would do nothing on the field's current control")
+                    .fix(format!("add `.control({field}, Control::Code(CodeLang::Expression))` or another language"))
+                    .docs("components/controls#code-editor"),
+                );
+            }
+        }
+        for (field, source) in &self.depends {
+            if self.lookup_of(field).is_none() {
+                check.problem(
+                    crate::Problem::new(
+                        "Z0604",
+                        format!("`depends_on` names `{field}`, which is not a lookup of this form"),
+                    )
+                    .why("only lookups load their options from the server, so there is nothing to reload when the other field changes")
+                    .fix(format!("add it with `.lookup({field}, ...)` first"))
+                    .docs("language/forms#dependent-lookups"),
+                );
+            }
+            if field == source
+                || !self
+                    .fields()
+                    .any(|f| f.meta.name == *source)
+            {
+                check.problem(
+                    crate::Problem::new(
+                        "Z0605",
+                        format!("lookup `{field}` depends on `{source}`, which is not another field of this form"),
+                    )
+                    .why("the lookup reloads when the field it depends on changes, and that field is not on the form")
+                    .fix("add the field it depends on")
+                    .docs("language/forms#dependent-lookups"),
+                );
+            }
+        }
+    }
+
+    /// The `data-zeyn-kinds` attribute of a filter form: which params are numbers or booleans,
+    /// so the browser sends them typed. Empty when no field is.
+    fn drive_kinds(&self) -> String {
+        let kinds: serde_json::Map<String, Json> = self
+            .fields()
+            .filter_map(|f| {
+                let kind = match f.meta.kind {
+                    FieldKind::Integer | FieldKind::Id => "number",
+                    FieldKind::Bool => "bool",
+                    _ => return None,
+                };
+                Some((f.meta.name.to_string(), Json::from(kind)))
+            })
+            .collect();
+        if kinds.is_empty() {
+            String::new()
+        } else {
+            format!(r#" data-zeyn-kinds="{}""#, crate::render::attr(&kinds))
+        }
+    }
+
+    fn files_of(&self, name: &str) -> Option<(crate::files::FileRules, bool)> {
+        self.files
+            .iter()
+            .find(|(n, _, _)| *n == name)
+            .map(|(_, r, many)| (*r, *many))
+    }
+
+    fn lines_of(&self, name: &str) -> Option<&dyn LinesEditor> {
+        self.lines
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, e)| e.as_ref())
+    }
+
+    /// Whether the field is edited with a password or one time code control. Its values never
+    /// reach the audit trail.
+    fn is_secret(&self, name: &str) -> bool {
+        matches!(
+            self.control_of(name),
+            Some(
+                Control::Password
+                    | Control::NewPassword
+                    | Control::PasswordMeter
+                    | Control::OneTimeCode
+            )
+        )
+    }
+
+    fn control_of(&self, name: &str) -> Option<Control> {
+        self.controls
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, c)| *c)
+    }
+
+    fn lookup_of(&self, name: &str) -> Option<(&dyn DataSource, bool)> {
+        self.lookups
+            .iter()
+            .find(|(n, _, _)| *n == name)
+            .map(|(_, s, many)| (s.as_ref(), *many))
+    }
+
+    fn options_of(&self, name: &str) -> Option<&DateOptions> {
+        self.options
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, o)| o)
+    }
+
+    fn fields(&self) -> impl Iterator<Item = &FormField> {
+        self.items
+            .iter()
+            .flat_map(|item| match item {
+                FormItem::Field(f) => std::slice::from_ref(f).iter(),
+                FormItem::Row(fs) => fs.iter(),
+                FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
+                FormItem::Step(_) | FormItem::Section(_) => [].iter(),
+            })
+            .chain(
+                self.items
+                    .iter()
+                    .filter_map(|item| match item {
+                        FormItem::Range(_, b) => Some(b),
+                        _ => None,
+                    }),
+            )
+    }
+
+    fn fields_schema(&self) -> Vec<Json> {
+        let mut list = Vec::new();
+        for (row, item) in self.items.iter().enumerate() {
+            let fields: Vec<&FormField> = match item {
+                FormItem::Field(f) => vec![f],
+                FormItem::Row(fs) => fs.iter().collect(),
+                FormItem::Range(a, b) => vec![a, b],
+                FormItem::Step(title) => {
+                    list.push(json!({ "row": row, "step": title }));
+                    Vec::new()
+                }
+                FormItem::Section(title) => {
+                    list.push(json!({ "row": row, "section": title }));
+                    Vec::new()
+                }
+            };
+            for f in fields {
+                let mut entry = json!({ "row": row, "field": f.meta });
+                if let Some(editor) = self.lines_of(f.meta.name) {
+                    entry["lines"] = editor.schema();
+                }
+                list.push(entry);
+            }
+        }
+        list
+    }
+
+    fn render_fields(&self, model: &dyn FormModel, out: &mut String, r: &Render) {
+        let titles: Vec<&Text> = self
+            .items
+            .iter()
+            .filter_map(|i| {
+                if let FormItem::Step(t) = i {
+                    Some(t)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if !titles.is_empty() {
+            out.push_str(&format!(
+                r#"<ol class="z-steps" data-zeyn-steps aria-label="{}" data-text-progress="{}">"#,
+                r.text(&Text::key("zeyn.ui.steps.label")),
+                r.text(&Text::key("zeyn.ui.steps.progress"))
+            ));
+            for (i, t) in titles.iter().enumerate() {
+                let current = if i == 0 {
+                    r#" aria-current="step""#
+                } else {
+                    ""
+                };
+                out.push_str(&format!(r#"<li data-step="{i}"{current}><span class="z-step-n" aria-hidden="true">{}</span><span class="z-step-title">{}</span></li>"#, i + 1, r.text(t)));
+            }
+            out.push_str("</ol>");
+        }
+        let mut step = 0usize;
+        let mut open = false;
+        let mut section = false;
+        for item in &self.items {
+            if section && matches!(item, FormItem::Step(_) | FormItem::Section(_)) {
+                out.push_str("</div></details>");
+                section = false;
+            }
+            match item {
+                FormItem::Section(title) => {
+                    crate::ui::open_section(out, &r.text(title));
+                    section = true;
+                }
+                FormItem::Step(title) => {
+                    if open {
+                        out.push_str("</fieldset>");
+                    }
+                    out.push_str(&format!(
+                        r#"<fieldset class="z-step" data-zeyn-step="{step}"><legend class="z-step-legend">{}</legend>"#,
+                        r.text(title)
+                    ));
+                    step += 1;
+                    open = true;
+                }
+                FormItem::Field(f) => render_field(out, r, f, self, model),
+                FormItem::Range(from, to) => crate::ui::render_range(
+                    out,
+                    r,
+                    [
+                        (from.meta, (from.value)(model.form_any())),
+                        (to.meta, (to.value)(model.form_any())),
+                    ],
+                    self.options_of(from.meta.name),
+                ),
+                FormItem::Row(fields) => {
+                    out.push_str(r#"<div class="z-form-row">"#);
+                    for f in fields {
+                        render_field(out, r, f, self, model);
+                    }
+                    out.push_str("</div>");
+                }
+            }
+        }
+        if section {
+            out.push_str("</div></details>");
+        }
+        if open {
+            out.push_str("</fieldset>");
+        }
+        for (i, meta) in model
+            .form_fields()
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m.version)
+        {
+            let v = match model.form_value_at(i) {
+                Some(Value::Int(n)) => n.to_string(),
+                _ => String::new(),
+            };
+            out.push_str(&format!(
+                r#"<input type="hidden" name="{}" value="{v}" data-zeyn-version>"#,
+                meta.name
+            ));
+        }
+    }
+
+    /// Server side checks of picker options and ranges: days that cannot be chosen, minute
+    /// steps and a `to` before its `from`.
+    fn check_pickers(&self, model: &dyn FormModel, tz: TimeZone, errors: &mut ValidationErrors) {
+        let unreadable: Vec<&str> = errors
+            .errors
+            .iter()
+            .map(|e| e.field)
+            .collect();
+        let value_of = |name: &str| {
+            model
+                .form_fields()
+                .iter()
+                .position(|m| m.name == name)
+                .and_then(|i| model.form_value_at(i))
+                .unwrap_or(Value::Null)
+        };
+        for (name, options) in &self.options {
+            let Some(meta) = model
+                .form_fields()
+                .iter()
+                .find(|m| m.name == *name)
+            else {
+                continue;
+            };
+            if unreadable.contains(name) {
+                continue;
+            }
+            if let Some(key) = options.problem(&value_of(name), tz) {
+                let mut message = Text::key(key).arg("label", meta.label_text());
+                if key == "zeyn.validation.time_step" {
+                    message = message.arg("n", options.step().to_string());
+                }
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: Rule::Custom,
+                    message,
+                });
+            }
+        }
+        for (name, control) in &self.controls {
+            if let Control::Color { .. } = control
+                && let Value::Text(text) = value_of(name)
+                && !text.is_empty()
+                && !crate::ui::is_hex_color(&text)
+                && !unreadable.contains(name)
+                && let Some(meta) = model
+                    .form_fields()
+                    .iter()
+                    .find(|m| m.name == *name)
+            {
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: Rule::Format,
+                    message: Text::key("zeyn.validation.color").arg("label", meta.label_text()),
+                });
+            }
+            let Some(meta) = model
+                .form_fields()
+                .iter()
+                .find(|m| m.name == *name && m.kind == FieldKind::Decimal)
+            else {
+                continue;
+            };
+            let value = value_of(name);
+            if *control == Control::Rating
+                && value != Value::Null
+                && crate::ui::rating_halves(&value).is_none()
+                && !unreadable.contains(name)
+            {
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: Rule::Custom,
+                    message: Text::key("zeyn.ui.shop.rating.half").arg("label", meta.label_text()),
+                });
+            }
+        }
+        if !self.files.is_empty() {
+            let object = model.form_json();
+            for (name, rules, many) in &self.files {
+                let count = object
+                    .get(*name)
+                    .and_then(Json::as_array)
+                    .map_or(0, Vec::len);
+                let Some(meta) = model
+                    .form_fields()
+                    .iter()
+                    .find(|m| m.name == *name)
+                else {
+                    continue;
+                };
+                if *many && count > rules.files() as usize && !unreadable.contains(name) {
+                    errors.errors.push(FieldError {
+                        field: meta.name,
+                        rule: Rule::Custom,
+                        message: Text::key("zeyn.files.too_many")
+                            .arg("label", meta.label_text())
+                            .arg("n", rules.files().to_string()),
+                    });
+                }
+            }
+        }
+        for item in &self.items {
+            let FormItem::Range(from, to) = item else {
+                continue;
+            };
+            let (a, b) = (value_of(from.meta.name), value_of(to.meta.name));
+            if crate::ui::range_reversed(&a, &b) && !unreadable.contains(&to.meta.name) {
+                errors.errors.push(FieldError {
+                    field: to.meta.name,
+                    rule: Rule::Custom,
+                    message: Text::key("zeyn.validation.range_order")
+                        .arg("label", to.meta.label_text())
+                        .arg("other", from.meta.label_text()),
+                });
+            }
+        }
+    }
+
+    fn merge(
+        &self,
+        model: &dyn FormModel,
+        values: &Map<String, Json>,
+        reading: &Reading,
+        unmask: &dyn Fn(&FieldMeta) -> bool,
+    ) -> std::result::Result<(Map<String, Json>, ValidationErrors), ValidationErrors> {
+        let mut object = match model.form_json() {
+            Json::Object(o) => o,
+            _ => return Err(general_error()),
+        };
+        let mut errors = ValidationErrors::default();
+        let empty = |name: &str| {
+            matches!(object.get(name), None | Some(Json::Null))
+                || object.get(name) == Some(&Json::String(String::new()))
+        };
+        let editable: Vec<&FieldMeta> = self
+            .fields()
+            .map(|f| f.meta)
+            .filter(|m| {
+                !m.key
+                    && !m.readonly
+                    && !m.version
+                    && (m.mask.is_none() || unmask(m) || empty(m.name))
+            })
+            .collect();
+        let versions = model
+            .form_fields()
+            .iter()
+            .filter(|m| m.version);
+        for meta in editable.into_iter().chain(versions) {
+            if let Some(editor) = self.lines_of(meta.name) {
+                let current = object
+                    .get(meta.name)
+                    .cloned()
+                    .unwrap_or(Json::Null);
+                if let Some((lines, problems)) = editor.read(values, meta, reading, &current) {
+                    object.insert(meta.name.to_string(), lines);
+                    errors.errors.extend(problems);
+                }
+                continue;
+            }
+            let Some(raw) = values.get(meta.name) else {
+                continue;
+            };
+            let current = object
+                .get(meta.name)
+                .cloned()
+                .unwrap_or(Json::Null);
+            let stored = self
+                .files
+                .iter()
+                .any(|(name, ..)| *name == meta.name);
+            match parse_value(meta, raw, reading, &current, stored) {
+                Ok(Json::String(s)) if meta.rules.contains(&Rule::Embed) => {
+                    let url = crate::csp::embed_url(&s).unwrap_or(s);
+                    object.insert(meta.name.to_string(), Json::String(url));
+                }
+                Ok(v) => {
+                    object.insert(meta.name.to_string(), v);
+                }
+                Err(problem) => {
+                    let key = match problem {
+                        Unreadable::Format => "zeyn.validation.format",
+                        Unreadable::SkippedTime => "zeyn.validation.skipped_time",
+                        Unreadable::File => "zeyn.files.not_found",
+                    };
+                    errors.errors.push(FieldError {
+                        field: meta.name,
+                        rule: Rule::Format,
+                        message: Text::key(key).arg("label", meta.label_text()),
+                    })
+                }
+            }
+        }
+        Ok((object, errors))
+    }
+
+    /// The file ids of each upload field that `saved` holds and `loaded` did not, with the
+    /// field, its store and the error shown when the store refuses one. Files the record held
+    /// before stay as they are, whoever uploaded them.
+    fn file_checks(&self, saved: &dyn FormModel, loaded: &dyn FormModel) -> Vec<FileCheck> {
+        if self.files.is_empty() {
+            return Vec::new();
+        }
+        let (saved_json, loaded_json) = (saved.form_json(), loaded.form_json());
+        let mut out = Vec::new();
+        for (name, rules, _) in &self.files {
+            let before = crate::files::file_ids(loaded_json.get(*name));
+            let ids: Vec<String> = crate::files::file_ids(saved_json.get(*name))
                 .into_iter()
-                .filter(|e| fields.contains(&e.field))
-                .map(|e| json!({ "field": e.field, "rule": e.rule, "message": ctx.t(&e.message) }))
-                .collect(),
-        });
-        Box::pin(async move {
-            let errors = result.ok_or(Error::NotFound)?;
-            Ok(json!({ "errors": errors }))
-        })
-    }
-}
-
-impl<M: Model> Component for Form<M> {
-    fn source(&self, key: &str) -> Option<&dyn DataSource> {
-        self.code_source(key)
-            .or_else(|| self.lookup_of(key).map(|(s, _)| s))
-    }
-
-    fn render(&self, out: &mut String, r: &Render) {
-        let drives = if self.drives.is_empty() {
-            String::new()
-        } else {
-            crate::ui::topics_attr("data-zeyn-drives", &self.drives) + &self.drive_kinds()
-        };
-        out.push_str(&format!(
-            r#"<form class="z-form" data-testid="{}.form"{drives} novalidate>"#,
-            r.scope
-        ));
-        self.render_fields(out, r);
-        out.push_str("</form>");
-    }
-
-    fn schema(&self) -> Json {
-        json!({ "type": "form", "model": M::NAME, "fields": self.fields_schema(), "submit": null, "drives": self.drives })
-    }
-
-    fn page_check(&self, check: &mut crate::ui::PageCheck) {
-        self.check_form(check);
-    }
-
-    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
-        self.fields()
-            .find(|f| f.meta.name == field)?;
-        crate::privacy::reveal_in(&self.model, field)
-    }
-}
-
-impl<M: Model, A> Component for SubmitForm<M, A>
-where
-    A: Action<Input = Valid<M>>,
-    A::Output: Outcome,
-{
-    fn render(&self, out: &mut String, r: &Render) {
-        let settings = self.form.settings;
-        out.push_str(&format!(
-            r#"<form class="z-form{}" data-testid="{}.form" data-zeyn-submit="{}" novalidate>"#,
-            if settings { " z-form-settings" } else { "" },
-            r.scope,
-            A::META.name
-        ));
-        self.form.render_fields(out, r);
-        let steps = if self.form.steps().is_empty() {
-            String::new()
-        } else {
-            format!(
-                r#"<button type="button" class="z-button" data-zeyn-step-back hidden data-testid="{0}.form.back">{1}</button><button type="button" class="z-button z-primary" data-zeyn-step-next hidden data-testid="{0}.form.next">{2}</button>"#,
-                r.scope,
-                r.text(&Text::key("zeyn.ui.steps.back")),
-                r.text(&Text::key("zeyn.ui.steps.next"))
-            )
-        };
-        let note = if settings {
-            format!(
-                r#"<span class="z-form-unsaved">{}</span>"#,
-                r.text(&Text::key("zeyn.draft.unsaved"))
-            )
-        } else {
-            String::new()
-        };
-        out.push_str(&format!(
-            r#"<div class="z-form-actions">{note}{steps}<button type="submit" class="z-button z-primary" data-testid="{}.form.submit">{}</button></div></form>"#,
-            r.scope,
-            r.text(&self.label)
-        ));
-    }
-
-    fn schema(&self) -> Json {
-        json!({
-            "type": "form",
-            "model": M::NAME,
-            "fields": self.form.fields_schema(),
-            "submit": { "label": self.label, "action": A::META },
-        })
-    }
-
-    fn form(&self) -> Option<&dyn FormSource> {
-        Some(self)
-    }
-
-    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
-        self.form.reveal(field)
-    }
-
-    fn source(&self, key: &str) -> Option<&dyn DataSource> {
-        if key == "_step" && !self.form.steps().is_empty() {
-            return Some(self);
+                .filter(|id| !before.contains(id))
+                .collect();
+            let Some(meta) = saved
+                .form_fields()
+                .iter()
+                .find(|m| m.name == *name)
+            else {
+                continue;
+            };
+            if !ids.is_empty() {
+                let error = FieldError {
+                    field: meta.name,
+                    rule: Rule::Custom,
+                    message: Text::key("zeyn.files.not_found").arg("label", meta.label_text()),
+                };
+                out.push((error, rules.store(), ids));
+            }
         }
-        self.form
-            .code_source(key)
-            .or_else(|| self.form.lookup_of(key).map(|(s, _)| s))
+        out
     }
 
-    fn page_check(&self, check: &mut crate::ui::PageCheck) {
-        if !self.form.drives.is_empty() {
-            check.problem(
-                crate::Problem::new("Z0606", "a form with `submit` cannot also `drive` topics")
-                    .why("a submit form saves first, so refreshing listeners on every change would show data that is not saved")
-                    .fix("drive with a form without submit, or refresh after saving with `ui.refresh(...)` in `on_success`")
-                    .docs("language/forms#filter-forms"),
-            );
+    /// Starts the checks of the dependent lookups of a read form: for each one with a value, the
+    /// lookup's action runs with the chosen ids and the submitted value of its source field.
+    fn pair_checks(
+        &self,
+        saved: &dyn FormModel,
+        values: &Map<String, Json>,
+        ctx: &Ctx,
+    ) -> Vec<PairCheck> {
+        let mut out = Vec::new();
+        for (field, source) in &self.depends {
+            let Some((lookup, _)) = self.lookup_of(field) else {
+                continue;
+            };
+            let ids = match saved
+                .form_fields()
+                .iter()
+                .position(|f| f.name == *field)
+                .and_then(|i| saved.form_value_at(i))
+            {
+                Some(Value::Int(n)) => vec![n],
+                Some(Value::Text(t)) => crate::ui::parse_ids(&t).unwrap_or_default(),
+                _ => Vec::new(),
+            };
+            if ids.is_empty() {
+                continue;
+            }
+            let parent = match values.get(*source) {
+                Some(Json::String(s)) if !s.trim().is_empty() => Some(s.trim().to_string()),
+                Some(Json::Number(n)) => Some(n.to_string()),
+                _ => None,
+            };
+            let fetch = ctx
+                .identity()
+                .can(&lookup.action().access)
+                .then(|| {
+                    lookup.fetch(
+                        ctx.clone(),
+                        json!({ "ids": ids, "parent": parent, "limit": ids.len() }),
+                    )
+                });
+            out.push((*field, ids, fetch));
         }
-        self.form.check_form(check);
-    }
-}
-
-impl<M: Model> From<Form<M>> for Node {
-    fn from(f: Form<M>) -> Self {
-        Node::new(f)
-    }
-}
-
-impl<M: Model, A> From<SubmitForm<M, A>> for Node
-where
-    A: Action<Input = Valid<M>>,
-    A::Output: Outcome,
-{
-    fn from(f: SubmitForm<M, A>) -> Self {
-        Node::new(f)
+        out
     }
 }

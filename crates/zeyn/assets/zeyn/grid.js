@@ -311,7 +311,8 @@ function updateChrome(grid, announce = false) {
 /**
  * Sets up a virtual grid (protocol 4.6). The grid root is the scroll container; a spacer
  * `tbody` after the rows gives the table its full height (capped at 8,000,000 px), and the rows
- * `tbody` holds only the visible rows plus 20 above and below, moved with `translateY`.
+ * `tbody` holds only the visible rows plus at least [`V_OVERSCAN`] above and below, moved with
+ * `translateY`.
  * The server rendered first block becomes the first cache entry, with the rows the server put
  * in a `<template data-zeyn-rows-later>` (inert until they scroll into view).
  */
@@ -350,6 +351,8 @@ function initVirtual(grid, s) {
     view: 0,
     height: 0,
     fillerHeight: -1,
+    start: -1,
+    end: -1,
     rowCount: -1,
     raf: 0,
     fetchTimer: 0,
@@ -413,9 +416,18 @@ function virtualRow(s, i, spare) {
 }
 
 /**
+ * Rows added ahead of the scroll direction, past [`V_OVERSCAN`], when the window of rows moves.
+ * A frame that moves the window restyles and lays out every kept row, at nearly the same cost for
+ * one new row as for ten, so the window stays while [`V_OVERSCAN`] rows remain on both sides and
+ * most scroll frames only move the rows `tbody`. A larger lead makes the frames that move it longer.
+ */
+const V_LEAD = 4;
+
+/**
  * Renders the visible window. Reads scroll geometry first, then writes; touches the DOM rows
- * only when the window or the loaded blocks changed. Focus stays on the focused row, or moves to
- * `focusIndex` when given.
+ * only when the window or the loaded blocks changed. The window moves only when fewer than
+ * [`V_OVERSCAN`] rows remain on a side of the visible ones (see [`V_LEAD`]). Focus stays on the
+ * focused row, or moves to `focusIndex` when given.
  */
 function renderVirtual(grid, focusIndex = null, geometry = null) {
   const s = grids.get(grid);
@@ -433,12 +445,19 @@ function renderVirtual(grid, focusIndex = null, geometry = null) {
   const visible = view / s.rh;
   const range = Math.max(1, height - view);
   const exact = full <= V_CAP ? top / s.rh : (Math.min(top, range) / range) * Math.max(0, total - visible);
-  const start = Math.max(0, Math.floor(exact) - V_OVERSCAN);
+  if (exact !== s.exact) s.dir = exact > s.exact ? 1 : -1;
+  const first = Math.floor(exact);
+  const last = Math.ceil(exact + visible);
+  const keep =
+    s.start >= 0 &&
+    s.start <= Math.max(0, first - V_OVERSCAN) &&
+    s.end >= Math.min(total, last + V_OVERSCAN) &&
+    (focusIndex == null || (focusIndex >= s.start && focusIndex < s.end));
+  const start = keep ? s.start : Math.max(0, first - V_OVERSCAN - (s.dir < 0 ? V_LEAD : 0));
   const shift = top - (exact - start) * s.rh;
   const fit = Math.max(0, Math.floor((height - shift) / s.rh + 0.01));
-  const end = Math.min(total, Math.ceil(exact + visible) + V_OVERSCAN, start + fit);
-  if (exact !== s.exact) s.dir = exact > s.exact ? 1 : -1;
-  Object.assign(s, { exact, view, height });
+  const end = Math.min(total, keep ? s.end : last + V_OVERSCAN + (s.dir > 0 ? V_LEAD : 0), start + fit);
+  Object.assign(s, { exact, view, height, start, end });
 
   s.body.style.transform = `translateY(${shift}px)`;
   const key = `${start}:${end}:${s.version}:${s.gen}`;

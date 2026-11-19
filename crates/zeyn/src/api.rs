@@ -122,6 +122,13 @@ pub trait ApiInput: Sized + Send + 'static {
     fn check_with(&self, _ctx: &Ctx) -> Result<()> {
         Ok(())
     }
+
+    /// The file ids each file field of the input names, checked against the stores before the
+    /// action runs.
+    #[doc(hidden)]
+    fn file_ids(&self) -> Vec<(&'static FieldMeta, Vec<String>)> {
+        Vec::new()
+    }
 }
 
 fn unreadable(e: serde_json::Error) -> Error {
@@ -151,6 +158,54 @@ impl<M: Model> ApiInput for Valid<M> {
     fn record(&self) -> Option<crate::audit::RecordRef> {
         Some(crate::audit::RecordRef::of(&**self))
     }
+
+    fn file_ids(&self) -> Vec<(&'static FieldMeta, Vec<String>)> {
+        let files: Vec<&'static FieldMeta> = M::fields()
+            .iter()
+            .filter(|m| {
+                matches!(
+                    m.kind,
+                    FieldKind::Custom {
+                        editor: "file" | "files"
+                    }
+                )
+            })
+            .collect();
+        if files.is_empty() {
+            return Vec::new();
+        }
+        let json = serde_json::to_value(&**self).unwrap_or(Json::Null);
+        files
+            .into_iter()
+            .map(|m| (m, crate::files::file_ids(json.get(m.name))))
+            .filter(|(_, ids)| !ids.is_empty())
+            .collect()
+    }
+}
+
+/// Refuses an API input that names a file the caller did not upload into one of the app's
+/// stores, see [`check_owned`](crate::files::check_owned). The API has no loaded record, so
+/// files someone else attached before are refused too.
+async fn check_files(ctx: &Ctx, files: Vec<(&'static FieldMeta, Vec<String>)>) -> Result<()> {
+    let mut errors = ValidationErrors::default();
+    for (meta, ids) in files {
+        if crate::files::check_owned(ctx, None, ids)
+            .await
+            .is_err()
+        {
+            errors
+                .errors
+                .push(crate::model::FieldError {
+                    field: meta.name,
+                    rule: crate::model::Rule::Custom,
+                    message: crate::i18n::Text::key("zeyn.files.not_found")
+                        .arg("label", meta.label_text()),
+                });
+        }
+    }
+    errors
+        .into_result()
+        .map_err(Error::Validation)
 }
 
 macro_rules! serde_input {
@@ -345,6 +400,7 @@ where
         let mut input = A::Input::from_json(body)?;
         input.clean(<A::Output as ApiResult>::fields(), &ctx);
         input.check_with(&ctx)?;
+        check_files(&ctx, input.file_ids()).await?;
         if let Some(record) = input.record() {
             ctx.update_trail(|t| {
                 t.record.get_or_insert(record);
