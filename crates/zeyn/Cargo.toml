@@ -50,6 +50,10 @@ accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
 # Resumable uploads: a tus 1.0 subset (creation, HEAD, PATCH, expiration, termination) under
 # `/_zeyn/uploads/`, used by the upload field and FileDrop. See examples/docs/pages/forms.md.
 resumable = ["server", "dep:base64"]
+# Wall clock job schedules on top of the job system: cron triggers with seconds and time zones,
+# calendars, misfire policies, pause and resume, chains, run history and an operations screen.
+# See docs/metronome.md.
+metronome = ["server"]
 # The `ui::Markdown` component: safe Markdown to HTML, with no dependencies.
 markdown = []
 # Framework texts (`zeyn.*`) in more languages. English and Turkish are always built in; each
@@ -148,6 +152,10 @@ required-features = ["totp"]
 [[test]]
 name = "islands"
 required-features = ["islands"]
+
+[[test]]
+name = "metronome"
+required-features = ["metronome"]
 
 [[test]]
 name = "realtime"

@@ -976,6 +976,18 @@
       "offset": "업로드가 서버와 맞지 않습니다. 서버가 있는 위치에서 계속합니다.",
       "busy": "이 업로드는 아직 데이터를 받고 있습니다. 잠시 후 다시 시도하세요.",
       "length": "업로드에 파일 크기가 없습니다."
+    },
+    "jobs": {
+      "title": "작업",
+      "subtitle": "백그라운드 작업, 트리거와 실행 기록입니다.",
+      "jobs": "작업",
+      "triggers": "트리거",
+      "runs": "실행 기록",
+      "run_now": "지금 실행",
+      "pause": "일시 중지",
+      "resume": "재개",
+      "catch_up": "재개하고 밀린 실행 처리",
+      "menu": "운영"
     }
   },
   "AccountLogin": {
@@ -1046,5 +1058,39 @@
     "code": "이메일로 받은 코드",
     "remember_machine": "이 브라우저 기억",
     "return_to": "돌아갈 곳"
+  },
+  "JobRow": {
+    "name": "작업",
+    "state": "상태",
+    "paused": "일시 중지됨",
+    "next_run": "다음 실행",
+    "last_error": "마지막 오류",
+    "runs": "실행 횟수",
+    "failures": "실패 횟수"
+  },
+  "TriggerRow": {
+    "key": "키",
+    "job": "작업",
+    "id": "트리거",
+    "expr": "일정",
+    "time_zone": "시간대",
+    "calendar": "달력",
+    "paused": "일시 중지됨",
+    "next_run": "다음 실행",
+    "then": "그다음",
+    "after": "그 후"
+  },
+  "RunRow": {
+    "id": "ID",
+    "job": "작업",
+    "trigger": "트리거",
+    "scheduled": "예정 시각",
+    "started": "시작",
+    "duration_ms": "소요 시간(ms)",
+    "attempt": "시도",
+    "outcome": "결과",
+    "error_code": "오류 코드",
+    "worker": "워커",
+    "started_by": "시작한 사람"
   }
 }

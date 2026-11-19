@@ -1521,6 +1521,7 @@ impl App {
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
         problems.extend(self.dev_auth_check());
+        problems.extend(self.jobs_problems());
         problems.extend(self.csp.problems().iter().cloned());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();

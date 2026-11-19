@@ -976,6 +976,18 @@
       "offset": "上传与服务器不同步。将从服务器所在的位置继续。",
       "busy": "此上传仍在接收数据。请稍后重试。",
       "length": "上传未说明文件大小。"
+    },
+    "jobs": {
+      "title": "作业",
+      "subtitle": "后台作业、触发器及其运行历史。",
+      "jobs": "作业",
+      "triggers": "触发器",
+      "runs": "运行历史",
+      "run_now": "立即运行",
+      "pause": "暂停",
+      "resume": "恢复",
+      "catch_up": "恢复并补跑",
+      "menu": "运维"
     }
   },
   "AccountLogin": {
@@ -1046,5 +1058,39 @@
     "code": "邮件中的验证码",
     "remember_machine": "记住此浏览器",
     "return_to": "返回到"
+  },
+  "JobRow": {
+    "name": "作业",
+    "state": "状态",
+    "paused": "已暂停",
+    "next_run": "下次运行",
+    "last_error": "最近错误",
+    "runs": "运行次数",
+    "failures": "失败次数"
+  },
+  "TriggerRow": {
+    "key": "键",
+    "job": "作业",
+    "id": "触发器",
+    "expr": "计划",
+    "time_zone": "时区",
+    "calendar": "日历",
+    "paused": "已暂停",
+    "next_run": "下次运行",
+    "then": "之后",
+    "after": "再之后"
+  },
+  "RunRow": {
+    "id": "编号",
+    "job": "作业",
+    "trigger": "触发器",
+    "scheduled": "计划时间",
+    "started": "开始",
+    "duration_ms": "时长（毫秒）",
+    "attempt": "尝试",
+    "outcome": "结果",
+    "error_code": "错误代码",
+    "worker": "工作进程",
+    "started_by": "发起人"
   }
 }

@@ -88,6 +88,9 @@ mod jobs;
 mod mail;
 mod media;
 mod menu;
+/// Wall clock job schedules: cron triggers, calendars, misfires, history (feature `metronome`).
+#[cfg(feature = "metronome")]
+pub mod metronome;
 mod model;
 #[cfg(feature = "pdf")]
 mod pdf;
@@ -180,6 +183,8 @@ pub use import::{
     Checked, CsvError, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource,
     MAX_CSV_BYTES, RowError, check_csv, check_file, error_report, parse_csv,
 };
+#[cfg(all(feature = "metronome", any(feature = "postgres", feature = "oracle")))]
+pub use jobs::migrate_job_tables;
 #[cfg(feature = "server")]
 pub use jobs::{
     ClaimedJob, JOB_LEASE, JOB_POLL, JobState, JobStatus, JobStore, Jobs, MAX_BACKOFF_MS,

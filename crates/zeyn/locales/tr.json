@@ -1268,6 +1268,18 @@
       "offset": "Yükleme sunucuyla aynı noktada değil. Sunucunun kaldığı yerden sürer.",
       "busy": "Bu yükleme hâlâ veri alıyor. Biraz sonra yeniden deneyin.",
       "length": "Yükleme dosyanın boyutunu bildirmedi."
+    },
+    "jobs": {
+      "title": "İşler",
+      "subtitle": "Arka plan işleri, tetikleyicileri ve çalışma geçmişi.",
+      "jobs": "İşler",
+      "triggers": "Tetikleyiciler",
+      "runs": "Çalışma geçmişi",
+      "run_now": "Şimdi çalıştır",
+      "pause": "Duraklat",
+      "resume": "Sürdür",
+      "catch_up": "Sürdür ve kaçırılanları çalıştır",
+      "menu": "Operasyon"
     }
   },
   "AccountLogin": {
@@ -1338,5 +1350,39 @@
     "code": "E-postadaki kod",
     "remember_machine": "Bu tarayıcıyı hatırla",
     "return_to": "Dönüş"
+  },
+  "JobRow": {
+    "name": "İş",
+    "state": "Durum",
+    "paused": "Duraklatıldı",
+    "next_run": "Sonraki çalışma",
+    "last_error": "Son hata",
+    "runs": "Çalışma",
+    "failures": "Hata"
+  },
+  "TriggerRow": {
+    "key": "Anahtar",
+    "job": "İş",
+    "id": "Tetikleyici",
+    "expr": "Zamanlama",
+    "time_zone": "Saat dilimi",
+    "calendar": "Takvim",
+    "paused": "Duraklatıldı",
+    "next_run": "Sonraki çalışma",
+    "then": "Sonra",
+    "after": "Daha sonra"
+  },
+  "RunRow": {
+    "id": "Kimlik",
+    "job": "İş",
+    "trigger": "Tetikleyici",
+    "scheduled": "Planlanan zaman",
+    "started": "Başlangıç",
+    "duration_ms": "Süre (ms)",
+    "attempt": "Deneme",
+    "outcome": "Sonuç",
+    "error_code": "Hata kodu",
+    "worker": "Çalışan",
+    "started_by": "Başlatan"
   }
 }
