@@ -241,8 +241,14 @@ async function sidewaysOverflow(page: Page): Promise<string[]> {
     for (const el of Array.from(document.body.querySelectorAll<HTMLElement>('*'))) {
       const r = el.getBoundingClientRect();
       if (r.right <= width + 1 && r.left >= -1) continue;
-      const parent = el.parentElement?.getBoundingClientRect();
-      if (parent && (parent.right > width + 1 || parent.left < -1)) continue;
+      let clipped = false;
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        if (getComputedStyle(a).overflowX !== 'visible') {
+          clipped = true;
+          break;
+        }
+      }
+      if (clipped) continue;
       const cls = typeof el.className === 'string' && el.className ? '.' + el.className.split(' ').join('.') : '';
       out.push(`${el.tagName.toLowerCase()}${cls} ${Math.round(r.left)}..${Math.round(r.right)}`);
       if (out.length > 6) break;
