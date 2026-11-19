@@ -95,7 +95,8 @@ Who saw which personal data, and when, is recorded as well as who changed it.
   its fragments, grid, form and reveal calls until a reason is given. The runtime asks in a
   dialog, sends `POST /_zeyn/reason {screen, reason}` (3 to 300 characters) and repeats the
   request. The reason is kept for 15 minutes in an `HttpOnly`, `SameSite=Strict` cookie, only
-  opens the screen it was given for and is written in `reason` of every audit record of that
+  opens the screen it was given for, only for the user and tenant who gave it (another user of
+  the same browser is asked again), and is written in `reason` of every audit record of that
   screen. Agents and API clients cannot give a reason, so they cannot open such screens.
 - Exports (CSV, XLSX, PDF) of a grid over a sensitive model write one audit record per file with
   `export` set: the model, the format, the number of rows and the sort and filters asked for.
@@ -231,7 +232,9 @@ Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
   language types them (`1.234,56`, `05.12.2026`), the field rules and the model's own `validate`.
 - Import sends only the valid rows to the action; `.all_or_nothing()` imports nothing unless
   every row is valid. On import the server reads and validates the file again; nothing from the
-  preview is trusted. Both steps need the action's permission, and the import is audited.
+  preview is trusted. Both steps need the action's permission and run through the interceptors
+  with the app's time limit (the preview as `CallKind::ImportPreview`, which is not audited, and
+  parsed off the async workers); the import is audited.
 - `.max_rows(n)` limits rows (5000 by default, never more than 50000). The error report defuses
   spreadsheet formulas. Masked fields are shown masked in the preview.
 

@@ -129,6 +129,17 @@ pub struct RoomKey {
 pub trait DocStore: Send + Sync + 'static {
     fn load(&self, key: RoomKey) -> BoxFuture<crate::Result<Option<Vec<u8>>>>;
     fn save(&self, key: RoomKey, state: Vec<u8>) -> BoxFuture<crate::Result<()>>;
+
+    /// Whether the user of `ctx` may open the document (`write` false) or change it (`write`
+    /// true). It runs on every join, also when the room is already open for other users, and
+    /// only for users who already hold the kind's `read` (or `write`) permission. The default
+    /// allows every such user every document of the kind; a store whose documents belong to
+    /// people or records answers from its own data, so a user cannot open another user's
+    /// document by its id.
+    fn allow(&self, ctx: &Ctx, key: &RoomKey, write: bool) -> BoxFuture<crate::Result<bool>> {
+        let _ = (ctx, key, write);
+        Box::pin(async { Ok(true) })
+    }
 }
 
 /// Keeps documents in process memory, for tests and demos. Unbounded: use a database in
@@ -873,6 +884,16 @@ async fn doc_socket(
         kind,
         doc,
     };
+    let allowed = |write: bool| st.timed(kind_def.store.allow(&ctx, &key, write));
+    match allowed(false).await {
+        Ok(true) => {}
+        Ok(false) => return refuse(&hub, Failure::App(Error::Forbidden)),
+        Err(f) => return refuse(&hub, f),
+    }
+    let can_write = ctx
+        .identity()
+        .can(&crate::action::Access::Permission(kind_def.write))
+        && matches!(allowed(true).await, Ok(true));
     let Some(room) = hub.open(&key, kind_def, &limits).await else {
         hub.release_user(&user);
         return busy();
@@ -904,9 +925,6 @@ async fn doc_socket(
         }
     }
     hub.start_sweeper(limits);
-    let can_write = ctx
-        .identity()
-        .can(&crate::action::Access::Permission(kind_def.write));
     ws.protocols([PROTOCOL])
         .max_message_size(limits.message_bytes)
         .on_upgrade(move |socket| async move {
