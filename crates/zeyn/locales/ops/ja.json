@@ -1,0 +1,50 @@
+{
+  "zeyn": {
+    "jobs": {
+      "title": "ジョブ",
+      "subtitle": "バックグラウンドジョブ、そのトリガーと実行履歴です。",
+      "jobs": "ジョブ",
+      "triggers": "トリガー",
+      "runs": "実行履歴",
+      "run_now": "今すぐ実行",
+      "pause": "一時停止",
+      "resume": "再開",
+      "catch_up": "再開して遅れを取り戻す",
+      "menu": "運用"
+    }
+  },
+  "JobRow": {
+    "name": "ジョブ",
+    "state": "状態",
+    "paused": "一時停止中",
+    "next_run": "次回実行",
+    "last_error": "最後のエラー",
+    "runs": "実行回数",
+    "failures": "失敗回数"
+  },
+  "TriggerRow": {
+    "key": "キー",
+    "job": "ジョブ",
+    "id": "トリガー",
+    "expr": "スケジュール",
+    "time_zone": "タイムゾーン",
+    "calendar": "カレンダー",
+    "paused": "一時停止中",
+    "next_run": "次回実行",
+    "then": "その次",
+    "after": "さらに次"
+  },
+  "RunRow": {
+    "id": "ID",
+    "job": "ジョブ",
+    "trigger": "トリガー",
+    "scheduled": "予定時刻",
+    "started": "開始",
+    "duration_ms": "所要時間（ミリ秒）",
+    "attempt": "試行",
+    "outcome": "結果",
+    "error_code": "エラーコード",
+    "worker": "ワーカー",
+    "started_by": "開始者"
+  }
+}

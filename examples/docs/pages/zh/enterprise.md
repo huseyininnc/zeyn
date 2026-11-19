@@ -192,3 +192,21 @@ jobs.enqueue("send_invoice", "42").await?;
 - 工作进程每隔 `JOB_POLL`（一秒）查找到期的运行，并在同一服务器上 `enqueue` 之后立即查找。每次认领最多取走与空闲任务槽数量相同的运行，因此内存不会随队列增长。
 - PostgreSQL 在一条 `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING` 中完成认领。Oracle 11g 及更高版本在事务中使用 `ROWNUM` 和 `FOR UPDATE SKIP LOCKED` 选取 id，更新它们，并在提交之前读回。Oracle 无法对加锁的 select 排序，因此那里到期的运行没有固定的取用顺序。时间是 Unix 毫秒，存放在 `BIGINT` 或 `NUMBER(19)` 列中。
 - 设置了存储时，同一个任务的计划运行和被触发的运行可能重叠；不得同时运行两次的任务应自行加以保护（例如使用行锁）。
+
+### Metronome
+
+`metronome` 功能在这些作业之上加入按墙上时钟的计划；完整指南见 `docs/metronome.md`。
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .calendar("holidays", Calendar::days(["2026-01-01"]).weekly_off([Weekday::Saturday, Weekday::Sunday]))
+    .queued_job("close_day", Schedule::manual().retry(3, Duration::from_secs(30)), close_day)
+    .trigger("close_day", Trigger::cron("0 30 23 * * *").time_zone("Europe/Istanbul").calendar("holidays"))
+    .chain("close_day", "send_reports")
+    .feature(zeyn::metronome::ops())
+```
+
+- `Trigger` 为已注册的作业排队运行：Quartz 方言、带秒的 cron，IANA 时区并对夏令时的跳过与重复有明确规则，以及负载、优先级、超时和错过策略（`RunOnce`、`RunAll { max }`、`Skip`）。日历可排除日期、星期、每年的日期和每天的时间段。
+- 共享同一存储的服务器对每个时刻只排队一次。`pause`、`resume` 和 `run_now` 跨服务器生效。
+- 每次完成的尝试记为一条历史（从不保存负载或错误文本），可通过 `jobs.history`、`GET /_zeyn/jobs/runs` 和运维页面 `/ops/jobs` 读取（`zeyn.jobs.read`、`zeyn.jobs.run`、`zeyn.jobs.admin`）。

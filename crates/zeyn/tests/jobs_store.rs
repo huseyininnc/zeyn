@@ -23,6 +23,7 @@ fn new_job(name: &str, at: i64, max_attempts: u32) -> NewJob {
         run_at_ms: at,
         max_attempts,
         backoff_ms: 100,
+        ..NewJob::default()
     }
 }
 
@@ -286,6 +287,7 @@ fn the_next_run_doubles_the_backoff_up_to_ten_minutes_and_schedules_never_die() 
         max_attempts: 30,
         backoff_ms: 1_000,
         every_ms,
+        ..ClaimedJob::default()
     };
     assert_eq!(
         job(1, None).after_failure(0),
