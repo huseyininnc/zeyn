@@ -88,6 +88,8 @@ cargo run -p zeyn-example-components    http://127.0.0.1:3010, the component cat
   directory when you are done. The `pdf` feature links Typst (about 40 MB); do not turn it on for
   the whole workspace. `sh scripts/sweep-target.sh` removes a target directory over 20 GB or
   built by an older toolchain.
+- Start a new worktree with `sh scripts/warm-target.sh` (after `sh scripts/warm-target.sh save` once) instead of a cold
+  build; it copies a built target directory with file times kept.
 - One build queue per target directory. Agents that build at the same time use separate target
   directories and set `CARGO_BUILD_JOBS` to half the cores; never start a second build in a
   directory another build is using.

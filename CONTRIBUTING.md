@@ -33,6 +33,10 @@ sh scripts/sweep-target.sh          20 GB limit, ./target or $CARGO_TARGET_DIR
 sh scripts/sweep-target.sh 10 D:/zeyn-target
 ```
 
+A new worktree or checkout does not need a cold build. `scripts/warm-target.sh save` builds this checkout once (workspace and tests with the full feature list) into a template directory, `../zeyn-target-template` by default or `$ZEYN_TARGET_TEMPLATE`; `scripts/warm-target.sh [TARGET]` copies it into a new, empty target directory with file times kept, so Cargo reuses every dependency. Measured on 2026-11-19: the first showcase build in a second worktree took 0.4 s after the copy against 191 s cold; a copy that does not keep file times rebuilt 118 crates (123 s). Save the template again after `Cargo.lock` or the toolchain changes; the script refuses a template built by another rustc. sccache does not help here: its keys include the target path, so a second worktree had no Rust cache hits.
+
+The parallel compiler front end is not stable yet. On a one line rebuild of `crates/zeyn` it cut 20.9 s to 15.0 s in one measurement (`RUSTC_BOOTSTRAP=1 RUSTFLAGS=-Zthreads=8`); changing `RUSTFLAGS` rebuilds every dependency, and the flag needs a nightly feature, so the repository does not set it. Use it in a terminal of your own if you want it.
+
 Several builds on one target directory wait for each other's lock, and several builds on separate directories at once can run out of memory and page file. When agents or terminals build in parallel, give each its own target directory and keep one build queue per directory. Lower the number of compiler jobs per build with `CARGO_BUILD_JOBS` (for example half the cores) when two builds run at the same time.
 
 Windows Defender scans every file the compiler writes, which slows a build a lot. Two changes, both need an administrator, so make them yourself:
