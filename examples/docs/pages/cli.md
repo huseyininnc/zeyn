@@ -127,7 +127,7 @@ zeyn migrate --dry-run
 zeyn migrate --from 0.0.9 --to 0.0.11 --json
 ```
 
-A step renames names and methods (`Hub` to `Socket`, `.realtime(live)` to `.socket(live)`), changes the shape of a call (`.sort_by(Order::date, true)` to `.sort_by_desc(Order::date)`), moves `use` paths and points out what it cannot rewrite safely, such as a `bool` flag that is not a literal or a sign out link to a removed address. It edits only the tokens it replaces, so formatting and comments stay, and a second run changes nothing. `--dry-run` writes nothing and prints a unified diff; `--json` prints the report as one JSON document with `changes`, `todos` and `errors`. The exit code is 0 unless a file cannot be read, parsed or written. `zeyn check --fix` applies the renames of every step. The MCP tool `zeyn_migrate` does the same for an agent.
+A step renames names and methods (`Hub` to `Socket`, `.realtime(live)` to `.socket(live)`), changes the shape of a call (`.sort_by(Order::date, true)` to `.sort_by_desc(Order::date)`), moves `use` paths and points out what it cannot rewrite safely, such as a `bool` flag that is not a literal, a sign out link to a removed address, a `match` on `CallKind` that needs an arm for `ImportPreview`, or an `impl` of `RateStore` or `DocStore` that may want the new `refund` or `allow` method. It edits only the tokens it replaces, so formatting and comments stay, and a second run changes nothing. `--dry-run` writes nothing and prints a unified diff; `--json` prints the report as one JSON document with `changes`, `todos` and `errors`. The exit code is 0 unless a file cannot be read, parsed or written. `zeyn check --fix` applies the renames of every step. The MCP tool `zeyn_migrate` does the same for an agent.
 
 ## Build speed and disk use
 

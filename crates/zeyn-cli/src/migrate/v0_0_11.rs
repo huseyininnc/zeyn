@@ -109,5 +109,21 @@ pub const STEP: Step = Step {
             Pattern::Text("/_zeyn/auth/logout"),
             "`GET /_zeyn/auth/logout` no longer ends a session: give sign out links `data-zeyn-signout` so they post with the CSRF token",
         ),
+        Change::Review(
+            Pattern::Name("CallKind::Import"),
+            "`CallKind::ImportPreview` is new: interceptors now also see the preview of an import (not audited), so a `match` on `CallKind` needs an arm for it and a check on `CallKind::Import` may need the same rule for previews",
+        ),
+        Change::Review(
+            Pattern::Impl("RateStore"),
+            "`RateStore::refund` is new: upload quotas give back what a file did not use. The default gives nothing back, which only makes the limit stricter; implement it to return the units",
+        ),
+        Change::Review(
+            Pattern::Impl("DocStore"),
+            "`DocStore::allow(ctx, key, write)` is new: it decides per document who may open and change it. The default keeps the old behavior (the kind's permission opens every document of the tenant), so implement it when documents belong to people",
+        ),
+        Change::Review(
+            Pattern::Name("PageCheck"),
+            "`PageCheck::problem` takes a `zeyn::Problem` (`Problem::new(code, summary).why(..).fix(..).docs(..)`, codes `Z06xx`) instead of a message",
+        ),
     ],
 };
