@@ -233,7 +233,7 @@ in four projects:
 
 Requests to other hosts get an empty answer, so the suite needs no network. A finding that is not
 fixed yet goes in `e2e/known-issues.json` as `slug:check` with the reason, and stays listed until
-it is fixed; today that is the kanban board, which widens the page on a phone.
+it is fixed; today the list is empty.
 
 **Budgets.** `e2e/tests/budgets.spec.ts` loads every catalog page in the light project and
 measures the script and stylesheet bytes it loads (as sent, so compressed) and its first
