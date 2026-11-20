@@ -1268,7 +1268,8 @@
       "offset": "The upload is out of step with the server. It continues from where the server is.",
       "busy": "This upload is still receiving data. Try again in a moment.",
       "length": "The upload did not say how large the file is.",
-      "not_found": "{label} holds a file that was not found. Upload it again."
+      "not_found": "{label} holds a file that was not found. Upload it again.",
+      "unclaimed": "You have too many uploaded files that are not saved in a record yet. Save the form that holds them, or try again later."
     }
   },
   "AccountLogin": {

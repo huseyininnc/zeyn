@@ -923,13 +923,18 @@ type PairCheck = (
 type FileCheck = (FieldError, &'static str, Vec<String>);
 
 /// Refuses a submit that names a file the user did not upload, see
-/// [`check_owned`](crate::files::check_owned).
+/// [`check_owned`](crate::files::check_owned), and claims the new files before the action runs;
+/// a file swept since the check is refused the same way.
 async fn check_files(ctx: &Ctx, checks: Vec<FileCheck>) -> Result<()> {
     let mut errors = ValidationErrors::default();
     for (error, store, ids) in checks {
-        if crate::files::check_owned(ctx, Some(store), ids)
+        let owned = crate::files::check_owned(ctx, Some(store), ids.clone())
             .await
-            .is_err()
+            .is_ok();
+        if !owned
+            || crate::files::claim(ctx, Some(store), ids)
+                .await
+                .is_err()
         {
             errors.errors.push(error);
         }
@@ -1050,10 +1055,25 @@ where
                 .file_checks(&**saved, &self.form.model),
             Err(_) => Vec::new(),
         };
+        let claims = match &valid {
+            Ok(saved) => self.form.body.file_claims(&**saved),
+            Err(_) => Vec::new(),
+        };
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;
             check_files(&ctx, files).await?;
+            for (store, ids) in claims {
+                for id in ids {
+                    let mine = vec![id];
+                    if crate::files::check_owned(&ctx, Some(store), mine.clone())
+                        .await
+                        .is_ok()
+                    {
+                        let _ = crate::files::claim(&ctx, Some(store), mine).await;
+                    }
+                }
+            }
             check_pairs(pairs).await?;
             let output = A::call(ctx, valid).await?;
             if let Some(error) = output.failure() {
@@ -1859,6 +1879,21 @@ impl FormBody {
             }
         }
         out
+    }
+
+    /// Every file id each upload field of `saved` holds, with its store. Before the save, the
+    /// ones the user uploaded are claimed again (claiming is idempotent); files of other users
+    /// the record held before are left alone.
+    fn file_claims(&self, saved: &dyn FormModel) -> Vec<(&'static str, Vec<String>)> {
+        if self.files.is_empty() {
+            return Vec::new();
+        }
+        let json = saved.form_json();
+        self.files
+            .iter()
+            .map(|(name, rules, _)| (rules.store(), crate::files::file_ids(json.get(*name))))
+            .filter(|(_, ids)| !ids.is_empty())
+            .collect()
     }
 
     /// Starts the checks of the dependent lookups of a read form: for each one with a value, the

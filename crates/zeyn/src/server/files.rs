@@ -100,6 +100,7 @@ async fn upload(
     State(st): State<Arc<AppState>>,
     Path(store): Path<String>,
     headers: HeaderMap,
+    extensions: axum::http::Extensions,
     body: Body,
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
@@ -116,7 +117,8 @@ async fn upload(
         .get(header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok());
-    match store_body(&st, &ctx, &store, name, declared, body).await {
+    let who = uploader(&st, &ctx, &headers, &extensions);
+    match store_body(&st, &ctx, &store, &who, name, declared, body).await {
         Ok(file) => {
             let mut r = (StatusCode::CREATED, axum::Json(file)).into_response();
             r.headers_mut()
@@ -175,6 +177,44 @@ pub(super) async fn check_quota(
     Ok(())
 }
 
+/// Who uploads, for the count of unclaimed uploads: the signed in user in the tenant, or the
+/// client address (as the rate limit finds it behind trusted proxies) without a user.
+pub(super) fn uploader(
+    st: &AppState,
+    ctx: &Ctx,
+    headers: &HeaderMap,
+    extensions: &axum::http::Extensions,
+) -> String {
+    let peer = extensions
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .map(|c| c.0.ip());
+    let forwarded = super::guard::forwarded_for(headers);
+    crate::files::uploader_key(
+        ctx.identity().user.as_deref(),
+        ctx.tenant().map(|t| t.id()),
+        crate::security::client_ip(peer, forwarded.as_deref(), &st.trusted),
+    )
+}
+
+/// `429` when `uploader` already holds as many unclaimed uploads in the store as its rules
+/// allow ([`FileRules::max_unclaimed`](crate::FileRules::max_unclaimed)). Without a signed in
+/// user the client address counts, so anonymous uploads cannot fill the store without bound.
+pub(super) async fn check_unclaimed(entry: &FileEntry, uploader: &str) -> Result<(), Failure> {
+    let held = entry
+        .store
+        .unclaimed(uploader.to_string())
+        .await
+        .map_err(Failure::App)?;
+    if held >= entry.rules.unclaimed_limit() as usize {
+        return Err(status(
+            StatusCode::TOO_MANY_REQUESTS,
+            "unclaimed",
+            Text::key("zeyn.files.unclaimed"),
+        ));
+    }
+    Ok(())
+}
+
 /// Checks access and quota, then reads, checks and stores a whole file from `body` inside the
 /// interceptors. Plain uploads and finished resumable uploads both end here. The declared size
 /// (the store's limit without one) is taken from the quota before the body is read, so uploads
@@ -184,6 +224,7 @@ pub(super) async fn store_body(
     st: &AppState,
     ctx: &Ctx,
     store: &str,
+    uploader: &str,
     name: String,
     declared: Option<u64>,
     body: Body,
@@ -198,6 +239,7 @@ pub(super) async fn store_body(
     let scanner = feature.file_scanner().cloned();
     let quota = quota(ctx, &entry);
     check_quota(st, &quota).await?;
+    check_unclaimed(&entry, uploader).await?;
     let reserved = u32::try_from(
         declared
             .unwrap_or(u64::MAX)
@@ -212,7 +254,7 @@ pub(super) async fn store_body(
     }
     let result = st
         .intercept(ctx, &call, || {
-            receive(ctx, entry, scanner, name, declared, body)
+            receive(ctx, entry, scanner, uploader, name, declared, body)
         })
         .await;
     if let Some((key, limit)) = &quota {
@@ -233,6 +275,7 @@ async fn receive(
     ctx: &Ctx,
     entry: FileEntry,
     scanner: Option<Arc<dyn crate::FileScanner>>,
+    uploader: &str,
     name: String,
     declared: Option<u64>,
     body: Body,
@@ -396,6 +439,17 @@ async fn receive(
                 return Err(refuse());
             }
         }
+    }
+    if let Err(e) = entry
+        .store
+        .mark_unclaimed(meta.clone(), uploader.to_string())
+        .await
+    {
+        let _ = entry
+            .store
+            .delete(meta.id.clone())
+            .await;
+        return Err(Failure::App(e));
     }
     ctx.update_trail(|t| {
         t.record = Some(RecordRef {
