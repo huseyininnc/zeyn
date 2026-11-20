@@ -317,10 +317,12 @@ async fn bubbles_group_by_sender_and_day_and_escape_text_and_names() {
         "consecutive messages of one sender group"
     );
     assert!(page.contains(">Today</span></h3>"));
-    assert_eq!(
-        page.matches(r#"class="z-thread-day""#)
-            .count(),
-        1
+    let days = page
+        .matches(r#"class="z-thread-day""#)
+        .count();
+    assert!(
+        (1..=2).contains(&days),
+        "the seeded two hours fall on one day, or two shortly after midnight: {days}"
     );
     assert!(page.contains("&lt;script&gt;alert(1)&lt;/script&gt;<br>second line"));
     assert!(!page.contains("<script>alert(1)"));
