@@ -884,7 +884,7 @@ impl Node {
     /// preloaded first page.
     #[cfg(debug_assertions)]
     pub(crate) fn tag(&self, out: &mut String, start: usize) {
-        if TAG_SOURCES.load(std::sync::atomic::Ordering::Relaxed)
+        if tag_sources_enabled()
             && let Some(src) = self.placed_at()
         {
             tag_source(out, start, &src);
@@ -898,6 +898,17 @@ impl Node {
     pub fn tag_sources(on: bool) {
         #[cfg(debug_assertions)]
         TAG_SOURCES.store(on, std::sync::atomic::Ordering::Relaxed);
+        #[cfg(not(debug_assertions))]
+        let _ = on;
+    }
+
+    /// Turns the `data-zeyn-src` attributes on or off for the calling thread only, over the
+    /// process wide setting of [`Node::tag_sources`]; `None` goes back to that setting. Tests
+    /// that look at tagged pages use it, so a test running beside them in the same process
+    /// still renders untagged HTML.
+    pub fn tag_sources_here(on: Option<bool>) {
+        #[cfg(debug_assertions)]
+        TAG_SOURCES_HERE.set(on);
         #[cfg(not(debug_assertions))]
         let _ = on;
     }
@@ -991,6 +1002,20 @@ impl Node {
 /// Whether rendered nodes carry their source line (see [`Node::tag_sources`]).
 #[cfg(debug_assertions)]
 static TAG_SOURCES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(debug_assertions)]
+thread_local! {
+    /// Per thread override of [`TAG_SOURCES`], see [`Node::tag_sources_here`].
+    static TAG_SOURCES_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether the calling thread tags nodes: its own override first, then the process wide flag.
+#[cfg(debug_assertions)]
+fn tag_sources_enabled() -> bool {
+    TAG_SOURCES_HERE
+        .get()
+        .unwrap_or_else(|| TAG_SOURCES.load(std::sync::atomic::Ordering::Relaxed))
+}
 
 /// Adds `data-zeyn-src="{src}"` to the first start tag written after `start`, when the output
 /// there begins with an element. Text, comments and elements that already carry a source keep

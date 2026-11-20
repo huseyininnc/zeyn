@@ -2,8 +2,8 @@
 //! nodes with it when the app is served, link the inspector module only then, and describe the
 //! node tree for `zeyn_inspect`. Release builds keep none of it.
 //!
-//! The source tags are a switch for the whole process, so this file holds one test that turns it
-//! on and off in order.
+//! The process wide switch of the source tags would leak into every test that renders HTML in the
+//! same binary, so these tests turn them on for their own thread only (`Node::tag_sources_here`).
 
 use axum::body::Body;
 use axum::http::Request;
@@ -65,13 +65,31 @@ fn a_node_is_one_boxed_pointer_in_release_and_carries_its_line_only_in_debug() {
     }
 }
 
+#[test]
+fn tags_switched_on_for_one_thread_do_not_reach_another() {
+    let tagged_here = std::thread::spawn(|| {
+        Node::tag_sources_here(Some(true));
+        let html = home::run().html(&home::META);
+        Node::tag_sources_here(None);
+        html
+    })
+    .join()
+    .unwrap();
+    let html = home::run().html(&home::META);
+    assert_eq!(
+        tagged_here.contains("data-zeyn-src"),
+        cfg!(debug_assertions)
+    );
+    assert!(!html.contains("data-zeyn-src"));
+}
+
 #[tokio::test]
 async fn served_pages_tag_nodes_and_link_the_inspector_only_in_debug() {
     let plain = page().await;
     assert!(!plain.contains("data-zeyn-src"));
     assert!(!plain.contains("/_zeyn/inspect.js"));
 
-    Node::tag_sources(true);
+    Node::tag_sources_here(Some(true));
     let tagged = page().await;
     let inspector = app()
         .router()
@@ -84,7 +102,7 @@ async fn served_pages_tag_nodes_and_link_the_inspector_only_in_debug() {
         .await
         .unwrap()
         .status();
-    Node::tag_sources(false);
+    Node::tag_sources_here(None);
 
     match cfg!(debug_assertions) {
         true => {

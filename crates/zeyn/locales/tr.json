@@ -1268,7 +1268,8 @@
       "offset": "Yükleme sunucuyla aynı noktada değil. Sunucunun kaldığı yerden sürer.",
       "busy": "Bu yükleme hâlâ veri alıyor. Biraz sonra yeniden deneyin.",
       "length": "Yükleme dosyanın boyutunu bildirmedi.",
-      "not_found": "{label} alanındaki bir dosya bulunamadı. Dosyayı yeniden yükleyin."
+      "not_found": "{label} alanındaki bir dosya bulunamadı. Dosyayı yeniden yükleyin.",
+      "unclaimed": "Henüz bir kayda kaydedilmemiş çok fazla dosya yüklediniz. Bu dosyaları içeren formu kaydedin ya da daha sonra yeniden deneyin."
     }
   },
   "AccountLogin": {

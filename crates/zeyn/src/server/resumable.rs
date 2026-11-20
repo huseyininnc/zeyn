@@ -14,7 +14,9 @@
 //! guards; an upload is found only by the user and tenant that opened it. Requests that change
 //! something need the CSRF header.
 
-use super::files::{check_quota, entry, next, quota, status, store_body};
+use super::files::{
+    check_quota, check_unclaimed, entry, next, quota, status, store_body, uploader,
+};
 use super::{AppState, Failure};
 use crate::ResumableUploads;
 use crate::action::Error;
@@ -49,6 +51,8 @@ pub(super) struct Uploads {
 /// One unfinished upload.
 struct Open {
     store: String,
+    /// Who uploads, for the count of unclaimed uploads.
+    uploader: String,
     owner: Option<String>,
     tenant: Option<String>,
     name: String,
@@ -307,6 +311,7 @@ async fn create(
     State(st): State<Arc<AppState>>,
     Path(store): Path<String>,
     headers: HeaderMap,
+    extensions: axum::http::Extensions,
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let made = async {
@@ -335,11 +340,14 @@ async fn create(
             ));
         }
         check_quota(&st, &quota(&ctx, &entry)).await?;
+        let who = uploader(&st, &ctx, &headers, &extensions);
+        check_unclaimed(&entry, &who).await?;
         st.uploads.sweep().await;
         let uploads = &st.uploads;
         let id = new_file_id();
         let open = Arc::new(Open {
             store: store.clone(),
+            uploader: who,
             owner: ctx.identity().user.clone(),
             tenant: ctx.tenant().map(|t| t.id().to_string()),
             name: file_name(&headers),
@@ -606,6 +614,7 @@ async fn write(
         st,
         ctx,
         store,
+        &open.uploader,
         open.name.clone(),
         Some(open.length),
         file_body(part.clone()),

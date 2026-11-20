@@ -19,7 +19,7 @@
 desktop = ["dep:zeyn-desktop"]
 
 [dependencies]
-zeyn-desktop = { version = "0.0.12", optional = true }
+zeyn-desktop = { version = "0.0.13", optional = true }
 ```
 
 شغّل النافذة بدلاً من `App::serve`:

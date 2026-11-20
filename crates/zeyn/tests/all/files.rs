@@ -367,7 +367,15 @@ async fn names_and_ids_cannot_walk_the_file_system() {
         })
         .collect();
     names.sort();
-    assert_eq!(names, vec![format!("{id}.bin"), format!("{id}.json")]);
+    assert_eq!(
+        names,
+        vec![
+            format!("{id}.bin"),
+            format!("{id}.claim"),
+            format!("{id}.json"),
+            "unclaimed".to_string()
+        ]
+    );
     assert!(!dir.join("evil.png").exists());
     for bad in [
         "..%2F..%2Fstore%2Fx",
@@ -1012,6 +1020,9 @@ impl Service for SavedTickets {}
 
 #[action(permission = "crm.files")]
 pub async fn save_ticket(ticket: Valid<Ticket>, saved: SavedTickets) -> Result<()> {
+    if ticket.title == "Fail" {
+        return Err(Error::Conflict);
+    }
     saved
         .0
         .lock()
@@ -1041,7 +1052,7 @@ pub fn edit_ticket() -> Screen {
     )
 }
 
-fn ticket_app(store: MemoryStore, saved: SavedTickets) -> Router {
+fn ticket_app(store: impl FileStore, saved: SavedTickets) -> Router {
     App::new("Test")
         .i18n(I18n::new("en"))
         .service(saved)
@@ -1475,5 +1486,340 @@ fn a_file_store_name_registered_twice_stops_the_app() {
             .iter()
             .any(|p| p.contains("Z0509") && p.contains("file store `docs`")),
         "{problems:?}"
+    );
+}
+
+/// Uploads two files as ada, saves the ticket with one of them, waits past the grace period of
+/// one second and uploads again: the next upload sweeps the file no record claimed, while the
+/// claimed file, a file written by `put` alone (as before claims existed) and the new upload
+/// stay.
+async fn unclaimed_files_expire(store: impl FileStore + Clone) {
+    let router = ticket_app(store.clone(), SavedTickets::default());
+    store
+        .put(
+            FileMeta {
+                id: KEPT.into(),
+                name: "old.png".into(),
+                content_type: "image/png".into(),
+                size: 0,
+                tenant: None,
+                owner: Some("bob".into()),
+                created: 0,
+            },
+            FileChunks::from_parts(vec![png(50)]),
+        )
+        .await
+        .unwrap();
+    let left = upload_as(&router, "ada").await;
+    let saved = upload_as(&router, "ada").await;
+    assert_eq!(
+        save_as(&router, "ada", &saved, &[KEPT]).await,
+        StatusCode::OK
+    );
+    assert!(
+        store.meta(left.clone()).await.is_ok(),
+        "kept within the grace period"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let fresh = upload_as(&router, "ada").await;
+    assert!(
+        store.meta(left).await.is_err(),
+        "an upload no record claimed is removed after the grace period"
+    );
+    for id in [saved, KEPT.to_string(), fresh] {
+        assert!(store.meta(id.clone()).await.is_ok(), "{id} stays");
+    }
+}
+
+#[tokio::test]
+async fn unclaimed_uploads_of_a_memory_store_are_removed_after_the_grace_period() {
+    unclaimed_files_expire(MemoryStore::default().unclaimed_for(std::time::Duration::from_secs(1)))
+        .await;
+}
+
+#[tokio::test]
+async fn unclaimed_uploads_of_a_disk_store_are_removed_after_the_grace_period() {
+    let dir = std::env::temp_dir().join(format!("zeyn-files-unclaimed-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    unclaimed_files_expire(
+        zeyn::DiskStore::new(&dir).unclaimed_for(std::time::Duration::from_secs(1)),
+    )
+    .await;
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn a_user_over_the_unclaimed_upload_cap_gets_429_until_a_save_claims_one() {
+    const FEW: FileRules = DOCS.max_unclaimed(2);
+    assert_eq!(FEW.unclaimed_limit(), 2);
+    assert_eq!(
+        DOCS.max_files(5)
+            .max_unclaimed(1)
+            .unclaimed_limit(),
+        5,
+        "a form can always take as many files as its field holds"
+    );
+    let store = MemoryStore::default();
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|h: &HeaderMap| {
+            let user = h
+                .get("x-user")?
+                .to_str()
+                .ok()?
+                .to_string();
+            Some(Identity::user(user).with_permissions(["crm.files"]))
+        })
+        .feature(Feature::new("crm").files(FEW, "crm.files", store.clone()))
+        .router()
+        .unwrap();
+    let first = upload_as(&router, "ada").await;
+    upload_as(&router, "ada").await;
+    let up = || {
+        upload("a.png", "")
+            .body(png(100).into())
+            .unwrap()
+    };
+    let (status, _, body) = send(&router, up()).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        String::from_utf8_lossy(&body).contains("not saved in a record yet"),
+        "{}",
+        String::from_utf8_lossy(&body)
+    );
+    upload_as(&router, "bob").await;
+    store.claim(vec![first]).await.unwrap();
+    assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn files_are_claimed_before_the_action_so_a_failed_save_never_loses_one() {
+    let store = MemoryStore::default();
+    let router = ticket_app(store.clone(), SavedTickets::default());
+    let id = upload_as(&router, "ada").await;
+    assert_eq!(store.unclaimed(ada()).await.unwrap(), 1);
+    let call = serde_json::json!({
+        "screen": "edit_ticket",
+        "node": 0,
+        "values": {
+            "title": "Fail",
+            "contract": file_json(&id, "c.png").to_string(),
+            "attachments": "[]",
+        },
+    });
+    let req = Request::post("/_zeyn/form")
+        .header("x-user", "ada")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-zeyn-csrf", TOKEN)
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+        .body(Body::from(call.to_string()))
+        .unwrap();
+    assert_ne!(send(&router, req).await.0, StatusCode::OK);
+    assert_eq!(
+        store.unclaimed(ada()).await.unwrap(),
+        0,
+        "the file was claimed before the action ran"
+    );
+    assert!(store.meta(id).await.is_ok(), "a failed save keeps the file");
+}
+
+#[tokio::test]
+async fn deleting_a_file_clears_its_unclaimed_marker() {
+    let dir = std::env::temp_dir().join(format!("zeyn-files-delete-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let disk = zeyn::DiskStore::new(&dir);
+    let memory = MemoryStore::default();
+    for store in [
+        Arc::new(disk) as Arc<dyn FileStore>,
+        Arc::new(memory) as Arc<dyn FileStore>,
+    ] {
+        let router = ticket_app(ArcStore(store.clone()), SavedTickets::default());
+        let id = upload_as(&router, "ada").await;
+        let count = || store.unclaimed(ada());
+        assert_eq!(count().await.unwrap(), 1);
+        store.delete(id).await.unwrap();
+        assert_eq!(count().await.unwrap(), 0);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A shared store, so a test keeps a handle on the store it gives the app.
+struct ArcStore(Arc<dyn FileStore>);
+
+impl FileStore for ArcStore {
+    fn put(&self, meta: FileMeta, chunks: FileChunks) -> BoxFuture<Result<()>> {
+        self.0.put(meta, chunks)
+    }
+    fn get(&self, id: String) -> BoxFuture<Result<zeyn::StoredFile>> {
+        self.0.get(id)
+    }
+    fn meta(&self, id: String) -> BoxFuture<Result<FileMeta>> {
+        self.0.meta(id)
+    }
+    fn delete(&self, id: String) -> BoxFuture<Result<()>> {
+        self.0.delete(id)
+    }
+    fn mark_unclaimed(&self, meta: FileMeta, uploader: String) -> BoxFuture<Result<()>> {
+        self.0.mark_unclaimed(meta, uploader)
+    }
+    fn claim(&self, ids: Vec<String>) -> BoxFuture<Result<()>> {
+        self.0.claim(ids)
+    }
+    fn unclaimed(&self, uploader: String) -> BoxFuture<Result<usize>> {
+        self.0.unclaimed(uploader)
+    }
+}
+
+#[tokio::test]
+async fn a_disk_store_removes_unclaimed_files_only_when_told_to() {
+    let dir = std::env::temp_dir().join(format!("zeyn-files-optin-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let router = ticket_app(zeyn::DiskStore::new(&dir), SavedTickets::default());
+    let id = upload_as(&router, "ada").await;
+    let long_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(48 * 3600);
+    for user in std::fs::read_dir(dir.join("unclaimed")).unwrap() {
+        for marker in std::fs::read_dir(user.unwrap().path()).unwrap() {
+            std::fs::File::options()
+                .write(true)
+                .open(marker.unwrap().path())
+                .unwrap()
+                .set_modified(long_ago)
+                .unwrap();
+        }
+    }
+    let put = |store: zeyn::DiskStore| async move {
+        store
+            .put(
+                FileMeta {
+                    id: zeyn_test_id(),
+                    name: "b.png".into(),
+                    content_type: "image/png".into(),
+                    size: 0,
+                    tenant: None,
+                    owner: None,
+                    created: 0,
+                },
+                FileChunks::from_parts(vec![png(10)]),
+            )
+            .await
+            .unwrap();
+        store
+    };
+    let store = put(zeyn::DiskStore::new(&dir)).await;
+    assert!(
+        store.meta(id.clone()).await.is_ok(),
+        "without unclaimed_for nothing is removed"
+    );
+    let store =
+        put(zeyn::DiskStore::new(&dir).unclaimed_for(std::time::Duration::from_secs(24 * 3600)))
+            .await;
+    assert!(
+        store.meta(id).await.is_err(),
+        "with unclaimed_for a file unclaimed past the grace period is removed"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A fresh file id for a direct `put`.
+fn zeyn_test_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    format!("{:032x}", NEXT.fetch_add(1, Ordering::Relaxed) + 0xb0b)
+}
+
+/// The uploader key of ada, signed in without a tenant.
+fn ada() -> String {
+    zeyn::uploader_key(Some("ada"), None, None)
+}
+
+/// A store that loses every file just before it is claimed, as a sweep between the ownership
+/// check and the claim would.
+struct SweptBeforeClaim(MemoryStore);
+
+impl FileStore for SweptBeforeClaim {
+    fn put(&self, meta: FileMeta, chunks: FileChunks) -> BoxFuture<Result<()>> {
+        self.0.put(meta, chunks)
+    }
+    fn get(&self, id: String) -> BoxFuture<Result<zeyn::StoredFile>> {
+        self.0.get(id)
+    }
+    fn meta(&self, id: String) -> BoxFuture<Result<FileMeta>> {
+        self.0.meta(id)
+    }
+    fn delete(&self, id: String) -> BoxFuture<Result<()>> {
+        self.0.delete(id)
+    }
+    fn mark_unclaimed(&self, meta: FileMeta, uploader: String) -> BoxFuture<Result<()>> {
+        self.0.mark_unclaimed(meta, uploader)
+    }
+    fn claim(&self, ids: Vec<String>) -> BoxFuture<Result<()>> {
+        let inner = self.0.clone();
+        Box::pin(async move {
+            for id in &ids {
+                inner.delete(id.clone()).await?;
+            }
+            inner.claim(ids).await
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_file_swept_between_the_check_and_the_claim_refuses_the_save() {
+    let saved = SavedTickets::default();
+    let router = ticket_app(SweptBeforeClaim(MemoryStore::default()), saved.clone());
+    let id = upload_as(&router, "ada").await;
+    assert_eq!(
+        save_as(&router, "ada", &id, &[]).await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert!(saved.0.lock().unwrap().is_empty(), "the action did not run");
+    let gone = MemoryStore::default();
+    assert!(
+        gone.claim(vec!["0123456789abcdef0123456789abcdef".into()])
+            .await
+            .is_err(),
+        "claiming an id the store does not hold is an error"
+    );
+}
+
+#[tokio::test]
+async fn uploads_without_a_user_are_capped_per_client_address() {
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|_: &HeaderMap| Some(Identity::anonymous().with_permissions(["crm.files"])))
+        .feature(Feature::new("crm").files(
+            DOCS.max_unclaimed(2),
+            "crm.files",
+            MemoryStore::default(),
+        ))
+        .router()
+        .unwrap();
+    let up = |ip: [u8; 4]| {
+        let mut req = upload("a.png", "")
+            .body(png(100).into())
+            .unwrap();
+        req.extensions_mut()
+            .insert(axum::extract::ConnectInfo(std::net::SocketAddr::from((
+                ip, 40000,
+            ))));
+        req
+    };
+    let first = [203, 0, 113, 1];
+    let second = [203, 0, 113, 2];
+    assert_eq!(send(&router, up(first)).await.0, StatusCode::CREATED);
+    assert_eq!(send(&router, up(first)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        send(&router, up(first)).await.0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        send(&router, up(second)).await.0,
+        StatusCode::CREATED,
+        "another client address has its own count"
+    );
+    assert_eq!(send(&router, up(second)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        send(&router, up(second)).await.0,
+        StatusCode::TOO_MANY_REQUESTS
     );
 }

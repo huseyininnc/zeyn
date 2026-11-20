@@ -184,14 +184,19 @@ impl<M: Model> ApiInput for Valid<M> {
 }
 
 /// Refuses an API input that names a file the caller did not upload into one of the app's
-/// stores, see [`check_owned`](crate::files::check_owned). The API has no loaded record, so
-/// files someone else attached before are refused too.
+/// stores, see [`check_owned`](crate::files::check_owned), and claims the others before the
+/// action runs, refusing a file swept meanwhile. The API has no loaded record, so files someone
+/// else attached before are refused too.
 async fn check_files(ctx: &Ctx, files: Vec<(&'static FieldMeta, Vec<String>)>) -> Result<()> {
     let mut errors = ValidationErrors::default();
     for (meta, ids) in files {
-        if crate::files::check_owned(ctx, None, ids)
+        let owned = crate::files::check_owned(ctx, None, ids.clone())
             .await
-            .is_err()
+            .is_ok();
+        if !owned
+            || crate::files::claim(ctx, None, ids)
+                .await
+                .is_err()
         {
             errors
                 .errors
