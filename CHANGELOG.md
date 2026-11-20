@@ -4,6 +4,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.0.13] - 2026-11-20
+
 ### Added
 
 - `Node::tag_sources_here` turns the `data-zeyn-src` tags on or off for the calling thread only, over the process wide `Node::tag_sources`. A test that looks at tagged pages uses it, so tests running beside it in the same process keep untagged HTML (the inspector test made `inventory::third_party_component_renders_and_describes_itself` fail now and then).
@@ -376,7 +378,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Navigation without page reloads.
 - MIT and Apache-2.0 licenses.
 
-[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.12...HEAD
+[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.13...HEAD
+[0.0.13]: https://github.com/huseyininnc/zeyn/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/huseyininnc/zeyn/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/huseyininnc/zeyn/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/huseyininnc/zeyn/compare/v0.0.9...v0.0.10
