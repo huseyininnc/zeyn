@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- `Node::tag_sources_here` turns the `data-zeyn-src` tags on or off for the calling thread only, over the process wide `Node::tag_sources`. A test that looks at tagged pages uses it, so tests running beside it in the same process keep untagged HTML (the inspector test made `inventory::third_party_component_renders_and_describes_itself` fail now and then).
+
 ### Security
 
 - Uploads wait for a saved record to claim them, and one user may hold at most 50 unclaimed uploads per store over 24 hours (`FileRules::max_unclaimed`; without a signed in user, per client address); the next upload answers `429`. Before, a signed in user could fill a store without bound with files of abandoned or refused forms. Form submits, `FileDrop` actions, `Composer` sends and API actions that take `Valid<M>` check that the user uploaded each new file and then claim it, before the action runs; a file removed meanwhile refuses the save like an unknown id. `DiskStore` and `MemoryStore` remove unclaimed uploads only when `unclaimed_for(grace)` is set; it is off by default, so upgrades, rolling deploys and restored backups never lose files, and it is recommended for upload forms open to the public. Files stored before this version count as claimed. `FileStore` gains `mark_unclaimed`, `claim` and `unclaimed` with defaults that keep every file, so custom stores work unchanged.
