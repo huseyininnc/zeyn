@@ -1019,6 +1019,9 @@ impl Service for SavedTickets {}
 
 #[action(permission = "crm.files")]
 pub async fn save_ticket(ticket: Valid<Ticket>, saved: SavedTickets) -> Result<()> {
+    if ticket.title == "Fail" {
+        return Err(Error::Conflict);
+    }
     saved
         .0
         .lock()
@@ -1586,4 +1589,170 @@ async fn a_user_over_the_unclaimed_upload_cap_gets_429_until_a_save_claims_one()
     upload_as(&router, "bob").await;
     store.claim(vec![first]).await.unwrap();
     assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn files_are_claimed_before_the_action_so_a_failed_save_never_loses_one() {
+    let store = MemoryStore::default();
+    let router = ticket_app(store.clone(), SavedTickets::default());
+    let id = upload_as(&router, "ada").await;
+    assert_eq!(
+        store
+            .unclaimed(Some("ada".into()), None)
+            .await
+            .unwrap(),
+        1
+    );
+    let call = serde_json::json!({
+        "screen": "edit_ticket",
+        "node": 0,
+        "values": {
+            "title": "Fail",
+            "contract": file_json(&id, "c.png").to_string(),
+            "attachments": "[]",
+        },
+    });
+    let req = Request::post("/_zeyn/form")
+        .header("x-user", "ada")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-zeyn-csrf", TOKEN)
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+        .body(Body::from(call.to_string()))
+        .unwrap();
+    assert_ne!(send(&router, req).await.0, StatusCode::OK);
+    assert_eq!(
+        store
+            .unclaimed(Some("ada".into()), None)
+            .await
+            .unwrap(),
+        0,
+        "the file was claimed before the action ran"
+    );
+    assert!(store.meta(id).await.is_ok(), "a failed save keeps the file");
+}
+
+#[tokio::test]
+async fn deleting_a_file_clears_its_unclaimed_marker() {
+    let dir = std::env::temp_dir().join(format!("zeyn-files-delete-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let disk = zeyn::DiskStore::new(&dir);
+    let memory = MemoryStore::default();
+    for store in [
+        Arc::new(disk) as Arc<dyn FileStore>,
+        Arc::new(memory) as Arc<dyn FileStore>,
+    ] {
+        let router = ticket_app(ArcStore(store.clone()), SavedTickets::default());
+        let id = upload_as(&router, "ada").await;
+        let count = || store.unclaimed(Some("ada".into()), None);
+        assert_eq!(count().await.unwrap(), 1);
+        store.delete(id).await.unwrap();
+        assert_eq!(count().await.unwrap(), 0);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A shared store, so a test keeps a handle on the store it gives the app.
+struct ArcStore(Arc<dyn FileStore>);
+
+impl FileStore for ArcStore {
+    fn put(&self, meta: FileMeta, chunks: FileChunks) -> BoxFuture<Result<()>> {
+        self.0.put(meta, chunks)
+    }
+    fn get(&self, id: String) -> BoxFuture<Result<zeyn::StoredFile>> {
+        self.0.get(id)
+    }
+    fn meta(&self, id: String) -> BoxFuture<Result<FileMeta>> {
+        self.0.meta(id)
+    }
+    fn delete(&self, id: String) -> BoxFuture<Result<()>> {
+        self.0.delete(id)
+    }
+    fn mark_unclaimed(&self, meta: FileMeta) -> BoxFuture<Result<()>> {
+        self.0.mark_unclaimed(meta)
+    }
+    fn claim(&self, ids: Vec<String>) -> BoxFuture<Result<()>> {
+        self.0.claim(ids)
+    }
+    fn unclaimed(&self, owner: Option<String>, tenant: Option<String>) -> BoxFuture<Result<usize>> {
+        self.0.unclaimed(owner, tenant)
+    }
+}
+
+#[tokio::test]
+async fn a_disk_store_removes_unclaimed_files_only_when_told_to() {
+    let dir = std::env::temp_dir().join(format!("zeyn-files-optin-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let router = ticket_app(zeyn::DiskStore::new(&dir), SavedTickets::default());
+    let id = upload_as(&router, "ada").await;
+    let long_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(48 * 3600);
+    for user in std::fs::read_dir(dir.join("unclaimed")).unwrap() {
+        for marker in std::fs::read_dir(user.unwrap().path()).unwrap() {
+            std::fs::File::options()
+                .write(true)
+                .open(marker.unwrap().path())
+                .unwrap()
+                .set_modified(long_ago)
+                .unwrap();
+        }
+    }
+    let put = |store: zeyn::DiskStore| async move {
+        store
+            .put(
+                FileMeta {
+                    id: zeyn_test_id(),
+                    name: "b.png".into(),
+                    content_type: "image/png".into(),
+                    size: 0,
+                    tenant: None,
+                    owner: None,
+                    created: 0,
+                },
+                FileChunks::from_parts(vec![png(10)]),
+            )
+            .await
+            .unwrap();
+        store
+    };
+    let store = put(zeyn::DiskStore::new(&dir)).await;
+    assert!(
+        store.meta(id.clone()).await.is_ok(),
+        "without unclaimed_for nothing is removed"
+    );
+    let store =
+        put(zeyn::DiskStore::new(&dir).unclaimed_for(std::time::Duration::from_secs(24 * 3600)))
+            .await;
+    assert!(
+        store.meta(id).await.is_err(),
+        "with unclaimed_for a file unclaimed past the grace period is removed"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A fresh file id for a direct `put`.
+fn zeyn_test_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    format!("{:032x}", NEXT.fetch_add(1, Ordering::Relaxed) + 0xb0b)
+}
+
+#[tokio::test]
+async fn uploads_without_a_user_share_one_unclaimed_cap() {
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|_: &HeaderMap| Some(Identity::anonymous().with_permissions(["crm.files"])))
+        .feature(Feature::new("crm").files(
+            DOCS.max_unclaimed(2),
+            "crm.files",
+            MemoryStore::default(),
+        ))
+        .router()
+        .unwrap();
+    let up = || {
+        upload("a.png", "")
+            .body(png(100).into())
+            .unwrap()
+    };
+    assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
+    assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
+    assert_eq!(send(&router, up()).await.0, StatusCode::TOO_MANY_REQUESTS);
 }

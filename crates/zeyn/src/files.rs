@@ -404,10 +404,11 @@ impl FileRules {
             .map(|(b, s)| (b, std::time::Duration::from_secs(s.max(1))))
     }
 
-    /// At most `n` uploads (50 by default, never fewer than [`FileRules::max_files`]) a signed
-    /// in user may hold in the store that no saved record claimed yet; the next upload answers
-    /// `429` until a save claims some or the store removes them after its grace period. Stores
-    /// that do not track claims (`FileStore::unclaimed`) have no such limit.
+    /// At most `n` uploads (50 by default, never fewer than [`FileRules::max_files`]) one user
+    /// may hold in the store that no saved record claimed yet, counted over the store's grace
+    /// period (24 hours unless the store sets one). Uploads without a signed in user share one
+    /// count. The next upload answers `429` until a save claims some or they age out of the
+    /// count. Stores that do not track claims (`FileStore::unclaimed`) have no such limit.
     pub const fn max_unclaimed(mut self, n: u32) -> Self {
         self.max_unclaimed = n;
         self
@@ -930,9 +931,10 @@ mod store {
         fn delete(&self, id: String) -> BoxFuture<Result<()>>;
 
         /// Records that the file `meta` names, just uploaded, waits for a saved record to claim
-        /// it with [`FileStore::claim`]; the store may remove it once its grace period passes
-        /// unclaimed. Files written with [`FileStore::put`] alone count as claimed. The default
-        /// does nothing, so a store that does not track claims never removes a file.
+        /// it with [`FileStore::claim`]; a store set to expire unclaimed uploads may remove it
+        /// once its grace period passes unclaimed. Files written with [`FileStore::put`] alone
+        /// count as claimed. The default does nothing, so a store that does not track claims
+        /// never removes a file.
         fn mark_unclaimed(&self, meta: FileMeta) -> BoxFuture<Result<()>> {
             let _ = meta;
             Box::pin(async { Ok(()) })
@@ -945,17 +947,21 @@ mod store {
             Box::pin(async { Ok(()) })
         }
 
-        /// How many uploads of `owner` in `tenant` are unclaimed and within the grace period,
-        /// for [`FileRules::max_unclaimed`]. The default, for stores that do not track claims,
-        /// is 0.
-        fn unclaimed(&self, owner: String, tenant: Option<String>) -> BoxFuture<Result<usize>> {
+        /// How many uploads of `owner` (`None` for uploads without a signed in user) in `tenant`
+        /// are unclaimed and younger than the grace period, for [`FileRules::max_unclaimed`].
+        /// The default, for stores that do not track claims, is 0.
+        fn unclaimed(
+            &self,
+            owner: Option<String>,
+            tenant: Option<String>,
+        ) -> BoxFuture<Result<usize>> {
             let _ = (owner, tenant);
             Box::pin(async { Ok(0) })
         }
     }
 
-    /// How long an upload may wait for a saved record to claim it before a [`DiskStore`] or a
-    /// [`MemoryStore`] removes it, unless `unclaimed_for` sets another time.
+    /// How long unclaimed uploads of a [`DiskStore`] or a [`MemoryStore`] count against
+    /// [`FileRules::max_unclaimed`] when the store does not remove them (no `unclaimed_for`).
     pub const UNCLAIMED_GRACE: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
 
     /// Whether a scanned file may be kept.
@@ -1232,33 +1238,37 @@ mod store {
     /// upload never shows up. Writing happens on the blocking pool, one chunk at a time.
     ///
     /// An upload no saved record claimed yet has an empty marker file in
-    /// `unclaimed/{user key}/{id}`; files without one, such as those of older versions, are
-    /// kept. An upload runs a sweep at most once per [`STALE_PART`], or once per grace period
-    /// when that is shorter, which removes the files whose marker is older than the grace
-    /// period.
+    /// `unclaimed/{user key}/{id}`; files without one, such as those of older versions, count
+    /// as claimed. Unclaimed files are removed only when [`DiskStore::unclaimed_for`] is set:
+    /// then an upload runs a sweep at most once per [`STALE_PART`], or once per grace period
+    /// when that is shorter (at least a second apart), which removes the files whose marker is
+    /// older than the grace period.
     #[derive(Clone)]
     pub struct DiskStore {
         root: Arc<PathBuf>,
         /// When the last sweep of stale `.part` files ran, in seconds since the epoch.
         swept: Arc<std::sync::atomic::AtomicU64>,
-        grace: std::time::Duration,
+        /// How long unclaimed files are kept; `None` keeps them.
+        grace: Option<std::time::Duration>,
     }
 
     impl DiskStore {
-        /// A store in `root`, created on the first upload. Unclaimed uploads are kept for
-        /// [`UNCLAIMED_GRACE`].
+        /// A store in `root`, created on the first upload. Unclaimed uploads are kept until
+        /// [`DiskStore::unclaimed_for`] says otherwise.
         pub fn new(root: impl Into<PathBuf>) -> Self {
             DiskStore {
                 root: Arc::new(root.into()),
                 swept: Arc::default(),
-                grace: UNCLAIMED_GRACE,
+                grace: None,
             }
         }
 
-        /// How long an upload may wait for a saved record to claim it before a sweep removes
-        /// it.
+        /// Removes an upload no saved record claimed within `grace`. Turn it on only when
+        /// every path that saves a file of this store claims it (forms, `FileDrop`, `Composer`
+        /// and API actions do); code that keeps an uploaded id in some other way must call
+        /// [`FileStore::claim`] itself.
         pub fn unclaimed_for(mut self, grace: std::time::Duration) -> Self {
-            self.grace = grace;
+            self.grace = Some(grace);
             self
         }
 
@@ -1309,9 +1319,18 @@ mod store {
         removed
     }
 
+    /// Removes a file, a missing one being fine.
+    fn remove(path: &std::path::Path) -> std::io::Result<()> {
+        match std::fs::remove_file(path) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        }
+    }
+
     /// Removes the files under `root` whose unclaimed marker is older than `grace`, and the
     /// markers. A marker is removed first, so a claim that removed it already keeps the file.
-    /// Returns how many files it removed.
+    /// A file whose metadata cannot be read is kept and logged. Returns how many files it
+    /// removed.
     pub(crate) fn sweep_unclaimed(root: &std::path::Path, grace: std::time::Duration) -> u64 {
         let Ok(users) = std::fs::read_dir(root.join("unclaimed")) else {
             return 0;
@@ -1327,9 +1346,17 @@ mod store {
                     .to_string_lossy()
                     .into_owned();
                 let stale = valid_file_id(&id) && age(&marker).is_some_and(|age| age > grace);
-                if stale && std::fs::remove_file(marker.path()).is_ok() {
-                    let _ = std::fs::remove_file(root.join(format!("{id}.bin")));
-                    let _ = std::fs::remove_file(root.join(format!("{id}.json")));
+                if !stale {
+                    continue;
+                }
+                let json = root.join(format!("{id}.json"));
+                if let Err(Error::Internal(e)) = read_meta(&json) {
+                    tracing::error!(file = %id, error = %e, "unclaimed file kept: its metadata cannot be read");
+                    continue;
+                }
+                if std::fs::remove_file(marker.path()).is_ok() {
+                    let _ = remove(&root.join(format!("{id}.bin")));
+                    let _ = remove(&json);
                     removed += 1;
                 }
             }
@@ -1361,7 +1388,11 @@ mod store {
             let last = self
                 .swept
                 .load(std::sync::atomic::Ordering::Relaxed);
-            let sweep = now.saturating_sub(last) >= STALE_PART.min(grace).as_secs()
+            let every = grace
+                .map_or(STALE_PART, |g| STALE_PART.min(g))
+                .as_secs()
+                .max(1);
+            let sweep = now.saturating_sub(last) >= every
                 && self
                     .swept
                     .compare_exchange(
@@ -1377,7 +1408,9 @@ mod store {
                     std::fs::create_dir_all(&*root).map_err(io)?;
                     if sweep {
                         sweep_parts(&root, STALE_PART);
-                        sweep_unclaimed(&root, grace);
+                        if let Some(grace) = grace {
+                            sweep_unclaimed(&root, grace);
+                        }
                     }
                     let mut file = std::fs::File::create_new(&part).map_err(io)?;
                     let written = (|| {
@@ -1438,15 +1471,16 @@ mod store {
 
         fn delete(&self, id: String) -> BoxFuture<Result<()>> {
             let paths = (self.path(&id, "bin"), self.path(&id, "json"));
+            let this = self.clone();
             Box::pin(async move {
                 let (bin, json) = (paths.0?, paths.1?);
                 tokio::task::spawn_blocking(move || {
+                    if let Ok(meta) = read_meta(&json) {
+                        let dir = this.unclaimed_dir(meta.owner.as_deref(), meta.tenant.as_deref());
+                        remove(&dir.join(&id)).map_err(io)?;
+                    }
                     for p in [bin, json] {
-                        match std::fs::remove_file(&p) {
-                            Ok(()) => {}
-                            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                            Err(e) => return Err(io(e)),
-                        }
+                        remove(&p).map_err(io)?;
                     }
                     Ok(())
                 })
@@ -1477,32 +1511,50 @@ mod store {
             let this = self.clone();
             Box::pin(async move {
                 tokio::task::spawn_blocking(move || {
+                    let mut failed = None;
                     for id in ids {
-                        let Ok(meta) = this
-                            .path(&id, "json")
-                            .and_then(|json| read_meta(&json))
-                        else {
+                        let Ok(json) = this.path(&id, "json") else {
                             continue;
                         };
-                        let marker = this
-                            .unclaimed_dir(meta.owner.as_deref(), meta.tenant.as_deref())
-                            .join(&id);
-                        match std::fs::remove_file(&marker) {
-                            Ok(()) => {}
-                            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                            Err(e) => return Err(io(e)),
+                        let markers: Vec<PathBuf> = match read_meta(&json) {
+                            Ok(meta) => vec![
+                                this.unclaimed_dir(meta.owner.as_deref(), meta.tenant.as_deref())
+                                    .join(&id),
+                            ],
+                            Err(Error::NotFound) => continue,
+                            Err(e) => {
+                                tracing::error!(file = %id, error = ?e, "claimed file has unreadable metadata; looking for its marker in every folder");
+                                std::fs::read_dir(this.root.join("unclaimed"))
+                                    .map(|users| {
+                                        users
+                                            .flatten()
+                                            .map(|u| u.path().join(&id))
+                                            .collect()
+                                    })
+                                    .unwrap_or_default()
+                            }
+                        };
+                        for marker in markers {
+                            if let Err(e) = remove(&marker) {
+                                tracing::error!(file = %id, error = %e, "claimed file could not be marked as claimed");
+                                failed = Some(io(e));
+                            }
                         }
                     }
-                    Ok(())
+                    failed.map_or(Ok(()), Err)
                 })
                 .await
                 .map_err(|e| Error::Internal(e.to_string()))?
             })
         }
 
-        fn unclaimed(&self, owner: String, tenant: Option<String>) -> BoxFuture<Result<usize>> {
-            let dir = self.unclaimed_dir(Some(&owner), tenant.as_deref());
-            let grace = self.grace;
+        fn unclaimed(
+            &self,
+            owner: Option<String>,
+            tenant: Option<String>,
+        ) -> BoxFuture<Result<usize>> {
+            let dir = self.unclaimed_dir(owner.as_deref(), tenant.as_deref());
+            let grace = self.grace.unwrap_or(UNCLAIMED_GRACE);
             Box::pin(async move {
                 tokio::task::spawn_blocking(move || {
                     std::fs::read_dir(&dir).map_or(0, |markers| {
@@ -1526,15 +1578,17 @@ mod store {
     type Held = HashMap<String, (FileMeta, Arc<[u8]>)>;
 
     /// Files in memory, for tests and demos. Capped by total bytes; an upload that would pass
-    /// the cap is refused. Unlike [`DiskStore`] it holds every file whole. Each upload first
-    /// removes the files left unclaimed longer than the grace period.
+    /// the cap is refused. Unlike [`DiskStore`] it holds every file whole. With
+    /// [`MemoryStore::unclaimed_for`], each upload first removes the files left unclaimed longer
+    /// than the grace period.
     #[derive(Clone)]
     pub struct MemoryStore {
         files: Arc<Mutex<Held>>,
         /// Unclaimed files by id, with the time they were marked.
         unclaimed: Arc<Mutex<HashMap<String, std::time::Instant>>>,
         cap: u64,
-        grace: std::time::Duration,
+        /// How long unclaimed files are kept; `None` keeps them.
+        grace: Option<std::time::Duration>,
     }
 
     impl Default for MemoryStore {
@@ -1550,25 +1604,28 @@ mod store {
                 files: Arc::new(Mutex::new(HashMap::new())),
                 unclaimed: Arc::default(),
                 cap,
-                grace: UNCLAIMED_GRACE,
+                grace: None,
             }
         }
 
-        /// How long an upload may wait for a saved record to claim it before the next upload
-        /// removes it.
+        /// Removes an upload no saved record claimed within `grace`, on the next upload. See
+        /// [`DiskStore::unclaimed_for`].
         pub fn unclaimed_for(mut self, grace: std::time::Duration) -> Self {
-            self.grace = grace;
+            self.grace = Some(grace);
             self
         }
 
         /// Removes the files unclaimed for longer than the grace period.
         fn sweep(&self) {
+            let Some(grace) = self.grace else {
+                return;
+            };
             let (Ok(mut files), Ok(mut unclaimed)) = (self.files.lock(), self.unclaimed.lock())
             else {
                 return;
             };
             unclaimed.retain(|id, since| {
-                let keep = since.elapsed() <= self.grace;
+                let keep = since.elapsed() <= grace;
                 if !keep {
                     files.remove(id);
                 }
@@ -1664,15 +1721,20 @@ mod store {
             Box::pin(async { Ok(()) })
         }
 
-        fn unclaimed(&self, owner: String, tenant: Option<String>) -> BoxFuture<Result<usize>> {
+        fn unclaimed(
+            &self,
+            owner: Option<String>,
+            tenant: Option<String>,
+        ) -> BoxFuture<Result<usize>> {
+            let grace = self.grace.unwrap_or(UNCLAIMED_GRACE);
             let count = match (self.files.lock(), self.unclaimed.lock()) {
                 (Ok(files), Ok(unclaimed)) => unclaimed
                     .iter()
                     .filter(|(id, since)| {
-                        since.elapsed() <= self.grace
-                            && files.get(*id).is_some_and(|(m, _)| {
-                                m.owner.as_deref() == Some(owner.as_str()) && m.tenant == tenant
-                            })
+                        since.elapsed() <= grace
+                            && files
+                                .get(*id)
+                                .is_some_and(|(m, _)| m.owner == owner && m.tenant == tenant)
                     })
                     .count(),
                 _ => 0,

@@ -1050,21 +1050,21 @@ where
                 .file_checks(&**saved, &self.form.model),
             Err(_) => Vec::new(),
         };
+        let claims = match &valid {
+            Ok(saved) => self.form.body.file_claims(&**saved),
+            Err(_) => Vec::new(),
+        };
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;
-            let claims: Vec<(&'static str, Vec<String>)> = files
-                .iter()
-                .map(|(_, store, ids)| (*store, ids.clone()))
-                .collect();
-            check_files(&ctx, files).await?;
-            check_pairs(pairs).await?;
-            let output = A::call(ctx.clone(), valid).await?;
-            if let Some(error) = output.failure() {
-                return Err(error);
-            }
             for (store, ids) in claims {
                 crate::files::claim(&ctx, Some(store), ids).await;
+            }
+            check_files(&ctx, files).await?;
+            check_pairs(pairs).await?;
+            let output = A::call(ctx, valid).await?;
+            if let Some(error) = output.failure() {
+                return Err(error);
             }
             let mut ui = UiCtx::default();
             if let Some(handler) = on_success {
@@ -1866,6 +1866,20 @@ impl FormBody {
             }
         }
         out
+    }
+
+    /// Every file id each upload field of `saved` holds, with its store, to claim before the
+    /// save: claiming is idempotent, and a file the record held before stays claimed.
+    fn file_claims(&self, saved: &dyn FormModel) -> Vec<(&'static str, Vec<String>)> {
+        if self.files.is_empty() {
+            return Vec::new();
+        }
+        let json = saved.form_json();
+        self.files
+            .iter()
+            .map(|(name, rules, _)| (rules.store(), crate::files::file_ids(json.get(*name))))
+            .filter(|(_, ids)| !ids.is_empty())
+            .collect()
     }
 
     /// Starts the checks of the dependent lookups of a read form: for each one with a value, the

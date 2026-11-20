@@ -6,7 +6,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Security
 
-- Uploads no saved record claimed are removed after a grace period, and one signed in user may hold at most 50 of them per store. Before, a file of an abandoned or refused form stayed in the store for good, so a signed in user could grow it without bound. Form submits, `FileDrop` actions, `Composer` sends and API actions that take `Valid<M>` claim the files they name once the action succeeds; `DiskStore` and `MemoryStore` remove the others after 24 hours (`unclaimed_for`), and the upload past `FileRules::max_unclaimed` answers `429`. Files stored before this version count as claimed. `FileStore` gains `mark_unclaimed`, `claim` and `unclaimed` with defaults that keep every file, so custom stores work unchanged.
+- Uploads wait for a saved record to claim them, and one user may hold at most 50 unclaimed uploads per store over 24 hours (`FileRules::max_unclaimed`; uploads without a signed in user share one count); the next upload answers `429`. Before, a signed in user could fill a store without bound with files of abandoned or refused forms. Form submits, `FileDrop` actions, `Composer` sends and API actions that take `Valid<M>` claim every file they name before the action runs. `DiskStore` and `MemoryStore` remove unclaimed uploads only when `unclaimed_for(grace)` is set; it is off by default, so upgrades, rolling deploys and restored backups never lose files, and it is recommended for upload forms open to the public. Files stored before this version count as claimed. `FileStore` gains `mark_unclaimed`, `claim` and `unclaimed` with defaults that keep every file, so custom stores work unchanged.
 
 ## [0.0.12] - 2026-11-20
 

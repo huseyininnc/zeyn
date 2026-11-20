@@ -175,13 +175,11 @@ pub(super) async fn check_quota(
     Ok(())
 }
 
-/// `429` when the signed in user already holds as many unclaimed uploads in the store as its
-/// rules allow ([`FileRules::max_unclaimed`](crate::FileRules::max_unclaimed)). Uploads without
-/// a user are not counted; the store still removes them when nothing claims them.
+/// `429` when the user already holds as many unclaimed uploads in the store as its rules allow
+/// ([`FileRules::max_unclaimed`](crate::FileRules::max_unclaimed)). Uploads without a signed in
+/// user share one count, so they cannot fill the store without bound either.
 pub(super) async fn check_unclaimed(ctx: &Ctx, entry: &FileEntry) -> Result<(), Failure> {
-    let Some(owner) = ctx.identity().user.clone() else {
-        return Ok(());
-    };
+    let owner = ctx.identity().user.clone();
     let tenant = ctx.tenant().map(|t| t.id().to_string());
     let held = entry
         .store

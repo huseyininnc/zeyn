@@ -405,6 +405,7 @@ where
             .iter()
             .flat_map(|(_, ids)| ids.iter().cloned())
             .collect();
+        crate::files::claim(&ctx, None, claims).await;
         check_files(&ctx, files).await?;
         if let Some(record) = input.record() {
             ctx.update_trail(|t| {
@@ -414,7 +415,6 @@ where
         let mut value = A::call(ctx.clone(), input)
             .await?
             .into_json()?;
-        crate::files::claim(&ctx, None, claims).await;
         <A::Output as ApiResult>::protect(&mut value, &ctx);
         Ok(value)
     })
