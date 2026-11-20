@@ -116,8 +116,10 @@ impl DataSource for FileDrop {
         let store = self.rules.store();
         Box::pin(async move {
             let (file, run) = file.zip(run).ok_or(Error::NotFound)?;
-            crate::files::check_owned(&ctx, Some(store), vec![file.id.clone()]).await?;
-            run(ctx, file).await?;
+            let id = file.id.clone();
+            crate::files::check_owned(&ctx, Some(store), vec![id.clone()]).await?;
+            run(ctx.clone(), file).await?;
+            crate::files::claim(&ctx, Some(store), vec![id]).await;
             Ok(json!({ "ok": true }))
         })
     }

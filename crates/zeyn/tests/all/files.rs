@@ -367,7 +367,14 @@ async fn names_and_ids_cannot_walk_the_file_system() {
         })
         .collect();
     names.sort();
-    assert_eq!(names, vec![format!("{id}.bin"), format!("{id}.json")]);
+    assert_eq!(
+        names,
+        vec![
+            format!("{id}.bin"),
+            format!("{id}.json"),
+            "unclaimed".to_string()
+        ]
+    );
     assert!(!dir.join("evil.png").exists());
     for bad in [
         "..%2F..%2Fstore%2Fx",
@@ -1041,7 +1048,7 @@ pub fn edit_ticket() -> Screen {
     )
 }
 
-fn ticket_app(store: MemoryStore, saved: SavedTickets) -> Router {
+fn ticket_app(store: impl FileStore, saved: SavedTickets) -> Router {
     App::new("Test")
         .i18n(I18n::new("en"))
         .service(saved)
@@ -1476,4 +1483,107 @@ fn a_file_store_name_registered_twice_stops_the_app() {
             .any(|p| p.contains("Z0509") && p.contains("file store `docs`")),
         "{problems:?}"
     );
+}
+
+/// Uploads two files as ada, saves the ticket with one of them, waits past the grace period of
+/// one second and uploads again: the next upload sweeps the file no record claimed, while the
+/// claimed file, a file written by `put` alone (as before claims existed) and the new upload
+/// stay.
+async fn unclaimed_files_expire(store: impl FileStore + Clone) {
+    let router = ticket_app(store.clone(), SavedTickets::default());
+    store
+        .put(
+            FileMeta {
+                id: KEPT.into(),
+                name: "old.png".into(),
+                content_type: "image/png".into(),
+                size: 0,
+                tenant: None,
+                owner: Some("bob".into()),
+                created: 0,
+            },
+            FileChunks::from_parts(vec![png(50)]),
+        )
+        .await
+        .unwrap();
+    let left = upload_as(&router, "ada").await;
+    let saved = upload_as(&router, "ada").await;
+    assert_eq!(
+        save_as(&router, "ada", &saved, &[KEPT]).await,
+        StatusCode::OK
+    );
+    assert!(
+        store.meta(left.clone()).await.is_ok(),
+        "kept within the grace period"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let fresh = upload_as(&router, "ada").await;
+    assert!(
+        store.meta(left).await.is_err(),
+        "an upload no record claimed is removed after the grace period"
+    );
+    for id in [saved, KEPT.to_string(), fresh] {
+        assert!(store.meta(id.clone()).await.is_ok(), "{id} stays");
+    }
+}
+
+#[tokio::test]
+async fn unclaimed_uploads_of_a_memory_store_are_removed_after_the_grace_period() {
+    unclaimed_files_expire(MemoryStore::default().unclaimed_for(std::time::Duration::from_secs(1)))
+        .await;
+}
+
+#[tokio::test]
+async fn unclaimed_uploads_of_a_disk_store_are_removed_after_the_grace_period() {
+    let dir = std::env::temp_dir().join(format!("zeyn-files-unclaimed-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    unclaimed_files_expire(
+        zeyn::DiskStore::new(&dir).unclaimed_for(std::time::Duration::from_secs(1)),
+    )
+    .await;
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn a_user_over_the_unclaimed_upload_cap_gets_429_until_a_save_claims_one() {
+    const FEW: FileRules = DOCS.max_unclaimed(2);
+    assert_eq!(FEW.unclaimed_limit(), 2);
+    assert_eq!(
+        DOCS.max_files(5)
+            .max_unclaimed(1)
+            .unclaimed_limit(),
+        5,
+        "a form can always take as many files as its field holds"
+    );
+    let store = MemoryStore::default();
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|h: &HeaderMap| {
+            let user = h
+                .get("x-user")?
+                .to_str()
+                .ok()?
+                .to_string();
+            Some(Identity::user(user).with_permissions(["crm.files"]))
+        })
+        .feature(Feature::new("crm").files(FEW, "crm.files", store.clone()))
+        .router()
+        .unwrap();
+    let first = upload_as(&router, "ada").await;
+    upload_as(&router, "ada").await;
+    let up = || {
+        upload("a.png", "")
+            .body(png(100).into())
+            .unwrap()
+    };
+    let (status, _, body) = send(&router, up()).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        String::from_utf8_lossy(&body).contains("not saved in a record yet"),
+        "{}",
+        String::from_utf8_lossy(&body)
+    );
+    upload_as(&router, "bob").await;
+    store.claim(vec![first]).await.unwrap();
+    assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
 }

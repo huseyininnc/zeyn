@@ -175,6 +175,29 @@ pub(super) async fn check_quota(
     Ok(())
 }
 
+/// `429` when the signed in user already holds as many unclaimed uploads in the store as its
+/// rules allow ([`FileRules::max_unclaimed`](crate::FileRules::max_unclaimed)). Uploads without
+/// a user are not counted; the store still removes them when nothing claims them.
+pub(super) async fn check_unclaimed(ctx: &Ctx, entry: &FileEntry) -> Result<(), Failure> {
+    let Some(owner) = ctx.identity().user.clone() else {
+        return Ok(());
+    };
+    let tenant = ctx.tenant().map(|t| t.id().to_string());
+    let held = entry
+        .store
+        .unclaimed(owner, tenant)
+        .await
+        .map_err(Failure::App)?;
+    if held >= entry.rules.unclaimed_limit() as usize {
+        return Err(status(
+            StatusCode::TOO_MANY_REQUESTS,
+            "unclaimed",
+            Text::key("zeyn.files.unclaimed"),
+        ));
+    }
+    Ok(())
+}
+
 /// Checks access and quota, then reads, checks and stores a whole file from `body` inside the
 /// interceptors. Plain uploads and finished resumable uploads both end here. The declared size
 /// (the store's limit without one) is taken from the quota before the body is read, so uploads
@@ -198,6 +221,7 @@ pub(super) async fn store_body(
     let scanner = feature.file_scanner().cloned();
     let quota = quota(ctx, &entry);
     check_quota(st, &quota).await?;
+    check_unclaimed(ctx, &entry).await?;
     let reserved = u32::try_from(
         declared
             .unwrap_or(u64::MAX)
@@ -396,6 +420,17 @@ async fn receive(
                 return Err(refuse());
             }
         }
+    }
+    if let Err(e) = entry
+        .store
+        .mark_unclaimed(meta.clone())
+        .await
+    {
+        let _ = entry
+            .store
+            .delete(meta.id.clone())
+            .await;
+        return Err(Failure::App(e));
     }
     ctx.update_trail(|t| {
         t.record = Some(RecordRef {

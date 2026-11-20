@@ -1053,11 +1053,18 @@ where
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;
+            let claims: Vec<(&'static str, Vec<String>)> = files
+                .iter()
+                .map(|(_, store, ids)| (*store, ids.clone()))
+                .collect();
             check_files(&ctx, files).await?;
             check_pairs(pairs).await?;
-            let output = A::call(ctx, valid).await?;
+            let output = A::call(ctx.clone(), valid).await?;
             if let Some(error) = output.failure() {
                 return Err(error);
+            }
+            for (store, ids) in claims {
+                crate::files::claim(&ctx, Some(store), ids).await;
             }
             let mut ui = UiCtx::default();
             if let Some(handler) = on_success {

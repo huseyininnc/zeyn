@@ -14,7 +14,7 @@
 //! guards; an upload is found only by the user and tenant that opened it. Requests that change
 //! something need the CSRF header.
 
-use super::files::{check_quota, entry, next, quota, status, store_body};
+use super::files::{check_quota, check_unclaimed, entry, next, quota, status, store_body};
 use super::{AppState, Failure};
 use crate::ResumableUploads;
 use crate::action::Error;
@@ -335,6 +335,7 @@ async fn create(
             ));
         }
         check_quota(&st, &quota(&ctx, &entry)).await?;
+        check_unclaimed(&ctx, &entry).await?;
         st.uploads.sweep().await;
         let uploads = &st.uploads;
         let id = new_file_id();

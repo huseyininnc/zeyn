@@ -400,7 +400,12 @@ where
         let mut input = A::Input::from_json(body)?;
         input.clean(<A::Output as ApiResult>::fields(), &ctx);
         input.check_with(&ctx)?;
-        check_files(&ctx, input.file_ids()).await?;
+        let files = input.file_ids();
+        let claims: Vec<String> = files
+            .iter()
+            .flat_map(|(_, ids)| ids.iter().cloned())
+            .collect();
+        check_files(&ctx, files).await?;
         if let Some(record) = input.record() {
             ctx.update_trail(|t| {
                 t.record.get_or_insert(record);
@@ -409,6 +414,7 @@ where
         let mut value = A::call(ctx.clone(), input)
             .await?
             .into_json()?;
+        crate::files::claim(&ctx, None, claims).await;
         <A::Output as ApiResult>::protect(&mut value, &ctx);
         Ok(value)
     })
