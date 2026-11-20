@@ -100,6 +100,7 @@ async fn upload(
     State(st): State<Arc<AppState>>,
     Path(store): Path<String>,
     headers: HeaderMap,
+    extensions: axum::http::Extensions,
     body: Body,
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
@@ -116,7 +117,8 @@ async fn upload(
         .get(header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok());
-    match store_body(&st, &ctx, &store, name, declared, body).await {
+    let who = uploader(&st, &ctx, &headers, &extensions);
+    match store_body(&st, &ctx, &store, &who, name, declared, body).await {
         Ok(file) => {
             let mut r = (StatusCode::CREATED, axum::Json(file)).into_response();
             r.headers_mut()
@@ -175,15 +177,32 @@ pub(super) async fn check_quota(
     Ok(())
 }
 
-/// `429` when the user already holds as many unclaimed uploads in the store as its rules allow
-/// ([`FileRules::max_unclaimed`](crate::FileRules::max_unclaimed)). Uploads without a signed in
-/// user share one count, so they cannot fill the store without bound either.
-pub(super) async fn check_unclaimed(ctx: &Ctx, entry: &FileEntry) -> Result<(), Failure> {
-    let owner = ctx.identity().user.clone();
-    let tenant = ctx.tenant().map(|t| t.id().to_string());
+/// Who uploads, for the count of unclaimed uploads: the signed in user in the tenant, or the
+/// client address (as the rate limit finds it behind trusted proxies) without a user.
+pub(super) fn uploader(
+    st: &AppState,
+    ctx: &Ctx,
+    headers: &HeaderMap,
+    extensions: &axum::http::Extensions,
+) -> String {
+    let peer = extensions
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .map(|c| c.0.ip());
+    let forwarded = super::guard::forwarded_for(headers);
+    crate::files::uploader_key(
+        ctx.identity().user.as_deref(),
+        ctx.tenant().map(|t| t.id()),
+        crate::security::client_ip(peer, forwarded.as_deref(), &st.trusted),
+    )
+}
+
+/// `429` when `uploader` already holds as many unclaimed uploads in the store as its rules
+/// allow ([`FileRules::max_unclaimed`](crate::FileRules::max_unclaimed)). Without a signed in
+/// user the client address counts, so anonymous uploads cannot fill the store without bound.
+pub(super) async fn check_unclaimed(entry: &FileEntry, uploader: &str) -> Result<(), Failure> {
     let held = entry
         .store
-        .unclaimed(owner, tenant)
+        .unclaimed(uploader.to_string())
         .await
         .map_err(Failure::App)?;
     if held >= entry.rules.unclaimed_limit() as usize {
@@ -205,6 +224,7 @@ pub(super) async fn store_body(
     st: &AppState,
     ctx: &Ctx,
     store: &str,
+    uploader: &str,
     name: String,
     declared: Option<u64>,
     body: Body,
@@ -219,7 +239,7 @@ pub(super) async fn store_body(
     let scanner = feature.file_scanner().cloned();
     let quota = quota(ctx, &entry);
     check_quota(st, &quota).await?;
-    check_unclaimed(ctx, &entry).await?;
+    check_unclaimed(&entry, uploader).await?;
     let reserved = u32::try_from(
         declared
             .unwrap_or(u64::MAX)
@@ -234,7 +254,7 @@ pub(super) async fn store_body(
     }
     let result = st
         .intercept(ctx, &call, || {
-            receive(ctx, entry, scanner, name, declared, body)
+            receive(ctx, entry, scanner, uploader, name, declared, body)
         })
         .await;
     if let Some((key, limit)) = &quota {
@@ -255,6 +275,7 @@ async fn receive(
     ctx: &Ctx,
     entry: FileEntry,
     scanner: Option<Arc<dyn crate::FileScanner>>,
+    uploader: &str,
     name: String,
     declared: Option<u64>,
     body: Body,
@@ -421,7 +442,7 @@ async fn receive(
     }
     if let Err(e) = entry
         .store
-        .mark_unclaimed(meta.clone())
+        .mark_unclaimed(meta.clone(), uploader.to_string())
         .await
     {
         let _ = entry

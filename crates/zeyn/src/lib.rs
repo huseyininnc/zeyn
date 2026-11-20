@@ -157,7 +157,7 @@ pub use files::ResumableUploads;
 #[cfg(feature = "server")]
 pub use files::{
     DiskStore, FileAccess, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore,
-    STALE_PART, ScanVerdict, StoredFile, ZipGuard,
+    STALE_PART, ScanVerdict, StoredFile, UNCLAIMED_GRACE, ZipGuard, uploader_key,
 };
 pub use files::{
     File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,

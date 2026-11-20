@@ -371,6 +371,7 @@ async fn names_and_ids_cannot_walk_the_file_system() {
         names,
         vec![
             format!("{id}.bin"),
+            format!("{id}.claim"),
             format!("{id}.json"),
             "unclaimed".to_string()
         ]
@@ -1596,13 +1597,7 @@ async fn files_are_claimed_before_the_action_so_a_failed_save_never_loses_one() 
     let store = MemoryStore::default();
     let router = ticket_app(store.clone(), SavedTickets::default());
     let id = upload_as(&router, "ada").await;
-    assert_eq!(
-        store
-            .unclaimed(Some("ada".into()), None)
-            .await
-            .unwrap(),
-        1
-    );
+    assert_eq!(store.unclaimed(ada()).await.unwrap(), 1);
     let call = serde_json::json!({
         "screen": "edit_ticket",
         "node": 0,
@@ -1621,10 +1616,7 @@ async fn files_are_claimed_before_the_action_so_a_failed_save_never_loses_one() 
         .unwrap();
     assert_ne!(send(&router, req).await.0, StatusCode::OK);
     assert_eq!(
-        store
-            .unclaimed(Some("ada".into()), None)
-            .await
-            .unwrap(),
+        store.unclaimed(ada()).await.unwrap(),
         0,
         "the file was claimed before the action ran"
     );
@@ -1643,7 +1635,7 @@ async fn deleting_a_file_clears_its_unclaimed_marker() {
     ] {
         let router = ticket_app(ArcStore(store.clone()), SavedTickets::default());
         let id = upload_as(&router, "ada").await;
-        let count = || store.unclaimed(Some("ada".into()), None);
+        let count = || store.unclaimed(ada());
         assert_eq!(count().await.unwrap(), 1);
         store.delete(id).await.unwrap();
         assert_eq!(count().await.unwrap(), 0);
@@ -1667,14 +1659,14 @@ impl FileStore for ArcStore {
     fn delete(&self, id: String) -> BoxFuture<Result<()>> {
         self.0.delete(id)
     }
-    fn mark_unclaimed(&self, meta: FileMeta) -> BoxFuture<Result<()>> {
-        self.0.mark_unclaimed(meta)
+    fn mark_unclaimed(&self, meta: FileMeta, uploader: String) -> BoxFuture<Result<()>> {
+        self.0.mark_unclaimed(meta, uploader)
     }
     fn claim(&self, ids: Vec<String>) -> BoxFuture<Result<()>> {
         self.0.claim(ids)
     }
-    fn unclaimed(&self, owner: Option<String>, tenant: Option<String>) -> BoxFuture<Result<usize>> {
-        self.0.unclaimed(owner, tenant)
+    fn unclaimed(&self, uploader: String) -> BoxFuture<Result<usize>> {
+        self.0.unclaimed(uploader)
     }
 }
 
@@ -1735,8 +1727,63 @@ fn zeyn_test_id() -> String {
     format!("{:032x}", NEXT.fetch_add(1, Ordering::Relaxed) + 0xb0b)
 }
 
+/// The uploader key of ada, signed in without a tenant.
+fn ada() -> String {
+    zeyn::uploader_key(Some("ada"), None, None)
+}
+
+/// A store that loses every file just before it is claimed, as a sweep between the ownership
+/// check and the claim would.
+struct SweptBeforeClaim(MemoryStore);
+
+impl FileStore for SweptBeforeClaim {
+    fn put(&self, meta: FileMeta, chunks: FileChunks) -> BoxFuture<Result<()>> {
+        self.0.put(meta, chunks)
+    }
+    fn get(&self, id: String) -> BoxFuture<Result<zeyn::StoredFile>> {
+        self.0.get(id)
+    }
+    fn meta(&self, id: String) -> BoxFuture<Result<FileMeta>> {
+        self.0.meta(id)
+    }
+    fn delete(&self, id: String) -> BoxFuture<Result<()>> {
+        self.0.delete(id)
+    }
+    fn mark_unclaimed(&self, meta: FileMeta, uploader: String) -> BoxFuture<Result<()>> {
+        self.0.mark_unclaimed(meta, uploader)
+    }
+    fn claim(&self, ids: Vec<String>) -> BoxFuture<Result<()>> {
+        let inner = self.0.clone();
+        Box::pin(async move {
+            for id in &ids {
+                inner.delete(id.clone()).await?;
+            }
+            inner.claim(ids).await
+        })
+    }
+}
+
 #[tokio::test]
-async fn uploads_without_a_user_share_one_unclaimed_cap() {
+async fn a_file_swept_between_the_check_and_the_claim_refuses_the_save() {
+    let saved = SavedTickets::default();
+    let router = ticket_app(SweptBeforeClaim(MemoryStore::default()), saved.clone());
+    let id = upload_as(&router, "ada").await;
+    assert_eq!(
+        save_as(&router, "ada", &id, &[]).await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert!(saved.0.lock().unwrap().is_empty(), "the action did not run");
+    let gone = MemoryStore::default();
+    assert!(
+        gone.claim(vec!["0123456789abcdef0123456789abcdef".into()])
+            .await
+            .is_err(),
+        "claiming an id the store does not hold is an error"
+    );
+}
+
+#[tokio::test]
+async fn uploads_without_a_user_are_capped_per_client_address() {
     let router = App::new("Test")
         .i18n(I18n::new("en"))
         .auth(|_: &HeaderMap| Some(Identity::anonymous().with_permissions(["crm.files"])))
@@ -1747,12 +1794,32 @@ async fn uploads_without_a_user_share_one_unclaimed_cap() {
         ))
         .router()
         .unwrap();
-    let up = || {
-        upload("a.png", "")
+    let up = |ip: [u8; 4]| {
+        let mut req = upload("a.png", "")
             .body(png(100).into())
-            .unwrap()
+            .unwrap();
+        req.extensions_mut()
+            .insert(axum::extract::ConnectInfo(std::net::SocketAddr::from((
+                ip, 40000,
+            ))));
+        req
     };
-    assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
-    assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
-    assert_eq!(send(&router, up()).await.0, StatusCode::TOO_MANY_REQUESTS);
+    let first = [203, 0, 113, 1];
+    let second = [203, 0, 113, 2];
+    assert_eq!(send(&router, up(first)).await.0, StatusCode::CREATED);
+    assert_eq!(send(&router, up(first)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        send(&router, up(first)).await.0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        send(&router, up(second)).await.0,
+        StatusCode::CREATED,
+        "another client address has its own count"
+    );
+    assert_eq!(send(&router, up(second)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        send(&router, up(second)).await.0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
 }

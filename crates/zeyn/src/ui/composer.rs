@@ -105,8 +105,8 @@ where
                 .iter()
                 .map(|f| f.id.clone())
                 .collect();
-            crate::files::claim(&ctx, store, ids.clone()).await;
-            crate::files::check_owned(&ctx, store, ids).await?;
+            crate::files::check_owned(&ctx, store, ids.clone()).await?;
+            crate::files::claim(&ctx, store, ids).await?;
             A::call(ctx, send).await??;
             Ok(json!({ "ok": true }))
         })
