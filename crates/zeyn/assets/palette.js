@@ -184,11 +184,18 @@ function collect() {
     };
     walk(menu, '');
   }
-  for (const a of document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]')) {
+  for (const a of document.querySelectorAll('.z-nav :is(a[href], .z-nav-window), .z-site-nav a[href]')) {
+    if (a.closest('.z-nav-favorites')) continue;
     const group = a.closest('.z-nav-group')?.querySelector(':scope > :is(h2, h3, h4, h5)')?.textContent.trim();
-    const path = new URL(a.href, location.href).pathname;
     const icon = [...(a.querySelector('.z-icon')?.classList ?? [])].find((c) => c.startsWith('z-icon-'));
-    add({ key: `nav:${path}`, label: a.textContent.trim(), group: group ? `${t.textGo} · ${group}` : t.textGo, icon, run: () => a.click() });
+    const where = group ? `${t.textGo} · ${group}` : t.textGo;
+    if (a.matches('.z-nav-window')) {
+      const label = (a.querySelector(':scope > span:not([class])') ?? a).textContent.trim();
+      add({ key: `win:${a.dataset.zeynEffect}`, label, group: where, icon, run: () => openMenuWindow(a) });
+      continue;
+    }
+    const path = new URL(a.href, location.href).pathname;
+    add({ key: `nav:${path}`, label: a.textContent.trim(), group: where, icon, run: () => a.click() });
   }
   return items;
 }
@@ -390,6 +397,20 @@ function searchServer() {
     p.found = (r.data?.hits ?? []).map((h) => ({ key: `search:${h.url}`, label: h.label, group: h.group, run: () => go(h.url) }));
     drawPalette();
   }, SEARCH_DELAY);
+}
+
+/**
+ * Opens the window of a side menu item (`Menu::window`) from the palette. The item may be hidden
+ * in a closed group or drawer, so focus returns to where it was before the palette opened.
+ */
+function openMenuWindow(item) {
+  let effect;
+  try {
+    effect = JSON.parse(item.dataset.zeynEffect);
+  } catch {
+    return;
+  }
+  run({ effects: [effect], source: document.activeElement });
 }
 
 /** Opens an app path through nav.js (`zeyn:navigate`), or with a page load without it. */

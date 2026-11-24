@@ -612,5 +612,10 @@
     "job_help": "İş sunucuda dört saniye çalışır ve ilerlemesini olaylar olarak gönderir. Çubuk her olayda yerinde yenilenir.",
     "progress": "İlerleme",
     "start_job": "İşi başlat"
+  },
+  "shortcuts": {
+    "title": "Klavye kısayolları",
+    "palette": "Komut paleti",
+    "palette_text": "Tüm ekranları, komutları ve menü öğelerini aramak için Alt+Shift+P tuşlarına basın."
   }
 }

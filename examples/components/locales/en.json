@@ -6,6 +6,8 @@
     "search": "Search components",
     "start": "Start",
     "all": "All components",
+    "about": "About this catalog",
+    "about_text": "Every component of Zeyn with live examples and the code that builds them. This window opens from the side menu without leaving the page.",
     "github": "Source on GitHub",
     "project": "License and security",
     "none": "No component matches \"{q}\".",

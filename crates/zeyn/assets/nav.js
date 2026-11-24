@@ -361,8 +361,8 @@ history.replaceState({ zeyn: true }, '', location.href);
  * Below 1024 px the side menu of the app shell folds behind the menu button under the app's name.
  * This shows the button; without the script the menu stays open. The button opens the menu as a
  * drawer over the screen: focus moves into it and stays between the button and the drawer, the
- * screen behind it is inert and does not scroll. The button, Escape, the backdrop, a link and a
- * swipe toward the menu's edge close it; focus returns to the button.
+ * screen behind it is inert and does not scroll. The button, Escape, the backdrop, a link, a menu
+ * item that opens a window and a swipe toward the menu's edge close it; focus returns to the button.
  */
 function initAppMenu() {
   const toggle = document.querySelector('[data-zeyn-nav-toggle]');
@@ -400,7 +400,7 @@ document.addEventListener('click', (e) => {
   const t = e.target instanceof Element ? e.target : null;
   if (t?.closest('[data-zeyn-nav-toggle]')) {
     setAppMenu(t.closest('[data-zeyn-nav-toggle]').getAttribute('aria-expanded') !== 'true');
-  } else if (t?.closest('#z-nav-body[data-open] a[href]')) {
+  } else if (t?.closest('#z-nav-body[data-open] :is(a[href], .z-nav-window)')) {
     setAppMenu(false);
   } else if (t?.matches('.z-nav') && openDrawer()) {
     setAppMenu(false);

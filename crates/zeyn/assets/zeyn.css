@@ -448,7 +448,8 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 
 .z-nav li + li { margin-top: 1px; }
 
-.z-nav a {
+/** Menu links, and the buttons of items that open a window (`Menu::window`), which look the same. */
+.z-nav :is(a, .z-nav-window) {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -463,13 +464,22 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   transition: background-color var(--z-dur-1) var(--z-ease-linear);
 }
 
-.z-nav-group:has(> h2 .z-icon) :is(a, .z-nav-sub > :is(h3, h4, h5)) { padding-inline-start: calc(var(--z-s-3) + 14px + var(--z-s-2)); }
+.z-nav .z-nav-window {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
 
-.z-nav a > .z-icon { color: var(--z-text-muted); }
+.z-nav-group:has(> h2 .z-icon) :is(a, .z-nav-window, .z-nav-sub > :is(h3, h4, h5)) { padding-inline-start: calc(var(--z-s-3) + 14px + var(--z-s-2)); }
 
-.z-nav a:hover { background: var(--z-hover); }
+.z-nav :is(a, .z-nav-window) > .z-icon { color: var(--z-text-muted); }
 
-.z-nav a:focus-visible { outline-offset: -2px; }
+.z-nav :is(a, .z-nav-window):hover { background: var(--z-hover); }
+
+.z-nav :is(a, .z-nav-window):focus-visible { outline-offset: -2px; }
 
 .z-nav a[aria-current="page"] {
   background: var(--z-brand-subtle);
@@ -530,12 +540,12 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 .z-nav li > .z-nav-pin[aria-pressed="true"] { opacity: 1; }
 .z-nav li > .z-nav-pin:hover { background: var(--z-hover); color: var(--z-text); }
 .z-nav li > .z-nav-pin:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
-.z-nav li:has(> .z-nav-pin) > a { padding-inline-end: 32px; }
+.z-nav li:has(> .z-nav-pin) > :is(a, .z-nav-window) { padding-inline-end: 32px; }
 .z-nav-group[hidden],
 .z-nav li[hidden] { display: none; }
 
 /** A menu item's fixed badge (`Menu::badge`) and its count (`Menu::count`), at the end of the row. */
-.z-nav a > span:has(+ :is(.z-nav-badge, .z-nav-count)) { flex: 1; min-width: 0; }
+.z-nav :is(a, .z-nav-window) > span:has(+ :is(.z-nav-badge, .z-nav-count)) { flex: 1; min-width: 0; }
 .z-nav-badge,
 .z-nav-count {
   flex: none;
@@ -917,7 +927,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
     background: var(--z-surface);
     box-shadow: var(--z-shadow-2);
   }
-  .z-app[data-zeyn-rail] .z-nav-group > ul a { padding-inline-start: var(--z-s-3); }
+  .z-app[data-zeyn-rail] .z-nav-group > ul :is(a, .z-nav-window) { padding-inline-start: var(--z-s-3); }
 }
 
 /* With scripting on, the menu starts folded so the page does not jump when nav.js folds it. */

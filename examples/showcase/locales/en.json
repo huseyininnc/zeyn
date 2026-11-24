@@ -612,5 +612,10 @@
     "job_help": "The job runs on the server for four seconds and sends its progress as events. The bar refreshes in place on each one.",
     "progress": "Progress",
     "start_job": "Start the job"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "palette": "Command palette",
+    "palette_text": "Press Alt+Shift+P to search every screen, command and menu item."
   }
 }
