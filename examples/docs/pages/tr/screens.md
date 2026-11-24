@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+Bir menü öğesi bir screen'i sayfasına gitmek yerine pencere olarak da açabilir: `.window(t!("stock.about"), about, ())`, `Window::open(about, ())` ile aynı işi yapar, adresi korur ve screen'de route gerektirmez. Öğe yalnız screen'i açabilen kullanıcılara görünür. Bkz. [pencere açan menü öğeleri](shell.md#menu-items-that-open-a-window).
+
 `App::home(screen)`, `/` adresinin bir screen açmasını sağlar.
 
 ## Hata sayfaları

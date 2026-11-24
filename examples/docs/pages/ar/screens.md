@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+يمكن لعنصر القائمة أيضًا أن يفتح شاشة كنافذة بدلًا من الانتقال إلى صفحتها: يفعل `.window(t!("stock.about"), about, ())` ما يفعله `Window::open(about, ())`، ويحافظ على العنوان، ولا يحتاج إلى route في الشاشة. ولا يظهر إلا للمستخدمين الذين يمكنهم فتح الشاشة. راجع [عناصر القائمة التي تفتح نافذة](shell.md#menu-items-that-open-a-window).
+
 يجعل `App::home(screen)` المسار `/` يفتح شاشة.
 
 ## صفحات الخطأ

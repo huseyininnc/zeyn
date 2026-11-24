@@ -7,12 +7,12 @@
     "source": "github",
     "subfolder": "crates/zeyn-cli"
   },
-  "version": "0.0.13",
+  "version": "0.0.14",
   "packages": [
     {
       "registryType": "cargo",
       "identifier": "zeyn-cli",
-      "version": "0.0.13",
+      "version": "0.0.14",
       "transport": {
         "type": "stdio"
       },

@@ -140,6 +140,15 @@ fn review_patterns_are_reported_with_their_reason_and_change_nothing() {
 }
 
 #[test]
+fn menu_item_literals_are_flagged_for_the_window_target() {
+    let (notes, todos) = check("menu_item", &[step("0.0.14")]);
+    assert!(notes.is_empty());
+    assert_eq!(todos.len(), 1, "{todos:#?}");
+    assert!(todos[0].starts_with("4: "), "{todos:#?}");
+    assert!(todos[0].contains("target: MenuTarget::Page"));
+}
+
+#[test]
 fn a_file_that_does_not_parse_is_an_error_with_its_line() {
     let mut report = Report::default();
     let text = "fn main() {\n    let = ;\n}\n";
@@ -243,7 +252,7 @@ fn a_project_migrates_with_a_stable_report_and_a_dry_run_writes_nothing() {
             "from": "0.0.9",
             "to": env!("CARGO_PKG_VERSION"),
             "dry_run": false,
-            "steps": ["0.0.11"],
+            "steps": ["0.0.11", "0.0.14"],
             "files": ["Cargo.toml", "src/main.rs"],
             "changes": [
                 { "file": "Cargo.toml", "line": 0, "step": env!("CARGO_PKG_VERSION"), "change": format!("Zeyn dependencies -> {}", env!("CARGO_PKG_VERSION")) },

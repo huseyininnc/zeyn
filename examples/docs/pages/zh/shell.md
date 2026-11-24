@@ -35,6 +35,26 @@ Feature::new("sales")
 - **键盘。** 上和下在可见的标题和链接之间移动，Home 和 End 跳到第一个和最后一个。右键展开折叠的分组或进入已展开的分组；左键折叠已展开的分组或移到外层分组的标题。Enter 和空格切换分组。在从右到左的语言中左右互换。
 - **权限与合并。** 同名分组在每一层跨 feature 合并；用户无法打开其中任何条目的分组（包括嵌套分组）不会显示。`App::header(|h| h.breadcrumb())` 的面包屑显示完整的分组路径。site shell 把嵌套分组的链接列在其顶层分组中。
 
+### 打开窗口的菜单项
+
+`.window(label, screen, params)` 添加一个菜单项，它像 `Window::open(screen, params)` 那样把 screen 作为模态窗口打开，而不是跳转到它的页面。地址不变，窗口下面的页面保持原样，适合“关于”、日志查看器或快速设置对话框这类 screen。该 screen 不需要 route，但必须在应用的某个 feature 中注册，否则 `zeyn check` 会报告 `Z0418`。类型错误的 params 无法编译。
+
+```rust
+.menu(|m| {
+    m.group(t!("menu.help"), Icon::Info)
+        .open()
+        .item(t!("menu.home"), home)
+        .window(t!("about.title"), about, ())
+        .icon(Icon::Info)
+})
+```
+
+- **访问权限。** 只有能打开该 screen 的用户才能看到此项：即 screen 的权限和注册它的 feature 的 guard，与窗口请求在服务器上做的检查相同。
+- **标记。** 此项是一个带 `aria-haspopup="dialog"` 的 `<button>`，运行 `open_window` 效果（`data-zeyn-effect`），并像周围的链接一样显示图标、徽章和计数。它从不带 `aria-current`，因此当前页面和面包屑导航仍属于页面项。
+- **键盘和焦点。** Enter 和 Space 打开窗口，方向键像链接一样到达此项，Escape 关闭窗口并把焦点还给此项。如果此时此项已被隐藏（选中后会关闭的图标栏弹出面板或手机抽屉），焦点会回到弹出面板的标题或菜单按钮。
+- **链接能去的地方它都能去。** 嵌套分组、手风琴、图标栏、筛选框、收藏夹和命令面板都把此项当作链接；在面板中选择它会打开同一个窗口。站点 shell 没有窗口，所以它的顶部菜单不包含这些项。
+- **描述。** `App::describe` 和 `zeyn mcp` 的 `zeyn_describe` 工具会列出每个菜单项的 `kind`（`"page"` 或 `"window"`），以及窗口项的 params。
+
 ### 图标栏、徽章、筛选和手机
 
 ```rust

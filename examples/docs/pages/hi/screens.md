@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+एक मेनू आइटम Screen के पेज पर जाने के बजाय उसे विंडो में भी खोल सकता है: `.window(t!("stock.about"), about, ())` वही करता है जो `Window::open(about, ())` करता है, पता बनाए रखता है और Screen पर route की ज़रूरत नहीं होती। यह केवल उन्हीं उपयोगकर्ताओं को दिखता है जो Screen खोल सकते हैं। देखें [विंडो खोलने वाले मेनू आइटम](shell.md#menu-items-that-open-a-window)।
+
 `App::home(screen)` `/` से एक Screen खुलवाता है।
 
 ## त्रुटि पृष्ठ
