@@ -862,8 +862,8 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
     overflow: visible;
     padding: 0 var(--z-s-2) var(--z-s-3);
   }
-  .z-app[data-zeyn-rail] .z-app-name { justify-content: center; margin: 0; padding: 0; }
-  .z-app[data-zeyn-rail] .z-app-name > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .z-app[data-zeyn-rail] .z-nav .z-app-name { justify-content: center; margin: 0; padding: 0; }
+  .z-app[data-zeyn-rail] .z-app-name > span:not(.z-logo) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .z-app[data-zeyn-rail] .z-nav-rail { position: static; margin-bottom: var(--z-s-2); }
   .z-app[data-zeyn-rail] .z-nav-body > :not(.z-nav-group) { display: none; }
   .z-app[data-zeyn-rail] .z-nav-group { position: relative; padding-top: var(--z-s-1); }
