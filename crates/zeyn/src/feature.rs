@@ -6,11 +6,15 @@ use crate::screen::{Icon, Screen, ScreenDef, ScreenMeta};
 use serde::Serialize;
 use std::sync::Arc;
 
-/// Menu item.
+/// Menu item: a link to a screen's page ([`Menu::item`]) or a button that opens a screen as a
+/// window ([`Menu::window`]).
 #[derive(Clone, Debug, Serialize)]
 pub struct MenuItem {
     pub label: Text,
     pub screen: &'static str,
+    /// What the item does when chosen: go to the screen's page, or open it as a window.
+    #[serde(flatten)]
+    pub target: MenuTarget,
     /// The icon before the label in the side menu, set with [`Menu::icon`].
     pub icon: Option<Icon>,
     /// A short fixed text after the label, set with [`Menu::badge`].
@@ -20,6 +24,35 @@ pub struct MenuItem {
     pub count: Option<MenuCount>,
     /// Topics that make the browser count again, set with [`Menu::count_listens`].
     pub topics: Vec<&'static str>,
+}
+
+/// What a [`MenuItem`] does when chosen, serialized as its `kind`: `"page"` or `"window"`.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MenuTarget {
+    /// Goes to the screen's page, which needs a route ([`Menu::item`]).
+    Page,
+    /// Opens the screen as a modal window with these params, as [`crate::Window::open`] does;
+    /// the address stays the same ([`Menu::window`]).
+    Window { params: serde_json::Value },
+}
+
+impl MenuItem {
+    /// Whether the item opens its screen as a window instead of going to its page.
+    pub fn is_window(&self) -> bool {
+        matches!(self.target, MenuTarget::Window { .. })
+    }
+
+    /// The effect that opens the item's window, or `None` for a page item.
+    pub fn window_effect(&self) -> Option<crate::screen::Effect> {
+        match &self.target {
+            MenuTarget::Window { params } => Some(crate::screen::Effect::OpenWindow {
+                screen: self.screen,
+                params: params.clone(),
+            }),
+            MenuTarget::Page => None,
+        }
+    }
 }
 
 /// The action that counts a menu item's number: it takes `()` and returns a `u64`, and runs with
@@ -77,8 +110,18 @@ impl MenuGroup {
             .unwrap_or(0)
     }
 
-    /// The item of `screen` in this group or a nested one, with the labels of the groups from
-    /// this one down to the item's own.
+    /// The items of this group and of its nested groups, in menu order.
+    pub fn all_items(&self) -> Vec<&MenuItem> {
+        let mut out: Vec<&MenuItem> = self.items.iter().collect();
+        for g in &self.groups {
+            out.extend(g.all_items());
+        }
+        out
+    }
+
+    /// The page item of `screen` in this group or a nested one, with the labels of the groups
+    /// from this one down to the item's own. Window items ([`Menu::window`]) are not pages, so
+    /// they are not found.
     ///
     /// ```
     /// use zeyn::prelude::*;
@@ -98,7 +141,7 @@ impl MenuGroup {
         if let Some(item) = self
             .items
             .iter()
-            .find(|i| i.screen == screen)
+            .find(|i| i.screen == screen && !i.is_window())
         {
             return Some((vec![&self.label], item));
         }
@@ -197,6 +240,52 @@ impl Menu {
         group.items.push(MenuItem {
             label: label.into(),
             screen: S::META.name,
+            target: MenuTarget::Page,
+            icon: None,
+            badge: None,
+            count: None,
+            topics: Vec::new(),
+        });
+        self
+    }
+
+    /// Adds an item to the last group that opens `screen` as a modal window with `params`, the
+    /// way [`crate::Window::open`] does, instead of going to its page: the address does not
+    /// change and the page under the window stays. The screen needs no route, and the item shows
+    /// only to users who may open it, as page items do. [`Self::icon`], [`Self::badge`] and
+    /// [`Self::count`] work on it. Params of the wrong type do not compile.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(public)]
+    /// pub fn about() -> Screen { Screen::new("About") }
+    ///
+    /// let feature = Feature::new("help").screen(about).menu(|m| {
+    ///     m.group("Help", Icon::Info)
+    ///         .open()
+    ///         .window("About", about, ())
+    ///         .icon(Icon::Info)
+    /// });
+    /// let item = &feature.menu_groups()[0].items[0];
+    /// assert!(item.is_window());
+    /// assert_eq!(serde_json::to_value(item).unwrap()["kind"], "window");
+    /// ```
+    pub fn window<S: ScreenDef>(
+        mut self,
+        label: impl Into<Text>,
+        _screen: S,
+        params: S::Params,
+    ) -> Self {
+        let params = serde_json::to_value(&params).expect("screen params must serialize to JSON");
+        let group = self
+            .groups
+            .last_mut()
+            .expect("call `group` before `window`");
+        group.items.push(MenuItem {
+            label: label.into(),
+            screen: S::META.name,
+            target: MenuTarget::Window { params },
             icon: None,
             badge: None,
             count: None,
@@ -780,7 +869,12 @@ impl Feature {
                 );
             }
         }
-        for item in self.menu.iter().flat_map(|g| &g.items) {
+        for item in self
+            .menu
+            .iter()
+            .flat_map(MenuGroup::all_items)
+            .filter(|i| !i.is_window())
+        {
             match self
                 .screens
                 .iter()

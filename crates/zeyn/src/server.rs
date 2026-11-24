@@ -1668,6 +1668,25 @@ impl App {
                 }
             }
         }
+        for f in &self.features {
+            for item in f
+                .menu_groups()
+                .iter()
+                .flat_map(crate::feature::MenuGroup::all_items)
+                .filter(|i| i.is_window() && !names.contains_key(i.screen))
+            {
+                problems.push(
+                    crate::Problem::new(
+                        "Z0418",
+                        format!("feature `{}`: menu item `{}` opens screen `{}` as a window, but no feature registers it", f.name(), item.label.english(), item.screen),
+                    )
+                    .why("a window loads its screen from the app, so the item would open nothing but an error")
+                    .fix("add `.screen(...)` for it to a feature, or remove the menu item")
+                    .docs("components/shell#menu-items-that-open-a-window")
+                    .to_string(),
+                );
+            }
+        }
         let mut media: HashMap<&str, &str> = HashMap::new();
         for f in &self.features {
             for m in f.media_sources() {
@@ -3863,10 +3882,18 @@ fn menu_json(i18n: &I18n, g: &crate::feature::MenuGroup) -> Json {
         "label": i18n.text(i18n.default_locale(), &g.label),
         "icon": g.icon,
         "open": g.open,
-        "items": g.items.iter().map(|i| json!({
-            "label": i18n.text(i18n.default_locale(), &i.label),
-            "screen": i.screen,
-        })).collect::<Vec<_>>(),
+        "items": g.items.iter().map(|i| {
+            let mut item = json!({
+                "label": i18n.text(i18n.default_locale(), &i.label),
+                "screen": i.screen,
+                "kind": "page",
+            });
+            if let crate::feature::MenuTarget::Window { params } = &i.target {
+                item["kind"] = json!("window");
+                item["params"] = params.clone();
+            }
+            item
+        }).collect::<Vec<_>>(),
         "groups": g.groups.iter().map(|s| menu_json(i18n, s)).collect::<Vec<_>>(),
     })
 }

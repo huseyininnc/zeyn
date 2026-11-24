@@ -11,6 +11,11 @@ async fn first(_: ()) -> Result<Screen> {
     Ok(Screen::new("First"))
 }
 
+#[screen(public)]
+async fn loose(_: ()) -> Result<Screen> {
+    Ok(Screen::window("Loose"))
+}
+
 #[screen(route = "/a", public)]
 async fn second(_: ()) -> Result<Screen> {
     Ok(Screen::new("Second"))
@@ -46,6 +51,13 @@ fn broken_setups_report_code_reason_fix_and_docs() {
         ("Z0203", App::new("T").deny_ips(["not an address"])),
         ("Z0303", App::new("T").site_url("http://shop.example")),
         ("Z0416", App::new("T").palette_shortcut("Ctrl+")),
+        (
+            "Z0418",
+            App::new("T").feature(Feature::new("one").menu(|m| {
+                m.group("Help", Icon::Info)
+                    .window("Loose", loose, ())
+            })),
+        ),
     ];
     for (code, app) in cases {
         let all = problems(app);
