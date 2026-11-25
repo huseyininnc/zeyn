@@ -44,7 +44,7 @@ let hits: Vec<Hit> = db
 ```
 
 ```toml
-zeyn = { version = "0.0.13", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.14", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

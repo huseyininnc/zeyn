@@ -35,6 +35,26 @@ Feature::new("sales")
 - **Keyboard.** Up and Down move between the visible headings and links, Home and End go to the first and the last. Right opens a closed group or moves into an open one; Left closes an open group or moves to the heading of the group around it. Enter and Space toggle a group. Left and Right swap in right to left languages.
 - **Permissions and merging.** Groups with the same label merge across features at every level, and a group whose items the user may not open is left out, nested groups included. The breadcrumb of `App::header(|h| h.breadcrumb())` shows the whole group path. The site shell lists the links of nested groups in their top level group.
 
+### Menu items that open a window
+
+`.window(label, screen, params)` adds an item that opens a screen as a modal window, the way `Window::open(screen, params)` does, instead of going to its page. The address does not change and the page under the window stays as it was, which suits screens such as "About", a log viewer or a quick settings dialog. The screen needs no route; it must be registered in a feature of the app, or `zeyn check` reports `Z0418`. Params of the wrong type do not compile.
+
+```rust
+.menu(|m| {
+    m.group(t!("menu.help"), Icon::Info)
+        .open()
+        .item(t!("menu.home"), home)
+        .window(t!("about.title"), about, ())
+        .icon(Icon::Info)
+})
+```
+
+- **Access.** The item shows only to users who may open the screen: its permission and the guards of the feature that registers it, the same checks the window's request makes on the server.
+- **Markup.** The item is a `<button>` with `aria-haspopup="dialog"` that runs the `open_window` effect (`data-zeyn-effect`), drawn like the links around it with its icon, badge and count. It never carries `aria-current`, so the current page and the breadcrumb stay with page items.
+- **Keyboard and focus.** Enter and Space open the window, the arrow keys reach the item like a link, and Escape closes the window and returns focus to the item. When the item is hidden by then (a closed rail flyout or the phone drawer, which close when it is chosen), focus goes to the flyout's heading or the menu button.
+- **Everywhere links go.** Nested groups, the accordion, the icon rail, the filter box, Favorites and the command palette treat the item like a link; choosing it in the palette opens the same window. The site shell has no windows, so its top menu leaves these items out.
+- **Description.** `App::describe` and the `zeyn_describe` tool of `zeyn mcp` list every menu item with its `kind`, `"page"` or `"window"`, and the params of a window item.
+
 ### Icon rail, badges, filter and phones
 
 ```rust

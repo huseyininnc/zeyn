@@ -91,6 +91,19 @@ pub fn about() -> Screen {
         )
 }
 
+/// The keyboard shortcuts of the app, opened as a window from the side menu (`Menu::window`)
+/// without leaving the page.
+#[screen(public)]
+pub fn shortcuts() -> Screen {
+    Screen::window(t!("shortcuts.title"))
+        .width(480)
+        .body(
+            Card::new()
+                .title(t!("shortcuts.palette"))
+                .add(Alert::info(t!("shortcuts.palette_text"))),
+        )
+}
+
 /// The public pages of the showcase for `/sitemap.xml`.
 #[action(public)]
 pub async fn public_pages(part: SitemapPart) -> Result<Vec<SitemapUrl>> {
@@ -101,6 +114,7 @@ pub fn feature() -> Feature {
     Feature::new("overview")
         .screen(overview)
         .screen(about)
+        .screen(shortcuts)
         .sitemap(public_pages)
         .menu(|m| {
             m.group(t!("menu.overview"), Icon::ChartBar)
@@ -108,5 +122,7 @@ pub fn feature() -> Feature {
                 .icon(Icon::Home)
                 .item(t!("about.title"), about)
                 .icon(Icon::Tag)
+                .window(t!("shortcuts.title"), shortcuts, ())
+                .icon(Icon::Command)
         })
 }

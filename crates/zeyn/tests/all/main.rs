@@ -31,6 +31,7 @@ mod license;
 #[cfg(feature = "email")]
 mod mail;
 mod menu_source;
+mod menu_window;
 #[cfg(feature = "metronome")]
 mod metronome;
 mod navigation;

@@ -4,6 +4,16 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.0.14] - 2026-11-24
+
+### Added
+
+- Side menu items that open a screen as a window: `Menu::window(label, screen, params)` adds an item that runs `Window::open(screen, params)` instead of going to a page, so the address and the page under it stay. The screen needs no route, and the item shows only to users who pass the screen's access and the guards of the feature that registers it. It is a `<button aria-haspopup="dialog">` with `data-zeyn-effect`, drawn like a link with its icon, badge and count; the menu keys, the filter box, Favorites, nested groups, the accordion, the icon rail, the phone drawer and the command palette treat it like a link, and focus returns to it (or to the flyout heading or menu button when it is hidden) when the window closes. `MenuItem` has a `target` (`MenuTarget::Page` or `MenuTarget::Window { params }`), serialized as its `kind`; the app description lists `kind` and `params` of every menu item. `zeyn check` reports `Z0418` when no feature registers the screen of a window item, and the menu checks `Z0401` and `Z0402` now look into nested groups too. `zeyn migrate` flags `MenuItem` struct literals, which need the new field.
+
+### Fixed
+
+- The icon rail keeps the app's logo mark: the rule that hides the app name in the rail also shrank a letter logo to one pixel, and the padding left for the rail button pushed the mark off center.
+
 ## [0.0.13] - 2026-11-20
 
 ### Added
@@ -378,7 +388,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Navigation without page reloads.
 - MIT and Apache-2.0 licenses.
 
-[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.13...HEAD
+[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.14...HEAD
+[0.0.14]: https://github.com/huseyininnc/zeyn/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/huseyininnc/zeyn/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/huseyininnc/zeyn/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/huseyininnc/zeyn/compare/v0.0.10...v0.0.11

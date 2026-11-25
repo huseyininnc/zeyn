@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+メニュー項目は、画面のページへ移動する代わりにウィンドウとして開くこともできます。`.window(t!("stock.about"), about, ())` は `Window::open(about, ())` と同じことをし、アドレスを保ち、画面に route を必要としません。その画面を開けるユーザーにだけ表示されます。[ウィンドウを開くメニュー項目](shell.md#menu-items-that-open-a-window)を参照してください。
+
 `App::home(screen)` は、`/` で画面を開くようにします。
 
 ## エラーページ

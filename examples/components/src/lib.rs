@@ -138,6 +138,8 @@ macro_rules! catalog {
                 .menu(|m| m
                     .group(t!("cx.start"), Icon::Home)
                     .item(t!("cx.all"), catalog_home)
+                    .window(t!("cx.about"), catalog_about, ())
+                    .icon(Icon::Info)
                     $( .group(Text::key(concat!("cx.cat.", $cat)), Icon::$icon) $( .item(examples::$slug::ENTRY.name, $slug) )* )*
                 )
         }
@@ -355,11 +357,21 @@ pub fn catalog_home(p: SearchParams, ctx: Ctx) -> Screen {
     page::index_screen(&p.q, &ctx)
 }
 
+/// What the catalog is, opened as a window from the side menu (`Menu::window`) over the page the
+/// reader is on.
+#[screen(public)]
+pub fn catalog_about() -> Screen {
+    Screen::window(t!("cx.about"))
+        .width(480)
+        .body(Alert::info(t!("cx.about_text")))
+}
+
 /// The catalog feature: the index, a page per component and the search.
 pub fn feature() -> Feature {
     with_screens(
         Feature::new("components")
             .screen(catalog_home)
+            .screen(catalog_about)
             .screen(examples::image_card::product)
             .screen(examples::card_grid::large_catalog)
             .screen(examples::card_grid::live_catalog)
