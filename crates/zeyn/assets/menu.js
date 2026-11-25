@@ -18,6 +18,10 @@
  * The rail button (`[data-zeyn-rail-toggle]`) folds the menu to an icon rail on wide screens and
  * back. In the rail a top level group opens as a flyout, one at a time; Escape, a click outside
  * and a navigation close it.
+ * Items that open a window (`.z-nav-window`, `Menu::window`) are buttons that the runtime runs
+ * like links are followed: keys, the filter and pins treat them as links. Choosing one in the
+ * rail closes the flyout; when the window closes and the item is hidden (a closed flyout or
+ * drawer), focus goes to its flyout's heading or the menu button instead.
  * Counted items (`[data-zeyn-menu-count]`, `Menu::count`) get their numbers from one
  * `GET /_zeyn/menu/counts` after the page shows, and again when one of their topics is named.
  * @module menu
@@ -27,6 +31,17 @@
 function heading(group) {
   return group?.querySelector(':scope > :is(h2, h3, h4, h5) > .z-nav-heading') ?? null;
 }
+
+/** The entries of a menu that are links or open a window. */
+const ENTRY = ':is(a[href], .z-nav-window)';
+
+/** The key of a menu entry for pins: a link's address, or the effect of a window item. */
+function entryKey(el) {
+  return el?.getAttribute('href') ?? (el?.matches('.z-nav-window') ? `window:${el.dataset.zeynEffect}` : null);
+}
+
+/** The window item whose window is open, to take focus back if the item is hidden by then. */
+let windowItem = null;
 
 /** The top level group headings of the icon rail, whose groups open as flyouts. */
 function flyouts() {
@@ -88,10 +103,37 @@ document.addEventListener('click', (e) => {
     setRail(rail, rail.getAttribute('aria-pressed') !== 'true');
     return;
   }
+  const item = target?.closest('[data-zeyn-menu] .z-nav-window');
+  if (item) {
+    windowItem = item;
+    if (item.closest('[data-zeyn-rail]')) closeFlyouts();
+    return;
+  }
   const button = target?.closest('[data-zeyn-menu] .z-nav-heading');
   if (button) setOpen(button, button.getAttribute('aria-expanded') !== 'true');
   else if (!target?.closest('[data-zeyn-rail] .z-nav-group > ul')) closeFlyouts();
 });
+
+/**
+ * After a window opened from a menu item closes, the runtime puts focus back on the item. When the
+ * item is hidden by then, focus goes to the heading of its rail flyout or to the menu button.
+ */
+document.addEventListener(
+  'close',
+  (e) => {
+    if (!windowItem || !(e.target instanceof HTMLDialogElement)) return;
+    setTimeout(() => {
+      const item = windowItem;
+      if (!item || document.querySelector('dialog.z-dialog[open]')) return;
+      windowItem = null;
+      if (document.activeElement && document.activeElement !== document.body) return;
+      const top = item.closest('[data-zeyn-menu] .z-nav-body > .z-nav-group');
+      const back = [item, heading(top), document.querySelector('[data-zeyn-nav-toggle]')].find((el) => el?.isConnected && el.checkVisibility());
+      back?.focus();
+    });
+  },
+  true,
+);
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && e.target instanceof Element && e.target.closest('[data-zeyn-rail] .z-nav-group')) {
@@ -106,11 +148,11 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.altKey || e.ctrlKey || e.metaKey || !(e.target instanceof Element)) return;
   const nav = e.target.closest('[data-zeyn-menu]');
-  const here = nav && e.target.closest('.z-nav-group') ? e.target.closest('.z-nav-heading, a[href]') : null;
+  const here = nav && e.target.closest('.z-nav-group') ? e.target.closest(`.z-nav-heading, ${ENTRY}`) : null;
   if (!here) return;
   const rtl = getComputedStyle(nav).direction === 'rtl';
   const key = rtl ? { ArrowLeft: 'ArrowRight', ArrowRight: 'ArrowLeft' }[e.key] ?? e.key : e.key;
-  const all = [...nav.querySelectorAll('.z-nav-group .z-nav-heading, .z-nav-group a[href]')].filter((el) => el.checkVisibility());
+  const all = [...nav.querySelectorAll(`.z-nav-group .z-nav-heading, .z-nav-group ${ENTRY}`)].filter((el) => el.checkVisibility());
   const at = all.indexOf(here);
   const isButton = here.classList.contains('z-nav-heading');
   const expanded = here.getAttribute('aria-expanded') === 'true';
@@ -150,7 +192,7 @@ function favoritesKey() {
   return `zeyn.menu.favorites:${document.querySelector('meta[name="zeyn-storage"]')?.content ?? 'anon'}`;
 }
 
-/** The hrefs the user pinned, at most 20. */
+/** The keys of the entries the user pinned (`entryKey`), at most 20. */
 function favorites() {
   try {
     const list = JSON.parse(localStorage.getItem(favoritesKey()) ?? '[]');
@@ -168,9 +210,9 @@ function saveFavorites(list) {
   }
 }
 
-/** The links of the menu's own groups, without the Favorites group. */
+/** The links and window items of the menu's own groups, without the Favorites group. */
 function menuLinks(nav) {
-  return [...nav.querySelectorAll('.z-nav-group:not(.z-nav-favorites) a[href]')];
+  return [...nav.querySelectorAll(`.z-nav-group:not(.z-nav-favorites) ${ENTRY}`)];
 }
 
 /** Draws the Favorites group and the state of every pin button. */
@@ -181,12 +223,12 @@ function drawFavorites(nav, box) {
   for (const a of links) {
     const button = a.parentElement.querySelector(':scope > .z-nav-pin');
     if (!button) continue;
-    const on = pinned.includes(a.getAttribute('href'));
+    const on = pinned.includes(entryKey(a));
     const label = linkText(a);
     button.setAttribute('aria-pressed', String(on));
     button.setAttribute('aria-label', (on ? box.dataset.textUnpin : box.dataset.textPin).replace('{label}', label));
   }
-  const shown = pinned.map((h) => links.find((a) => a.getAttribute('href') === h)).filter(Boolean);
+  const shown = pinned.map((k) => links.find((a) => entryKey(a) === k)).filter(Boolean);
   if (!shown.length) return;
   const group = document.createElement('div');
   group.className = 'z-nav-group z-nav-favorites';
@@ -222,13 +264,13 @@ function initFilter(box) {
   const apply = () => {
     const q = fold(input.value.trim());
     let shown = 0;
-    for (const li of nav.querySelectorAll('.z-nav-group:not(.z-nav-favorites) li:has(> a[href])')) {
-      const hit = !q || fold(linkText(li.querySelector(':scope > a'))).includes(q);
+    for (const li of nav.querySelectorAll(`.z-nav-group:not(.z-nav-favorites) li:has(> ${ENTRY})`)) {
+      const hit = !q || fold(linkText(li.querySelector(`:scope > ${ENTRY}`))).includes(q);
       li.hidden = !hit;
       if (hit) shown++;
     }
     for (const g of nav.querySelectorAll('.z-nav-group:not(.z-nav-favorites)')) {
-      g.hidden = !!q && !g.querySelector('li:has(> a[href]):not([hidden])');
+      g.hidden = !!q && !g.querySelector(`li:has(> ${ENTRY}):not([hidden])`);
       if (q && !g.hidden) heading(g)?.setAttribute('aria-expanded', 'true');
     }
     status.textContent = q ? (shown ? box.dataset.textResults.replace('{n}', String(shown)) : box.dataset.textNone) : '';
@@ -245,15 +287,18 @@ function initFilter(box) {
   nav.addEventListener('click', (e) => {
     const pin = e.target instanceof Element ? e.target.closest('.z-nav-pin') : null;
     if (!pin) return;
-    const href = pin.previousElementSibling?.getAttribute('href');
-    if (!href) return;
+    const key = entryKey(pin.previousElementSibling);
+    if (!key) return;
     const list = favorites();
-    const at = list.indexOf(href);
+    const at = list.indexOf(key);
     if (at >= 0) list.splice(at, 1);
-    else list.unshift(href);
+    else list.unshift(key);
     saveFavorites(list);
     drawFavorites(nav, box);
-    nav.querySelector(`.z-nav-group:not(.z-nav-favorites) a[href="${CSS.escape(href)}"] + .z-nav-pin`)?.focus();
+    menuLinks(nav)
+      .find((a) => entryKey(a) === key)
+      ?.parentElement.querySelector(':scope > .z-nav-pin')
+      ?.focus();
   });
 }
 

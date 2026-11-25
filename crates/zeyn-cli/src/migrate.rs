@@ -7,6 +7,7 @@
 //! `zeyn check --fix` applies the renames of every step through the same engine.
 
 mod v0_0_11;
+mod v0_0_14;
 mod v0_0_6;
 mod v0_0_8;
 mod v0_0_9;
@@ -18,7 +19,13 @@ use syn::visit::{self, Visit};
 
 /// The steps, oldest first. A step runs when the app's version is below its version and the
 /// target is at or above it.
-pub const STEPS: &[Step] = &[v0_0_6::STEP, v0_0_8::STEP, v0_0_9::STEP, v0_0_11::STEP];
+pub const STEPS: &[Step] = &[
+    v0_0_6::STEP,
+    v0_0_8::STEP,
+    v0_0_9::STEP,
+    v0_0_11::STEP,
+    v0_0_14::STEP,
+];
 
 /// Zeyn crates whose dependency version `zeyn migrate` moves with the app.
 const CRATES: &[&str] = &["zeyn", "zeyn-macros", "zeyn-island", "zeyn-desktop"];

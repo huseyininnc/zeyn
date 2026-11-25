@@ -35,6 +35,26 @@ Feature::new("sales")
 - **Teclado.** Arriba y Abajo recorren los encabezados y enlaces visibles, Inicio y Fin van al primero y al último. Derecha abre un grupo cerrado o entra en uno abierto; Izquierda cierra un grupo abierto o va al encabezado del grupo que lo rodea. Enter y Espacio abren o cierran un grupo. Izquierda y Derecha se intercambian en los idiomas de derecha a izquierda.
 - **Permisos y fusión.** Los grupos con la misma etiqueta se fusionan entre features en todos los niveles, y un grupo cuyos elementos el usuario no puede abrir se omite, incluidos los grupos anidados. La ruta de navegación de `App::header(|h| h.breadcrumb())` muestra la ruta completa de grupos. El site shell lista los enlaces de los grupos anidados en su grupo de primer nivel.
 
+### Elementos del menú que abren una ventana
+
+`.window(label, screen, params)` añade un elemento que abre una pantalla como ventana modal, como hace `Window::open(screen, params)`, en lugar de ir a su página. La dirección no cambia y la página bajo la ventana sigue como estaba, lo que conviene a pantallas como "Acerca de", un visor de registros o un diálogo rápido de ajustes. La pantalla no necesita route; debe estar registrada en una feature de la app, o `zeyn check` informa `Z0418`. Los params de un tipo incorrecto no compilan.
+
+```rust
+.menu(|m| {
+    m.group(t!("menu.help"), Icon::Info)
+        .open()
+        .item(t!("menu.home"), home)
+        .window(t!("about.title"), about, ())
+        .icon(Icon::Info)
+})
+```
+
+- **Acceso.** El elemento solo aparece a los usuarios que pueden abrir la pantalla: su permiso y los guards de la feature que la registra, las mismas comprobaciones que hace en el servidor la petición de la ventana.
+- **Marcado.** El elemento es un `<button>` con `aria-haspopup="dialog"` que ejecuta el efecto `open_window` (`data-zeyn-effect`), dibujado como los enlaces que lo rodean con su icono, insignia y contador. Nunca lleva `aria-current`, así que la página actual y las migas de pan quedan en los elementos de página.
+- **Teclado y foco.** Enter y Space abren la ventana, las flechas llegan al elemento como a un enlace, y Escape cierra la ventana y devuelve el foco al elemento. Si para entonces el elemento está oculto (un panel del riel o el cajón del teléfono, que se cierran al elegirlo), el foco va al encabezado del panel o al botón del menú.
+- **Donde van los enlaces.** Los grupos anidados, el acordeón, el riel de iconos, el filtro, Favoritos y la paleta de comandos tratan el elemento como un enlace; elegirlo en la paleta abre la misma ventana. El shell del sitio no tiene ventanas, así que su menú superior omite estos elementos.
+- **Descripción.** `App::describe` y la herramienta `zeyn_describe` de `zeyn mcp` listan cada elemento del menú con su `kind`, `"page"` o `"window"`, y los params de un elemento de ventana.
+
 ### Riel de iconos, insignias, filtro y teléfonos
 
 ```rust

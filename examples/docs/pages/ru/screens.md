@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+Пункт меню может также открыть экран как окно вместо перехода на его страницу: `.window(t!("stock.about"), about, ())` делает то же, что `Window::open(about, ())`, сохраняет адрес и не требует route у экрана. Он виден только пользователям, которые могут открыть экран. См. [пункты меню, открывающие окно](shell.md#menu-items-that-open-a-window).
+
 `App::home(screen)` делает так, что `/` открывает экран.
 
 ## Страницы ошибок

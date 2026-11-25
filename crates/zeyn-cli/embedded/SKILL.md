@@ -287,6 +287,9 @@ What to remember:
 - Menus nest: `.sub(t!("..."), |m| m.item(..).item(..))` after `.group(..)` adds a collapsible
   subgroup (at most three levels deep); `.open()` keeps a group open, `.accordion()` closes
   siblings when a group opens.
+- Menu items that open a window: `.window(t!("about.title"), about, ())` after `.group(..)` opens
+  the screen as a modal like `Window::open(about, ())`; the address stays and the screen needs no
+  route. It shows only to users who may open the screen.
 - Menus from a table or an API: `App::menu_source(|ctx: Ctx| async move { Ok(vec![MenuNode::group(..,
   vec![MenuNode::screen(label, "screen_name"), MenuNode::path(label, "/path")])]) })`. The server
   drops links the user may not open and caches answers per permission set; call

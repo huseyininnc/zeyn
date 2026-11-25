@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+Un elemento del menú también puede abrir una pantalla como ventana en lugar de ir a su página: `.window(t!("stock.about"), about, ())` hace lo mismo que `Window::open(about, ())`, mantiene la dirección y no necesita route en la pantalla. Solo aparece a los usuarios que pueden abrir la pantalla. Consulta [elementos del menú que abren una ventana](shell.md#menu-items-that-open-a-window).
+
 `App::home(screen)` hace que `/` abra una pantalla.
 
 ## Páginas de error

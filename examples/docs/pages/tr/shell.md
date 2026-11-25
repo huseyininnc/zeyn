@@ -35,6 +35,26 @@ Feature::new("sales")
 - **Klavye.** Yukarı ve Aşağı görünen başlıklar ve bağlantılar arasında gezer, Home ve End ilkine ve sonuncusuna gider. Sağ kapalı bir grubu açar ya da açık bir grubun içine geçer; Sol açık bir grubu kapatır ya da çevreleyen grubun başlığına gider. Enter ve Space grubu açıp kapatır. Sağdan sola dillerde Sol ve Sağ yer değiştirir.
 - **İzinler ve birleştirme.** Aynı etiketli gruplar her seviyede feature'lar arasında birleşir; kullanıcının açamayacağı öğelerden oluşan bir grup, iç içe gruplar dahil, dışarıda kalır. `App::header(|h| h.breadcrumb())` içerik yolu grubun bütün yolunu gösterir. Site shell'i iç içe grupların bağlantılarını en üst gruplarında listeler.
 
+### Pencere açan menü öğeleri
+
+`.window(label, screen, params)`, bir screen'i sayfasına gitmek yerine, `Window::open(screen, params)` gibi modal bir pencere olarak açan bir öğe ekler. Adres değişmez ve pencerenin altındaki sayfa olduğu gibi kalır; bu, "Hakkında", bir log görüntüleyici ya da hızlı bir ayar penceresi gibi screen'lere uyar. Screen'in route'a ihtiyacı yoktur; uygulamanın bir feature'ında kayıtlı olmalıdır, yoksa `zeyn check` `Z0418` bildirir. Yanlış türde params derlenmez.
+
+```rust
+.menu(|m| {
+    m.group(t!("menu.help"), Icon::Info)
+        .open()
+        .item(t!("menu.home"), home)
+        .window(t!("about.title"), about, ())
+        .icon(Icon::Info)
+})
+```
+
+- **Erişim.** Öğe yalnız screen'i açabilen kullanıcılara görünür: screen'in izni ve onu kaydeden feature'ın guard'ları, yani pencerenin isteğinin sunucuda yaptığı denetimlerin aynısı.
+- **İşaretleme.** Öğe, `open_window` efektini (`data-zeyn-effect`) çalıştıran, `aria-haspopup="dialog"` taşıyan bir `<button>`'dır ve ikonu, rozeti ve sayısıyla çevresindeki bağlantılar gibi çizilir. Hiçbir zaman `aria-current` taşımaz, böylece geçerli sayfa ve breadcrumb sayfa öğelerinde kalır.
+- **Klavye ve odak.** Enter ve Space pencereyi açar, ok tuşları öğeye bir bağlantı gibi ulaşır, Escape pencereyi kapatıp odağı öğeye geri verir. Öğe o sırada gizliyse (seçilince kapanan bir şerit paneli ya da telefon çekmecesi), odak panelin başlığına ya da menü düğmesine gider.
+- **Bağlantıların gittiği her yer.** İç içe gruplar, akordeon, ikon şeridi, filtre kutusu, Favoriler ve komut paleti öğeye bir bağlantı gibi davranır; paletten seçmek aynı pencereyi açar. Site shell'inde pencere olmadığından üst menüsü bu öğeleri dışarıda bırakır.
+- **Açıklama.** `App::describe` ve `zeyn mcp`'nin `zeyn_describe` aracı her menü öğesini `kind` değeriyle (`"page"` ya da `"window"`), pencere öğelerini de params'larıyla listeler.
+
 ### İkon şeridi, rozetler, filtre ve telefonlar
 
 ```rust

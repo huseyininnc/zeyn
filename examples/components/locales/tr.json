@@ -6,6 +6,8 @@
     "search": "Bileşen ara",
     "start": "Başlangıç",
     "all": "Tüm bileşenler",
+    "about": "Bu katalog hakkında",
+    "about_text": "Zeyn'in her bileşeni, canlı örnekleri ve onları kuran koduyla. Bu pencere yan menüden, sayfadan ayrılmadan açılır.",
     "github": "GitHub'da kaynak kodu",
     "project": "Lisans ve güvenlik",
     "none": "\"{q}\" ile eşleşen bileşen yok.",

@@ -259,8 +259,10 @@ fn post(path: &str, perms: &str, body: serde_json::Value) -> Request<Body> {
 fn the_palette_finds_menu_items_from_the_first_keystroke() {
     let js = include_str!("../../assets/palette.js");
     assert!(
-        js.contains("document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]')"),
-        "menu links of both shells are indexed"
+        js.contains(
+            "document.querySelectorAll('.z-nav :is(a[href], .z-nav-window), .z-site-nav a[href]')"
+        ),
+        "menu links of both shells and window items of the side menu are indexed"
     );
     assert!(
         js.contains("if (!p.items.length) p.items = collect();"),

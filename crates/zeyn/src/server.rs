@@ -1668,6 +1668,25 @@ impl App {
                 }
             }
         }
+        for f in &self.features {
+            for item in f
+                .menu_groups()
+                .iter()
+                .flat_map(crate::feature::MenuGroup::all_items)
+                .filter(|i| i.is_window() && !names.contains_key(i.screen))
+            {
+                problems.push(
+                    crate::Problem::new(
+                        "Z0418",
+                        format!("feature `{}`: menu item `{}` opens screen `{}` as a window, but no feature registers it", f.name(), item.label.english(), item.screen),
+                    )
+                    .why("a window loads its screen from the app, so the item would open nothing but an error")
+                    .fix("add `.screen(...)` for it to a feature, or remove the menu item")
+                    .docs("components/shell#menu-items-that-open-a-window")
+                    .to_string(),
+                );
+            }
+        }
         let mut media: HashMap<&str, &str> = HashMap::new();
         for f in &self.features {
             for m in f.media_sources() {
@@ -2904,6 +2923,19 @@ impl AppState {
     }
 
     /// Finds, checks and builds a screen: access, then feature guards.
+    /// Whether the user may open the registered screen `name`: its access and the guards of the
+    /// feature that registers it, the checks [`Self::open`] makes before it builds the screen.
+    fn may_open(&self, ctx: &Ctx, name: &str) -> bool {
+        self.screens
+            .get(name)
+            .is_some_and(|(fi, entry)| {
+                ctx.identity().can(&entry.meta.access)
+                    && self.features[*fi]
+                        .check_guards(ctx)
+                        .is_ok()
+            })
+    }
+
     async fn open(
         &self,
         ctx: &Ctx,
@@ -3292,20 +3324,32 @@ impl AppState {
             .items
             .iter()
             .filter_map(|item| {
-                let entry = f
-                    .screens()
-                    .iter()
-                    .find(|s| s.meta.name == item.screen)?;
-                if !ctx.identity().can(&entry.meta.access) {
-                    return None;
-                }
-                let path = f.path_of(&entry.meta)?;
+                let target = match item.window_effect() {
+                    Some(effect) => {
+                        if site || !self.may_open(ctx, item.screen) {
+                            return None;
+                        }
+                        NavTarget::Window(crate::render::attr(&effect.to_json(r)))
+                    }
+                    None => {
+                        let entry = f
+                            .screens()
+                            .iter()
+                            .find(|s| s.meta.name == item.screen)?;
+                        if !ctx.identity().can(&entry.meta.access) {
+                            return None;
+                        }
+                        let path = f.path_of(&entry.meta)?;
+                        NavTarget::Page {
+                            href: escape(&self.url(&locale::path(self, ctx, &path))),
+                            current: current == Some(item.screen),
+                        }
+                    }
+                };
                 let label = r.text(&item.label);
-                let current = current == Some(item.screen);
-                if current {
+                if matches!(target, NavTarget::Page { current: true, .. }) {
                     page = Some(label.clone());
                 }
-                let href = escape(&self.url(&locale::path(self, ctx, &path)));
                 let mut extra = String::new();
                 if let Some(badge) = &item.badge {
                     extra.push_str(&format!(
@@ -3330,9 +3374,8 @@ impl AppState {
                         escape(count.action.name)
                     ));
                 }
-                Some(nav_link(
-                    &href,
-                    current,
+                Some(nav_entry(
+                    &target,
                     item.icon.filter(|_| !site),
                     &label,
                     &extra,
@@ -3833,6 +3876,14 @@ fn rail_toggle(r: &Render, rail: bool) -> String {
     )
 }
 
+/// What a side menu entry does: go to a page, or open a window ([`crate::Menu::window`]).
+enum NavTarget {
+    /// A link to an escaped `href`, marked when it is the current page.
+    Page { href: String, current: bool },
+    /// A button that runs this `open_window` effect, escaped for an attribute.
+    Window(String),
+}
+
 /// A side menu link: `href` is escaped, and so is `label`.
 /// `extra` is HTML after the label (a badge or a count), already escaped.
 fn nav_link(
@@ -3842,18 +3893,53 @@ fn nav_link(
     label: &str,
     extra: &str,
 ) -> String {
-    let aria = if current {
-        r#" aria-current="page""#
-    } else {
-        ""
+    nav_entry(
+        &NavTarget::Page {
+            href: href.to_string(),
+            current,
+        },
+        icon,
+        label,
+        extra,
+    )
+}
+
+/// A side menu entry: an `<a>` for a page, or for a window a `<button>` that runs its effect
+/// through the runtime (`data-zeyn-effect`), named by `data-zeyn-menu-window` for the menu
+/// script and the palette. `label` is escaped; `extra` is HTML after it (a badge or a count),
+/// already escaped.
+fn nav_entry(
+    target: &NavTarget,
+    icon: Option<crate::screen::Icon>,
+    label: &str,
+    extra: &str,
+) -> String {
+    let (open, close) = match target {
+        NavTarget::Page { href, current } => (
+            format!(
+                r#"<a href="{href}"{}>"#,
+                if *current {
+                    r#" aria-current="page""#
+                } else {
+                    ""
+                }
+            ),
+            "</a>",
+        ),
+        NavTarget::Window(effect) => (
+            format!(
+                r#"<button type="button" class="z-nav-window" aria-haspopup="dialog" data-zeyn-menu-window data-zeyn-effect="{effect}">"#
+            ),
+            "</button>",
+        ),
     };
     match icon {
         Some(icon) => format!(
-            r#"<li><a href="{href}"{aria}>{}<span>{label}</span>{extra}</a></li>"#,
+            "<li>{open}{}<span>{label}</span>{extra}{close}</li>",
             icon.html()
         ),
-        None if extra.is_empty() => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
-        None => format!(r#"<li><a href="{href}"{aria}><span>{label}</span>{extra}</a></li>"#),
+        None if extra.is_empty() => format!("<li>{open}{label}{close}</li>"),
+        None => format!("<li>{open}<span>{label}</span>{extra}{close}</li>"),
     }
 }
 
@@ -3863,10 +3949,18 @@ fn menu_json(i18n: &I18n, g: &crate::feature::MenuGroup) -> Json {
         "label": i18n.text(i18n.default_locale(), &g.label),
         "icon": g.icon,
         "open": g.open,
-        "items": g.items.iter().map(|i| json!({
-            "label": i18n.text(i18n.default_locale(), &i.label),
-            "screen": i.screen,
-        })).collect::<Vec<_>>(),
+        "items": g.items.iter().map(|i| {
+            let mut item = json!({
+                "label": i18n.text(i18n.default_locale(), &i.label),
+                "screen": i.screen,
+                "kind": "page",
+            });
+            if let crate::feature::MenuTarget::Window { params } = &i.target {
+                item["kind"] = json!("window");
+                item["params"] = params.clone();
+            }
+            item
+        }).collect::<Vec<_>>(),
         "groups": g.groups.iter().map(|s| menu_json(i18n, s)).collect::<Vec<_>>(),
     })
 }

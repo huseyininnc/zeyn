@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+A menu item can also open a screen as a window instead of going to its page: `.window(t!("stock.about"), about, ())` does what `Window::open(about, ())` does, keeps the address and needs no route on the screen. It shows only to users who may open the screen. See [menu items that open a window](shell.md#menu-items-that-open-a-window).
+
 `App::home(screen)` makes `/` open a screen.
 
 ## Error pages

@@ -171,6 +171,8 @@ Feature::new("stock")
     .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 ```
 
+菜单项也可以把 screen 作为窗口打开，而不是跳转到它的页面：`.window(t!("stock.about"), about, ())` 的作用与 `Window::open(about, ())` 相同，保留地址，且 screen 不需要 route。只有能打开该 screen 的用户才能看到它。参见[打开窗口的菜单项](shell.md#menu-items-that-open-a-window)。
+
 `App::home(screen)` 使 `/` 打开一个 screen。
 
 ## 错误页面
