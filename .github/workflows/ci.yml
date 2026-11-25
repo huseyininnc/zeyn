@@ -51,7 +51,7 @@ jobs:
             echo "Target folder: ${target} MB"
           } >> "$GITHUB_STEP_SUMMARY"
           sh ci/check-build-budget.sh "$build" "$rebuild" "$target"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cargo-timings
@@ -139,7 +139,7 @@ jobs:
       - run: npm test -- --shard=${{ matrix.shard }}/2
         working-directory: e2e
       - if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.shard }}
           path: e2e/playwright-report
